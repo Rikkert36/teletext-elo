@@ -156,6 +156,10 @@ const PlayerPage: React.FC = () => {
       fetchRank();
     }
     if (playerGamesIndexUpdated) fetchPlayerGames();
+
+    if (allPlayerGames == null) {
+      fetchAllPlayerGames();
+    }
   });
 
   const fetchPlayer = async () => {
@@ -600,13 +604,28 @@ const PlayerPage: React.FC = () => {
   const showRatingProgressChart = () => {
     if (allPlayerGames == null) {
       return <CircularProgress />;
-    } else
-
-    return <LineChart
-              series={[{ data: [null, null, 10, 11, 12] }]}
-              xAxis={[{ data: [0, 1, 2, 3, 4, 5, 6] }]}
-          /> 
-
+    } else {
+    const playerPerGame = allPlayerGames.map(game => {
+      let player;
+      if (game.firstTeam?.firstPlayer?.playerId == id!) player = game.firstTeam.firstPlayer;
+      if (game.firstTeam?.secondPlayer?.playerId == id!) player = game.firstTeam.secondPlayer;
+      if (game.secondTeam?.firstPlayer?.playerId == id!) player = game.secondTeam.firstPlayer;
+      if (game.secondTeam?.secondPlayer?.playerId == id!) player = game.secondTeam.secondPlayer;
+      return player;
+    });
+    const ratingPerGame = playerPerGame.map(player => player?.newRating!);
+    const dates = allPlayerGames.map(game => game.createdAt);
+    return (        
+          <Paper style={{ width: '100%' }}  className={classes.matchPaper}>
+            <LineChart
+              series={[{ data: ratingPerGame }]}
+              xAxis={[{ data: dates, min:1719000000000}]}
+              height={600}
+              yAxis={[{min: 1200}]}
+          />
+          </Paper>
+          ); 
+    }
   }
 
   console.log('PlayerPage - id:', id);
@@ -635,9 +654,7 @@ const PlayerPage: React.FC = () => {
             speler profiel
           </Paper>
           <Grid container spacing={2}>
-          <Grid item xs={12}>
-              {showRatingProgressChart()}
-            </Grid>
+
             <Grid item xs={6}>
               {showProfileOrloading()}
               {showStatsOrLoading()}
@@ -645,7 +662,9 @@ const PlayerPage: React.FC = () => {
             <Grid item xs={6}>
               {showPlayerGamesOrLoading()}
             </Grid>
-            
+            <Grid item xs={12}>
+              {showRatingProgressChart()}
+            </Grid>
           </Grid>
         </Grid>
       </Grid>
