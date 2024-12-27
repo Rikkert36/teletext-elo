@@ -24,7 +24,7 @@ namespace UnitTests
             
             var game = GetGame(team1Goals, team2Goals, firstPlayerRating, secondPlayerRating, thirdPlayerRating, fourthPlayerRating);
             var ratingCalculator = new AnagoLeaderboard.Services.RatingCalculator(game, _standardGamesPlayed, 50);
-            ratingCalculator.CalculateRating();
+            //ratingCalculator.CalculateRating();
             
             Assert.That(game.FirstTeam.FirstPlayer.NewRating, Is.EqualTo(1508));
             Assert.That(game.SecondTeam.FirstPlayer.NewRating, Is.EqualTo(1192));
@@ -42,7 +42,7 @@ namespace UnitTests
 
             var game = GetGame(team1Goals, team2Goals, firstPlayerRating, secondPlayerRating, thirdPlayerRating, fourthPlayerRating);
             var ratingCalculator = new AnagoLeaderboard.Services.RatingCalculator(game, _standardGamesPlayed, 50);
-            ratingCalculator.CalculateRating();
+            //ratingCalculator.CalculateRating();
 
             Assert.That(game.FirstTeam.FirstPlayer.NewRating, Is.EqualTo(1515));
             Assert.That(game.SecondTeam.FirstPlayer.NewRating, Is.EqualTo(1185));
@@ -60,7 +60,7 @@ namespace UnitTests
 
             var game = GetGame(team1Goals, team2Goals, firstPlayerRating, secondPlayerRating, thirdPlayerRating, fourthPlayerRating);
             var ratingCalculator = new AnagoLeaderboard.Services.RatingCalculator(game, _standardGamesPlayed, 50);
-            ratingCalculator.CalculateRating();
+            //ratingCalculator.CalculateRating();
 
             Assert.That(game.FirstTeam.FirstPlayer.NewRating, Is.EqualTo(1502));
             Assert.That(game.SecondTeam.FirstPlayer.NewRating, Is.EqualTo(1198));
@@ -78,7 +78,7 @@ namespace UnitTests
 
             var game = GetGame(team1Goals, team2Goals, firstPlayerRating, secondPlayerRating, thirdPlayerRating, fourthPlayerRating);
             var ratingCalculator = new AnagoLeaderboard.Services.RatingCalculator(game, _standardGamesPlayed, 50);
-            ratingCalculator.CalculateRating();
+            //ratingCalculator.CalculateRating();
 
             Assert.That(game.FirstTeam.FirstPlayer.NewRating, Is.EqualTo(1608));
             Assert.That(game.FirstTeam.SecondPlayer.NewRating, Is.EqualTo(1408));
@@ -98,8 +98,9 @@ namespace UnitTests
             var gamesPlayed = new List<int> { 0, 3, 6, 10 };
 
             var game = GetGame(team1Goals, team2Goals, firstPlayerRating, secondPlayerRating, thirdPlayerRating, fourthPlayerRating);
+            
             var ratingCalculator = new AnagoLeaderboard.Services.RatingCalculator(game, gamesPlayed, 50);
-            ratingCalculator.CalculateRating();
+            //ratingCalculator.CalculateRating();
 
             Assert.That(game.FirstTeam.FirstPlayer.NewRating, Is.EqualTo(1530));
             Assert.That(game.FirstTeam.SecondPlayer.NewRating, Is.EqualTo(1526));

@@ -24,11 +24,13 @@ namespace UnitTests
         public void Setup()
         {
             var dbOption = new DbContextOptionsBuilder<DatabaseContext>()
-                .UseSqlite("Data Source=C:\\tafelvoetbal\\tafelvoetbal-server\\data\\test\\testdata.db")
+                .UseInMemoryDatabase("some database")
                 .Options;
+
             var databaseContext = new DatabaseContext(dbOption);
-            _playerService = new PlayerService(databaseContext);
             _gameService = new GameService(databaseContext);
+            var leaderBoardService = new LeaderBoardService(_gameService, databaseContext);
+            _playerService = new PlayerService(databaseContext, leaderBoardService, _gameService);
 
         }
 
@@ -257,6 +259,8 @@ namespace UnitTests
             Assert.That(thirdPlayer.Rating, Is.LessThan(1000));
 
             await _gameService.DeleteGame(gameId);
+            firstPlayer = await _playerService.GetPlayer(randomPlayerIds[0]);
+            thirdPlayer = await _playerService.GetPlayer(randomPlayerIds[2]);
             Assert.That(firstPlayer.Rating, Is.EqualTo(1000));
             Assert.That(thirdPlayer.Rating, Is.EqualTo(1000));
 
@@ -264,13 +268,13 @@ namespace UnitTests
             Assert.That(attemptedDeletedGame, Is.Not.Null);
 
         }
-
-        [Test] 
-        public async Task IfAGameIsNotTheLatestForOnePerson_GameCannotBeDeleted()
+ 
+        [Test]
+        public async Task Game_score_can_be_updated()
         {
-            var (randomPlayerNames, randomPlayerIds) = await CreateNewPlayers(7);
+            var (randomPlayerNames, randomPlayerIds) = await CreateNewPlayers(4);
 
-            var gameForm = new GameForm()
+            var initialGame = new GameForm()
             {
                 FirstTeamForm = new TeamPerformanceForm()
                 {
@@ -286,7 +290,55 @@ namespace UnitTests
                 }
             };
 
-            var gameForm2 = new GameForm()
+            var gameId = await _gameService.CreateGame(initialGame);
+
+            var updatedGame = new GameForm()
+            {
+                FirstTeamForm = new TeamPerformanceForm()
+                {
+                    FirstPlayerId = randomPlayerIds[0],
+                    SecondPlayerId = randomPlayerIds[1],
+                    Goals = 10
+                },
+                SecondTeamForm = new TeamPerformanceForm()
+                {
+                    FirstPlayerId = randomPlayerIds[2],
+                    SecondPlayerId = randomPlayerIds[3],
+                    Goals = 3
+                }
+            };
+
+            _gameService.UpdateGame(gameId, updatedGame);
+
+            var game = await _gameService.GetGame(gameId);
+            Assert.NotNull(game);
+            Assert.That(game.SecondTeam.Goals, Is.EqualTo(3));
+        }
+
+        [Test]
+        public async Task Game_players_be_updated()
+        {
+            var (randomPlayerNames, randomPlayerIds) = await CreateNewPlayers(5);
+
+            var initialGame = new GameForm()
+            {
+                FirstTeamForm = new TeamPerformanceForm()
+                {
+                    FirstPlayerId = randomPlayerIds[0],
+                    SecondPlayerId = randomPlayerIds[1],
+                    Goals = 10
+                },
+                SecondTeamForm = new TeamPerformanceForm()
+                {
+                    FirstPlayerId = randomPlayerIds[2],
+                    SecondPlayerId = randomPlayerIds[3],
+                    Goals = 5
+                }
+            };
+
+            var gameId = await _gameService.CreateGame(initialGame);
+
+            var updatedGame = new GameForm()
             {
                 FirstTeamForm = new TeamPerformanceForm()
                 {
@@ -296,33 +348,18 @@ namespace UnitTests
                 },
                 SecondTeamForm = new TeamPerformanceForm()
                 {
-                    FirstPlayerId = randomPlayerIds[5],
-                    SecondPlayerId = randomPlayerIds[6],
-                    Goals = 5
+                    FirstPlayerId = randomPlayerIds[2],
+                    SecondPlayerId = randomPlayerIds[3],
+                    Goals = 3
                 }
             };
 
-            var game1Id = await _gameService.CreateGame(gameForm);
-            var game2Id = await _gameService.CreateGame(gameForm);
+            _gameService.UpdateGame(gameId, updatedGame);
 
-            var bothGamesPlayer = await _playerService.GetPlayer(randomPlayerIds[0]);
-            var firstGamePlayer = await _playerService.GetPlayer(randomPlayerIds[2]);
-            var secondGamePlayer = await _playerService.GetPlayer(randomPlayerIds[5]);
-
-            int bothGamesPlayerRating = bothGamesPlayer.Rating;
-            int firstGamePlayerRating = firstGamePlayer.Rating;
-            int secondGamePlayerRating = secondGamePlayer.Rating;
-
-            var attemptedDeletedGame = _gameService.GetGame(game1Id);
-            bool gameIndeedNotDeleted = attemptedDeletedGame != null;
-
-            Assert.ThrowsAsync<InvalidOperationException>(async() => await _gameService.DeleteGame(game1Id));
-            Assert.That(bothGamesPlayer.Rating, Is.EqualTo(bothGamesPlayerRating));
-            Assert.That(firstGamePlayer.Rating, Is.EqualTo(firstGamePlayerRating));
-            Assert.That(secondGamePlayer.Rating, Is.EqualTo(secondGamePlayerRating));
-
-            Assert.That(gameIndeedNotDeleted, Is.True);
-
+            var game = await _gameService.GetGame(gameId);
+            Assert.NotNull(game);
+            Assert.That(game.SecondTeam.Goals, Is.EqualTo(3));
+            Assert.That(game.FirstTeam.SecondPlayer.Name, Is.EqualTo(randomPlayerNames[4]));
         }
 
         private async Task<(List<string>, List<string>)> CreateNewPlayers(int n)

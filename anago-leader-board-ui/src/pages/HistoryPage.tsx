@@ -157,6 +157,11 @@ const useStyles = makeStyles((theme: Theme) =>
       fontSize: '1.2rem',
 
     },
+    inActivePlayerName: {
+      color: '#0000ff', // Bright blue
+      background: '#000', // Black
+      fontSize: '1.2rem',
+    },
     menuContainer: {
       display: 'flex',
       justifyContent: 'flex-end',
@@ -226,109 +231,34 @@ const useStyles = makeStyles((theme: Theme) =>
       "&:hover": {
         textDecoration: "underline #ffff00"
     }
+    },
+    inActiveLink: {
+      "&:hover": {
+        textDecoration: "underline #ff0000"
+    }
     }
   })
 );
-
-
-
-const LeaderboardPage: React.FC = () => {
+const HistoryPage: React.FC = () => {
   const classes = useStyles();
   const client = new Client(window.TAFELVOETBAL_SERVER_URL);
   const [players, setPlayers] = useState<RankedPlayer[]>();
-  const [isSearchOpen, setIsSearchOpen] = useState(false); 
-  const [isSaving, setIsSaving] = useState(false);
-  const [isModalOpen, setModalOpen] = useState(false);
   const [playersLoading, setPlayersLoading] = useState(true);
-  const [playerForm, setPlayerForm] = useState({
-    name: '',
-    avatar: null as Blob | null,
-  });
   useEffect(() => {
     if (players == null) refreshPlayers();
   });
 
   const refreshPlayers = async () => {
     setPlayersLoading(true);
-    const players : DynamicRatingPlayer[] = await client.getDynamicLeaderBoard();
+    const players : DynamicRatingPlayer[] = await client.getDynamicLeaderBoardByYear(2024);
     const rankedPlayers : RankedPlayer[] = addRankToPlayers(players);
 
     setPlayers(rankedPlayers);
     setPlayersLoading(false);
   }
 
-  const handleSearchToggle = () => {
-    setIsSearchOpen(!isSearchOpen);
-  };
-
-  const handleOpenModal = () => {
-    setModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setModalOpen(false);
-  };
-
-  const handleSavePlayer = async () => {
-    setIsSaving(true);
-    try {
-    let image = undefined;
-    if (playerForm.avatar !== null) {
-      const fileParameter = {fileName: "Avatar", data: playerForm.avatar} as FileParameter;
-      const formData = new FormData();
-      formData.append('file', playerForm.avatar)
-      image = fileParameter
-    }
-    await client.createPlayer(playerForm.name, image);
-
-  } catch (exception) {
-    console.log(exception);
-  } finally {
-    setPlayerForm({
-      name: '',
-      avatar: null,
-    });
-    setModalOpen(false);
-    setIsSaving(false);
-    refreshPlayers();
-  }
-  };
-
-  const handleAvatarChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      const avatar = files[0];
-      setPlayerForm({ ...playerForm, avatar });
-    }
-  };
-
-  const getDateInRightFormat = () => {
-    var d = new Date(),
-      month = '' + (d.getMonth() + 1),
-      day = '' + d.getDate();
-    
-      if (month.length < 2) 
-      month = '0' + month;
-      if (day.length < 2) 
-      day = '0' + day;
-
-    return [day, month].join('/');
-  };
-
   const getAvatarLink = (playerId: string) => {
     return `${window.TAFELVOETBAL_SERVER_URL}/api/player/${playerId}/avatar`
-  }
-
-  const showSaveButtonOrLoading = () => {
-    if (!isSaving) {
-      return (
-        <Button onClick={handleSavePlayer} className={classes.addPlayerSave} >
-            opslaan
-          </Button>
-      );
-    } else {
-      return <CircularProgress />
-    }
   }
 
   const showPlayersOrLoading = () => {
@@ -346,15 +276,15 @@ const LeaderboardPage: React.FC = () => {
       return players!.map((player, index) => (
         <TableRow key={player.player.id} className={classes.tableRow}>
           <TableCell style={{width:'0.5rem'}}className={classes.tableCell + ' ' + classes.otherRowValue}>{player.rank + '.'}</TableCell>
-          <TableCell className={classes.tableCell + ' ' + (player.rank == 1 ? classes.firstPlayerName : classes.playerName)}>
+          <TableCell className={classes.tableCell + ' ' + (GetPlayerClass(player))}>
             <Grid container display={'-ms-flexbox'} alignItems="center">
               <Grid item xs={2}>
                 <Avatar alt='?' src={getAvatarLink(player.player.id!)} className={classes.avatar} />
               </Grid> 
               <Grid item xs={10} style={{ overflow: 'hidden', display: 'flex' }}>
                 <Link style={{ textDecoration: 'none' }}  
-                  className={classes.link + ' ' + (player.rank == 1 ? classes.firstPlayerName : classes.playerName)} 
-                  to={`speler/${player.player.id}`}>
+                  className={classes.link + ' ' + (GetPlayerClass(player))} 
+                  to={`../speler/${player.player.id}`}>
                   <Typography className={classes.playernameTypography} gutterBottom noWrap style={{ width: '100%' }}>
                     {player.player.name}
                   </Typography>
@@ -370,6 +300,18 @@ const LeaderboardPage: React.FC = () => {
         </TableRow>
       ));
     }
+
+    function GetPlayerClass(player: RankedPlayer) {
+      if (player.rank == 1) return classes.firstPlayerName;
+      if (!player.player.active) return classes.inActivePlayerName;
+      return classes.playerName;
+    }
+
+    function GetLinkClass(player: RankedPlayer) {
+      if (!player.player.active) return classes.inActiveLink;
+      return classes.link;
+    }
+    
   };
 
   return (
@@ -381,7 +323,7 @@ const LeaderboardPage: React.FC = () => {
         </Grid>
         <Grid item xs={8} >
           <Paper className={classes.banner}>
-            tafelvoetbal,stand per {getDateInRightFormat()}
+            eindstand 2024
           </Paper>
         </Grid> 
         <Grid item xs={2}>
@@ -389,16 +331,7 @@ const LeaderboardPage: React.FC = () => {
         </Grid>
         <Grid item xs={2} className={classes.menuContainer}>
           <div className={classes.menuContainer}>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleOpenModal}
-              className={classes.addButton}
-            >
-              <Typography variant="h6" className={classes.buttonText}>
-                speler toevoegen
-              </Typography>
-            </Button>
+            
           </div>
         </Grid>
         <Grid item xs={8}>
@@ -413,55 +346,10 @@ const LeaderboardPage: React.FC = () => {
         <Grid item xs={2}>
 
         </Grid>
-      </Grid>      
-
-      <Modal
-        open={isModalOpen}
-        onClose={handleCloseModal}
-        className={classes.modal}
-      >
-        <div className={classes.modalPaper}>
-          <Typography variant="h6" gutterBottom className={classes.modalBanner}>
-            speler toevoegen
-          </Typography>
-          <Grid container spacing={2} display={'-ms-flexbox'} alignItems="center">
-            <Grid item xs={2} style={{ overflow: 'hidden', display: 'flex' }}>
-              <Avatar alt={playerForm.name} src={playerForm.avatar ? URL.createObjectURL(playerForm.avatar) : ""} className={classes.avatar} />
-            </Grid>
-            <Grid item xs={10}>
-              <TextField
-                label="naam"
-                variant="outlined"
-                fullWidth
-                value={playerForm.name}
-                onChange={(e) => setPlayerForm({ ...playerForm, name: e.target.value })}
-              />
-            </Grid>            
-          </Grid>   
-             
-          <input
-            accept="image/*"
-            id="avatar-upload"
-            type="file"
-            onChange={handleAvatarChange}
-            style={{ display: 'none' }}
-          />
-          <label htmlFor="avatar-upload">
-            <Button
-              component="span"
-              className={classes.uploadButton}
-            >
-              foto toevoegen
-            </Button>
-          </label>
-          {showSaveButtonOrLoading()}
-          <Button onClick={handleCloseModal} className={classes.addPlayerBack}>
-            terug
-          </Button>
-        </div>
-      </Modal>
+      </Grid>   
     </div>
   );
 };
 
-export default LeaderboardPage;
+export default HistoryPage;
+

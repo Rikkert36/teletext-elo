@@ -6,15 +6,16 @@ namespace AnagoLeaderboard.Models.Results
     public class Player
     {
         public string Id { get; private set; }
-        public string Name { get; private set; }
+        public string Name { get; set; }
         public int Rating { get; set; }
-        public int NumberOfGames { get; private set; }
-        public int NumberOfWins { get; private set; }
-        public int NumberOfLosses { get; private set; }
-        public int GoalsFor { get; private set; }
-        public int GoalsAgainst { get; private set; }
+        public int NumberOfGames { get; protected set; }
+        public int NumberOfWins { get; protected set; }
+        public int NumberOfLosses { get; protected set; }
+        public int GoalsFor { get; protected set; }
+        public int GoalsAgainst { get; protected set; }
         public DateTime CreatedAt { get; private set; }
         public DateTime UpdatedAt { get; private set; }
+        public bool Active { get; set; }
 
         public static Player CreatePlayer(PlayerForm playerData)
         {
@@ -30,39 +31,28 @@ namespace AnagoLeaderboard.Models.Results
                 GoalsFor = 0,
                 GoalsAgainst = 0,
                 CreatedAt = now,
-                UpdatedAt = now
+                UpdatedAt = now,
+                Active = true
             };
         }
 
-        public void AddGame(bool won, int goalsFor, int goalsAgainst)
+        public Player()
         {
-            NumberOfGames++;
-            if (won)
-            {
-                NumberOfWins++;
-            } else
-            {
-                NumberOfLosses++;
-            }
-            GoalsFor += goalsFor;
-            GoalsAgainst += goalsAgainst;
-            UpdatedAt = DateTime.Now;
         }
 
-        public void RevertGame(bool won, int goalsFor, int goalsAgainst)
+        public Player(Player copyPlayer)
         {
-            NumberOfGames--;
-            if (won)
-            {
-                NumberOfWins--;
-            } else
-            {
-                NumberOfLosses--;
-            }
-            GoalsFor -= goalsFor;
-            GoalsAgainst -= goalsAgainst;
-            UpdatedAt = DateTime.Now;
-            
+            Id = copyPlayer.Id;
+            Name = copyPlayer.Name;
+            Rating = copyPlayer.Rating;
+            NumberOfGames = copyPlayer.NumberOfGames;
+            NumberOfWins = copyPlayer.NumberOfWins;
+            NumberOfLosses = copyPlayer.NumberOfLosses;
+            GoalsFor = copyPlayer.GoalsFor;
+            GoalsAgainst = copyPlayer.GoalsAgainst;
+            CreatedAt = copyPlayer.CreatedAt;
+            UpdatedAt = copyPlayer.UpdatedAt;
+            Active = copyPlayer.Active;
         }
     }
 }

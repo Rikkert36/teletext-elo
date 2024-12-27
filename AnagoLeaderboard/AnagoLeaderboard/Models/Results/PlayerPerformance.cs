@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Transactions;
 
 namespace AnagoLeaderboard.Models.Results
 {
@@ -10,12 +11,24 @@ namespace AnagoLeaderboard.Models.Results
         public int OldRating { get; set; }
         public int NewRating { get; set; }
 
+        [NotMapped]
+        public double? StdBefore { get; private set; }
+
+        [NotMapped]
+        public double? StdAfter { get; private set; }
+
         public static PlayerPerformance Create(string playerId)
         {
             return new PlayerPerformance()
             {
                 PlayerId = playerId,
             };
+        }
+
+        internal void SetStandardDeviation(double stdBefore, double stdAfter)
+        {
+            StdBefore = stdBefore;
+            StdAfter = stdAfter;
         }
     }
 }

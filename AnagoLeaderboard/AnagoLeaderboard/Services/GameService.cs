@@ -16,10 +16,6 @@ namespace AnagoLeaderboard.Services
         public async Task<string> CreateGame(GameForm gameForm)
         {
             var game = Game.Create(gameForm);
-            await _dbContext.AddOldRatings(game);
-            List<int> numberOfGamesPlayed = await _dbContext.GetNumberOfGamesPlayedByPlayers(game);
-            var ratingCalculator = new RatingCalculator(game, numberOfGamesPlayed);
-            ratingCalculator.CalculateRating();
             await _dbContext.AddGame(game);
             return game.Id;
 
@@ -30,57 +26,13 @@ namespace AnagoLeaderboard.Services
             var game = await _dbContext.Games.FindAsync(gameId);
             if (game != null)
             {
-                await CheckCanBeDeleted(game);
                 _dbContext.Attach(game);
                 _dbContext.Remove(game);
-                await RevertGameChanges(game);
                 _dbContext.SaveChanges();
             } else
             {
                 throw new KeyNotFoundException("Game was not found.");
             };
-        }
-
-        private async Task CheckCanBeDeleted(Game game)
-        {
-            var playerPerformances = game.GetPlayerPerformances();
-            foreach (var playerPerformance in playerPerformances)
-            {
-                var player = await _dbContext.Players.FindAsync(playerPerformance.PlayerId);
-                if (player != null)
-                {
-                    bool notLatestGame = player.Rating != playerPerformance.NewRating;
-                    if (notLatestGame) throw new InvalidOperationException();
-                }
-            }
-        }
-
-        private async Task RevertGameChanges(Game game)
-        {
-            var winningTeam = game.FirstTeam.Goals > game.SecondTeam.Goals ? game.FirstTeam : game.SecondTeam;
-            var losingTeam = game.FirstTeam.Goals > game.SecondTeam.Goals ? game.SecondTeam : game.FirstTeam;
-            foreach (var playerPerformance in game.GetPlayerPerformances())
-            {
-                var player = await _dbContext.Players.FindAsync(playerPerformance.PlayerId);
-                if (player != null)
-                {
-                    player.Rating = playerPerformance.OldRating;
-                    bool won = winningTeam.FirstPlayer.PlayerId == player.Id || winningTeam.SecondPlayer.PlayerId == player.Id;
-                    int goalsFor;
-                    int goalsAgainst;
-                    if (won)
-                    {
-                        goalsFor = winningTeam.Goals;
-                        goalsAgainst = losingTeam.Goals;
-                    } else
-                    {
-                        goalsFor = losingTeam.Goals;
-                        goalsAgainst = winningTeam.Goals;
-                    }
-                    player.RevertGame(won, goalsFor, goalsAgainst);
-
-                }
-            }
         }
 
         public async Task DeleteGames()
@@ -133,6 +85,52 @@ namespace AnagoLeaderboard.Services
                     playerPerformance.Name = "Player not found";
                 }
             });
+        }
+
+        internal async Task<DateTime> GetOldestDate()
+        {
+            return await _dbContext.GetOldestDate();
+        }
+
+        internal async Task<GamesInRange> GetGamesInRange(DateTime start, DateTime end)
+        {
+            var result = await _dbContext.GetGamesInRange(start, end);
+            foreach (Game game in result.Games)
+            {
+                AddPlayerNames(game);
+            }
+            return result;
+        }
+
+        public async Task UpdateGame(string gameId, GameForm updatedGame)
+        {
+
+            var game = await _dbContext.Games.FindAsync(gameId);
+            if (game != null)
+            {
+                _dbContext.Attach(game);
+                game.FirstTeam.FirstPlayer.PlayerId = updatedGame.FirstTeamForm.FirstPlayerId;
+                game.FirstTeam.SecondPlayer.PlayerId = updatedGame.FirstTeamForm.SecondPlayerId;
+                game.SecondTeam.FirstPlayer.PlayerId = updatedGame.SecondTeamForm.FirstPlayerId;
+                game.SecondTeam.SecondPlayer.PlayerId = updatedGame.SecondTeamForm.SecondPlayerId;
+                game.FirstTeam.Goals = updatedGame.FirstTeamForm.Goals;
+                game.SecondTeam.Goals = updatedGame.SecondTeamForm.Goals;
+                _dbContext.SaveChanges();
+            } else
+            {
+                throw new KeyNotFoundException("Game was not found.");
+            };
+
+        }
+
+        public async Task<List<Game>> GetGamesUntilYear(int year)
+        {
+            var result = await _dbContext.Games.Where(game => game.CreatedAt.Year <= year).ToListAsync();
+            foreach (Game game in result)
+            {
+                AddPlayerNames(game);
+            }
+            return result;
         }
     }
 }

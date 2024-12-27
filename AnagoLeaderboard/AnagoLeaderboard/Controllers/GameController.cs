@@ -12,12 +12,12 @@ namespace AnagoLeaderboard.Controllers
     {
 
         private readonly GameService _gameService;
-        LogComponent.LogClass _logClient;
+        private readonly LeaderBoardService _leaderBoardService;
 
-        public GameController(DatabaseContext databaseContext)
+        public GameController(GameService gameService, LeaderBoardService leaderBoardService)
         {
-            _gameService = new GameService(databaseContext);
-            _logClient = new LogComponent.LogClass(Anago.Config.clsAnagoConfig.GetConfig().LogServiceURI, "TafelvoetbalServer");
+            _gameService = gameService;
+            _leaderBoardService = leaderBoardService;
         }
 
         [HttpPost("game")]
@@ -31,10 +31,23 @@ namespace AnagoLeaderboard.Controllers
             {
                 string message = ex.Message;
                 if (ex.InnerException != null) message += " " + ex.InnerException.Message;
-                Log("CreateGame", message);
                 throw ex;
             }
+        }
 
+        [HttpPut("game/{id}")]
+        public async Task<ActionResult> UpdateGame(string id, [FromBody] GameForm gameForm)
+        {
+            try
+            {
+                await _gameService.UpdateGame(id, gameForm);
+                return Ok();
+            } catch (Exception ex)
+            {
+                string message = ex.Message;
+                if (ex.InnerException != null) message += " " + ex.InnerException.Message;
+                throw ex;
+            }
         }
 
         [HttpGet("game/{id}")]
@@ -46,7 +59,24 @@ namespace AnagoLeaderboard.Controllers
         [HttpGet("games")]
         public async Task<List<Game>> GetGames()
         {
-            return await _gameService.GetGames();
+            return (await _leaderBoardService.GetLeaderBoard()).Item2;
+        }
+
+        [HttpGet("games/{start}/{end}")]
+        public async Task<GamesInRange> GetGamesInRange(DateTime start, DateTime end)
+        {
+            try
+            {
+                return await _leaderBoardService.GetGamesInRange(start, end);
+            } catch(Exception ex)
+            {
+                string message = ex.Message;
+                if (ex.InnerException != null)
+                {
+                    message += ex.InnerException.Message;
+                }
+                throw ex;
+            }
         }
 
         [HttpDelete("game/{id}")]
@@ -56,15 +86,11 @@ namespace AnagoLeaderboard.Controllers
         }
 
         [HttpDelete("games")]
-        public async Task<ActionResult> DeleteGames()
+        public async Task<ActionResult> DeleteGames(string password)
         {
+            if (!password.Equals("deletegame" + DateTime.Now.Date.DayOfWeek + DateTime.Now.Date.Hour)) throw new Exception("Enter the password");
             await _gameService.DeleteGames();
             return Ok();
-        }
-
-        private void Log(string function, string message)
-        {
-            _logClient.Log("", "", "", function, message, DateTime.Now, 0);
         }
     }
 }

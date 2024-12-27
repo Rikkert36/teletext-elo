@@ -57,6 +57,47 @@ export class Client {
     }
 
     /**
+     * @param body (optional) 
+     * @return Success
+     */
+    updateGame(id: string, body: GameForm | undefined): Promise<void> {
+        let url_ = this.baseUrl + "/api/game/{id}";
+        if (id === undefined || id === null)
+            throw new Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(body);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PUT",
+            headers: {
+                "Content-Type": "application/json",
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpdateGame(_response);
+        });
+    }
+
+    protected processUpdateGame(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
      * @return Success
      */
     getGame(id: string): Promise<Game> {
@@ -94,6 +135,42 @@ export class Client {
             });
         }
         return Promise.resolve<Game>(null as any);
+    }
+
+    /**
+     * @return Success
+     */
+    deleteGame(id: string): Promise<void> {
+        let url_ = this.baseUrl + "/api/game/{id}";
+        if (id === undefined || id === null)
+            throw new Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDeleteGame(_response);
+        });
+    }
+
+    protected processDeleteGame(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
     }
 
     /**
@@ -141,10 +218,15 @@ export class Client {
     }
 
     /**
+     * @param password (optional) 
      * @return Success
      */
-    deleteGames(): Promise<void> {
-        let url_ = this.baseUrl + "/api/games";
+    deleteGames(password: string | undefined): Promise<void> {
+        let url_ = this.baseUrl + "/api/games?";
+        if (password === null)
+            throw new Error("The parameter 'password' cannot be null.");
+        else if (password !== undefined)
+            url_ += "password=" + encodeURIComponent("" + password) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -174,6 +256,140 @@ export class Client {
     }
 
     /**
+     * @return Success
+     */
+    getGamesInRange(start: Date, end: Date): Promise<GamesInRange> {
+        let url_ = this.baseUrl + "/api/games/{start}/{end}";
+        if (start === undefined || start === null)
+            throw new Error("The parameter 'start' must be defined.");
+        url_ = url_.replace("{start}", encodeURIComponent(start ? "" + start.toISOString() : "null"));
+        if (end === undefined || end === null)
+            throw new Error("The parameter 'end' must be defined.");
+        url_ = url_.replace("{end}", encodeURIComponent(end ? "" + end.toISOString() : "null"));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "text/plain"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetGamesInRange(_response);
+        });
+    }
+
+    protected processGetGamesInRange(response: Response): Promise<GamesInRange> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = GamesInRange.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<GamesInRange>(null as any);
+    }
+
+    /**
+     * @return Success
+     */
+    getDynamicLeaderBoard(): Promise<DynamicRatingPlayer[]> {
+        let url_ = this.baseUrl + "/api/leaderboard";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "text/plain"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetDynamicLeaderBoard(_response);
+        });
+    }
+
+    protected processGetDynamicLeaderBoard(response: Response): Promise<DynamicRatingPlayer[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(DynamicRatingPlayer.fromJS(item));
+            }
+            else {
+                result200 = <any>null;
+            }
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<DynamicRatingPlayer[]>(null as any);
+    }
+
+    /**
+     * @return Success
+     */
+    getDynamicLeaderBoardByYear(year: number): Promise<DynamicRatingPlayer[]> {
+        let url_ = this.baseUrl + "/api/leaderboard/years/{year}";
+        if (year === undefined || year === null)
+            throw new Error("The parameter 'year' must be defined.");
+        url_ = url_.replace("{year}", encodeURIComponent("" + year));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "text/plain"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetDynamicLeaderBoardByYear(_response);
+        });
+    }
+
+    protected processGetDynamicLeaderBoardByYear(response: Response): Promise<DynamicRatingPlayer[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(DynamicRatingPlayer.fromJS(item));
+            }
+            else {
+                result200 = <any>null;
+            }
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<DynamicRatingPlayer[]>(null as any);
+    }
+
+    /**
      * @param name (optional) 
      * @param avatar (optional) 
      * @return Success
@@ -188,7 +404,8 @@ export class Client {
         else
             content_.append("Name", name.toString());
         if (avatar === null || avatar === undefined)
-            ''
+            var x = 32;
+            //throw new Error("The parameter 'avatar' cannot be null.");
         else
             content_.append("Avatar", avatar.data, avatar.fileName ? avatar.fileName : "Avatar");
 
@@ -220,53 +437,50 @@ export class Client {
     }
 
     /**
+     * @param body (optional) 
      * @return Success
      */
-    getPlayers(): Promise<Player[]> {
-        let url_ = this.baseUrl + "/api/players";
+    updatePlayerName(id: string, body: string | undefined): Promise<void> {
+        let url_ = this.baseUrl + "/api/player/{id}";
+        if (id === undefined || id === null)
+            throw new Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
         url_ = url_.replace(/[?&]$/, "");
 
+        const content_ = JSON.stringify(body);
+
         let options_: RequestInit = {
-            method: "GET",
+            body: content_,
+            method: "PATCH",
             headers: {
-                "Accept": "text/plain"
+                "Content-Type": "application/json",
             }
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processGetPlayers(_response);
+            return this.processUpdatePlayerName(_response);
         });
     }
 
-    protected processGetPlayers(response: Response): Promise<Player[]> {
+    protected processUpdatePlayerName(response: Response): Promise<void> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
-            let result200: any = null;
-            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
-            if (Array.isArray(resultData200)) {
-                result200 = [] as any;
-                for (let item of resultData200)
-                    result200!.push(Player.fromJS(item));
-            }
-            else {
-                result200 = <any>null;
-            }
-            return result200;
+            return;
             });
         } else if (status !== 200 && status !== 204) {
             return response.text().then((_responseText) => {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Player[]>(null as any);
+        return Promise.resolve<void>(null as any);
     }
 
     /**
      * @return Success
      */
-    getPlayer(id: string): Promise<Player> {
+    getPlayer(id: string): Promise<DynamicRatingPlayer> {
         let url_ = this.baseUrl + "/api/player/{id}";
         if (id === undefined || id === null)
             throw new Error("The parameter 'id' must be defined.");
@@ -285,14 +499,14 @@ export class Client {
         });
     }
 
-    protected processGetPlayer(response: Response): Promise<Player> {
+    protected processGetPlayer(response: Response): Promise<DynamicRatingPlayer> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
             let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
-            result200 = Player.fromJS(resultData200);
+            result200 = DynamicRatingPlayer.fromJS(resultData200);
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -300,7 +514,174 @@ export class Client {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Player>(null as any);
+        return Promise.resolve<DynamicRatingPlayer>(null as any);
+    }
+
+    /**
+     * @return Success
+     */
+    deletePlayer(id: string): Promise<void> {
+        let url_ = this.baseUrl + "/api/player/{id}";
+        if (id === undefined || id === null)
+            throw new Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDeletePlayer(_response);
+        });
+    }
+
+    protected processDeletePlayer(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * @param activeOnly (optional) 
+     * @return Success
+     */
+    getPlayers(activeOnly: boolean | undefined): Promise<DynamicRatingPlayer[]> {
+        let url_ = this.baseUrl + "/api/players?";
+        if (activeOnly === null)
+            throw new Error("The parameter 'activeOnly' cannot be null.");
+        else if (activeOnly !== undefined)
+            url_ += "activeOnly=" + encodeURIComponent("" + activeOnly) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "text/plain"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetPlayers(_response);
+        });
+    }
+
+    protected processGetPlayers(response: Response): Promise<DynamicRatingPlayer[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(DynamicRatingPlayer.fromJS(item));
+            }
+            else {
+                result200 = <any>null;
+            }
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<DynamicRatingPlayer[]>(null as any);
+    }
+
+    /**
+     * @param password (optional) 
+     * @return Success
+     */
+    deletePlayers(password: string | undefined): Promise<void> {
+        let url_ = this.baseUrl + "/api/players?";
+        if (password === null)
+            throw new Error("The parameter 'password' cannot be null.");
+        else if (password !== undefined)
+            url_ += "password=" + encodeURIComponent("" + password) + "&";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "DELETE",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processDeletePlayers(_response);
+        });
+    }
+
+    protected processDeletePlayers(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * @param avatar (optional) 
+     * @return Success
+     */
+    updateAvatar(id: string, avatar: FileParameter | undefined): Promise<void> {
+        let url_ = this.baseUrl + "/api/player/{id}/avatar";
+        if (id === undefined || id === null)
+            throw new Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = new FormData();
+        if (avatar === null || avatar === undefined)
+            throw new Error("The parameter 'avatar' cannot be null.");
+        else
+            content_.append("Avatar", avatar.data, avatar.fileName ? avatar.fileName : "Avatar");
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "PATCH",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpdateAvatar(_response);
+        });
+    }
+
+    protected processUpdateAvatar(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
     }
 
     /**
@@ -338,6 +719,329 @@ export class Client {
         }
         return Promise.resolve<void>(null as any);
     }
+
+    /**
+     * @return Success
+     */
+    getPlayerGamesPage(id: string, pageNumber: number): Promise<PlayerGamePage> {
+        let url_ = this.baseUrl + "/api/player/{id}/games/page/{pageNumber}";
+        if (id === undefined || id === null)
+            throw new Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (pageNumber === undefined || pageNumber === null)
+            throw new Error("The parameter 'pageNumber' must be defined.");
+        url_ = url_.replace("{pageNumber}", encodeURIComponent("" + pageNumber));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "text/plain"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetPlayerGamesPage(_response);
+        });
+    }
+
+    protected processGetPlayerGamesPage(response: Response): Promise<PlayerGamePage> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = PlayerGamePage.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PlayerGamePage>(null as any);
+    }
+
+    /**
+     * @return Success
+     */
+    getPlayerGames(id: string): Promise<Game[]> {
+        let url_ = this.baseUrl + "/api/player/{id}/games";
+        if (id === undefined || id === null)
+            throw new Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "text/plain"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetPlayerGames(_response);
+        });
+    }
+
+    protected processGetPlayerGames(response: Response): Promise<Game[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(Game.fromJS(item));
+            }
+            else {
+                result200 = <any>null;
+            }
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<Game[]>(null as any);
+    }
+
+    /**
+     * @return Success
+     */
+    getPlayerOneAvatar(): Promise<void> {
+        let url_ = this.baseUrl + "/api/player/one/avatar";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetPlayerOneAvatar(_response);
+        });
+    }
+
+    protected processGetPlayerOneAvatar(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+
+    /**
+     * @return Success
+     */
+    getPlayerRank(id: string): Promise<number> {
+        let url_ = this.baseUrl + "/api/player/{id}/rank";
+        if (id === undefined || id === null)
+            throw new Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "text/plain"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetPlayerRank(_response);
+        });
+    }
+
+    protected processGetPlayerRank(response: Response): Promise<number> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+                result200 = resultData200 !== undefined ? resultData200 : <any>null;
+    
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<number>(null as any);
+    }
+
+    /**
+     * @return Success
+     */
+    getPlayerStats(id: string): Promise<PlayerStatistics> {
+        let url_ = this.baseUrl + "/api/player/{id}/stats";
+        if (id === undefined || id === null)
+            throw new Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "text/plain"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetPlayerStats(_response);
+        });
+    }
+
+    protected processGetPlayerStats(response: Response): Promise<PlayerStatistics> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            result200 = PlayerStatistics.fromJS(resultData200);
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PlayerStatistics>(null as any);
+    }
+
+    /**
+     * @return Success
+     */
+    updatePlayerActive(id: string, active: boolean): Promise<void> {
+        let url_ = this.baseUrl + "/api/player/{id}/active/{active}";
+        if (id === undefined || id === null)
+            throw new Error("The parameter 'id' must be defined.");
+        url_ = url_.replace("{id}", encodeURIComponent("" + id));
+        if (active === undefined || active === null)
+            throw new Error("The parameter 'active' must be defined.");
+        url_ = url_.replace("{active}", encodeURIComponent("" + active));
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "PATCH",
+            headers: {
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processUpdatePlayerActive(_response);
+        });
+    }
+
+    protected processUpdatePlayerActive(response: Response): Promise<void> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            return;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<void>(null as any);
+    }
+}
+
+export class DynamicRatingPlayer implements IDynamicRatingPlayer {
+    readonly id?: string | undefined;
+    name?: string | undefined;
+    rating?: number;
+    readonly numberOfGames?: number;
+    readonly numberOfWins?: number;
+    readonly numberOfLosses?: number;
+    readonly goalsFor?: number;
+    readonly goalsAgainst?: number;
+    readonly createdAt?: Date;
+    readonly updatedAt?: Date;
+    active?: boolean;
+    readonly visibleRating?: number;
+
+    constructor(data?: IDynamicRatingPlayer) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (<any>this)[property] = (<any>data)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            (<any>this).id = _data["id"];
+            this.name = _data["name"];
+            this.rating = _data["rating"];
+            (<any>this).numberOfGames = _data["numberOfGames"];
+            (<any>this).numberOfWins = _data["numberOfWins"];
+            (<any>this).numberOfLosses = _data["numberOfLosses"];
+            (<any>this).goalsFor = _data["goalsFor"];
+            (<any>this).goalsAgainst = _data["goalsAgainst"];
+            (<any>this).createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : <any>undefined;
+            (<any>this).updatedAt = _data["updatedAt"] ? new Date(_data["updatedAt"].toString()) : <any>undefined;
+            this.active = _data["active"];
+            (<any>this).visibleRating = _data["visibleRating"];
+        }
+    }
+
+    static fromJS(data: any): DynamicRatingPlayer {
+        data = typeof data === 'object' ? data : {};
+        let result = new DynamicRatingPlayer();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["id"] = this.id;
+        data["name"] = this.name;
+        data["rating"] = this.rating;
+        data["numberOfGames"] = this.numberOfGames;
+        data["numberOfWins"] = this.numberOfWins;
+        data["numberOfLosses"] = this.numberOfLosses;
+        data["goalsFor"] = this.goalsFor;
+        data["goalsAgainst"] = this.goalsAgainst;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : <any>undefined;
+        data["updatedAt"] = this.updatedAt ? this.updatedAt.toISOString() : <any>undefined;
+        data["active"] = this.active;
+        data["visibleRating"] = this.visibleRating;
+        return data;
+    }
+}
+
+export interface IDynamicRatingPlayer {
+    id?: string | undefined;
+    name?: string | undefined;
+    rating?: number;
+    numberOfGames?: number;
+    numberOfWins?: number;
+    numberOfLosses?: number;
+    goalsFor?: number;
+    goalsAgainst?: number;
+    createdAt?: Date;
+    updatedAt?: Date;
+    active?: boolean;
+    visibleRating?: number;
 }
 
 export class Game implements IGame {
@@ -428,18 +1132,11 @@ export interface IGameForm {
     secondTeamForm?: TeamPerformanceForm;
 }
 
-export class Player implements IPlayer {
-    readonly id?: string | undefined;
-    readonly name?: string | undefined;
-    readonly rating?: number;
-    readonly numberOfGames?: number;
-    readonly numberOfWins?: number;
-    readonly numberOfLosses?: number;
-    readonly goalsFor?: number;
-    readonly goalsAgainst?: number;
-    readonly createdAt?: Date;
+export class GamesInRange implements IGamesInRange {
+    games?: Game[] | undefined;
+    gamesBefore?: boolean;
 
-    constructor(data?: IPlayer) {
+    constructor(data?: IGamesInRange) {
         if (data) {
             for (var property in data) {
                 if (data.hasOwnProperty(property))
@@ -450,50 +1147,129 @@ export class Player implements IPlayer {
 
     init(_data?: any) {
         if (_data) {
-            (<any>this).id = _data["id"];
-            (<any>this).name = _data["name"];
-            (<any>this).rating = _data["rating"];
-            (<any>this).numberOfGames = _data["numberOfGames"];
-            (<any>this).numberOfWins = _data["numberOfWins"];
-            (<any>this).numberOfLosses = _data["numberOfLosses"];
-            (<any>this).goalsFor = _data["goalsFor"];
-            (<any>this).goalsAgainst = _data["goalsAgainst"];
-            (<any>this).createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : <any>undefined;
+            if (Array.isArray(_data["games"])) {
+                this.games = [] as any;
+                for (let item of _data["games"])
+                    this.games!.push(Game.fromJS(item));
+            }
+            this.gamesBefore = _data["gamesBefore"];
         }
     }
 
-    static fromJS(data: any): Player {
+    static fromJS(data: any): GamesInRange {
         data = typeof data === 'object' ? data : {};
-        let result = new Player();
+        let result = new GamesInRange();
         result.init(data);
         return result;
     }
 
     toJSON(data?: any) {
         data = typeof data === 'object' ? data : {};
-        data["id"] = this.id;
-        data["name"] = this.name;
-        data["rating"] = this.rating;
-        data["numberOfGames"] = this.numberOfGames;
-        data["numberOfWins"] = this.numberOfWins;
-        data["numberOfLosses"] = this.numberOfLosses;
-        data["goalsFor"] = this.goalsFor;
-        data["goalsAgainst"] = this.goalsAgainst;
-        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : <any>undefined;
+        if (Array.isArray(this.games)) {
+            data["games"] = [];
+            for (let item of this.games)
+                data["games"].push(item.toJSON());
+        }
+        data["gamesBefore"] = this.gamesBefore;
         return data;
     }
 }
 
-export interface IPlayer {
-    id?: string | undefined;
-    name?: string | undefined;
-    rating?: number;
-    numberOfGames?: number;
-    numberOfWins?: number;
-    numberOfLosses?: number;
-    goalsFor?: number;
-    goalsAgainst?: number;
-    createdAt?: Date;
+export interface IGamesInRange {
+    games?: Game[] | undefined;
+    gamesBefore?: boolean;
+}
+
+export class PlayerGameNumberTuple implements IPlayerGameNumberTuple {
+    player?: DynamicRatingPlayer;
+    won?: number;
+    lost?: number;
+
+    constructor(data?: IPlayerGameNumberTuple) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (<any>this)[property] = (<any>data)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.player = _data["player"] ? DynamicRatingPlayer.fromJS(_data["player"]) : <any>undefined;
+            this.won = _data["won"];
+            this.lost = _data["lost"];
+        }
+    }
+
+    static fromJS(data: any): PlayerGameNumberTuple {
+        data = typeof data === 'object' ? data : {};
+        let result = new PlayerGameNumberTuple();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["player"] = this.player ? this.player.toJSON() : <any>undefined;
+        data["won"] = this.won;
+        data["lost"] = this.lost;
+        return data;
+    }
+}
+
+export interface IPlayerGameNumberTuple {
+    player?: DynamicRatingPlayer;
+    won?: number;
+    lost?: number;
+}
+
+export class PlayerGamePage implements IPlayerGamePage {
+    games?: Game[] | undefined;
+    numberOfPages?: number;
+
+    constructor(data?: IPlayerGamePage) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (<any>this)[property] = (<any>data)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            if (Array.isArray(_data["games"])) {
+                this.games = [] as any;
+                for (let item of _data["games"])
+                    this.games!.push(Game.fromJS(item));
+            }
+            this.numberOfPages = _data["numberOfPages"];
+        }
+    }
+
+    static fromJS(data: any): PlayerGamePage {
+        data = typeof data === 'object' ? data : {};
+        let result = new PlayerGamePage();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        if (Array.isArray(this.games)) {
+            data["games"] = [];
+            for (let item of this.games)
+                data["games"].push(item.toJSON());
+        }
+        data["numberOfPages"] = this.numberOfPages;
+        return data;
+    }
+}
+
+export interface IPlayerGamePage {
+    games?: Game[] | undefined;
+    numberOfPages?: number;
 }
 
 export class PlayerPerformance implements IPlayerPerformance {
@@ -501,6 +1277,8 @@ export class PlayerPerformance implements IPlayerPerformance {
     name?: string | undefined;
     oldRating?: number;
     newRating?: number;
+    readonly stdBefore?: number | undefined;
+    readonly stdAfter?: number | undefined;
 
     constructor(data?: IPlayerPerformance) {
         if (data) {
@@ -517,6 +1295,8 @@ export class PlayerPerformance implements IPlayerPerformance {
             this.name = _data["name"];
             this.oldRating = _data["oldRating"];
             this.newRating = _data["newRating"];
+            (<any>this).stdBefore = _data["stdBefore"];
+            (<any>this).stdAfter = _data["stdAfter"];
         }
     }
 
@@ -533,6 +1313,8 @@ export class PlayerPerformance implements IPlayerPerformance {
         data["name"] = this.name;
         data["oldRating"] = this.oldRating;
         data["newRating"] = this.newRating;
+        data["stdBefore"] = this.stdBefore;
+        data["stdAfter"] = this.stdAfter;
         return data;
     }
 }
@@ -542,6 +1324,64 @@ export interface IPlayerPerformance {
     name?: string | undefined;
     oldRating?: number;
     newRating?: number;
+    stdBefore?: number | undefined;
+    stdAfter?: number | undefined;
+}
+
+export class PlayerStatistics implements IPlayerStatistics {
+    gamesWith?: PlayerGameNumberTuple[] | undefined;
+    gamesAgainst?: PlayerGameNumberTuple[] | undefined;
+
+    constructor(data?: IPlayerStatistics) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (<any>this)[property] = (<any>data)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            if (Array.isArray(_data["gamesWith"])) {
+                this.gamesWith = [] as any;
+                for (let item of _data["gamesWith"])
+                    this.gamesWith!.push(PlayerGameNumberTuple.fromJS(item));
+            }
+            if (Array.isArray(_data["gamesAgainst"])) {
+                this.gamesAgainst = [] as any;
+                for (let item of _data["gamesAgainst"])
+                    this.gamesAgainst!.push(PlayerGameNumberTuple.fromJS(item));
+            }
+        }
+    }
+
+    static fromJS(data: any): PlayerStatistics {
+        data = typeof data === 'object' ? data : {};
+        let result = new PlayerStatistics();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        if (Array.isArray(this.gamesWith)) {
+            data["gamesWith"] = [];
+            for (let item of this.gamesWith)
+                data["gamesWith"].push(item.toJSON());
+        }
+        if (Array.isArray(this.gamesAgainst)) {
+            data["gamesAgainst"] = [];
+            for (let item of this.gamesAgainst)
+                data["gamesAgainst"].push(item.toJSON());
+        }
+        return data;
+    }
+}
+
+export interface IPlayerStatistics {
+    gamesWith?: PlayerGameNumberTuple[] | undefined;
+    gamesAgainst?: PlayerGameNumberTuple[] | undefined;
 }
 
 export class TeamPerformance implements ITeamPerformance {

@@ -1,12 +1,9 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
-anago-leader-board-ui/node_modules
+node_modules/
 /.pnp
 .pnp.js
-
-*node_modules*
-**node_modules**
 
 # These are some examples of commonly ignored file patterns.
 # You should customize this list as applicable to your project.
@@ -489,8 +486,3 @@ anago-leader-board-ui/node_modules/.bin/acorn
 anago-leader-board-ui/node_modules/*
 anago-leader-board-ui/node_modules/.bin/acorn
 anago-leader-board-ui/node_modules/.bin/acorn.cmd
-/anago-leader-board-ui/node_modules
-/anago-leader-board-ui/node_modules
-/anago-leader-board-ui/node_modules
-/anago-leader-board-ui/node_modules
-/anago-leader-board-ui/build

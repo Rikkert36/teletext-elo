@@ -38,6 +38,9 @@ const useStyles = makeStyles((theme: Theme) => ({
   },
   waaromButton: {
     color: '#ffff00', // Yellow
+  },
+  historyButton: {
+    color: '#00ffff', // Bright blue
   }
 }));
 
@@ -57,7 +60,9 @@ const NavBar = () => {
           <Button component={Link} to="/about" className={classes.button + ' ' + classes.waaromButton}>
             vaak gevragen vragen
           </Button>
-          
+          <Button component={Link} to="/historie" className={classes.button + ' ' + classes.historyButton}>
+            historie
+          </Button>
         </div>
       </Toolbar>
     </AppBar>

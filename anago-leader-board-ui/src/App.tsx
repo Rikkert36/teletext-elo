@@ -7,6 +7,8 @@ import LeaderBoardPage from "./pages/LeaderBoardPage";
 import NoPage from "./pages/NoPage";
 import theme from "./styles/theme";
 import GamesPage from "./pages/GamesPage";
+import PlayerPage from "./pages/PlayerPage";
+import HistoryPage from "./pages/HistoryPage";
 
 declare global {
   interface Window {
@@ -21,7 +23,9 @@ function App() {
       <Routes>
         <Route path="/" element={<LeaderBoardPage/>} />
         <Route path="wedstrijden" element={<GamesPage/>} />
+        <Route path="speler/:id" element={<PlayerPage/>} />
         <Route path="about" element={<AboutPage />} />
+        <Route path="historie" element={<HistoryPage />} />
         <Route path="*" element={<NoPage />} />
       </Routes>
     </div>

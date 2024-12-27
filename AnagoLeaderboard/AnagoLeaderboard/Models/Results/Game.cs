@@ -34,43 +34,68 @@ namespace AnagoLeaderboard.Models.Results
             };
         }
 
-        public List<PlayerPerformance> GetPlayerPerformances()
-        {
-            return new List<PlayerPerformance>()
-            {
-                FirstTeam.FirstPlayer,
-                FirstTeam.SecondPlayer,
-                SecondTeam.FirstPlayer,
-                SecondTeam.SecondPlayer
-            };
-        }
-
-        internal int GetGoalsFor(string playerId)
+        public bool IsWonBy(string playerId)
         {
             if (FirstTeam.FirstPlayer.PlayerId.Equals(playerId) || FirstTeam.SecondPlayer.PlayerId.Equals(playerId))
             {
-                return FirstTeam.Goals;
-            } else if (SecondTeam.FirstPlayer.PlayerId.Equals(playerId) || SecondTeam.SecondPlayer.PlayerId.Equals(playerId))
-            {
-                return SecondTeam.Goals;
-            } else
-            {
-                throw new Exception("PlayerID not in team");
+                return FirstTeam.Goals > SecondTeam.Goals;
             }
+
+            if (SecondTeam.FirstPlayer.PlayerId.Equals(playerId) || SecondTeam.SecondPlayer.PlayerId.Equals(playerId))
+            {
+                return SecondTeam.Goals > FirstTeam.Goals;
+            }
+
+            throw new Exception("PlayerID not in team");
         }
 
-        internal int GetGoalsAgainst(string playerId)
+        public string GetTeamMemberId(string playerId)
+        {
+            if (FirstTeam.FirstPlayer.PlayerId.Equals(playerId))
+            {
+                return FirstTeam.SecondPlayer.PlayerId;
+            }
+            
+            if (FirstTeam.SecondPlayer.PlayerId.Equals(playerId))
+            {
+                return FirstTeam.FirstPlayer.PlayerId;
+            }
+            
+            if (SecondTeam.FirstPlayer.PlayerId.Equals(playerId))
+            {
+                return SecondTeam.SecondPlayer.PlayerId;
+            }
+            
+            if (SecondTeam.SecondPlayer.PlayerId.Equals(playerId))
+            {
+                return SecondTeam.FirstPlayer.PlayerId;
+            }
+            
+            throw new Exception("PlayerID not in team");
+        }
+
+        public TeamPerformance GetOtherTeam(string playerId)
         {
             if (FirstTeam.FirstPlayer.PlayerId.Equals(playerId) || FirstTeam.SecondPlayer.PlayerId.Equals(playerId))
             {
-                return SecondTeam.Goals;
-            } else if (SecondTeam.FirstPlayer.PlayerId.Equals(playerId) || SecondTeam.SecondPlayer.PlayerId.Equals(playerId))
-            {
-                return FirstTeam.Goals;
-            } else
-            {
-                throw new Exception("PlayerID not in team");
+                return SecondTeam;
             }
+
+            if (SecondTeam.FirstPlayer.PlayerId.Equals(playerId) || SecondTeam.SecondPlayer.PlayerId.Equals(playerId))
+            {
+                return FirstTeam;
+            }
+            
+            throw new Exception("PlayerID not in team");
+
+        }
+
+        internal bool IsPlayedBy(string id)
+        {
+            return FirstTeam.FirstPlayer.PlayerId.Equals(id)
+                || FirstTeam.SecondPlayer.PlayerId.Equals(id)
+                || SecondTeam.FirstPlayer.PlayerId.Equals(id)
+                || SecondTeam.SecondPlayer.PlayerId.Equals(id);
         }
     }
 }

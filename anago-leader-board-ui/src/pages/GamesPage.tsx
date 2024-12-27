@@ -20,7 +20,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import { Theme} from '@mui/material';
 import {   makeStyles,  createStyles, ThemeProvider} from '@mui/styles';
-import { Client, Player, Game, GameForm, PlayerPerformance, TeamPerformance } from '../clients/server.generated';
+import { Client, Game, GameForm, PlayerPerformance, TeamPerformance, GamesInRange, DynamicRatingPlayer } from '../clients/server.generated';
 
 // interface PlayerMatchInfo {
 //     id: string,
@@ -215,7 +215,39 @@ const useStyles = makeStyles((theme: Theme) =>
     numberinput: {
         width: '3rem',
         background: "#000"
-    }
+    }, 
+    floatingPaper: {
+      position: 'fixed',
+      bottom: 0,
+      fontSize: '2rem',
+      left: '50%',  // Center the element horizontally
+      transform: 'translateX(-50%)',  // Adjust for centering
+      width: '30%',
+      height: '3rem', // Set the height as needed
+      backgroundColor: '#FF0000', // Same color as the banner
+      color: '#ffff00', // Same text color as the banner
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: theme.zIndex.drawer + 1,  // Set zIndex to make it appear above other elements
+    },
+    vorigevolgendebutton: {
+      fontSize: '2rem',
+      backgroundColor: '#FF0000', // Same color as the banner
+      color: '#ffff00', // Same text color as the banner
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+
+      // Remove transition effect
+      transition: 'none',
+
+      '&:hover': {
+        // No hover effect
+        backgroundColor: '#FF0000', // Same color as the banner
+        color: '#ffff00', // Same text color as the banner
+      },
+    },
   })
 );
 
@@ -312,9 +344,12 @@ const GamesPage: React.FC = () => {
   const client = new Client(window.TAFELVOETBAL_SERVER_URL);
   const [games, setGames] = useState<Game[]>();
   const [gamesPerDayList, setGamesPerDay] = useState<GamesPerDayList>();
-  const [players, setPlayers] = useState<Player[]>();
+  const [players, setPlayers] = useState<DynamicRatingPlayer[]>();
   const [isModalOpen, setModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [weekIndex, setWeekIndex] = useState(0);
+  const [weekIndexUpdated, setWeekIndexUpdated] = useState(true);
+  const [thereArePreviousWeeks, setThereArePreviousWeeks] = useState(true);
   const [newMatchForm, setNewMatchForm] = useState({
     team1_player1: 0,
     team1_player2: 0,
@@ -326,11 +361,14 @@ const GamesPage: React.FC = () => {
 
   useEffect(() => {
     if (players == null) refreshPlayers();
-    if (games == null) refreshMatches();
+    if (weekIndexUpdated) {
+       refreshMatches();
+    }
   });
 
   const refreshPlayers = async () => {
-    const players : Player[] = await client.getPlayers();
+    const players : DynamicRatingPlayer[] = await client.getPlayers(true);
+    players.sort((a: DynamicRatingPlayer, b: DynamicRatingPlayer) => (a.name! > b.name!) ? 1 : ((b.name! > a.name!) ? -1 : 0));
     setPlayers(players);
     const team1_player2 = Math.min(1, players.length);
     const team2_player1 = Math.min(2, players.length);
@@ -339,10 +377,13 @@ const GamesPage: React.FC = () => {
   }
 
   const refreshMatches = async () => {
-    const games: Game[] = await client.getGames();
-    setGames(games);
-    const gamesPerDayList = sortMatchesPerDay(games);
+    const [start, end] = getStartAndEndOfWeek();
+    const games: GamesInRange = await client.getGamesInRange(start, end);
+    setGames(games.games);
+    setThereArePreviousWeeks(games.gamesBefore!);
+    const gamesPerDayList = sortMatchesPerDay(games.games!);
     setGamesPerDay(gamesPerDayList);
+    setWeekIndexUpdated(false);
   };
 
 
@@ -352,7 +393,29 @@ const GamesPage: React.FC = () => {
 //         team1_player1: event.target.value,
 //     });
 //   }
+
+  const mapToMondayFirst = (index: number) => {
+    if (index == 0) return 6;
+    return index - 1;
+  }
   
+  const getStartAndEndOfWeek = () : [Date, Date] => {
+    const now = new Date();
+    const today = mapToMondayFirst(now.getDay()); // Get current day of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+    const startOfWeek = new Date(now);
+    const endOfWeek = new Date(now);
+
+    const daysAgo = weekIndex * 7;
+
+    startOfWeek.setDate(now.getDate() - today - daysAgo); // Set to the first day of the week (Monday)
+    endOfWeek.setDate(now.getDate() + (6 - today) - daysAgo); // Set to the last day of the week (Sunday)
+
+    // Adjust to midnight
+    startOfWeek.setHours(0, 0, 0, 0);
+    endOfWeek.setHours(23, 59, 59, 999);
+
+    return [ startOfWeek, endOfWeek ];
+  }
 
   const handleOpenModal = () => {
     setModalOpen(true);
@@ -388,7 +451,7 @@ const GamesPage: React.FC = () => {
     const gameForm = new GameForm();
     gameForm.init(game);
     try {
-    await client.createGame(gameForm);
+      await client.createGame(gameForm);
     } catch (ex) {
       console.log(ex);
     } finally {
@@ -464,8 +527,10 @@ const GamesPage: React.FC = () => {
   };
 
   const showMatches = () => {
-    if (gamesPerDayList) {
-      return gamesPerDayList.matchesPerDay!.map((day, index) => (
+    if (weekIndexUpdated) {
+      return <CircularProgress/>
+    }  else if (gamesPerDayList && gamesPerDayList!.matchesPerDay.length > 0) {
+      return gamesPerDayList!.matchesPerDay!.map((day, index) => (
         <div>
             <Paper className={classes.dayPaper}>
                 {getDateInRightFormat(day.day) + ':'}
@@ -473,7 +538,11 @@ const GamesPage: React.FC = () => {
             {showMatchesOnDay(day)}
         </div>
         
-      ));
+      )); 
+    } else {
+      return <div>
+        Geen wedstrijden gespeeld deze week.
+        </div>
     }
   };
 
@@ -745,8 +814,44 @@ const GamesPage: React.FC = () => {
     </Modal>;
 }
 
+const showVorigeButton = () => {
+  if (thereArePreviousWeeks && !weekIndexUpdated) {
+    return (<Typography  style={{textTransform: 'none'}} className={classes.vorigevolgendebutton}> 
+    vorige
+  </Typography>);
+}
+};
+
+const showVolgendeButton = () => {
+  if (weekIndex != 0 && !weekIndexUpdated) {
+    return (
+        <Typography  style={{textTransform: 'none'}} className={classes.vorigevolgendebutton}> 
+              volgende
+            </Typography>
+    );
+  }
+};
+
+const clickVorigeButton = async () => {
+  setWeekIndexUpdated(true);
+  setWeekIndex(prevWeekIndex => prevWeekIndex + 1);
+}
+
+const clickVolgendeButton = async () => {
+  setWeekIndexUpdated(true);
+  setWeekIndex(prevWeekIndex => prevWeekIndex - 1);
+
+}
+
+const showStartAndEndOfWeek = () => {
+  const [startWeek, endWeek] = getStartAndEndOfWeek();
+  const startDay = `${startWeek.getDate()} ${toDutchMonth(startWeek.getMonth())}`
+  const endDay = `${endWeek.getDate()} ${toDutchMonth(endWeek.getMonth())}`
+  return `${startDay} - ${endDay}`;
+}
+
   return (
-    <div className={classes.centerContainer}>
+    <div className={classes.centerContainer} style={{paddingBottom: '10rem'}}>
 
       <Grid container spacing={2} >
         <Grid item xs={2}>
@@ -754,7 +859,7 @@ const GamesPage: React.FC = () => {
         </Grid>
         <Grid item xs={8} >
           <Paper className={classes.banner}>
-            tafelvoetbal uitslagen
+            tafelvoetbal uitslagen, {showStartAndEndOfWeek()}
           </Paper>
         </Grid> 
         <Grid item xs={2}>
@@ -780,8 +885,37 @@ const GamesPage: React.FC = () => {
         <Grid item xs={2}>
 
         </Grid>
-      </Grid>      
 
+    
+
+        <Grid item xs={2}>
+
+        </Grid>
+        <Grid item xs={8} >
+        <Paper className={classes.floatingPaper}>
+          {/* Content for the floating paper element */}
+          {/* You can customize the content and styles as needed */}
+
+          <Grid item xs={4}>
+            <Button variant="text" disabled={!thereArePreviousWeeks || weekIndexUpdated} onClick={clickVorigeButton}>
+              { showVorigeButton()} 
+            </Button>
+          </Grid>
+          
+
+          <Grid item xs={4}>
+          <Button variant="text" disabled={weekIndex == 0 || weekIndexUpdated} onClick={clickVolgendeButton}>
+            {showVolgendeButton()}
+          </Button>
+          </Grid>
+         
+        </Paper>
+        </Grid>
+        <Grid item xs={2}>
+
+        </Grid>
+      </Grid>      
+      
       {showModal()} 
     </div>
   );

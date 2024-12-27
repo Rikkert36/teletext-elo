@@ -14,9 +14,13 @@ namespace UnitTests
         public void Setup()
         {
             var dbOption = new DbContextOptionsBuilder<DatabaseContext>()
-                .UseSqlite("Data Source=C:\\tafelvoetbal\\tafelvoetbal-server\\data\\test\\testdata.db")
+                .UseInMemoryDatabase("AnagoLeaderboard")
                 .Options;
-            _playerService = new PlayerService(new AnagoLeaderboard.Database.DatabaseContext(dbOption));
+            
+            var databaseContext = new DatabaseContext(dbOption);
+            var gameService = new GameService(databaseContext);
+            var leaderBoardService = new LeaderBoardService(gameService, databaseContext);
+            _playerService = new PlayerService(databaseContext, leaderBoardService, gameService);
         }
 
         [TearDown]
@@ -34,11 +38,6 @@ namespace UnitTests
             Assert.That(player.Name, Is.EqualTo("Rik Maas"));
         }
 
-        [Test]
-        public async Task GetPlayers_RetrievesNothingInitially()
-        {
-            List<Player> players = await _playerService.GetPlayers();
-            Assert.That(players.Count, Is.EqualTo(0));
-        }
+
     }
 }

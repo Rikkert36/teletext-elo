@@ -1,4 +1,5 @@
-﻿using AnagoLeaderboard.Models.Results;
+﻿using AnagoLeaderboard.Models.RequestParameters;
+using AnagoLeaderboard.Models.Results;
 using Microsoft.EntityFrameworkCore;
 
 namespace AnagoLeaderboard.Database
@@ -7,7 +8,6 @@ namespace AnagoLeaderboard.Database
     {
         public DatabaseContext(DbContextOptions<DatabaseContext> options) : base(options)
         {
-
         }
 
         public DbSet<Player> Players => Set<Player>();
@@ -17,81 +17,43 @@ namespace AnagoLeaderboard.Database
         {
             var allPlayers = Players.ToList();
             Players.RemoveRange(allPlayers);
-            await this.SaveChangesAsync();
+            var allGames = Games.ToList();
+            Games.RemoveRange(allGames);
+            await SaveChangesAsync();
         }
 
         public async Task AddGame(Game game)
         {
             Games.Add(game);
-            List<string> playerIds = game.GetPlayerIds();
-
-            var winningTeam = game.FirstTeam.Goals > game.SecondTeam.Goals ? game.FirstTeam : game.SecondTeam;
-            var playerPerformances = game.GetPlayerPerformances();
-
-            foreach (var playerId in playerIds)
-            {
-                var player = await Players.FindAsync(playerId);
-                if (player != null)
-                {
-                    bool won = winningTeam.FirstPlayer.PlayerId == playerId || winningTeam.SecondPlayer.PlayerId == playerId;
-                    player.Rating = playerPerformances.Find(performance => performance.PlayerId.Equals(playerId))!.NewRating;
-                    var goalsFor = game.GetGoalsFor(playerId);
-                    var goalsAgainst = game.GetGoalsAgainst(playerId);
-                    player.AddGame(won, goalsFor, goalsAgainst);
-                }
-            }
             await SaveChangesAsync();
-        }
-
-        internal async Task AddOldRatings(Game game)
-        {
-            var playerPerformances = game.GetPlayerPerformances();
-            foreach (var playerPerformance in playerPerformances)
-            {
-                var player = await Players.FindAsync(playerPerformance.PlayerId);
-                playerPerformance.OldRating = player!.Rating;
-            }
-        }
-        internal async Task<List<int>> GetNumberOfGamesPlayedByPlayers(Game game)
-        {
-            List<int> result = new List<int>();
-            List<string> playerIds = game.GetPlayerIds();
-            foreach(var playerId in playerIds)
-            {
-                var player = await Players.FindAsync(playerId);
-                if (player != null)
-                {
-                    result.Add(player.NumberOfGames);
-                } else
-                {
-                    throw new KeyNotFoundException($"Player: {playerId} not found");
-                }
-            }
-            return result;
         }
 
         public async Task DeleteGames()
         {
             var allGames = Games.ToList();
             Games.RemoveRange(allGames);
-            await this.SaveChangesAsync();
+            await SaveChangesAsync();
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder.Entity<Game>()
-                .OwnsOne(g => g.FirstTeam, tp =>
-                {
-                    tp.OwnsOne(tp => tp.FirstPlayer);
-                    tp.OwnsOne(tp => tp.SecondPlayer);
-                });
+                .OwnsOne(
+                    g => g.FirstTeam,
+                    tp =>
+                    {
+                        tp.OwnsOne(tp => tp.FirstPlayer);
+                        tp.OwnsOne(tp => tp.SecondPlayer);
+                    });
 
             modelBuilder.Entity<Game>()
-                .OwnsOne(g => g.SecondTeam, tp =>
-                {
-                    tp.OwnsOne(tp => tp.FirstPlayer);
-                    tp.OwnsOne(tp => tp.SecondPlayer);
-                });
+                .OwnsOne(
+                    g => g.SecondTeam,
+                    tp =>
+                    {
+                        tp.OwnsOne(tp => tp.FirstPlayer);
+                        tp.OwnsOne(tp => tp.SecondPlayer);
+                    });
 
             base.OnModelCreating(modelBuilder);
         }
@@ -101,6 +63,57 @@ namespace AnagoLeaderboard.Database
             var allPlayes = Players.ToList();
             Players.RemoveRange(allPlayes);
             await this.SaveChangesAsync();
+        }
+
+        internal async Task<GamesInRange> GetGamesInRange(DateTime start, DateTime end)
+        {
+            var result = await Games
+                .Where(game => game.CreatedAt >= start && game.CreatedAt <= end)
+                .ToListAsync();
+            var notLatestGame = true;
+            if (result.Count > 0)
+            {
+                var oldestGameFromWeek = result.Min(game => game.CreatedAt);
+                var oldestGameEver = Games.Min(game => game.CreatedAt);
+                notLatestGame = oldestGameFromWeek != oldestGameEver;
+            }
+
+            return new GamesInRange()
+            {
+                Games = result,
+                GamesBefore = notLatestGame
+            };
+        }
+
+        internal async Task<DateTime> GetOldestDate()
+        {
+            return Games.Min(game => game.CreatedAt);
+        }
+
+        internal async Task<PlayerGamePage> GetPlayerGames(string id, int pageNumber)
+        {
+            var pageSize = 10;
+
+            var gamesOnPage = await Games
+                .Where(game => game.FirstTeam.FirstPlayer.PlayerId == id
+                               || game.FirstTeam.SecondPlayer.PlayerId == id
+                               || game.SecondTeam.FirstPlayer.PlayerId == id
+                               || game.SecondTeam.SecondPlayer.PlayerId == id)
+                .OrderByDescending(game => game.CreatedAt)
+                .Take(pageSize)
+                .ToListAsync();
+
+            var numberOfGames = Games.Count(game => game.FirstTeam.FirstPlayer.PlayerId == id
+                                                  || game.FirstTeam.SecondPlayer.PlayerId == id
+                                                  || game.SecondTeam.FirstPlayer.PlayerId == id
+                                                  || game.SecondTeam.SecondPlayer.PlayerId == id);
+
+            var numberOfPages = numberOfGames / pageSize + 1;
+            return new PlayerGamePage()
+            {
+                Games = gamesOnPage,
+                NumberOfPages = numberOfPages
+            };
         }
     }
 }
