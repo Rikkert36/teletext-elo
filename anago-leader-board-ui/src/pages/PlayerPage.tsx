@@ -1,11 +1,15 @@
 import React, { ChangeEvent, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Alert, Avatar, CircularProgress, IconButton, Modal, Snackbar, TextField, Theme } from '@mui/material';
+import { Alert, Avatar, CircularProgress, IconButton, Modal, Snackbar, TextField, Theme, } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
+import { ChartsItemContentProps, ChartContainer, ChartsTooltip, ChartsTooltipSlots, DefaultChartsItemTooltipContent  } from '@mui/x-charts';
+
 import { makeStyles, createStyles, } from '@mui/styles'
-import { AppBar, Toolbar, Typography, Container, Paper, Button, Grid, List, ListItem } from '@mui/material';
+import { AppBar, Toolbar, Typography, Container, Paper, Button, Grid, List, ListItem, ButtonGroup } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
-import { Client, DynamicRatingPlayer, FileParameter, Game, PlayerGameNumberTuple, PlayerGamePage, PlayerStatistics, TeamPerformance } from '../clients/server.generated';
+import { Client, DynamicRatingPlayer, FileParameter, Game, PlayerGameNumberTuple, PlayerGamePage, PlayerStatistics, TeamPerformance, PlayerPerformance } from '../clients/server.generated';
+
+
 
 // Define styles using makeStyles
 const useStyles = makeStyles((theme: Theme) =>
@@ -121,6 +125,33 @@ const useStyles = makeStyles((theme: Theme) =>
       fontSize: '1.0em',
       padding: '0.4rem'
     },
+    buttonContainer: {
+      display: 'flex',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center', height: '100%' 
+    },
+    grow: {
+      flexGrow: 1,
+    },
+    button: {
+      margin: theme.spacing(1),
+      fontFamily: 'Teletext',
+      fontSize: '1.0rem',
+      textTransform: 'none'
+    },
+    ranglijstButton: {
+      color: '#FF0000', // Teletekst red
+    },
+    selectedRange: {
+      color: '#00ff00', // Very bright green
+    },
+    unselectedRange: {
+      color: '#ffff00', // Yellow
+    },
+    historyButton: {
+      color: '#00ffff', // Bright blue
+    }
   }),
 );
 
@@ -146,31 +177,51 @@ const PlayerPage: React.FC = () => {
   const [playerRank, setPlayerRank] = useState<number>();
   const [playerStats, SetPlayerStats] = useState<PlayerStatistics>();
   const [playerGamesIndexUpdated, SetPlayerGamesIndexUpdated] = useState(true);
+  const [dateRange, setDateRange] = useState('3months');
   const client = new Client(window.TAFELVOETBAL_SERVER_URL);
 
   useEffect(() => {
-    if (player == null) {
+    if (!player) {
       fetchPlayer();
     }
-    if (playerRank == null) {
+  }, [player]);
+
+  useEffect(() => {
+    if (!playerStats) {
+      fetchStats();
+    }
+  }, [playerStats]);
+  
+  useEffect(() => {
+    if (!playerRank) {
       fetchRank();
     }
-    if (playerGamesIndexUpdated) fetchPlayerGames();
-
-    if (allPlayerGames == null) {
+  }, [playerRank]);
+  
+  useEffect(() => {
+    if (playerGamesIndexUpdated) {
+      fetchPlayerGames();
+    }
+  }, [playerGamesIndexUpdated]);
+  
+  useEffect(() => {
+    if (!allPlayerGames) {
       fetchAllPlayerGames();
     }
-  });
+  }, [allPlayerGames]);
 
   const fetchPlayer = async () => {
     setPlayerLoading(true);
     const player: DynamicRatingPlayer = await client.getPlayer(id!);
-    const playerStats: PlayerStatistics = await client.getPlayerStats(id!);
     setPlayer(player);
-    SetPlayerStats(playerStats);
     setPlayerLoading(false);
     setNewName(player.name!)
   }
+
+  const fetchStats = async () => {
+    const playerStats: PlayerStatistics = await client.getPlayerStats(id!);
+    SetPlayerStats(playerStats);
+  }  
 
   const fetchRank = async () => {
     const rank = await client.getPlayerRank(id!);
@@ -303,6 +354,8 @@ const PlayerPage: React.FC = () => {
     if (player!.numberOfGames! == 0) factor = 0;
     return factor + '%';
   }
+
+  const dummyElement = () => (<Paper></Paper>)
 
   const getWinstMagneet = () => {
     let bestPlayer = undefined;
@@ -439,15 +492,17 @@ const PlayerPage: React.FC = () => {
     return [playerName, `${percentage}% (${wins}/${total})`];
   }
 
-  const showStatsOrLoading = () => {
-    if (playerLoading || playerRank == null) {
+  const getSelectedColor = (buttonText: string) => {
+    if (buttonText === dateRange) {
+      return classes.selectedRange;
+    }
+    return classes.unselectedRange;
+  }
+
+  const showBasicStatsOrLoading = () => {
+    if (playerLoading || playerRank == null ) {
       return <CircularProgress />;
     } else {
-      var [winstMagnet, winstMagnetPerc] = getWinstMagneet();
-      var [partnerInPain, partnerInPainPerc] = getPartnerInPain();
-      var [practiceMaterial, practiceMaterialPerc] = getPracticeMaterial();
-      var [nemesis, nemesisPerc] = getNemesis();
-
       return (
         <Grid container style={{ paddingTop: '1rem' }} display={'-ms-flexbox'} alignItems="center" spacing={2}>
           <Grid item xs={4} className={classes.stats}>
@@ -474,7 +529,23 @@ const PlayerPage: React.FC = () => {
             <Typography className={classes.stats}>{player!.numberOfWins}</Typography>
             <Typography className={classes.stats}>{player!.numberOfLosses}</Typography>
             <Typography className={classes.stats}>{winstPercText()}</Typography>
-          </Grid>
+          </Grid>          
+        </Grid>
+      );
+    };
+  }
+
+  const showCoolStatsOrLoading = () => {
+    if (playerStats == null) {
+      return <CircularProgress />;
+    } else {
+      var [winstMagnet, winstMagnetPerc] = getWinstMagneet();
+      var [partnerInPain, partnerInPainPerc] = getPartnerInPain();
+      var [practiceMaterial, practiceMaterialPerc] = getPracticeMaterial();
+      var [nemesis, nemesisPerc] = getNemesis();
+
+      return (
+        <Grid container style={{ paddingTop: '1rem' }} display={'-ms-flexbox'} alignItems="center" spacing={2}>          
           <Grid item xs={6} className={classes.stats}>
             <Typography className={classes.stats}>winstmagneet</Typography>
           </Grid>
@@ -590,42 +661,243 @@ const PlayerPage: React.FC = () => {
       return <CircularProgress />;
     } else
       return playerGames!.map((game) => (
+        showGame(game)
+      ));
+  };
+
+  const showGames = (games: Game[]) => {
+    return playerGames!.map((game) => (
+      showGame(game)
+    ));
+  }
+
+  const showGame = (game: Game) => {
+    return 
         <Paper className={classes.matchPaper}>
           <Grid container>
             {showTeam(game.firstTeam!)}
             {showTeam(game.secondTeam!)}
             {showGameDate(game)}
           </Grid>
-
         </Paper>
-      ));
-  };
+  }
+
+  function createZeroRatingGame(referenceDate: Date): Game {
+    // Helper function to create a PlayerPerformance
+    const createPlayerPerformance = (playerId: string): PlayerPerformance => {
+        return new PlayerPerformance({
+            playerId: playerId,
+            name: undefined,
+            oldRating: undefined,
+            newRating: 0,
+            stdBefore: undefined,
+            stdAfter: undefined,
+        });
+    };
+
+    // Create two teams with two players each
+    const firstTeam = new TeamPerformance();
+    firstTeam.firstPlayer = createPlayerPerformance(id!);
+    firstTeam.secondPlayer = createPlayerPerformance(id!);
+    firstTeam.goals = 0;
+
+    const secondTeam = new TeamPerformance();
+    secondTeam.firstPlayer = createPlayerPerformance(id!);
+    secondTeam.secondPlayer = createPlayerPerformance(id!);
+    secondTeam.goals = 0;
+
+    // Create the game
+    const game = new Game();
+    game.id = '<game-id>'; // Set an appropriate ID or leave undefined if optional
+    game.firstTeam = firstTeam;
+    game.secondTeam = secondTeam;
+    game.createdAt = new Date(referenceDate.getTime() - 7 * 24 * 60 * 60 * 1000); // A day before the reference date
+
+    return game;
+}
+
+
+function groupGamesByDate(games: Game[]) {
+  // Use a Map to group games by their date
+  const groupedGames = games.reduce((acc, game) => {
+    // Extract the date portion from the `createdAt` timestamp (ignoring the time)
+    const gameDate = new Date(game.createdAt!).toISOString().split('T')[0];
+
+    // Initialize the array for this date if it doesn't exist
+    if (!acc.has(gameDate)) {
+      acc.set(gameDate, []);
+    }
+
+    // Add the current game to the array for this date
+    acc.get(gameDate).push(game);
+
+    return acc;
+  }, new Map());
+
+  // Convert the Map to a 2D array
+  const groupedArray: Game[][] = Array.from(groupedGames.values());
+
+  return groupedArray.filter(gameList => {
+    const gameDate = new Date(gameList[0].createdAt!);
+    const now = new Date();
+
+    switch (dateRange) {
+      case '1month':
+        return gameDate >= new Date(now.setMonth(now.getMonth() - 1));
+      case '3months':
+        return gameDate >= new Date(now.setMonth(now.getMonth() - 3));
+      case '6months':
+        return gameDate >= new Date(now.setMonth(now.getMonth() - 6));
+      case '1year':
+        return gameDate >= new Date(now.setFullYear(now.getFullYear() - 1));
+      case 'all':
+        return true; // Show all games
+      default:
+        return true;
+    }
+  });
+  
+}
 
   const showRatingProgressChart = () => {
     if (allPlayerGames == null) {
       return <CircularProgress />;
+    } else if (allPlayerGames.length == 0) {
+      return <div>{"geen wedstrijden gespeeld"}</div>;
     } else {
-    const playerPerGame = allPlayerGames.map(game => {
-      let player;
-      if (game.firstTeam?.firstPlayer?.playerId == id!) player = game.firstTeam.firstPlayer;
-      if (game.firstTeam?.secondPlayer?.playerId == id!) player = game.firstTeam.secondPlayer;
-      if (game.secondTeam?.firstPlayer?.playerId == id!) player = game.secondTeam.firstPlayer;
-      if (game.secondTeam?.secondPlayer?.playerId == id!) player = game.secondTeam.secondPlayer;
-      return player;
-    });
-    const ratingPerGame = playerPerGame.map(player => player?.newRating!);
-    const dates = allPlayerGames.map(game => game.createdAt);
-    return (        
+
+      const gamesWith0 = [
+        createZeroRatingGame(allPlayerGames[0].createdAt!),        
+        ...allPlayerGames]
+
+      const filteredGames = Object.values(
+        gamesWith0.reduce((acc, game) => {
+          // Get the date portion of the `createdAt` timestamp (ignoring the time)
+          const gameDate = new Date(game.createdAt!).toISOString().split('T')[0];
+      
+          // If there's no game for this date or the current game is later, update the entry
+          if (!acc[gameDate] || new Date(game.createdAt!) > new Date(acc[gameDate].createdAt!)) {
+            acc[gameDate] = game;
+          }
+      
+          return acc;
+        }, {} as Record<string, Game>)
+      );
+      
+      const recentGames = filteredGames.filter(game => {
+        const gameDate = new Date(game.createdAt!);
+        const now = new Date();
+    
+        switch (dateRange) {
+          case '1month':
+            return gameDate >= new Date(now.setMonth(now.getMonth() - 1));
+          case '3months':
+            return gameDate >= new Date(now.setMonth(now.getMonth() - 3));
+          case '6months':
+            return gameDate >= new Date(now.setMonth(now.getMonth() - 6));
+          case '1year':
+            return gameDate >= new Date(now.setFullYear(now.getFullYear() - 1));
+          case 'all':
+            return true; // Show all games
+          default:
+            return true;
+        }
+      });
+
+      const playerPerGame = recentGames.map(game => {
+        let player;
+        if (game.firstTeam?.firstPlayer?.playerId == id!) player = game.firstTeam.firstPlayer;
+        if (game.firstTeam?.secondPlayer?.playerId == id!) player = game.firstTeam.secondPlayer;
+        if (game.secondTeam?.firstPlayer?.playerId == id!) player = game.secondTeam.firstPlayer;
+        if (game.secondTeam?.secondPlayer?.playerId == id!) player = game.secondTeam.secondPlayer;
+        return player;
+      });
+      const ratingPerGame = [...playerPerGame.map(player => player?.newRating!)];
+
+      const dates = [
+        ...recentGames.map(game => game.createdAt),
+      ];     
+      const maxTicks = 7; // Maximum number of labels
+      const minDate = dates[0]; // Earliest date in milliseconds
+      const maxDate = dates[dates.length - 1]; // Latest date in milliseconds
+      const step = (maxDate?.getTime()! - minDate?.getTime()!) / maxTicks; 
+
+      // Generate custom ticks
+      const customTicks = Array.from({ length: maxTicks + 1 }, (_, i) => minDate?.getTime()! + i * step);
+      const tooltipGames : Game[][] = groupGamesByDate(gamesWith0);
+
+      return (        
           <Paper style={{ width: '100%' }}  className={classes.matchPaper}>
             <LineChart
-              series={[{ data: ratingPerGame }]}
-              xAxis={[{ data: dates, min:1719000000000}]}
+              tooltip={{ trigger: 'axis', axisContent: (props) => {
+                const { dataIndex, series } = props;
+
+                return showGames(tooltipGames[dataIndex!])
+              }} }             
+              series={[
+                {                   
+                data: ratingPerGame, 
+                showMark: false, 
+                //area: true,
+                baseline: 'min',
+                curve:'linear', 
+                id: 'pvId' ,
+                }
+            ]}
+              xAxis={[{ 
+                data: dates, 
+                min: dates[0],
+                max: dates[dates.length - 1],
+                valueFormatter: (value) => {
+                  return new Intl.DateTimeFormat('nl-NL', { day: '2-digit', month: 'short' }).format(new Date(value));              
+                },
+                tickInterval:customTicks
+              }]}
+              grid={{ horizontal: true }}
               height={600}
-              yAxis={[{min: 1200}]}
+              sx={{'.MuiLineElement-series-pvId': {
+              strokeDasharray: '2 2', // Dashed line for the first series
+              stroke:"#00ff00"
+              },
+              "& .MuiChartsAxis-left .MuiChartsAxis-tickLabel":{
+                fill:"#00ff00"
+              },
+              "& .MuiMarkElement-root": {
+                  fill: "#ff0000", // Set the mark color (red in this case)
+              },
+              "& .MuiChartsAxis-bottom .MuiChartsAxis-tickLabel":{
+                fill:"#00ff00"
+              },
+              "& .MuiChartsAxis-bottom .MuiChartsAxis-line":{
+                stroke:"#00ff00",
+              },
+              "& .MuiChartsAxis-left .MuiChartsAxis-line":{
+                stroke:"#00ff00",
+              },
+              "& .MuiChartsAxis-tick":{
+              stroke:"#00ff00",
+              }}}
+              yAxis={[{
+                tickNumber: 5
+              }]}
+              // yAxis={[{colorMap:{
+              //   type: 'piecewise',
+              //   thresholds: [0, 10],
+              //   colors: ['red', 'green', 'rgba(125, 254, 227, 0.5)'],}}]}
+              //yAxis={[{min: 1200}]}
           />
+
+          <div className={classes.buttonContainer}>
+            <Button className={classes.button + ' ' + getSelectedColor('all')} onClick={() => setDateRange('all')}>altijd</Button>
+            <Button className={classes.button + ' ' + getSelectedColor('1year')} onClick={() => setDateRange('1year')}>1 jaar</Button>
+            <Button className={classes.button + ' ' + getSelectedColor('6months')} onClick={() => setDateRange('6months')}>6 maanden</Button>
+            <Button className={classes.button + ' ' + getSelectedColor('3months')} onClick={() => setDateRange('3months')}>3 maanden</Button>
+            <Button className={classes.button + ' ' + getSelectedColor('1month')} onClick={() => setDateRange('1month')}>1 maand</Button>
+          </div>
           </Paper>
+          
           ); 
-    }
+      }
   }
 
   console.log('PlayerPage - id:', id);
@@ -657,13 +929,17 @@ const PlayerPage: React.FC = () => {
 
             <Grid item xs={6}>
               {showProfileOrloading()}
-              {showStatsOrLoading()}
+              {showBasicStatsOrLoading()}
+
             </Grid>
             <Grid item xs={6}>
-              {showPlayerGamesOrLoading()}
+              {showCoolStatsOrLoading()}
             </Grid>
             <Grid item xs={12}>
               {showRatingProgressChart()}
+            </Grid>
+            <Grid item xs={12}>
+              {showPlayerGamesOrLoading()}
             </Grid>
           </Grid>
         </Grid>
@@ -673,6 +949,9 @@ const PlayerPage: React.FC = () => {
       {editPlayerModal()}
     </div>
   );
+  
 };
 
+
 export default PlayerPage;
+
