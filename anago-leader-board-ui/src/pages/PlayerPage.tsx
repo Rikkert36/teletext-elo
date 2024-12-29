@@ -665,20 +665,14 @@ const PlayerPage: React.FC = () => {
       ));
   };
 
-  const showGames = (games: Game[]) => {
-    return playerGames!.map((game) => (
-      showGame(game)
-    ));
-  }
-
   const showGame = (game: Game) => {
-    return 
-        <Paper className={classes.matchPaper}>
+    return <Paper className={classes.matchPaper}>
           <Grid container>
             {showTeam(game.firstTeam!)}
             {showTeam(game.secondTeam!)}
             {showGameDate(game)}
           </Grid>
+
         </Paper>
   }
 
@@ -737,7 +731,7 @@ function groupGamesByDate(games: Game[]) {
   // Convert the Map to a 2D array
   const groupedArray: Game[][] = Array.from(groupedGames.values());
 
-  return groupedArray.filter(gameList => {
+  const recentGames = groupedArray.filter(gameList => {
     const gameDate = new Date(gameList[0].createdAt!);
     const now = new Date();
 
@@ -756,7 +750,6 @@ function groupGamesByDate(games: Game[]) {
         return true;
     }
   });
-  
 }
 
   const showRatingProgressChart = () => {
@@ -824,16 +817,15 @@ function groupGamesByDate(games: Game[]) {
 
       // Generate custom ticks
       const customTicks = Array.from({ length: maxTicks + 1 }, (_, i) => minDate?.getTime()! + i * step);
-      const tooltipGames : Game[][] = groupGamesByDate(gamesWith0);
-
+      //const tooltipGames : Game[][] = groupGamesByDate(gamesWith0);
       return (        
           <Paper style={{ width: '100%' }}  className={classes.matchPaper}>
             <LineChart
-              tooltip={{ trigger: 'axis', axisContent: (props) => {
-                const { dataIndex, series } = props;
+          tooltip={{ trigger: 'axis', axisContent: (props) => {
+            const { dataIndex, series } = props;
 
-                return showGames(tooltipGames[dataIndex!])
-              }} }             
+            return showGame(recentGames[dataIndex!])
+          }} }             
               series={[
                 {                   
                 data: ratingPerGame, 
