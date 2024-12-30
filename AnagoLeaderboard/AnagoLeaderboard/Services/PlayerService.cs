@@ -55,6 +55,7 @@ namespace AnagoLeaderboard.Services
         public async Task<PlayerStatistics> GetPlayerStatistics(string id)
         {
             var games = await _gameService.GetGames();
+            var players = await GetPlayers();
             var wonWithPerPlayer = new Dictionary<string, List<Game>>();
             var lostWithPerPlayer = new Dictionary<string, List<Game>>();
             var wonAgainstPerPlayer = new Dictionary<string, List<Game>>();
@@ -83,28 +84,29 @@ namespace AnagoLeaderboard.Services
             }
 
             return new PlayerStatistics(
-                await ComputeResult(wonWithPerPlayer, lostWithPerPlayer),
-                await ComputeResult(wonAgainstPerPlayer, lostAgainstPerPlayer)
+                await AddResultsWithOtherPlayers(wonWithPerPlayer, lostWithPerPlayer, players),
+                await AddResultsWithOtherPlayers(wonAgainstPerPlayer, lostAgainstPerPlayer, players)
             );
         }
 
-        public async Task<List<PlayerGameNumberTuple>> ComputeResult(
+        public async Task<List<PlayerGameNumberTuple>> AddResultsWithOtherPlayers(
             Dictionary<string, List<Game>> wonPerPlayer,
-            Dictionary<string, List<Game>> lostPerPlayer)
+            Dictionary<string, List<Game>> lostPerPlayer,
+            List<DynamicRatingPlayer> players)
         {
             var result = new List<PlayerGameNumberTuple>();
             foreach (var playerId in wonPerPlayer.Keys)
             {
-                var player = await GetPlayer(playerId);
+                var player = players.FirstOrDefault(x => x.Id == playerId);
                 var lostNumber = lostPerPlayer.TryGetValue(playerId, out var value) ? value.Count : 0;
                 result.Add(new PlayerGameNumberTuple(player, wonPerPlayer[playerId].Count, lostNumber));
             }
 
             foreach (var playerId in lostPerPlayer.Keys)
             {
-                if (!result.Any(tuple => tuple.Player.Id == playerId))
+                if (result.All(tuple => tuple.Player.Id != playerId))
                 {
-                    var player = await GetPlayer(playerId);
+                    var player = players.FirstOrDefault(x => x.Id == playerId);
                     result.Add(new PlayerGameNumberTuple(player, 0, lostPerPlayer[playerId].Count));
                 }
             }
