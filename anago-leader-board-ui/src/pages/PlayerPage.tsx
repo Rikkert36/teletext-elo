@@ -712,7 +712,18 @@ const toDutchMonth = (month: number): string => {
       return (
           `${playerInfo.oldRating} ${sign}${delta}`
       )
-      };
+    };
+
+    const getDayDelta = (gamesOnDay: Game[]) => {
+      var firstPerformance = getPlayerPerformance(gamesOnDay[0]);
+      var lastPerformance = getPlayerPerformance(gamesOnDay[gamesOnDay.length - 1]);
+
+      var delta = lastPerformance.newRating! - firstPerformance.oldRating!;
+      var sign = delta >= 0 ? '+' : '';
+      return (
+          ` (${firstPerformance.oldRating} ${sign}${delta}) `
+      )
+    };
 
 
   const showTeam = (team: TeamPerformance) => {
@@ -759,7 +770,9 @@ const showGames = (games: Game[]) => {
   return (
     <div>
       <Paper className={classes.dayPaper}>
-        {getDateInRightFormat(games[0].createdAt!) + ' - ' + getPlayerPerformance(games[games.length - 1]).newRating + ':' }
+        {getDateInRightFormat(games[0].createdAt!) + ' - ' + 
+        getPlayerPerformance(games[games.length - 1]).newRating + 
+        getDayDelta(games) + ':' }
       </Paper>
       {games!.map((game) => (showTooltipGame(game)))}
     </div>
@@ -923,7 +936,7 @@ function groupGamesByDate(games: Game[]) : Game[][] {
         tickDate.setHours(12, 0, 0, 0); // Set time to 12:00 PM
         return tickDate.getTime(); // Return the timestamp
       });
-      
+
       const tooltipGames : Game[][] = groupGamesByDate(gamesWith0);
       return (        
           <Paper style={{ width: '100%' }}  className={classes.matchPaper}>
