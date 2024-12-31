@@ -241,7 +241,17 @@ const PlayerPage: React.FC = () => {
 
   const fetchAllPlayerGames = async () => {
     const allPlayerGames: Game[] = await client.getPlayerGames(id!);
-    setAllPlayerGames(allPlayerGames);
+
+    const normalizedGames = allPlayerGames.map((game) => {
+      const createdAt = new Date(game.createdAt!); // Parse the date
+      createdAt.setHours(12, 0, 0, 0); // Set to 12:00 PM, resetting minutes, seconds, and milliseconds
+      return {
+        ...game,
+        createdAt: createdAt, // Optional: Format it back as a string if needed
+      } as Game;
+    });    
+    
+    setAllPlayerGames(normalizedGames);
   }
 
   const handleSavePlayer = async () => {
@@ -908,7 +918,12 @@ function groupGamesByDate(games: Game[]) : Game[][] {
       const step = (maxDate?.getTime()! - minDate?.getTime()!) / maxTicks; 
 
       // Generate custom ticks
-      const customTicks = Array.from({ length: maxTicks + 1 }, (_, i) => minDate?.getTime()! + i * step);
+      const customTicks = Array.from({ length: maxTicks + 1 }, (_, i) => {
+        const tickDate = new Date(minDate?.getTime()! + i * step); // Calculate the tick date
+        tickDate.setHours(12, 0, 0, 0); // Set time to 12:00 PM
+        return tickDate.getTime(); // Return the timestamp
+      });
+      
       const tooltipGames : Game[][] = groupGamesByDate(gamesWith0);
       return (        
           <Paper style={{ width: '100%' }}  className={classes.matchPaper}>

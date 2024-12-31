@@ -11,6 +11,8 @@ import {
 
 } from '@mui/material';
 import { styled } from '@mui/system';
+import {Link} from"react-router-dom"
+
 
 import {
     numberInputClasses,
@@ -202,7 +204,13 @@ const useStyles = makeStyles((theme: Theme) =>
         
     },
     playerNameTypo: {
-        fontSize: '1.0em'
+        fontSize: '1.0em',
+        color: '#ffff00', // Yellow
+    },
+    link: {
+      "&:hover": {
+        textDecoration: "underline #ffff00"
+    },
     },
     modalBanner: {
         
@@ -472,17 +480,12 @@ const GamesPage: React.FC = () => {
       setIsSaving(false);
       refreshMatches();
     }
-  };
-
-  
+  };  
 
   const showRatingAndDelta = (playerInfo: PlayerPerformance) => {
     var delta = playerInfo.newRating! - playerInfo.oldRating!;
     var sign = delta >= 0 ? '+' : '';
     return (
-    // <Typography display="inline" className={classes.ratingChange}>        
-    //  {`(${playerInfo.oldRating} ${sign}${delta})`}
-    // </Typography>);
         `(${playerInfo.oldRating} ${sign}${delta})`
     )
     };
@@ -491,12 +494,16 @@ const GamesPage: React.FC = () => {
         return (
             <>
                 <Grid item xs={3} className={classes.playerNames}>
-                    <Typography className={classes.playerNameTypo} gutterBottom noWrap style={{ width: '100%' }}>
-                        {team.firstPlayer!.name} 
-                    </Typography>
-                    <Typography className={classes.playerNameTypo} gutterBottom noWrap style={{ width: '100%' }}>
-                        {team.secondPlayer!.name} 
-                    </Typography>
+                    <Link className={classes.playerNameTypo} style={{ textDecoration: 'none' }} to={`../speler/${team.firstPlayer!.playerId}`}>
+                      <Typography className={classes.playerNameTypo} gutterBottom noWrap style={{ width: '100%' }}>
+                        {team.firstPlayer!.name}
+                      </Typography>
+                    </Link>
+                    <Link className={classes.playerNameTypo} style={{ textDecoration: 'none' }} to={`../speler/${team.secondPlayer!.playerId}`}>
+                      <Typography className={classes.playerNameTypo} gutterBottom noWrap style={{ width: '100%' }}>
+                        {team.secondPlayer!.name}
+                      </Typography>
+                    </Link>
                 </Grid>
                 <Grid item xs={2} className={classes.playerNames}>
                     <Typography className={classes.playerNameTypo} gutterBottom noWrap style={{ width: '100%' }}>
