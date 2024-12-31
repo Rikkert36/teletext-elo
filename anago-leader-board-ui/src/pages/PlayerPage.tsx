@@ -721,7 +721,7 @@ const toDutchMonth = (month: number): string => {
       var delta = lastPerformance.newRating! - firstPerformance.oldRating!;
       var sign = delta >= 0 ? '+' : '';
       return (
-          ` (${firstPerformance.oldRating} ${sign}${delta}) `
+          ` (${firstPerformance.oldRating} ${sign}${delta})`
       )
     };
 
@@ -884,7 +884,7 @@ function groupGamesByDate(games: Game[]) : Game[][] {
           const gameDate = new Date(game.createdAt!).toISOString().split('T')[0];
       
           // If there's no game for this date or the current game is later, update the entry
-          if (!acc[gameDate] || new Date(game.createdAt!) > new Date(acc[gameDate].createdAt!)) {
+          if (!acc[gameDate] || new Date(game.createdAt!) >= new Date(acc[gameDate].createdAt!)) {
             acc[gameDate] = game;
           }
       
