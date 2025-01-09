@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router-dom';
 import './App.css';
 import NavBar from "./pages/NavBar";
 import AboutPage from "./pages/AboutPage";
+import StatsPage from "./pages/StatsPage";
 import LeaderBoardPage from "./pages/LeaderBoardPage";
 import NoPage from "./pages/NoPage";
 import theme from "./styles/theme";
@@ -24,7 +25,7 @@ function App() {
         <Route path="/" element={<LeaderBoardPage/>} />
         <Route path="wedstrijden" element={<GamesPage/>} />
         <Route path="speler/:id" element={<PlayerPage/>} />
-        <Route path="about" element={<AboutPage />} />
+        <Route path="about" element={<StatsPage />} />
         <Route path="historie" element={<HistoryPage />} />
         <Route path="*" element={<NoPage />} />
       </Routes>
