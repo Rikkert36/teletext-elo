@@ -34,6 +34,21 @@ namespace AnagoLeaderboard.Controllers
                 throw ex;
             }
         }
+        
+        [HttpPost("game/duplicate")]
+        public async Task<bool> IsGameDuplicate([FromBody]GameForm gameForm)
+        {
+            try
+            {
+                return await _gameService.IsGameDuplicate(gameForm);
+            } 
+            catch (Exception ex)
+            {
+                string message = ex.Message;
+                if (ex.InnerException != null) message += " " + ex.InnerException.Message;
+                throw ex;
+            }
+        }
 
         [HttpPut("game/{id}")]
         public async Task<ActionResult> UpdateGame(string id, [FromBody] GameForm gameForm)

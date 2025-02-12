@@ -351,11 +351,14 @@ const GamesPage: React.FC = () => {
   const classes = useStyles();
   const client = new Client(window.TAFELVOETBAL_SERVER_URL);
   const [games, setGames] = useState<Game[]>();
+  const [duplicateGame, setDuplicateGame] = useState<GameForm>();
   const [gamesPerDayList, setGamesPerDay] = useState<GamesPerDayList>();
   const [players, setPlayers] = useState<DynamicRatingPlayer[]>();
   const [isModalOpen, setModalOpen] = useState(false);
+  const [isDuplicateGameDialogOpen, setDuplicateGameDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [weekIndex, setWeekIndex] = useState(0);
+  const [loadGames, setLoadGames] = useState(true);
   const [weekIndexUpdated, setWeekIndexUpdated] = useState(true);
   const [thereArePreviousWeeks, setThereArePreviousWeeks] = useState(true);
   const [newMatchForm, setNewMatchForm] = useState({
@@ -368,8 +371,9 @@ const GamesPage: React.FC = () => {
   });
 
   useEffect(() => {
-    if (players == null) refreshPlayers();
-    if (weekIndexUpdated) {
+    if (!players) refreshPlayers();
+    if (weekIndexUpdated && loadGames) {
+       setWeekIndexUpdated(false)
        refreshMatches();
     }
   });
@@ -391,7 +395,7 @@ const GamesPage: React.FC = () => {
     setThereArePreviousWeeks(games.gamesBefore!);
     const gamesPerDayList = sortMatchesPerDay(games.games!);
     setGamesPerDay(gamesPerDayList);
-    setWeekIndexUpdated(false);
+    setLoadGames(false);
   };
 
 
@@ -424,6 +428,14 @@ const GamesPage: React.FC = () => {
 
     return [ startOfWeek, endOfWeek ];
   }
+
+  const openDuplicateGameDialog = () => {
+    setDuplicateGameDialogOpen(true);
+  };
+
+  const closeDuplicateGameDialog = () => {
+    setDuplicateGameDialogOpen(false);
+  };
 
   const handleOpenModal = () => {
     setModalOpen(true);
@@ -458,28 +470,16 @@ const GamesPage: React.FC = () => {
 
     const gameForm = new GameForm();
     gameForm.init(game);
-    try {
-      await client.createGame(gameForm);
-    } catch (ex) {
-      console.log(ex);
-    } finally {
-
-      const team1_player2 = Math.min(1, players!.length);
-      const team2_player1 = Math.min(2, players!.length);
-      const team2_player2 = Math.min(3, players!.length);
-      setNewMatchForm({...newMatchForm, team1_player2, team2_player1, team2_player2});
-      setNewMatchForm({
-          team1_player1: 0,
-          team1_player2: 1,
-          team2_player1: 2,
-          team2_player2: 3,
-          team1_score: 0,
-          team2_score: 0
-      });
-      setModalOpen(false);
-      setIsSaving(false);
-      refreshMatches();
-    }
+    var gameIsDuplicate = await client.isGameDuplicate(gameForm); 
+    if (gameIsDuplicate) 
+    {
+      setDuplicateGame(gameForm);
+      openDuplicateGameDialog();
+    } 
+    else 
+    {
+      await saveGame(gameForm);      
+    }    
   };  
 
   const showRatingAndDelta = (playerInfo: PlayerPerformance) => {
@@ -534,7 +534,7 @@ const GamesPage: React.FC = () => {
   };
 
   const showMatches = () => {
-    if (weekIndexUpdated) {
+    if (loadGames) {
       return <CircularProgress/>
     }  else if (gamesPerDayList && gamesPerDayList!.matchesPerDay.length > 0) {
       return gamesPerDayList!.matchesPerDay!.map((day, index) => (
@@ -711,6 +711,72 @@ const GamesPage: React.FC = () => {
   `,
   );
 
+  function showDuplicateGameDialog() {
+    return <Modal
+      open={isDuplicateGameDialogOpen}
+      onClose={closeDuplicateGameDialog}
+      className={classes.modal}
+      style={{ maxWidth: 'none' }}
+    >
+        <div className={classes.modalPaper} style={{ width: '60rem'}}>
+            <Typography variant="h6" gutterBottom className={classes.modalBanner}>
+                Een wedstrijd met dezelfde uitslag was vandaag al ingevuld. Weet je zeker dat je dit wedstrijdformulier in wil leveren?
+            </Typography>            
+            <Grid container justifyContent="center" spacing={2}>
+                <Grid item>
+                  <Button onClick={handleSaveDuplicateGame} className={classes.addPlayerSave}>
+                    ja
+                  </Button>
+                </Grid>
+                <Grid item>
+                  <Button onClick={handleCloseDialog} className={classes.addPlayerBack}>
+                    nee
+                  </Button>
+                </Grid>
+            </Grid>
+        </div>
+    </Modal>
+  }
+
+  const handleSaveDuplicateGame = async () => {
+    await saveGame(duplicateGame!);
+    handleCloseDialog();
+  }
+
+  const handleCloseDialog = () => {
+    setDuplicateGame(undefined);
+    closeDuplicateGameDialog();
+    closeGameModal();
+  }
+
+  const saveGame = async (gameForm: GameForm) => {
+    try {
+      await client.createGame(gameForm);
+    } catch (ex) {
+      console.log(ex);
+    } finally {
+      closeGameModal();
+    }
+  }
+
+  const closeGameModal = () => {
+      const team1_player2 = Math.min(1, players!.length);
+      const team2_player1 = Math.min(2, players!.length);
+      const team2_player2 = Math.min(3, players!.length);
+      setNewMatchForm({...newMatchForm, team1_player2, team2_player1, team2_player2});
+      setNewMatchForm({
+          team1_player1: 0,
+          team1_player2: 1,
+          team2_player1: 2,
+          team2_player2: 3,
+          team1_score: 0,
+          team2_score: 0
+      });
+      setModalOpen(false);
+      setIsSaving(false);
+      refreshMatches();
+  }
+
   function showModal() {
     return <Modal
         open={isModalOpen}
@@ -822,7 +888,7 @@ const GamesPage: React.FC = () => {
 }
 
 const showVorigeButton = () => {
-  if (thereArePreviousWeeks && !weekIndexUpdated) {
+  if (thereArePreviousWeeks && !loadGames) {
     return (<Typography  style={{textTransform: 'none'}} className={classes.vorigevolgendebutton}> 
     vorige
   </Typography>);
@@ -830,7 +896,7 @@ const showVorigeButton = () => {
 };
 
 const showVolgendeButton = () => {
-  if (weekIndex != 0 && !weekIndexUpdated) {
+  if (weekIndex != 0 && !loadGames) {
     return (
         <Typography  style={{textTransform: 'none'}} className={classes.vorigevolgendebutton}> 
               volgende
@@ -841,11 +907,13 @@ const showVolgendeButton = () => {
 
 const clickVorigeButton = async () => {
   setWeekIndexUpdated(true);
+  setLoadGames(true)
   setWeekIndex(prevWeekIndex => prevWeekIndex + 1);
 }
 
 const clickVolgendeButton = async () => {
   setWeekIndexUpdated(true);
+  setLoadGames(true)
   setWeekIndex(prevWeekIndex => prevWeekIndex - 1);
 
 }
@@ -904,14 +972,14 @@ const showStartAndEndOfWeek = () => {
           {/* You can customize the content and styles as needed */}
 
           <Grid item xs={4}>
-            <Button variant="text" disabled={!thereArePreviousWeeks || weekIndexUpdated} onClick={clickVorigeButton}>
+            <Button variant="text" disabled={!thereArePreviousWeeks || loadGames} onClick={clickVorigeButton}>
               { showVorigeButton()} 
             </Button>
           </Grid>
           
 
           <Grid item xs={4}>
-          <Button variant="text" disabled={weekIndex == 0 || weekIndexUpdated} onClick={clickVolgendeButton}>
+          <Button variant="text" disabled={weekIndex == 0 || loadGames} onClick={clickVolgendeButton}>
             {showVolgendeButton()}
           </Button>
           </Grid>
@@ -922,7 +990,7 @@ const showStartAndEndOfWeek = () => {
 
         </Grid>
       </Grid>      
-      
+      {showDuplicateGameDialog()}
       {showModal()} 
     </div>
   );

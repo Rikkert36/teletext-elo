@@ -20,6 +20,24 @@ namespace AnagoLeaderboard.Services
             return game.Id;
 
         }
+        
+        public async Task<bool> IsGameDuplicate(GameForm gameForm)
+        {
+            var game = Game.Create(gameForm);
+            var games = await _dbContext.Games.ToListAsync();
+            
+            var gamesToday = games.Where(game => game.CreatedAt.Date == DateTime.Now.Date);
+            
+            foreach (Game existingGame in gamesToday)
+            {
+                if (game.Equals(existingGame))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         public async Task DeleteGame(string gameId)
         {

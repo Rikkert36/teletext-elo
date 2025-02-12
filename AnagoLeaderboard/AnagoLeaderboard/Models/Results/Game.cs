@@ -22,6 +22,23 @@ namespace AnagoLeaderboard.Models.Results
                 CreatedAt = DateTime.Now
             };
         }
+        
+        public bool Equals(Game otherGame)
+        {
+            if (!otherGame.IsPlayedBy(FirstTeam.FirstPlayer.PlayerId)) return false;
+            
+            var firstPlayerTeam = otherGame.GetTeam(FirstTeam.FirstPlayer.PlayerId);
+            var opponentTeam = otherGame.GetOtherTeam(FirstTeam.FirstPlayer.PlayerId);
+                
+            if (FirstTeam.Goals != firstPlayerTeam.Goals || SecondTeam.Goals != opponentTeam.Goals)
+            {
+                return false;
+            }
+                
+            return firstPlayerTeam.HasPlayer(FirstTeam.SecondPlayer.PlayerId) 
+                   && opponentTeam.HasPlayer(SecondTeam.FirstPlayer.PlayerId)
+                   && opponentTeam.HasPlayer(SecondTeam.SecondPlayer.PlayerId);
+        }
 
         public List<string> GetPlayerIds()
         {
@@ -72,6 +89,22 @@ namespace AnagoLeaderboard.Models.Results
             }
             
             throw new Exception("PlayerID not in team");
+        }
+        
+        public TeamPerformance GetTeam(string playerId)
+        {
+            if (FirstTeam.FirstPlayer.PlayerId.Equals(playerId) || FirstTeam.SecondPlayer.PlayerId.Equals(playerId))
+            {
+                return FirstTeam;
+            }
+
+            if (SecondTeam.FirstPlayer.PlayerId.Equals(playerId) || SecondTeam.SecondPlayer.PlayerId.Equals(playerId))
+            {
+                return SecondTeam;
+            }
+            
+            throw new Exception("PlayerID not in team");
+
         }
 
         public TeamPerformance GetOtherTeam(string playerId)

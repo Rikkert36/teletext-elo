@@ -22,5 +22,10 @@ namespace AnagoLeaderboard.Models.Results
             };
             
         }
+        
+        public bool HasPlayer(string playerId)
+        {
+            return FirstPlayer.PlayerId.Equals(playerId) || SecondPlayer.PlayerId.Equals(playerId);
+        }
     }
 }
