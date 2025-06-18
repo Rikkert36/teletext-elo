@@ -13,14 +13,12 @@ public class PlayerStatistics(
 
 public class PlayerGameNumberTuple
 {
-    public PlayerGameNumberTuple(DynamicRatingPlayer player, int won, int lost)
+    public PlayerGameNumberTuple(DynamicRatingPlayer player, int delta)
     {
         Player = player;
-        Won = won;
-        Lost = lost;
+        Delta = delta;
     }
 
     public DynamicRatingPlayer Player { get; }
-    public int Won { get; }
-    public int Lost { get; }
+    public int Delta { get; }
 }

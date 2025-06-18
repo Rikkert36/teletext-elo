@@ -11,7 +11,10 @@ namespace AnagoLeaderboard.Models.Results
 
         [NotMapped]
         public PlayerPerformance SecondPlayer { get; set; }
+        
         public int Goals { get; set;}
+        
+        public int DeltaPoints { get; set; }
 
         public static TeamPerformance Create(TeamPerformanceForm teamPerformance) {
             return new TeamPerformance()

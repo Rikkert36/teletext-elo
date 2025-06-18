@@ -12,10 +12,6 @@ namespace AnagoLeaderboard.Services
         private readonly List<int> _gamesPlayed;
         private readonly int _team1Goals;
         private readonly int _team2Goals;
-        private readonly int _team1Player1Rating;
-        private readonly int _team1Player2Rating;
-        private readonly int _team2Player1Rating;
-        private readonly int _team2Player2Rating;
 
         private const double lambda = 0.2303;
 
@@ -33,13 +29,9 @@ namespace AnagoLeaderboard.Services
             _kFactor = kFactor;
             _team1Goals = game.FirstTeam.Goals;
             _team2Goals = game.SecondTeam.Goals;
-            _team1Player1Rating = game.FirstTeam.FirstPlayer.OldRating;
-            _team1Player2Rating = game.FirstTeam.SecondPlayer.OldRating;
-            _team2Player1Rating = game.SecondTeam.FirstPlayer.OldRating;
-            _team2Player2Rating = game.SecondTeam.SecondPlayer.OldRating;
         }
 
-        internal List<(int rating, double std, int gamesPlayed, int gamesWon, int gamesLost, int goalsFor, int goalsAgainst)> 
+        internal List<(int rating, double std, int gamesPlayed, int gamesWon, int gamesLost, int goalsFor, int goalsAgainst, int delta)> 
             GetUpdates(List<(int rating, double std, int gamesWon, int gamesLost, int goalsFor, int goalsAgainst)> currentValues)
         {
             var result = CalculateOutcome(
@@ -67,7 +59,7 @@ namespace AnagoLeaderboard.Services
             return result;
         }
 
-        private List<(int rating, double std, int gamesPlayed, int gamesWon, int gamesLost, int goalsFor, int goalsAgainst)> 
+        private List<(int rating, double std, int gamesPlayed, int gamesWon, int gamesLost, int goalsFor, int goalsAgainst, int delta)> 
             CalculateOutcome(List<int> rating, List<int> gamesWon, List<int> gamesLost, List<int> goalsFor, List<int> goalsAgainst)
         {
             var team1Score = _team1Goals > _team2Goals ? 1 : 0;
@@ -112,7 +104,7 @@ namespace AnagoLeaderboard.Services
                 roundedTeam2Player2Delta
                 };
 
-            List<(int rating, double std, int gamesPlayed, int gameWon, int gamesLost, int goalsFor, int goalsAgainst)> result = [];
+            List<(int rating, double std, int gamesPlayed, int gameWon, int gamesLost, int goalsFor, int goalsAgainst, int delta)> result = [];
             for (int i = 0; i < 4; i++)
             {
                 result.Add(
@@ -123,7 +115,8 @@ namespace AnagoLeaderboard.Services
                     gamesWon[i] + (i < 2 ? team1Score : team2Score),
                     gamesLost[i] + (i < 2 ? team2Score : team1Score),
                     goalsFor[i] + (i < 2 ? _team1Goals : _team2Goals),
-                    goalsAgainst[i] + (i < 2 ? _team2Goals : _team1Goals)
+                    goalsAgainst[i] + (i < 2 ? _team2Goals : _team1Goals),
+                    i < 2 ? _team1Goals : _team2Goals
                     )
                 );
             }

@@ -8,6 +8,7 @@ namespace AnagoLeaderboard.Services
     public class GameService
     {
         private readonly DatabaseContext _dbContext;
+
         public GameService(DatabaseContext dbContext)
         {
             _dbContext = dbContext;
@@ -18,16 +19,15 @@ namespace AnagoLeaderboard.Services
             var game = Game.Create(gameForm);
             await _dbContext.AddGame(game);
             return game.Id;
-
         }
-        
+
         public async Task<bool> IsGameDuplicate(GameForm gameForm)
         {
             var game = Game.Create(gameForm);
             var games = await _dbContext.Games.ToListAsync();
-            
+
             var gamesToday = games.Where(game => game.CreatedAt.Date == DateTime.Now.Date);
-            
+
             foreach (Game existingGame in gamesToday)
             {
                 if (game.Equals(existingGame))
@@ -47,16 +47,18 @@ namespace AnagoLeaderboard.Services
                 _dbContext.Attach(game);
                 _dbContext.Remove(game);
                 _dbContext.SaveChanges();
-            } else
+            }
+            else
             {
                 throw new KeyNotFoundException("Game was not found.");
-            };
+            }
+
+            ;
         }
 
         public async Task DeleteGames()
         {
             await _dbContext.DeleteGames();
-
         }
 
         public async Task<Game> GetGame(string Id)
@@ -65,11 +67,10 @@ namespace AnagoLeaderboard.Services
             if (result == null)
             {
                 throw new KeyNotFoundException($"player {Id} does not exist");
-            } else
-            {
-                AddPlayerNames(result);
-                return result;
             }
+
+            AddPlayerNames(result);
+            return result;
         }
 
         public async Task<List<Game>> GetGames()
@@ -79,6 +80,7 @@ namespace AnagoLeaderboard.Services
             {
                 AddPlayerNames(game);
             }
+
             return result;
         }
 
@@ -92,17 +94,19 @@ namespace AnagoLeaderboard.Services
                 result.SecondTeam.SecondPlayer
             };
 
-            players.ForEach(async (PlayerPerformance playerPerformance) =>
-            {
-                var playerNameOrNull = (await _dbContext.Players.FindAsync(playerPerformance.PlayerId));
-                if (playerNameOrNull != null)
+            players.ForEach(
+                async (PlayerPerformance playerPerformance) =>
                 {
-                    playerPerformance.Name = playerNameOrNull.Name;
-                } else
-                {
-                    playerPerformance.Name = "Player not found";
-                }
-            });
+                    var playerNameOrNull = (await _dbContext.Players.FindAsync(playerPerformance.PlayerId));
+                    if (playerNameOrNull != null)
+                    {
+                        playerPerformance.Name = playerNameOrNull.Name;
+                    }
+                    else
+                    {
+                        playerPerformance.Name = "Player not found";
+                    }
+                });
         }
 
         internal async Task<DateTime> GetOldestDate()
@@ -117,12 +121,12 @@ namespace AnagoLeaderboard.Services
             {
                 AddPlayerNames(game);
             }
+
             return result;
         }
 
         public async Task UpdateGame(string gameId, GameForm updatedGame)
         {
-
             var game = await _dbContext.Games.FindAsync(gameId);
             if (game != null)
             {
@@ -134,11 +138,13 @@ namespace AnagoLeaderboard.Services
                 game.FirstTeam.Goals = updatedGame.FirstTeamForm.Goals;
                 game.SecondTeam.Goals = updatedGame.SecondTeamForm.Goals;
                 _dbContext.SaveChanges();
-            } else
+            }
+            else
             {
                 throw new KeyNotFoundException("Game was not found.");
-            };
+            }
 
+            ;
         }
 
         public async Task<List<Game>> GetGamesUntilYear(int year)
@@ -148,6 +154,7 @@ namespace AnagoLeaderboard.Services
             {
                 AddPlayerNames(game);
             }
+
             return result;
         }
     }

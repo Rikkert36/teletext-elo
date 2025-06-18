@@ -50,16 +50,14 @@ namespace AnagoLeaderboard.Services
                 return result;
             }
         }
-
-
+        
         public async Task<PlayerStatistics> GetPlayerStatistics(string id)
         {
-            var games = await _gameService.GetGames();
+            var (_, games) = await _leaderBoardService.GetLeaderBoard();
+            
             var players = await GetPlayers();
-            var wonWithPerPlayer = new Dictionary<string, List<Game>>();
-            var lostWithPerPlayer = new Dictionary<string, List<Game>>();
-            var wonAgainstPerPlayer = new Dictionary<string, List<Game>>();
-            var lostAgainstPerPlayer = new Dictionary<string, List<Game>>();
+            var deltaWithPerPlayer = new Dictionary<string, int>();
+            var deltaAgainstPerPlayer = new Dictionary<string, int>();
 
             foreach (Game game in games)
             {
@@ -67,62 +65,42 @@ namespace AnagoLeaderboard.Services
                 {
                     var teamMemberId = game.GetTeamMemberId(id);
                     var otherTeam = game.GetOtherTeam(id);
-
-                    if (game.IsWonBy(id))
-                    {
-                        AddToMap(wonWithPerPlayer, teamMemberId, game);
-                        AddToMap(wonAgainstPerPlayer, otherTeam.FirstPlayer.PlayerId, game);
-                        AddToMap(wonAgainstPerPlayer, otherTeam.SecondPlayer.PlayerId, game);
-                    }
-                    else
-                    {
-                        AddToMap(lostWithPerPlayer, teamMemberId, game);
-                        AddToMap(lostAgainstPerPlayer, otherTeam.FirstPlayer.PlayerId, game);
-                        AddToMap(lostAgainstPerPlayer, otherTeam.SecondPlayer.PlayerId, game);
-                    }
+                    
+                    AddToMap(deltaWithPerPlayer, teamMemberId, game.GetTeam(id).DeltaPoints);
+                    AddToMap(deltaAgainstPerPlayer, otherTeam.FirstPlayer.PlayerId, game.GetOtherTeam(id).DeltaPoints);
+                    AddToMap(deltaAgainstPerPlayer, otherTeam.SecondPlayer.PlayerId, game.GetOtherTeam(id).DeltaPoints);
                 }
             }
 
             return new PlayerStatistics(
-                await AddResultsWithOtherPlayers(wonWithPerPlayer, lostWithPerPlayer, players),
-                await AddResultsWithOtherPlayers(wonAgainstPerPlayer, lostAgainstPerPlayer, players)
+                AddResultsWithOtherPlayers(deltaWithPerPlayer, players),
+                AddResultsWithOtherPlayers(deltaAgainstPerPlayer, players)
             );
         }
+        
 
-        public async Task<List<PlayerGameNumberTuple>> AddResultsWithOtherPlayers(
-            Dictionary<string, List<Game>> wonPerPlayer,
-            Dictionary<string, List<Game>> lostPerPlayer,
+        private List<PlayerGameNumberTuple> AddResultsWithOtherPlayers(
+            Dictionary<string, int> deltaPerPlayer,
             List<DynamicRatingPlayer> players)
         {
             var result = new List<PlayerGameNumberTuple>();
-            foreach (var playerId in wonPerPlayer.Keys)
+            foreach (var playerId in deltaPerPlayer.Keys)
             {
                 var player = players.FirstOrDefault(x => x.Id == playerId);
-                var lostNumber = lostPerPlayer.TryGetValue(playerId, out var value) ? value.Count : 0;
-                result.Add(new PlayerGameNumberTuple(player, wonPerPlayer[playerId].Count, lostNumber));
-            }
-
-            foreach (var playerId in lostPerPlayer.Keys)
-            {
-                if (result.All(tuple => tuple.Player.Id != playerId))
-                {
-                    var player = players.FirstOrDefault(x => x.Id == playerId);
-                    result.Add(new PlayerGameNumberTuple(player, 0, lostPerPlayer[playerId].Count));
-                }
+                result.Add(new PlayerGameNumberTuple(player, deltaPerPlayer[playerId]));
             }
 
             return result;
         }
-
-        private static void AddToMap(Dictionary<string, List<Game>> playerGameMap, string otherplayerId, Game game)
+        
+        private static void AddToMap(Dictionary<string, int> playerDeltaMap, string otherplayerId, int delta)
         {
-            if (!playerGameMap.TryGetValue(otherplayerId, out List<Game> wonWithList))
+            if (!playerDeltaMap.TryGetValue(otherplayerId, out int currentDelta))
             {
-                wonWithList = [];
-                playerGameMap[otherplayerId] = wonWithList;
+                currentDelta = 0;
             }
 
-            wonWithList.Add(game);
+            playerDeltaMap[otherplayerId] = currentDelta + delta;
         }
 
         public async Task Clear()

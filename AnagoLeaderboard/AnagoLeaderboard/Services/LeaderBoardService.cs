@@ -84,10 +84,18 @@ namespace AnagoLeaderboard.Services
 
                 var ratingCalculator = new RatingCalculator(game, gamesPlayed);
                 var updatedValues = ratingCalculator.GetUpdates(currentValues);
-                playerIdToRating[playerIds[0]] = updatedValues[0];
-                playerIdToRating[playerIds[1]] = updatedValues[1];
-                playerIdToRating[playerIds[2]] = updatedValues[2];
-                playerIdToRating[playerIds[3]] = updatedValues[3];
+                
+                var (_, _, _, _, _, _, _, delta1) = updatedValues[0];
+                var (_, _, _, _, _, _, _, delta2) = updatedValues[2];
+                
+                game.FirstTeam.DeltaPoints = delta1;
+                game.SecondTeam.DeltaPoints = delta2;
+                
+                for (int i = 0; i < playerIds.Count; i++)
+                {
+                    var (rating, std, totalGamesPlayed, gamesWon, gamesLost, goalsFor, goalsAgainst, _) = updatedValues[i];
+                    playerIdToRating[playerIds[i]] = (rating, std, totalGamesPlayed, gamesWon, gamesLost, goalsFor, goalsAgainst);
+                }
             }
 
             var result = playerIdToRating
