@@ -447,7 +447,8 @@ export class Client {
         else
             content_.append("Name", name.toString());
         if (avatar === null || avatar === undefined)
-            throw new Error("The parameter 'avatar' cannot be null.");
+            var x = 32;
+            //throw new Error("The parameter 'avatar' cannot be null.");
         else
             content_.append("Avatar", avatar.data, avatar.fileName ? avatar.fileName : "Avatar");
 
