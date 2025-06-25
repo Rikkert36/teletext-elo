@@ -116,7 +116,7 @@ namespace AnagoLeaderboard.Services
                     gamesLost[i] + (i < 2 ? team2Score : team1Score),
                     goalsFor[i] + (i < 2 ? _team1Goals : _team2Goals),
                     goalsAgainst[i] + (i < 2 ? _team2Goals : _team1Goals),
-                    i < 2 ? _team1Goals : _team2Goals
+                    i < 2 ? (int)Math.Round(team1Delta, 0) : (int)Math.Round(team2Delta, 0)
                     )
                 );
             }

@@ -447,8 +447,8 @@ export class Client {
         else
             content_.append("Name", name.toString());
         if (avatar === null || avatar === undefined)
-            var x = 32;
             //throw new Error("The parameter 'avatar' cannot be null.");
+        var x = 3;
         else
             content_.append("Avatar", avatar.data, avatar.fileName ? avatar.fileName : "Avatar");
 
@@ -1225,8 +1225,8 @@ export interface IGamesInRange {
 
 export class PlayerGameNumberTuple implements IPlayerGameNumberTuple {
     player?: DynamicRatingPlayer;
-    won?: number;
-    lost?: number;
+    delta?: number;
+    numberOfGames?: number;
 
     constructor(data?: IPlayerGameNumberTuple) {
         if (data) {
@@ -1240,8 +1240,8 @@ export class PlayerGameNumberTuple implements IPlayerGameNumberTuple {
     init(_data?: any) {
         if (_data) {
             this.player = _data["player"] ? DynamicRatingPlayer.fromJS(_data["player"]) : <any>undefined;
-            this.won = _data["won"];
-            this.lost = _data["lost"];
+            this.delta = _data["delta"];
+            this.numberOfGames = _data["numberOfGames"];
         }
     }
 
@@ -1255,16 +1255,16 @@ export class PlayerGameNumberTuple implements IPlayerGameNumberTuple {
     toJSON(data?: any) {
         data = typeof data === 'object' ? data : {};
         data["player"] = this.player ? this.player.toJSON() : <any>undefined;
-        data["won"] = this.won;
-        data["lost"] = this.lost;
+        data["delta"] = this.delta;
+        data["numberOfGames"] = this.numberOfGames;
         return data;
     }
 }
 
 export interface IPlayerGameNumberTuple {
     player?: DynamicRatingPlayer;
-    won?: number;
-    lost?: number;
+    delta?: number;
+    numberOfGames?: number;
 }
 
 export class PlayerGamePage implements IPlayerGamePage {
@@ -1431,6 +1431,7 @@ export class TeamPerformance implements ITeamPerformance {
     firstPlayer?: PlayerPerformance;
     secondPlayer?: PlayerPerformance;
     goals?: number;
+    deltaPoints?: number;
 
     constructor(data?: ITeamPerformance) {
         if (data) {
@@ -1446,6 +1447,7 @@ export class TeamPerformance implements ITeamPerformance {
             this.firstPlayer = _data["firstPlayer"] ? PlayerPerformance.fromJS(_data["firstPlayer"]) : <any>undefined;
             this.secondPlayer = _data["secondPlayer"] ? PlayerPerformance.fromJS(_data["secondPlayer"]) : <any>undefined;
             this.goals = _data["goals"];
+            this.deltaPoints = _data["deltaPoints"];
         }
     }
 
@@ -1461,6 +1463,7 @@ export class TeamPerformance implements ITeamPerformance {
         data["firstPlayer"] = this.firstPlayer ? this.firstPlayer.toJSON() : <any>undefined;
         data["secondPlayer"] = this.secondPlayer ? this.secondPlayer.toJSON() : <any>undefined;
         data["goals"] = this.goals;
+        data["deltaPoints"] = this.deltaPoints;
         return data;
     }
 }
@@ -1469,6 +1472,7 @@ export interface ITeamPerformance {
     firstPlayer?: PlayerPerformance;
     secondPlayer?: PlayerPerformance;
     goals?: number;
+    deltaPoints?: number;
 }
 
 export class TeamPerformanceForm implements ITeamPerformanceForm {

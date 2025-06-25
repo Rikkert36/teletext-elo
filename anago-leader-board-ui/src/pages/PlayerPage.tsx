@@ -1,8 +1,8 @@
 import React, { ChangeEvent, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Alert, Avatar, CircularProgress, IconButton, Modal, Snackbar, TextField, Theme, } from '@mui/material';
+import { Alert, Avatar, CircularProgress, IconButton, Modal, Snackbar, TextField, Theme, Tooltip } from '@mui/material';
 import { LineChart } from '@mui/x-charts/LineChart';
-import { ChartsItemContentProps, ChartContainer, ChartsTooltip, ChartsTooltipSlots, DefaultChartsItemTooltipContent  } from '@mui/x-charts';
+import { ChartsItemContentProps, ChartContainer, ChartsTooltip, ChartsTooltipSlots, DefaultChartsItemTooltipContent } from '@mui/x-charts';
 
 import { makeStyles, createStyles, } from '@mui/styles'
 import { AppBar, Toolbar, Typography, Container, Paper, Button, Grid, List, ListItem, ButtonGroup } from '@mui/material';
@@ -134,7 +134,7 @@ const useStyles = makeStyles((theme: Theme) =>
       display: 'flex',
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center', height: '100%' 
+      justifyContent: 'center', height: '100%'
     },
     grow: {
       flexGrow: 1,
@@ -196,19 +196,19 @@ const PlayerPage: React.FC = () => {
       fetchStats();
     }
   }, [playerStats]);
-  
+
   useEffect(() => {
     if (!playerRank) {
       fetchRank();
     }
   }, [playerRank]);
-  
+
   useEffect(() => {
     if (playerGamesIndexUpdated) {
       fetchPlayerGames();
     }
   }, [playerGamesIndexUpdated]);
-  
+
   useEffect(() => {
     if (!allPlayerGames) {
       fetchAllPlayerGames();
@@ -226,7 +226,7 @@ const PlayerPage: React.FC = () => {
   const fetchStats = async () => {
     const playerStats: PlayerStatistics = await client.getPlayerStats(id!);
     SetPlayerStats(playerStats);
-  }  
+  }
 
   const fetchRank = async () => {
     const rank = await client.getPlayerRank(id!);
@@ -249,8 +249,8 @@ const PlayerPage: React.FC = () => {
         ...game,
         createdAt: createdAt, // Optional: Format it back as a string if needed
       } as Game;
-    });    
-    
+    });
+
     setAllPlayerGames(normalizedGames);
   }
 
@@ -370,51 +370,25 @@ const PlayerPage: React.FC = () => {
     return factor + '%';
   }
 
-  const getWinstMagneet = () => {
-    let bestPlayer = undefined;
-    let bestWinPercentage = 0;
-    let wins = 0;
-    let total = 0;
 
-    const threshHold = getThreshold(playerStats?.gamesWith!);
 
-    for (let player of playerStats?.gamesWith!) {
-      const totalGames = player.won! + player.lost!;
-      if (player.won! + player.lost! >= threshHold) {
-        let winPercentage = player.won! / totalGames;
-        if (winPercentage > bestWinPercentage 
-          || (winPercentage == bestWinPercentage && totalGames > total)
-        ) {
-          bestPlayer = player;
-          bestWinPercentage = winPercentage;
-          wins = player.won!;
-          total = totalGames;
-        }
-      }
-    }
+  function getThreshold(gamesPlayed: PlayerGameNumberTuple[]) {
+    // const playedAtLeast10Times = gamesPlayed.filter(
+    //   player => player.numberOfGames! >= 10);
 
-    const playerName = (bestPlayer == undefined) ? "-" : bestPlayer.player!.name;
-    var percentage = Math.round(bestWinPercentage * 100);
-    return [playerName, `${percentage}% (${wins}/${total})`];    
-  }
-
-  function getThreshold(gamesPlayed: PlayerGameNumberTuple[] ) {
-    const playedAtLeast10Times = gamesPlayed.filter(
-      player => (player.won! + player.lost!) >= 10);
-      
-    if (playedAtLeast10Times.length >= 5) {
-      return 10;
-    }
+    // if (playedAtLeast10Times.length >= 10) {
+    //   return 10;
+    // }
 
     const playedAtLeast5TimesWith = gamesPlayed.filter(
-      player => (player.won! + player.lost!) >= 5);
+      player => player.numberOfGames! >= 5);
 
-    if (playedAtLeast5TimesWith.length >= 3) {
+    if (playedAtLeast5TimesWith.length >= 5) {
       return 5;
     }
 
     const playedAtLeast3TimesWith = gamesPlayed.filter(
-      player => (player.won! + player.lost!) >= 3);
+      player => player.numberOfGames! >= 3);
 
     if (playedAtLeast3TimesWith.length >= 1) {
       return 3;
@@ -423,6 +397,7 @@ const PlayerPage: React.FC = () => {
     return 1;
   }
 
+
   const getDateInRightFormat = (d: Date) => {
     const weekDay = toDutchDay(d.getDay());
     const dayOfMonth = d.getDate();
@@ -430,55 +405,29 @@ const PlayerPage: React.FC = () => {
     return `${weekDay}, ${dayOfMonth} ${month}`
   };
 
-  const getPartnerInPain = () => {
-    let worstPlayer = undefined;
-    let worstWinPercentage = 1;
-    let wins = 0;
-    let total = 0;
-
-    const threshHold = getThreshold(playerStats?.gamesWith!);
-
-    for (let player of playerStats?.gamesWith!) {
-      const totalGames = player.won! + player.lost!;
-      if (player.won! + player.lost! >= threshHold) {
-        let winPercentage = player.won! / totalGames;
-        if (winPercentage < worstWinPercentage 
-          || (winPercentage == worstWinPercentage && totalGames > total)) {
-          worstPlayer = player;
-          worstWinPercentage = winPercentage;
-          wins = player.won!;
-          total = totalGames;
-        }
-      }
-    }
-
-    const playerName = (worstPlayer == undefined) ? "-" : worstPlayer.player!.name;
-    var percentage = Math.round(worstWinPercentage * 100);
-    return [playerName, `${percentage}% (${wins}/${total})`];
-  }
 
   const toDutchDay = (day: number): string => {
     switch (day) {
-        case 0:
-            return 'Zondag';
-        case 1:
-            return 'Maandag';
-        case 2:
-            return 'Dinsdag';
-        case 3:
-            return 'Woensdag';
-        case 4:
-            return 'Donderdag';
-        case 5:
-            return 'Vrijdag';
-        case 6: 
-            return 'Zaterdag';
-        default:
-          throw new Error('Invalid weekday index. Month should be between 0 and 11.');
+      case 0:
+        return 'Zondag';
+      case 1:
+        return 'Maandag';
+      case 2:
+        return 'Dinsdag';
+      case 3:
+        return 'Woensdag';
+      case 4:
+        return 'Donderdag';
+      case 5:
+        return 'Vrijdag';
+      case 6:
+        return 'Zaterdag';
+      default:
+        throw new Error('Invalid weekday index. Month should be between 0 and 11.');
     }
-}
+  }
 
-const toDutchMonth = (month: number): string => {
+  const toDutchMonth = (month: number): string => {
     switch (month) {
       case 0:
         return 'januari';
@@ -509,60 +458,42 @@ const toDutchMonth = (month: number): string => {
     }
   };
 
-  const getPracticeMaterial = () => {
-    let worstPlayer = undefined;
-    let bestWinPercentage = 0;
-    let wins = 0;
-    let total = 0;
+  const getRelations = (players: PlayerGameNumberTuple[]) => {
+    const thresHold = getThreshold(players);
+    const eligiblePlayers = players.filter(g => g.numberOfGames! >= thresHold);
 
-    const threshHold = getThreshold(playerStats?.gamesAgainst!);
+    const sortedPlayers = eligiblePlayers.slice().sort(
+      (a, b) => getAverageDelta(b) - getAverageDelta(a)
+    );
 
-    for (let player of playerStats?.gamesAgainst!) {
-      const totalGames = player.won! + player.lost!;
-      if (player.won! + player.lost! >= threshHold) {
-        let winPercentage = player.won! / totalGames;
-        if (winPercentage > bestWinPercentage 
-          || (winPercentage == bestWinPercentage && totalGames > total)) {
-          worstPlayer = player;
-          bestWinPercentage = winPercentage;
-          wins = player.won!;
-          total = totalGames;
-        }
-      }
-    }
+    const result = sortedPlayers.map(player => {
+      const playerName = player?.player?.name ?? "-";
 
-    const playerName = (worstPlayer == undefined) ? "-" : worstPlayer.player!.name;
-    var percentage = Math.round(bestWinPercentage * 100);
-    return [playerName, `${percentage}% (${wins}/${total})`];
+      const avgDeltaNum = getAverageDelta(player);
+      const avgDeltaFormatted =
+        avgDeltaNum > 0
+          ? `+${avgDeltaNum.toFixed(2)}`
+          : avgDeltaNum.toFixed(2);
+
+      const delta = player?.delta;
+      const deltaFormatted =
+        delta == null
+          ? "-"
+          : delta > 0
+            ? `+${delta}`
+            : `${delta}`;
+
+      return [playerName, `${avgDeltaFormatted} (${deltaFormatted})`];
+    });
+
+    return result;
+  };
+
+
+  const getAverageDelta = (player: PlayerGameNumberTuple) => {
+    return player.delta! / player.numberOfGames!;
   }
 
-  const getNemesis = () => {
-    let bestPlayer = undefined;
-    let worstWinPercentage = 1;
-    let wins = 0;
-    let total = 0;
-
-    const threshHold = getThreshold(playerStats?.gamesAgainst!);
-
-    for (let player of playerStats?.gamesAgainst!) {
-      const totalGames = player.won! + player.lost!;
-      if (player.won! + player.lost! >= threshHold) {
-        let winPercentage = player.won! / totalGames;
-        if (winPercentage < worstWinPercentage
-          || (winPercentage == worstWinPercentage && totalGames > total)
-        ) {
-          bestPlayer = player;
-          worstWinPercentage = winPercentage;
-          wins = player.won!;
-          total = totalGames;
-        }
-      }
-    }
-
-    const playerName = (bestPlayer == undefined) ? "-" : bestPlayer.player!.name;
-    var percentage = Math.round(worstWinPercentage * 100);
-    return [playerName, `${percentage}% (${wins}/${total})`];
-  }
 
   const getSelectedColor = (buttonText: string) => {
     if (buttonText === dateRange) {
@@ -572,7 +503,7 @@ const toDutchMonth = (month: number): string => {
   }
 
   const showBasicStatsOrLoading = () => {
-    if (playerLoading || playerRank == null ) {
+    if (playerLoading || playerRank == null) {
       return <CircularProgress />;
     } else {
       return (
@@ -601,63 +532,136 @@ const toDutchMonth = (month: number): string => {
             <Typography className={classes.stats}>{player!.numberOfWins}</Typography>
             <Typography className={classes.stats}>{player!.numberOfLosses}</Typography>
             <Typography className={classes.stats}>{winstPercText()}</Typography>
-          </Grid>          
+          </Grid>
         </Grid>
       );
     };
   }
+
+  const tooltipPlayers = (players: (string | undefined)[][]): JSX.Element => (
+    <Grid container spacing={0.5} direction="column" style={{ minWidth: 400, maxWidth: 600 }}>
+      {players.map(([first, second], i) => (
+        <Grid container item key={i} wrap="nowrap" spacing={1} alignItems="center">
+          <Grid item xs={7}>
+            <Typography
+              noWrap
+              title={first ?? ''}
+              className={classes.playerNames}
+              style={{ maxWidth: '100%' }}
+            >
+              {first ?? ''}
+            </Typography>
+          </Grid>
+          <Grid item xs={5}>
+            <Typography
+              noWrap
+              title={second ?? ''}
+              className={classes.stats}
+              style={{ maxWidth: '100%' }}
+            >
+              {second ?? ''}
+            </Typography>
+          </Grid>
+        </Grid>
+      ))}
+    </Grid>
+  );
+
+  const tooltipStyle = {
+    tooltip: {
+      style: {
+        maxWidth: '450px',
+        minWidth: '300px',
+        backgroundColor: 'black',
+        borderRadius: '4px',
+        padding: '0.5rem 0.75rem',
+      },
+    },
+  };
+
 
   const showCoolStatsOrLoading = () => {
     if (playerStats == null) {
       return <CircularProgress />;
     } else {
-      var [winstMagnet, winstMagnetPerc] = getWinstMagneet();
-      var [partnerInPain, partnerInPainPerc] = getPartnerInPain();
-      var [practiceMaterial, practiceMaterialPerc] = getPracticeMaterial();
-      var [nemesis, nemesisPerc] = getNemesis();
+      const winstMagneets = getRelations(playerStats.gamesWith!).slice(0, 10);
+      const partnerInPains = getRelations(playerStats.gamesWith!).reverse().slice(0, 10);
+      const practiceMaterials = getRelations(playerStats.gamesAgainst!).slice(0, 10);
+      const nemeses = getRelations(playerStats.gamesAgainst!).reverse().slice(0, 10);
 
       return (
-        <Grid container style={{ paddingTop: '1rem' }} display={'-ms-flexbox'} alignItems="center" spacing={2}>          
-          <Grid item xs={6} className={classes.stats}>
-            <Typography className={classes.stats}>winstmagneet</Typography>
-          </Grid>
-          <Grid item xs={6} className={classes.stats}>
-            <Typography className={classes.stats}>{winstMagnetPerc}</Typography>
-          </Grid>
-          <Grid item xs={12} className={classes.stats}>
-            <Typography className={classes.playerNames} gutterBottom noWrap style={{ width: '100%' }}>{winstMagnet}</Typography>
-          </Grid>
-          <Grid item xs={6} className={classes.stats}>
-            <Typography className={classes.stats}>partner in pijn</Typography>
-          </Grid>
-          <Grid item xs={6} className={classes.stats}>
-            <Typography className={classes.stats}>{partnerInPainPerc}</Typography>
-          </Grid>
-          <Grid item xs={12} className={classes.stats}>
-            <Typography className={classes.playerNames} gutterBottom noWrap style={{ width: '100%' }}>{partnerInPain}</Typography>
-          </Grid>
-          <Grid item xs={6} className={classes.stats}>
-            <Typography className={classes.stats}>oefenmateriaal</Typography>
-          </Grid>
-          <Grid item xs={6} className={classes.stats}>
-            <Typography className={classes.stats}>{practiceMaterialPerc}</Typography>
-          </Grid>
-          <Grid item xs={12} className={classes.stats}>
-            <Typography className={classes.playerNames} gutterBottom noWrap style={{ width: '100%' }}>{practiceMaterial}</Typography>
-          </Grid>
-          <Grid item xs={6} className={classes.stats}>
-            <Typography className={classes.stats}>angstgegner</Typography>
-          </Grid>
-          <Grid item xs={6} className={classes.stats}>
-            <Typography className={classes.stats}>{nemesisPerc}</Typography>
-          </Grid>
-          <Grid item xs={12} className={classes.stats}>
-            <Typography className={classes.playerNames} gutterBottom noWrap style={{ width: '100%' }}>{nemesis}</Typography>
-          </Grid>
+        <Grid container style={{ paddingTop: '1rem' }} alignItems="center" spacing={2}>
+          {/* Winstmagneet */}
+          <Tooltip title={tooltipPlayers(winstMagneets)} componentsProps={tooltipStyle}>
+            <Grid container item>
+              <Grid item xs={6} className={classes.stats}>
+                <Typography className={classes.stats}>winstmagneet</Typography>
+              </Grid>
+              <Grid item xs={6} className={classes.stats}>
+                <Typography className={classes.stats}>{winstMagneets[0][1]}</Typography>
+              </Grid>
+              <Grid item xs={12} className={classes.stats}>
+                <Typography className={classes.playerNames} gutterBottom noWrap style={{ width: '100%' }}>
+                  {winstMagneets[0][0]}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Tooltip>
+
+          {/* Partner in pijn */}
+          <Tooltip title={tooltipPlayers(partnerInPains)} componentsProps={tooltipStyle}>
+            <Grid container item>
+              <Grid item xs={6} className={classes.stats}>
+                <Typography className={classes.stats}>partner in pijn</Typography>
+              </Grid>
+              <Grid item xs={6} className={classes.stats}>
+                <Typography className={classes.stats}>{partnerInPains[0][1]}</Typography>
+              </Grid>
+              <Grid item xs={12} className={classes.stats}>
+                <Typography className={classes.playerNames} gutterBottom noWrap style={{ width: '100%' }}>
+                  {partnerInPains[0][0]}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Tooltip>
+
+          {/* Oefenmateriaal */}
+          <Tooltip title={tooltipPlayers(practiceMaterials)} componentsProps={tooltipStyle}>
+            <Grid container item>
+              <Grid item xs={6} className={classes.stats}>
+                <Typography className={classes.stats}>oefenmateriaal</Typography>
+              </Grid>
+              <Grid item xs={6} className={classes.stats}>
+                <Typography className={classes.stats}>{practiceMaterials[0][1]}</Typography>
+              </Grid>
+              <Grid item xs={12} className={classes.stats}>
+                <Typography className={classes.playerNames} gutterBottom noWrap style={{ width: '100%' }}>
+                  {practiceMaterials[0][0]}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Tooltip>
+
+          {/* Angstgegner */}
+          <Tooltip title={tooltipPlayers(nemeses)} componentsProps={tooltipStyle}>
+            <Grid container item>
+              <Grid item xs={6} className={classes.stats}>
+                <Typography className={classes.stats}>angstgegner</Typography>
+              </Grid>
+              <Grid item xs={6} className={classes.stats}>
+                <Typography className={classes.stats}>{nemeses[0][1]}</Typography>
+              </Grid>
+              <Grid item xs={12} className={classes.stats}>
+                <Typography className={classes.playerNames} gutterBottom noWrap style={{ width: '100%' }}>
+                  {nemeses[0][0]}
+                </Typography>
+              </Grid>
+            </Grid>
+          </Tooltip>
         </Grid>
       );
-    };
-  }
+    }
+  };
 
   const showProfileOrloading = () => {
     if (playerLoading) {
@@ -706,24 +710,24 @@ const toDutchMonth = (month: number): string => {
     );
   }
 
-   const showRatingAndDelta = (playerInfo: PlayerPerformance) => {
-      var delta = playerInfo.newRating! - playerInfo.oldRating!;
-      var sign = delta >= 0 ? '+' : '';
-      return (
-          `${playerInfo.oldRating} ${sign}${delta}`
-      )
-    };
+  const showRatingAndDelta = (playerInfo: PlayerPerformance) => {
+    var delta = playerInfo.newRating! - playerInfo.oldRating!;
+    var sign = delta >= 0 ? '+' : '';
+    return (
+      `${playerInfo.oldRating} ${sign}${delta}`
+    )
+  };
 
-    const getDayDelta = (gamesOnDay: Game[]) => {
-      var firstPerformance = getPlayerPerformance(gamesOnDay[0]);
-      var lastPerformance = getPlayerPerformance(gamesOnDay[gamesOnDay.length - 1]);
+  const getDayDelta = (gamesOnDay: Game[]) => {
+    var firstPerformance = getPlayerPerformance(gamesOnDay[0]);
+    var lastPerformance = getPlayerPerformance(gamesOnDay[gamesOnDay.length - 1]);
 
-      var delta = lastPerformance.newRating! - firstPerformance.oldRating!;
-      var sign = delta >= 0 ? '+' : '';
-      return (
-          ` (${firstPerformance.oldRating} ${sign}${delta})`
-      )
-    };
+    var delta = lastPerformance.newRating! - firstPerformance.oldRating!;
+    var sign = delta >= 0 ? '+' : '';
+    return (
+      ` (${firstPerformance.oldRating} ${sign}${delta})`
+    )
+  };
 
 
   const showTeam = (team: TeamPerformance) => {
@@ -742,7 +746,7 @@ const toDutchMonth = (month: number): string => {
         </Grid>
       </>
     );
-  } 
+  }
 
   const getOwnTeamPerformance = (game: Game): TeamPerformance => {
     if (game.firstTeam?.firstPlayer?.playerId == id) return game.firstTeam!;
@@ -764,44 +768,44 @@ const toDutchMonth = (month: number): string => {
     if (game.secondTeam?.firstPlayer?.playerId == id) return game.secondTeam?.firstPlayer!;
     return game.secondTeam?.secondPlayer!;
   }
-  
-const showGames = (games: Game[]) => {
-  if (games != null && games[0].createdAt != null) {
-  return (
-    <div>
-      <Paper className={classes.dayPaper}>
-        {getDateInRightFormat(games[0].createdAt!) + ' - ' + 
-        getPlayerPerformance(games[games.length - 1]).newRating + 
-        getDayDelta(games) + ':' }
-      </Paper>
-      {games!.map((game) => (showTooltipGame(game)))}
-    </div>
-  ); 
-  } else {
-    return <div>{"no"}</div>;
-  }
-}
 
-const showTooltipGame = (game: Game) => {
-  return <Paper className={classes.matchPaper}>
-        <Grid container>
-          {showOwnTeam(game)}
-          {showTeam(getOtherTeamPerformance(game))}
-        </Grid>
-      </Paper>
-}
+  const showGames = (games: Game[]) => {
+    if (games != null && games[0].createdAt != null) {
+      return (
+        <div>
+          <Paper className={classes.dayPaper}>
+            {getDateInRightFormat(games[0].createdAt!) + ' - ' +
+              getPlayerPerformance(games[games.length - 1]).newRating +
+              getDayDelta(games) + ':'}
+          </Paper>
+          {games!.map((game) => (showTooltipGame(game)))}
+        </div>
+      );
+    } else {
+      return <div>{"no"}</div>;
+    }
+  }
+
+  const showTooltipGame = (game: Game) => {
+    return <Paper className={classes.matchPaper}>
+      <Grid container>
+        {showOwnTeam(game)}
+        {showTeam(getOtherTeamPerformance(game))}
+      </Grid>
+    </Paper>
+  }
 
   function createZeroRatingGame(referenceDate: Date): Game {
     // Helper function to create a PlayerPerformance
     const createPlayerPerformance = (playerId: string): PlayerPerformance => {
-        return new PlayerPerformance({
-            playerId: playerId,
-            name: undefined,
-            oldRating: undefined,
-            newRating: 0,
-            stdBefore: undefined,
-            stdAfter: undefined,
-        });
+      return new PlayerPerformance({
+        playerId: playerId,
+        name: undefined,
+        oldRating: undefined,
+        newRating: 0,
+        stdBefore: undefined,
+        stdAfter: undefined,
+      });
     };
 
     // Create two teams with two players each
@@ -823,49 +827,49 @@ const showTooltipGame = (game: Game) => {
     game.createdAt = new Date(referenceDate.getTime() - 7 * 24 * 60 * 60 * 1000); // A day before the reference date
 
     return game;
-}
+  }
 
-function groupGamesByDate(games: Game[]) : Game[][] {
-  // Use a Map to group games by their date
-  const groupedGames = games.reduce((acc, game) => {
-    // Extract the date portion from the `createdAt` timestamp (ignoring the time)
-    const gameDate = new Date(game.createdAt!).toISOString().split('T')[0];
+  function groupGamesByDate(games: Game[]): Game[][] {
+    // Use a Map to group games by their date
+    const groupedGames = games.reduce((acc, game) => {
+      // Extract the date portion from the `createdAt` timestamp (ignoring the time)
+      const gameDate = new Date(game.createdAt!).toISOString().split('T')[0];
 
-    // Initialize the array for this date if it doesn't exist
-    if (!acc.has(gameDate)) {
-      acc.set(gameDate, []);
-    }
+      // Initialize the array for this date if it doesn't exist
+      if (!acc.has(gameDate)) {
+        acc.set(gameDate, []);
+      }
 
-    // Add the current game to the array for this date
-    acc.get(gameDate).push(game);
+      // Add the current game to the array for this date
+      acc.get(gameDate).push(game);
 
-    return acc;
-  }, new Map());
+      return acc;
+    }, new Map());
 
-  // Convert the Map to a 2D array
-  const groupedArray: Game[][] = Array.from(groupedGames.values());
+    // Convert the Map to a 2D array
+    const groupedArray: Game[][] = Array.from(groupedGames.values());
 
-  var result = groupedArray.filter(gameList => {
-    const gameDate = new Date(gameList[0].createdAt!);
-    const now = new Date();
+    var result = groupedArray.filter(gameList => {
+      const gameDate = new Date(gameList[0].createdAt!);
+      const now = new Date();
 
-    switch (dateRange) {
-      case '1month':
-        return gameDate >= new Date(now.setMonth(now.getMonth() - 1));
-      case '3months':
-        return gameDate >= new Date(now.setMonth(now.getMonth() - 3));
-      case '6months':
-        return gameDate >= new Date(now.setMonth(now.getMonth() - 6));
-      case '1year':
-        return gameDate >= new Date(now.setFullYear(now.getFullYear() - 1));
-      case 'all':
-        return true; // Show all games
-      default:
-        return true;
-    }
-  });
-  return result;
-}
+      switch (dateRange) {
+        case '1month':
+          return gameDate >= new Date(now.setMonth(now.getMonth() - 1));
+        case '3months':
+          return gameDate >= new Date(now.setMonth(now.getMonth() - 3));
+        case '6months':
+          return gameDate >= new Date(now.setMonth(now.getMonth() - 6));
+        case '1year':
+          return gameDate >= new Date(now.setFullYear(now.getFullYear() - 1));
+        case 'all':
+          return true; // Show all games
+        default:
+          return true;
+      }
+    });
+    return result;
+  }
 
   const showRatingProgressChart = () => {
     if (allPlayerGames == null) {
@@ -875,27 +879,27 @@ function groupGamesByDate(games: Game[]) : Game[][] {
     } else {
 
       const gamesWith0 = [
-        createZeroRatingGame(allPlayerGames[0].createdAt!),        
+        createZeroRatingGame(allPlayerGames[0].createdAt!),
         ...allPlayerGames]
 
       const filteredGames = Object.values(
         gamesWith0.reduce((acc, game) => {
           // Get the date portion of the `createdAt` timestamp (ignoring the time)
           const gameDate = new Date(game.createdAt!).toISOString().split('T')[0];
-      
+
           // If there's no game for this date or the current game is later, update the entry
           if (!acc[gameDate] || new Date(game.createdAt!) >= new Date(acc[gameDate].createdAt!)) {
             acc[gameDate] = game;
           }
-      
+
           return acc;
         }, {} as Record<string, Game>)
       );
-      
+
       const recentGames = filteredGames.filter(game => {
         const gameDate = new Date(game.createdAt!);
         const now = new Date();
-    
+
         switch (dateRange) {
           case '1month':
             return gameDate >= new Date(now.setMonth(now.getMonth() - 1));
@@ -924,11 +928,11 @@ function groupGamesByDate(games: Game[]) : Game[][] {
 
       const dates = [
         ...recentGames.map(game => game.createdAt),
-      ];     
+      ];
       const maxTicks = 7; // Maximum number of labels
       const minDate = dates[0]; // Earliest date in milliseconds
       const maxDate = dates[dates.length - 1]; // Latest date in milliseconds
-      const step = (maxDate?.getTime()! - minDate?.getTime()!) / maxTicks; 
+      const step = (maxDate?.getTime()! - minDate?.getTime()!) / maxTicks;
 
       // Generate custom ticks
       const customTicks = Array.from({ length: maxTicks + 1 }, (_, i) => {
@@ -937,74 +941,77 @@ function groupGamesByDate(games: Game[]) : Game[][] {
         return tickDate.getTime(); // Return the timestamp
       });
 
-      const tooltipGames : Game[][] = groupGamesByDate(gamesWith0);
-      return (        
-          <Paper style={{ width: '100%' }}  className={classes.matchPaper}>
-            <LineChart
-              tooltip={
-                { trigger: 'axis', 
-                  axisContent: (props) => {
-                    const { dataIndex, series } = props;
+      const tooltipGames: Game[][] = groupGamesByDate(gamesWith0);
+      return (
+        <Paper style={{ width: '100%' }} className={classes.matchPaper}>
+          <LineChart
+            tooltip={
+              {
+                trigger: 'axis',
+                axisContent: (props) => {
+                  const { dataIndex, series } = props;
 
-                    return showGames(tooltipGames[dataIndex!])
-                  }
-              } }             
-              series={[
-                {                   
-                data: ratingPerGame, 
-                showMark: false, 
+                  return showGames(tooltipGames[dataIndex!])
+                }
+              }}
+            series={[
+              {
+                data: ratingPerGame,
+                showMark: false,
                 //area: true,
                 baseline: 'min',
-                curve:'linear', 
-                id: 'pvId' ,
-                }
+                curve: 'linear',
+                id: 'pvId',
+              }
             ]}
-              xAxis={[{ 
-                data: dates, 
-                min: dates[0],
-                max: dates[dates.length - 1],
-                valueFormatter: (value) => {
-                  return new Intl.DateTimeFormat('nl-NL', { day: '2-digit', month: 'short' }).format(new Date(value));              
-                },
-                tickInterval:customTicks
-              }]}
-              grid={{ horizontal: true }}
-              height={600}
-              sx={{'.MuiLineElement-series-pvId': {
-              strokeDasharray: '2 2', // Dashed line for the first series
-              stroke:"#00ff00"
+            xAxis={[{
+              data: dates,
+              min: dates[0],
+              max: dates[dates.length - 1],
+              valueFormatter: (value) => {
+                return new Intl.DateTimeFormat('nl-NL', { day: '2-digit', month: 'short' }).format(new Date(value));
+              },
+              tickInterval: customTicks
+            }]}
+            grid={{ horizontal: true }}
+            height={600}
+            sx={{
+              '.MuiLineElement-series-pvId': {
+                strokeDasharray: '2 2', // Dashed line for the first series
+                stroke: "#00ff00"
               },
               '& .MuiPopper-root': {
                 stroke: '#ff0000', // Set vertical cursor line color
                 strokeWidth: 2,   // Set line thickness
                 strokeDasharray: '4 2', // Optional: dashed line style
               },
-              "& .MuiChartsAxis-left .MuiChartsAxis-tickLabel":{
-                fill:"#00ff00"
+              "& .MuiChartsAxis-left .MuiChartsAxis-tickLabel": {
+                fill: "#00ff00"
               },
               "& .MuiMarkElement-root": {
-                  fill: "#ff0000", // Set the mark color (red in this case)
+                fill: "#ff0000", // Set the mark color (red in this case)
               },
-              "& .MuiChartsAxis-bottom .MuiChartsAxis-tickLabel":{
-                fill:"#00ff00"
+              "& .MuiChartsAxis-bottom .MuiChartsAxis-tickLabel": {
+                fill: "#00ff00"
               },
-              "& .MuiChartsAxis-bottom .MuiChartsAxis-line":{
-                stroke:"#00ff00",
+              "& .MuiChartsAxis-bottom .MuiChartsAxis-line": {
+                stroke: "#00ff00",
               },
-              "& .MuiChartsAxis-left .MuiChartsAxis-line":{
-                stroke:"#00ff00",
+              "& .MuiChartsAxis-left .MuiChartsAxis-line": {
+                stroke: "#00ff00",
               },
-              "& .MuiChartsAxis-tick":{
-              stroke:"#00ff00",
-              }}}
-              yAxis={[{
-                tickNumber: 5
-              }]}
-              // yAxis={[{colorMap:{
-              //   type: 'piecewise',
-              //   thresholds: [0, 10],
-              //   colors: ['red', 'green', 'rgba(125, 254, 227, 0.5)'],}}]}
-              //yAxis={[{min: 1200}]}
+              "& .MuiChartsAxis-tick": {
+                stroke: "#00ff00",
+              }
+            }}
+            yAxis={[{
+              tickNumber: 5
+            }]}
+          // yAxis={[{colorMap:{
+          //   type: 'piecewise',
+          //   thresholds: [0, 10],
+          //   colors: ['red', 'green', 'rgba(125, 254, 227, 0.5)'],}}]}
+          //yAxis={[{min: 1200}]}
           />
 
           <div className={classes.buttonContainer}>
@@ -1014,10 +1021,10 @@ function groupGamesByDate(games: Game[]) : Game[][] {
             <Button className={classes.button + ' ' + getSelectedColor('3months')} onClick={() => setDateRange('3months')}>3 maanden</Button>
             <Button className={classes.button + ' ' + getSelectedColor('1month')} onClick={() => setDateRange('1month')}>1 maand</Button>
           </div>
-          </Paper>
-          
-          ); 
-      }
+        </Paper>
+
+      );
+    }
   }
 
   console.log('PlayerPage - id:', id);
@@ -1066,7 +1073,7 @@ function groupGamesByDate(games: Game[]) : Game[][] {
       {editPlayerModal()}
     </div>
   );
-  
+
 };
 
 

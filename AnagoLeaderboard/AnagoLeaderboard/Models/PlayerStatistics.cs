@@ -13,12 +13,15 @@ public class PlayerStatistics(
 
 public class PlayerGameNumberTuple
 {
-    public PlayerGameNumberTuple(DynamicRatingPlayer player, int delta)
+    public PlayerGameNumberTuple(DynamicRatingPlayer player, int delta, int numberOfGames)
     {
         Player = player;
         Delta = delta;
+        NumberOfGames = numberOfGames;
     }
 
     public DynamicRatingPlayer Player { get; }
     public int Delta { get; }
+    
+    public int NumberOfGames { get; }
 }

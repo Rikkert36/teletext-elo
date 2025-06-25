@@ -46,6 +46,7 @@ const generatePlaceholderImage = () => {
   return `https://picsum.photos/50/50?random=${randomNum}`;
 };
 
+
 // const initialPlayers: Player[] = [
 //   { id: 1, name: 'Jan van Griensven', rating: 934, matchesPlayed: 10, wins: 5, losses: 5, goalsFor: 65, goalsAgainst: 33, avatar: null },
 //   { Id: 2, name: 'Alexander', rating: 1145, matchesPlayed: 10, wins: 7, losses: 3, goalsFor: 80, goalsAgainst: 13, avatar: null },

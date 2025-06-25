@@ -14,6 +14,7 @@ namespace AnagoLeaderboard.Models.Results
         
         public int Goals { get; set;}
         
+        [NotMapped]
         public int DeltaPoints { get; set; }
 
         public static TeamPerformance Create(TeamPerformanceForm teamPerformance) {

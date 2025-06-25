@@ -3,6 +3,7 @@ using AnagoLeaderboard.Models;
 using AnagoLeaderboard.Models.RequestParameters;
 using AnagoLeaderboard.Models.Results;
 using Microsoft.EntityFrameworkCore;
+using MoreLinq.Extensions;
 
 namespace AnagoLeaderboard.Services
 {
@@ -57,7 +58,10 @@ namespace AnagoLeaderboard.Services
             
             var players = await GetPlayers();
             var deltaWithPerPlayer = new Dictionary<string, int>();
+            var gamesWithPlayer = new Dictionary<string, int>();
+            
             var deltaAgainstPerPlayer = new Dictionary<string, int>();
+            var gamesAgainstPlayer = new Dictionary<string, int>();
 
             foreach (Game game in games)
             {
@@ -67,27 +71,31 @@ namespace AnagoLeaderboard.Services
                     var otherTeam = game.GetOtherTeam(id);
                     
                     AddToMap(deltaWithPerPlayer, teamMemberId, game.GetTeam(id).DeltaPoints);
-                    AddToMap(deltaAgainstPerPlayer, otherTeam.FirstPlayer.PlayerId, game.GetOtherTeam(id).DeltaPoints);
-                    AddToMap(deltaAgainstPerPlayer, otherTeam.SecondPlayer.PlayerId, game.GetOtherTeam(id).DeltaPoints);
+                    AddToMap(gamesWithPlayer, teamMemberId, 1);
+                    AddToMap(deltaAgainstPerPlayer, otherTeam.FirstPlayer.PlayerId, -game.GetOtherTeam(id).DeltaPoints);
+                    AddToMap(gamesAgainstPlayer, otherTeam.FirstPlayer.PlayerId, 1);
+                    AddToMap(deltaAgainstPerPlayer, otherTeam.SecondPlayer.PlayerId, -game.GetOtherTeam(id).DeltaPoints);
+                    AddToMap(gamesAgainstPlayer, otherTeam.SecondPlayer.PlayerId, 1);
                 }
             }
 
             return new PlayerStatistics(
-                AddResultsWithOtherPlayers(deltaWithPerPlayer, players),
-                AddResultsWithOtherPlayers(deltaAgainstPerPlayer, players)
+                AddResultsWithOtherPlayers(deltaWithPerPlayer, gamesWithPlayer, players),
+                AddResultsWithOtherPlayers(deltaAgainstPerPlayer, gamesAgainstPlayer, players)
             );
         }
         
-
         private List<PlayerGameNumberTuple> AddResultsWithOtherPlayers(
             Dictionary<string, int> deltaPerPlayer,
+            Dictionary<string, int> numberOfGames,
             List<DynamicRatingPlayer> players)
         {
             var result = new List<PlayerGameNumberTuple>();
             foreach (var playerId in deltaPerPlayer.Keys)
             {
                 var player = players.FirstOrDefault(x => x.Id == playerId);
-                result.Add(new PlayerGameNumberTuple(player, deltaPerPlayer[playerId]));
+                if (player.Active)
+                    result.Add(new PlayerGameNumberTuple(player, deltaPerPlayer[playerId], numberOfGames[playerId]));
             }
 
             return result;
