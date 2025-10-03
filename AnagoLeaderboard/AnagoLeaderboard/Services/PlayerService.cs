@@ -134,11 +134,9 @@ namespace AnagoLeaderboard.Services
         {
             var players = await GetPlayers();
             var highestRatedPlayer = players.OrderByDescending(player => player.Rating).FirstOrDefault();
-            var filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\{highestRatedPlayer.Id}";
-            if (File.Exists(filePath))
-            {
-            }
-            else
+            var randomPlayer = players[new Random().Next(players.Count)];
+            var filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\{randomPlayer.Id}";
+            if (!File.Exists(filePath))
             {
                 filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\empty-avatar.jpg";
             }
