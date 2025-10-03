@@ -2,7 +2,28 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="http://rik-dev.anago.io/tafelvoetbal-server/api/player/one/avatar" />
+    <script>
+      async function setFaviconNoCache(url) {
+        const res = await fetch(url, { cache: 'no-store', credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to fetch favicon');
+        const blob = await res.blob();
+        const objectUrl = URL.createObjectURL(blob);
+      
+        let link = document.getElementById('app-favicon') || document.createElement('link');
+        link.id = 'app-favicon';
+        link.rel = 'icon';
+        link.type = blob.type || 'image/png';
+        link.href = objectUrl;
+        document.head.appendChild(link);
+      
+        // Clean up the previous blob url to avoid leaks
+        if (setFaviconNoCache._prev) URL.revokeObjectURL(setFaviconNoCache._prev);
+        setFaviconNoCache._prev = objectUrl;
+      }
+    
+      // Call whenever the avatar changes:
+      setFaviconNoCache('https://rik-dev.anago.io/tafelvoetbal-server/api/player/one/avatar');
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
     <meta
