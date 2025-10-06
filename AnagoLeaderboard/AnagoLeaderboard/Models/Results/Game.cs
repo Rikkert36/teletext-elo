@@ -50,6 +50,16 @@ namespace AnagoLeaderboard.Models.Results
                 SecondTeam.SecondPlayer.PlayerId
             };
         }
+        
+        public List<PlayerPerformance> GetPlayers() {
+            return new List<PlayerPerformance>()
+            {
+                FirstTeam.FirstPlayer,
+                FirstTeam.SecondPlayer,
+                SecondTeam.FirstPlayer,
+                SecondTeam.SecondPlayer
+            };
+        }
 
         public bool IsWonBy(string playerId)
         {
@@ -89,6 +99,16 @@ namespace AnagoLeaderboard.Models.Results
             }
             
             throw new Exception("PlayerID not in team");
+        }
+
+        public TeamPerformance GetWinningTeam()
+        {
+            if (FirstTeam.Goals > SecondTeam.Goals)
+            {
+                return FirstTeam;
+            }
+
+            return SecondTeam;
         }
         
         public TeamPerformance GetTeam(string playerId)

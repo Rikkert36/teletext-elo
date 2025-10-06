@@ -11,10 +11,12 @@ namespace AnagoLeaderboard.Controllers
     public class PlayerController : ControllerBase
     {
         private readonly PlayerService _playerService;
+        private readonly ChampionService _championService;
 
-        public PlayerController(PlayerService playerService)
+        public PlayerController(PlayerService playerService, ChampionService championService)
         {
             _playerService = playerService;
+            _championService = championService;
         }
 
         [HttpPost("player")]
@@ -102,6 +104,12 @@ namespace AnagoLeaderboard.Controllers
         {
             var fileBytes = await _playerService.GetPlayerOneAvatar();
             return File(fileBytes, "image/jpeg");
+        }
+        
+        [HttpGet]
+        public async Task<List<ChampionChange>> GetChampionHistory()
+        {
+            return await _championService.GetChampionHistory();
         }
 
         [HttpGet("player/{id}/rank")]
