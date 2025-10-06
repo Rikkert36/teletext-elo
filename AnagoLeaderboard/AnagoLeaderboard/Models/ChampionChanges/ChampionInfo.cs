@@ -10,6 +10,15 @@ public class ChampionInfo : EqualityComparer<ChampionInfo> {
         Name = name;
     }
     
+    public string ToString()
+    {
+        int index = Name.IndexOfAny(new char[] { ' ', '\t', '\n', '\r' });
+
+        string firstWord = index == -1 ? Name : Name.Substring(0, index);
+
+        return firstWord;
+    }
+    
     public override bool Equals(ChampionInfo? x, ChampionInfo? y)
     {
         if (x is null && y is null) return true;

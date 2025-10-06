@@ -18,6 +18,24 @@ public class ChampionService
         _gameService = gameService;
         _random = new Random(RandomnessSeed);
     }
+    
+    public async Task<byte[]> GetChampionAvatar()
+    {
+        var history = await GetChampionHistory();
+        var champion = history.LastOrDefault()?.NewChampion;
+        if (champion == null)
+        {
+            return Array.Empty<byte>();
+        }
+
+        var filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\{champion.Id}";
+        if (!File.Exists(filePath))
+        {
+            filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\empty-avatar.jpg";
+        }
+
+        return System.IO.File.ReadAllBytes(filePath);
+    }
 
     public async Task<List<ChampionChange>> GetChampionHistory()
     {
@@ -77,6 +95,7 @@ public class ChampionService
                 result.Add(new ChampionChange(currentChampion, newChampion, game.CreatedAt, game));
                 currentChampion = newChampion;
             }
+            daysSinceChampionPlayed++;
 
         }
 

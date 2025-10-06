@@ -25,6 +25,7 @@ builder.Services.AddCors(
 builder.Services.AddScoped<LeaderBoardService>();
 builder.Services.AddScoped<GameService>();
 builder.Services.AddScoped<PlayerService>();
+builder.Services.AddScoped<ChampionService>();
 
 builder.Services.AddControllers();
 
