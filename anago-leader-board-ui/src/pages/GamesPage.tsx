@@ -8,6 +8,7 @@ import {
   Modal,
   Select,
   MenuItem,
+  Tooltip
 
 } from '@mui/material';
 import { styled } from '@mui/system';
@@ -22,7 +23,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import { Theme} from '@mui/material';
 import {   makeStyles,  createStyles, ThemeProvider} from '@mui/styles';
-import { Client, Game, GameForm, PlayerPerformance, TeamPerformance, GamesInRange, DynamicRatingPlayer } from '../clients/server.generated';
+import { Client, Game, GameForm, PlayerPerformance, TeamPerformance, GamesInRange, DynamicRatingPlayer, GameWithAnalytics } from '../clients/server.generated';
 
 // interface PlayerMatchInfo {
 //     id: string,
@@ -45,7 +46,7 @@ import { Client, Game, GameForm, PlayerPerformance, TeamPerformance, GamesInRang
 
 interface GamesPerDay {
     day: Date,
-    games: Game[]
+    games: GameWithAnalytics[]
 }
 
 interface GamesPerDayList {
@@ -398,6 +399,18 @@ const GamesPage: React.FC = () => {
     setLoadGames(false);
   };
 
+  const tooltipStyle = {
+    tooltip: {
+      style: {
+        maxWidth: '450px',
+        minWidth: '300px',
+        backgroundColor: 'black',
+        borderRadius: '4px',
+        padding: '0.5rem 0.75rem',
+      },
+    },
+  };
+
 
 //   const handleTeam1Player1Change = (event: SelectChangeEvent) => {
 //     setNewMatchForm({
@@ -523,6 +536,7 @@ const GamesPage: React.FC = () => {
 
   const showMatchesOnDay = (day: GamesPerDay) => {
     return day.games.map((match) => (
+      <Tooltip title={gameAnalyticsTooltip(winstMagneets)} componentsProps={tooltipStyle}>
         <Paper className={classes.matchPaper}>
             <Grid container>
                 {showTeam(match.firstTeam!)}
@@ -530,6 +544,7 @@ const GamesPage: React.FC = () => {
             </Grid>
             
         </Paper>
+                </Tooltip>
     ));
   };
 
@@ -776,6 +791,35 @@ const GamesPage: React.FC = () => {
       setIsSaving(false);
       refreshMatches();
   }
+
+  const gameAnalyticsTooltip = (players: (string | undefined)[][]): JSX.Element => (
+      <Grid container spacing={0.5} direction="column" style={{ minWidth: 400, maxWidth: 600 }}>
+        {players.map(([first, second], i) => (
+          <Grid container item key={i} wrap="nowrap" spacing={1} alignItems="center">
+            <Grid item xs={7}>
+              <Typography
+                noWrap
+                title={first ?? ''}
+                className={classes.playerNames}
+                style={{ maxWidth: '100%' }}
+              >
+                {first ?? ''}
+              </Typography>
+            </Grid>
+            <Grid item xs={5}>
+              <Typography
+                noWrap
+                title={second ?? ''}
+                className={classes.stats}
+                style={{ maxWidth: '100%' }}
+              >
+                {second ?? ''}
+              </Typography>
+            </Grid>
+          </Grid>
+        ))}
+      </Grid>
+    );
 
   function showModal() {
     return <Modal
