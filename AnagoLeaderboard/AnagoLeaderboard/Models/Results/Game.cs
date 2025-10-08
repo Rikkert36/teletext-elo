@@ -162,5 +162,10 @@ namespace AnagoLeaderboard.Models.Results
                 || SecondTeam.FirstPlayer.PlayerId.Equals(id)
                 || SecondTeam.SecondPlayer.PlayerId.Equals(id);
         }
+        
+        public string ToString(){
+            return $"{FirstTeam.FirstPlayer.ToString()}, {FirstTeam.SecondPlayer.ToString()} {FirstTeam.Goals} "
+                   + $"- {SecondTeam.Goals} {SecondTeam.FirstPlayer.ToString()}, {SecondTeam.SecondPlayer.ToString()}";
+        }
     }
 }

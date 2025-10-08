@@ -10,7 +10,7 @@ public class ChampionInfo : EqualityComparer<ChampionInfo> {
         Name = name;
     }
     
-    public string GetDisplayName()
+    public string ToString()
     {
         int index = Name.IndexOfAny(new char[] { ' ', '\t', '\n', '\r' });
 

@@ -102,14 +102,15 @@ namespace AnagoLeaderboard.Controllers
         [HttpGet("player/one/avatar")]
         public async Task<IActionResult> GetPlayerOneAvatar()
         {
-            var fileBytes = await _playerService.GetPlayerOneAvatar();
+            var fileBytes = await _championService.GetChampionAvatar();
             return File(fileBytes, "image/jpeg");
         }
         
-        [HttpGet]
-        public async Task<List<ChampionChange>> GetChampionHistory()
+        [HttpGet("player/champion-history")]
+        public async Task<List<string>> GetChampionHistory()
         {
-            return await _championService.GetChampionHistory();
+            var history = await _championService.GetChampionHistory();
+            return history.Select(change => change.ToString()).ToList();
         }
 
         [HttpGet("player/{id}/rank")]

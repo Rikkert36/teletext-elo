@@ -30,5 +30,14 @@ namespace AnagoLeaderboard.Models.Results
             StdBefore = stdBefore;
             StdAfter = stdAfter;
         }
+        
+        public string ToString()
+        {
+            int index = Name.IndexOfAny(new char[] { ' ', '\t', '\n', '\r' });
+
+            string firstWord = index == -1 ? Name : Name.Substring(0, index);
+
+            return firstWord;
+        }
     }
 }
