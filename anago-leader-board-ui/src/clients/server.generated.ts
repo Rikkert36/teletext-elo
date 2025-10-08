@@ -301,6 +301,50 @@ export class Client {
     /**
      * @return Success
      */
+    getGameScores(): Promise<string[]> {
+        let url_ = this.baseUrl + "/api/games/scores";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "text/plain"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetGameScores(_response);
+        });
+    }
+
+    protected processGetGameScores(response: Response): Promise<string[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(item);
+            }
+            else {
+                result200 = <any>null;
+            }
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<string[]>(null as any);
+    }
+
+    /**
+     * @return Success
+     */
     getGamesInRange(start: Date, end: Date): Promise<GamesInRange> {
         let url_ = this.baseUrl + "/api/games/{start}/{end}";
         if (start === undefined || start === null)
@@ -889,6 +933,50 @@ export class Client {
     /**
      * @return Success
      */
+    getChampionHistory(): Promise<string[]> {
+        let url_ = this.baseUrl + "/api/player/champion-history";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "text/plain"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetChampionHistory(_response);
+        });
+    }
+
+    protected processGetChampionHistory(response: Response): Promise<string[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            let resultData200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver);
+            if (Array.isArray(resultData200)) {
+                result200 = [] as any;
+                for (let item of resultData200)
+                    result200!.push(item);
+            }
+            else {
+                result200 = <any>null;
+            }
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<string[]>(null as any);
+    }
+
+    /**
+     * @return Success
+     */
     getPlayerRank(id: string): Promise<number> {
         let url_ = this.baseUrl + "/api/player/{id}/rank";
         if (id === undefined || id === null)
@@ -1175,8 +1263,92 @@ export interface IGameForm {
     secondTeamForm?: TeamPerformanceForm;
 }
 
+export class GameWithAnalytics implements IGameWithAnalytics {
+    id?: string | undefined;
+    firstTeam?: TeamPerformance;
+    secondTeam?: TeamPerformance;
+    createdAt?: Date;
+    probabilityPerScore?: number[] | undefined;
+    deltaPerScore?: number[] | undefined;
+    expectedScore?: number;
+    actualScore?: number;
+    probabilityFirstTeamWins?: number;
+
+    constructor(data?: IGameWithAnalytics) {
+        if (data) {
+            for (var property in data) {
+                if (data.hasOwnProperty(property))
+                    (<any>this)[property] = (<any>data)[property];
+            }
+        }
+    }
+
+    init(_data?: any) {
+        if (_data) {
+            this.id = _data["id"];
+            this.firstTeam = _data["firstTeam"] ? TeamPerformance.fromJS(_data["firstTeam"]) : <any>undefined;
+            this.secondTeam = _data["secondTeam"] ? TeamPerformance.fromJS(_data["secondTeam"]) : <any>undefined;
+            this.createdAt = _data["createdAt"] ? new Date(_data["createdAt"].toString()) : <any>undefined;
+            if (Array.isArray(_data["probabilityPerScore"])) {
+                this.probabilityPerScore = [] as any;
+                for (let item of _data["probabilityPerScore"])
+                    this.probabilityPerScore!.push(item);
+            }
+            if (Array.isArray(_data["deltaPerScore"])) {
+                this.deltaPerScore = [] as any;
+                for (let item of _data["deltaPerScore"])
+                    this.deltaPerScore!.push(item);
+            }
+            this.expectedScore = _data["expectedScore"];
+            this.actualScore = _data["actualScore"];
+            this.probabilityFirstTeamWins = _data["probabilityFirstTeamWins"];
+        }
+    }
+
+    static fromJS(data: any): GameWithAnalytics {
+        data = typeof data === 'object' ? data : {};
+        let result = new GameWithAnalytics();
+        result.init(data);
+        return result;
+    }
+
+    toJSON(data?: any) {
+        data = typeof data === 'object' ? data : {};
+        data["id"] = this.id;
+        data["firstTeam"] = this.firstTeam ? this.firstTeam.toJSON() : <any>undefined;
+        data["secondTeam"] = this.secondTeam ? this.secondTeam.toJSON() : <any>undefined;
+        data["createdAt"] = this.createdAt ? this.createdAt.toISOString() : <any>undefined;
+        if (Array.isArray(this.probabilityPerScore)) {
+            data["probabilityPerScore"] = [];
+            for (let item of this.probabilityPerScore)
+                data["probabilityPerScore"].push(item);
+        }
+        if (Array.isArray(this.deltaPerScore)) {
+            data["deltaPerScore"] = [];
+            for (let item of this.deltaPerScore)
+                data["deltaPerScore"].push(item);
+        }
+        data["expectedScore"] = this.expectedScore;
+        data["actualScore"] = this.actualScore;
+        data["probabilityFirstTeamWins"] = this.probabilityFirstTeamWins;
+        return data;
+    }
+}
+
+export interface IGameWithAnalytics {
+    id?: string | undefined;
+    firstTeam?: TeamPerformance;
+    secondTeam?: TeamPerformance;
+    createdAt?: Date;
+    probabilityPerScore?: number[] | undefined;
+    deltaPerScore?: number[] | undefined;
+    expectedScore?: number;
+    actualScore?: number;
+    probabilityFirstTeamWins?: number;
+}
+
 export class GamesInRange implements IGamesInRange {
-    games?: Game[] | undefined;
+    games?: GameWithAnalytics[] | undefined;
     gamesBefore?: boolean;
 
     constructor(data?: IGamesInRange) {
@@ -1193,7 +1365,7 @@ export class GamesInRange implements IGamesInRange {
             if (Array.isArray(_data["games"])) {
                 this.games = [] as any;
                 for (let item of _data["games"])
-                    this.games!.push(Game.fromJS(item));
+                    this.games!.push(GameWithAnalytics.fromJS(item));
             }
             this.gamesBefore = _data["gamesBefore"];
         }
@@ -1219,7 +1391,7 @@ export class GamesInRange implements IGamesInRange {
 }
 
 export interface IGamesInRange {
-    games?: Game[] | undefined;
+    games?: GameWithAnalytics[] | undefined;
     gamesBefore?: boolean;
 }
 
