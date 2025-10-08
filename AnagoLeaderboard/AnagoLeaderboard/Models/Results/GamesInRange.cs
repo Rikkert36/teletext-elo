@@ -2,7 +2,7 @@
 {
     public class GamesInRange
     {
-        public List<Game> Games { get; set; }
+        public List<GameWithAnalytics> Games { get; set; }
         public bool GamesBefore { get; set; }
     }
 }

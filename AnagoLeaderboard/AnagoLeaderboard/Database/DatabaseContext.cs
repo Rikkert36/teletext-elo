@@ -65,24 +65,18 @@ namespace AnagoLeaderboard.Database
             await this.SaveChangesAsync();
         }
 
-        internal async Task<GamesInRange> GetGamesInRange(DateTime start, DateTime end)
+        internal async Task<List<Game>> GetGamesInRange(DateTime start, DateTime end)
         {
             var result = await Games
                 .Where(game => game.CreatedAt >= start && game.CreatedAt <= end)
                 .ToListAsync();
-            var notLatestGame = true;
-            if (result.Count > 0)
-            {
-                var oldestGameFromWeek = result.Min(game => game.CreatedAt);
-                var oldestGameEver = Games.Min(game => game.CreatedAt);
-                notLatestGame = oldestGameFromWeek != oldestGameEver;
-            }
-
-            return new GamesInRange()
-            {
-                Games = result,
-                GamesBefore = notLatestGame
-            };
+            return result;
+            
+        }
+        
+        internal async Task<DateTime> FirstGameDate()
+        {
+            return Games.Min(game => game.CreatedAt);
         }
 
         internal async Task<DateTime> GetOldestDate()

@@ -5,15 +5,14 @@ namespace AnagoLeaderboard.Services
 {
     public class RatingCalculator
     {
-        //maximum number you can grow (if you win by a 5 goal margin) (assuming that you played at least 10 games)
-        private readonly int _kFactor;
-
         private readonly Game _game;
         private readonly List<int> _gamesPlayed;
         private readonly int _team1Goals;
         private readonly int _team2Goals;
 
-        private const double lambda = 0.2303;
+        //maximum number you can grow (if you win by a 5 goal margin) (assuming that you played at least 10 games)
+        private const double Lambda = 0.2303;
+        private const int KFactor = 50;
 
         /// <summary>
         /// Computes new rating based on Elo based calculation.
@@ -21,18 +20,20 @@ namespace AnagoLeaderboard.Services
         /// The margin = pointfactor relations is as follows: 1 = 0.2, 2 = 0.4, 3 = 0.6, 4 = 0.8, 5 = 1, 6  = 1.2, 7 = 1.4, 8 = 1.6, 9 = 1.8, 10 = 2
         /// </summary>
         /// <param name="game"></param>
-        /// <param name="kFactor"></param>
-        public RatingCalculator(Game game, List<int> gamesPlayed, int kFactor = 50)
+        /// <param name="gamesPlayed"></param>
+        public RatingCalculator(Game game, List<int> gamesPlayed)
         {
             _game = game;
             _gamesPlayed = gamesPlayed;
-            _kFactor = kFactor;
             _team1Goals = game.FirstTeam.Goals;
             _team2Goals = game.SecondTeam.Goals;
         }
 
-        internal List<(int rating, double std, int gamesPlayed, int gamesWon, int gamesLost, int goalsFor, int goalsAgainst, int delta)> 
-            GetUpdates(List<(int rating, double std, int gamesWon, int gamesLost, int goalsFor, int goalsAgainst)> currentValues)
+        internal List<(int rating, double std, int gamesPlayed, int gamesWon, int gamesLost, int goalsFor, int
+                goalsAgainst, int delta)>
+            GetUpdates(
+                List<(int rating, double std, int gamesWon, int gamesLost, int goalsFor, int goalsAgainst)>
+                    currentValues)
         {
             var result = CalculateOutcome(
                 currentValues.Select(value => (value.rating)).ToList(),
@@ -59,26 +60,19 @@ namespace AnagoLeaderboard.Services
             return result;
         }
 
-        private List<(int rating, double std, int gamesPlayed, int gamesWon, int gamesLost, int goalsFor, int goalsAgainst, int delta)> 
-            CalculateOutcome(List<int> rating, List<int> gamesWon, List<int> gamesLost, List<int> goalsFor, List<int> goalsAgainst)
+        private List<(int rating, double std, int gamesPlayed, int gamesWon, int gamesLost, int goalsFor, int
+                goalsAgainst, int delta)>
+            CalculateOutcome(
+                List<int> rating,
+                List<int> gamesWon,
+                List<int> gamesLost,
+                List<int> goalsFor,
+                List<int> goalsAgainst)
         {
-            var team1Score = _team1Goals > _team2Goals ? 1 : 0;
-            var team2Score = _team2Goals > _team1Goals ? 1 : 0;
-            if (_team1Goals == _team2Goals) throw new InvalidDataException("It cannot be a draw");
+            var delta = GetDelta(rating[0], rating[1], rating[2], rating[3], _team1Goals, _team2Goals);
 
-            var pointsFactor = Math.Abs(_team1Goals - _team2Goals) * 0.2;
-
-            var team1Rating = (rating[0] + rating[1]) / 2;
-            var team2Rating = (rating[2] + rating[3]) / 2;
-
-            double team1Ratio = (team2Rating - team1Rating) / (double)400;
-            double team2Ratio = (team1Rating - team2Rating) / (double)400;
-
-            double team1Expected = 1 / (Math.Pow(10, team1Ratio) + 1);
-            double team2Expected = 1 / (Math.Pow(10, team2Ratio) + 1);
-
-            var team1Delta = (team1Score - team1Expected) * _kFactor * pointsFactor;
-            var team2Delta = (team2Score - team2Expected) * _kFactor * pointsFactor;
+            var team1Delta = delta;
+            var team2Delta = delta * -1;
 
             var team1Player1ExperienceFactor = Math.Max(1, 2 - (0.1 * _gamesPlayed[0]));
             var team1Player2ExperienceFactor = Math.Max(1, 2 - (0.1 * _gamesPlayed[1]));
@@ -93,35 +87,70 @@ namespace AnagoLeaderboard.Services
             var stdValues = new double[4];
             for (int i = 0; i < 4; i++)
             {
-                double decreaseFactor = Math.Exp(-lambda * (_gamesPlayed[i] + 1));
+                double decreaseFactor = Math.Exp(-Lambda * (_gamesPlayed[i] + 1));
                 stdValues[i] = 1000 * decreaseFactor;
             }
 
-            var deltas = new List<int>() {
+            var deltas = new List<int>()
+            {
                 roundedTeam1Player1Delta,
                 roundedTeam1Player2Delta,
                 roundedTeam2Player1Delta,
                 roundedTeam2Player2Delta
-                };
+            };
+            
+            var team1Score = _team1Goals > _team2Goals ? 1 : 0;
+            var team2Score = _team2Goals > _team1Goals ? 1 : 0;
 
-            List<(int rating, double std, int gamesPlayed, int gameWon, int gamesLost, int goalsFor, int goalsAgainst, int delta)> result = [];
+            List<(int rating, double std, int gamesPlayed, int gameWon, int gamesLost, int goalsFor, int goalsAgainst,
+                int delta)> result = [];
             for (int i = 0; i < 4; i++)
             {
                 result.Add(
                     (
-                    rating[i] + deltas[i],
-                    stdValues[i],
-                    _gamesPlayed[i] + 1,
-                    gamesWon[i] + (i < 2 ? team1Score : team2Score),
-                    gamesLost[i] + (i < 2 ? team2Score : team1Score),
-                    goalsFor[i] + (i < 2 ? _team1Goals : _team2Goals),
-                    goalsAgainst[i] + (i < 2 ? _team2Goals : _team1Goals),
-                    i < 2 ? (int)Math.Round(team1Delta, 0) : (int)Math.Round(team2Delta, 0)
+                        rating[i] + deltas[i],
+                        stdValues[i],
+                        _gamesPlayed[i] + 1,
+                        gamesWon[i] + (i < 2 ? team1Score : team2Score),
+                        gamesLost[i] + (i < 2 ? team2Score : team1Score),
+                        goalsFor[i] + (i < 2 ? _team1Goals : _team2Goals),
+                        goalsAgainst[i] + (i < 2 ? _team2Goals : _team1Goals),
+                        i < 2 ? (int)Math.Round(team1Delta, 0) : (int)Math.Round(team2Delta, 0)
                     )
                 );
             }
-            return result;
 
+            return result;
+        }
+
+        public static double GetDelta(
+            int rating1,
+            int rating2,
+            int rating3,
+            int rating4,
+            int team1Goals,
+            int team2Goals)
+        {
+            double expected1 = ProbTeam1Wins(rating1, rating2, rating3, rating4);
+
+            var team1Score = team1Goals >= team2Goals ? 1 : 0;
+            
+            var pointsFactor = Math.Abs(team1Goals - team2Goals) * 0.2;
+            var delta = (team1Score - expected1) * KFactor * pointsFactor;
+
+            return delta;
+        }
+
+        public static double ProbTeam1Wins(int rating11, int rating12, int rating21, int rating22)
+        {
+            var team1Rating = (rating11 + rating12) / 2;
+            var team2Rating = (rating21 + rating22) / 2;
+
+            double team1Ratio = (team2Rating - team1Rating) / (double)400;
+
+            double team1Expected = 1 / (Math.Pow(10, team1Ratio) + 1);
+
+            return team1Expected;
         }
     }
 }

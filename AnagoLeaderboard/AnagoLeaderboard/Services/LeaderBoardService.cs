@@ -31,9 +31,11 @@ namespace AnagoLeaderboard.Services
                 notLatestGame = oldestGameFromWeek != oldestGameEver;
             }
 
+            var analyzedGames = result.Select(game => new GameWithAnalytics(game));
+
             return new GamesInRange()
             {
-                Games = result,
+                Games = analyzedGames.ToList(),
                 GamesBefore = notLatestGame
             };
         }
@@ -71,44 +73,44 @@ namespace AnagoLeaderboard.Services
                     .ToList();
 
                 var currentValues = playerIds
-                    .Select(
-                        playerId => (
-                            playerIdToRating[playerId].rating,
-                            playerIdToRating[playerId].std,
-                            playerIdToRating[playerId].gamesWon,
-                            playerIdToRating[playerId].gamesLost,
-                            playerIdToRating[playerId].goalsFor,
-                            playerIdToRating[playerId].goalsAgainst
-                        ))
+                    .Select(playerId => (
+                        playerIdToRating[playerId].rating,
+                        playerIdToRating[playerId].std,
+                        playerIdToRating[playerId].gamesWon,
+                        playerIdToRating[playerId].gamesLost,
+                        playerIdToRating[playerId].goalsFor,
+                        playerIdToRating[playerId].goalsAgainst
+                    ))
                     .ToList();
 
                 var ratingCalculator = new RatingCalculator(game, gamesPlayed);
                 var updatedValues = ratingCalculator.GetUpdates(currentValues);
-                
+
                 var (_, _, _, _, _, _, _, delta1) = updatedValues[0];
                 var (_, _, _, _, _, _, _, delta2) = updatedValues[2];
-                
+
                 game.FirstTeam.DeltaPoints = delta1;
                 game.SecondTeam.DeltaPoints = delta2;
-                
+
                 for (int i = 0; i < playerIds.Count; i++)
                 {
-                    var (rating, std, totalGamesPlayed, gamesWon, gamesLost, goalsFor, goalsAgainst, _) = updatedValues[i];
-                    playerIdToRating[playerIds[i]] = (rating, std, totalGamesPlayed, gamesWon, gamesLost, goalsFor, goalsAgainst);
+                    var (rating, std, totalGamesPlayed, gamesWon, gamesLost, goalsFor, goalsAgainst, _) =
+                        updatedValues[i];
+                    playerIdToRating[playerIds[i]] = (rating, std, totalGamesPlayed, gamesWon, gamesLost, goalsFor,
+                        goalsAgainst);
                 }
             }
 
             var result = playerIdToRating
-                .Select(
-                    kvp => new DynamicRatingPlayer(
-                        allPlayers.Find(player => player.Id.Equals(kvp.Key)),
-                        kvp.Value.rating,
-                        kvp.Value.std,
-                        kvp.Value.gamesPlayed,
-                        kvp.Value.gamesWon,
-                        kvp.Value.gamesLost,
-                        kvp.Value.goalsFor,
-                        kvp.Value.goalsAgainst)
+                .Select(kvp => new DynamicRatingPlayer(
+                    allPlayers.Find(player => player.Id.Equals(kvp.Key)),
+                    kvp.Value.rating,
+                    kvp.Value.std,
+                    kvp.Value.gamesPlayed,
+                    kvp.Value.gamesWon,
+                    kvp.Value.gamesLost,
+                    kvp.Value.goalsFor,
+                    kvp.Value.goalsAgainst)
                 )
                 .OrderByDescending(player => player.VisibleRating)
                 .ToList();
@@ -126,10 +128,8 @@ namespace AnagoLeaderboard.Services
         {
             var (players, games) = await GetLeaderBoard(year);
             return players
-                .Where(
-                    player => games.Find(
-                                  game => game.IsPlayedBy(player.Id) && game.CreatedAt.Year == year)
-                              != null)
+                .Where(player => games.Find(game => game.IsPlayedBy(player.Id) && game.CreatedAt.Year == year)
+                                 != null)
                 .ToList();
         }
     }

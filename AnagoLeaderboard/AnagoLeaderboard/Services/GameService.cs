@@ -114,17 +114,6 @@ namespace AnagoLeaderboard.Services
             return await _dbContext.GetOldestDate();
         }
 
-        internal async Task<GamesInRange> GetGamesInRange(DateTime start, DateTime end)
-        {
-            var result = await _dbContext.GetGamesInRange(start, end);
-            foreach (Game game in result.Games)
-            {
-                AddPlayerNames(game);
-            }
-
-            return result;
-        }
-
         public async Task UpdateGame(string gameId, GameForm updatedGame)
         {
             var game = await _dbContext.Games.FindAsync(gameId);
@@ -143,8 +132,6 @@ namespace AnagoLeaderboard.Services
             {
                 throw new KeyNotFoundException("Game was not found.");
             }
-
-            ;
         }
 
         public async Task<List<Game>> GetGamesUntilYear(int year)

@@ -1,5 +1,6 @@
 ﻿using AnagoLeaderboard.Models.RequestParameters;
 using System.ComponentModel.DataAnnotations.Schema;
+using AnagoLeaderboard.Services;
 
 namespace AnagoLeaderboard.Models.Results
 {
@@ -141,6 +142,17 @@ namespace AnagoLeaderboard.Models.Results
             
             throw new Exception("PlayerID not in team");
 
+        }
+
+        public string GetScoreString()
+        {
+            var expectedScore = RatingCalculator.ProbTeam1Wins(
+                FirstTeam.FirstPlayer.OldRating,
+                FirstTeam.SecondPlayer.OldRating,
+                SecondTeam.FirstPlayer.OldRating,
+                SecondTeam.SecondPlayer.OldRating);
+            
+            return $"{FirstTeam.Goals - SecondTeam.Goals}, {expectedScore}";
         }
 
         internal bool IsPlayedBy(string id)

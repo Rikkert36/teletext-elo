@@ -76,6 +76,13 @@ namespace AnagoLeaderboard.Controllers
         {
             return (await _leaderBoardService.GetLeaderBoard()).Item2;
         }
+        
+        [HttpGet("games/scores")]
+        public async Task<List<string>> GetGameScores()
+        {
+            var games = (await _leaderBoardService.GetLeaderBoard()).Item2;
+            return games.Select(g => g.GetScoreString()).ToList();
+        }
 
         [HttpGet("games/{start}/{end}")]
         public async Task<GamesInRange> GetGamesInRange(DateTime start, DateTime end)
