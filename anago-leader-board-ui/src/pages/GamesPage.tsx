@@ -189,7 +189,17 @@ const useStyles = makeStyles((theme: Theme) =>
         fontSize: '1.2em'
     },
     matchPaper: {
-        background: '#000',
+      background: '#000',
+      fontSize: '1.2em',
+      padding: '0.4rem',
+      transition: 'box-shadow 120ms ease, transform 120ms ease, outline-color 120ms ease',
+    },
+    matchPaperHighlight: {
+      outline: '2px solid #00ff00',
+      cursor: 'pointer',
+    },
+    tooltipPaper: {
+      background: '#030',
         fontSize: '1.2em',
         padding: '0.4rem'
     },
@@ -362,6 +372,7 @@ const GamesPage: React.FC = () => {
   const [loadGames, setLoadGames] = useState(true);
   const [weekIndexUpdated, setWeekIndexUpdated] = useState(true);
   const [thereArePreviousWeeks, setThereArePreviousWeeks] = useState(true);
+  const [highlightedMatchId, setHighlightedMatchId] = useState<string | null>(null);
   const [newMatchForm, setNewMatchForm] = useState({
     team1_player1: 0,
     team1_player2: 0,
@@ -402,11 +413,12 @@ const GamesPage: React.FC = () => {
   const tooltipStyle = {
     tooltip: {
       style: {
-        maxWidth: '450px',
+        maxWidth: '650px',
         minWidth: '300px',
         backgroundColor: 'black',
         borderRadius: '4px',
         padding: '0.5rem 0.75rem',
+        border: '2px solid #00ff00',
       },
     },
   };
@@ -535,17 +547,29 @@ const GamesPage: React.FC = () => {
     }
 
   const showMatchesOnDay = (day: GamesPerDay) => {
-    return day.games.map((match) => (
-      <Tooltip title={gameAnalyticsTooltip(winstMagneets)} componentsProps={tooltipStyle}>
-        <Paper className={classes.matchPaper}>
-            <Grid container>
-                {showTeam(match.firstTeam!)}
-                {showTeam(match.secondTeam!)}
-            </Grid>
-            
-        </Paper>
-                </Tooltip>
-    ));
+   return day.games.map((match) => (
+    <Tooltip
+      key={match.id} // ensure your GameWithAnalytics has a stable id
+      title={gameAnalyticsTooltip(match)}
+      componentsProps={tooltipStyle}
+      enterDelay={150}
+      onOpen={() => setHighlightedMatchId(match.id!)}
+      onClose={() => setHighlightedMatchId(null)}
+    >
+      <Paper
+        className={`${classes.matchPaper} ${
+          highlightedMatchId === match.id ? classes.matchPaperHighlight : ''
+        }`}
+        onMouseEnter={() => setHighlightedMatchId(match.id!)}
+        onMouseLeave={() => setHighlightedMatchId(null)}
+      >
+        <Grid container>
+          {showTeam(match.firstTeam!)}
+          {showTeam(match.secondTeam!)}
+        </Grid>
+      </Paper>
+    </Tooltip>
+  ));
   };
 
   const showMatches = () => {
@@ -792,34 +816,44 @@ const GamesPage: React.FC = () => {
       refreshMatches();
   }
 
-  const gameAnalyticsTooltip = (players: (string | undefined)[][]): JSX.Element => (
-      <Grid container spacing={0.5} direction="column" style={{ minWidth: 400, maxWidth: 600 }}>
-        {players.map(([first, second], i) => (
-          <Grid container item key={i} wrap="nowrap" spacing={1} alignItems="center">
+  const gameAnalyticsTooltip = (game: GameWithAnalytics): JSX.Element => {
+    const prob = game.probabilityPerScore![game.actualScore!]! * 100;
+    const rounded = Math.round(prob * 100) / 100;
+    return (<Grid container spacing={0.5} direction="column" style={{ minWidth: 450, maxWidth: 600, background:'black'}}>
             <Grid item xs={7}>
               <Typography
                 noWrap
-                title={first ?? ''}
+                title={game.expectedScore?.toString() ?? ''}
                 className={classes.playerNames}
                 style={{ maxWidth: '100%' }}
               >
-                {first ?? ''}
+                Voorspelde uitslag:{' '}
+                <span style={{ color: 'cyan' }}>
+                  { toScore(game.expectedScore!) ?? ''}
+                </span>
               </Typography>
             </Grid>
             <Grid item xs={5}>
               <Typography
                 noWrap
-                title={second ?? ''}
-                className={classes.stats}
+                title={game.probabilityPerScore![game.actualScore!].toString() ?? ''}
+                className={classes.playerNames}
                 style={{ maxWidth: '100%' }}
               >
-                {second ?? ''}
+                Werkelijke uitslag:{' '}                
+ {toScore(game.actualScore!) + ' -> '}kans:<span style={{ color: 'cyan' }}> {rounded}%</span>         
+
               </Typography>
-            </Grid>
           </Grid>
-        ))}
-      </Grid>
-    );
+      </Grid>);
+  }
+
+
+    const toScore = (score: number) => {
+      const team1Score = score <= 10 ? 10 : 10 - (score - 10);
+      const team2Score = score >= 10 ? 10 : 10 - (10 - score);
+      return `${team1Score}-${team2Score}`;
+    }
 
   function showModal() {
     return <Modal
