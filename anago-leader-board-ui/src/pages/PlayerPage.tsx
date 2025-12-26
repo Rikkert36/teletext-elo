@@ -954,6 +954,7 @@ const PlayerPage: React.FC = () => {
                   return showGames(tooltipGames[dataIndex!])
                 }
               }}
+              
             series={[
               {
                 data: ratingPerGame,
@@ -1007,11 +1008,6 @@ const PlayerPage: React.FC = () => {
             yAxis={[{
               tickNumber: 5
             }]}
-          // yAxis={[{colorMap:{
-          //   type: 'piecewise',
-          //   thresholds: [0, 10],
-          //   colors: ['red', 'green', 'rgba(125, 254, 227, 0.5)'],}}]}
-          //yAxis={[{min: 1200}]}
           />
 
           <div className={classes.buttonContainer}>

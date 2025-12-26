@@ -30,7 +30,7 @@ namespace UnitTests
             var databaseContext = new DatabaseContext(dbOption);
             _gameService = new GameService(databaseContext);
             var leaderBoardService = new LeaderBoardService(_gameService, databaseContext);
-            _playerService = new PlayerService(databaseContext, leaderBoardService, _gameService);
+            _playerService = new PlayerService(databaseContext, leaderBoardService, null);
 
         }
 

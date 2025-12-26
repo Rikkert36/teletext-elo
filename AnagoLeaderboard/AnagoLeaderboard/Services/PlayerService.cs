@@ -11,13 +11,14 @@ namespace AnagoLeaderboard.Services
     {
         private readonly DatabaseContext _dbContext;
         private readonly LeaderBoardService _leaderBoardService;
-        private readonly GameService _gameService;
+        private readonly string _fileSystemBasePath;
 
-        public PlayerService(DatabaseContext dbContext, LeaderBoardService leaderBoardService, GameService gameService)
+        public PlayerService(DatabaseContext dbContext, LeaderBoardService leaderBoardService, IConfiguration configuration)
         {
             _dbContext = dbContext;
             _leaderBoardService = leaderBoardService;
-            _gameService = gameService;
+            _fileSystemBasePath = configuration.GetValue<string>("FileSystem:BasePath") 
+                                  ?? throw new ArgumentNullException("FileSystem:BasePath not configured");
         }
 
         public async Task<string> CreatePlayer(PlayerForm playerData)
@@ -118,14 +119,14 @@ namespace AnagoLeaderboard.Services
 
         internal byte[] GetAvatar(string id)
         {
-            var filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\{id}";
+            var filePath = Path.Combine(_fileSystemBasePath, "avatars", id);
             if (File.Exists(filePath))
             {
             }
             else
             {
-                filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\empty-avatar.jpg";
-            }
+                filePath = Path.Combine(_fileSystemBasePath, "avatars", "empty-avatar.jpg");
+            } 
 
             return System.IO.File.ReadAllBytes(filePath);
         }
@@ -134,10 +135,10 @@ namespace AnagoLeaderboard.Services
         {
             var players = await GetPlayers();
             var highestRatedPlayer = players.OrderByDescending(player => player.Rating).FirstOrDefault();
-            var filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\{highestRatedPlayer.Id}";
+            var filePath = Path.Combine(_fileSystemBasePath, "avatars", highestRatedPlayer.Id);
             if (!File.Exists(filePath))
             {
-                filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\empty-avatar.jpg";
+                filePath = Path.Combine(_fileSystemBasePath, "avatars", "empty-avatar.jpg");
             }
 
             return System.IO.File.ReadAllBytes(filePath);

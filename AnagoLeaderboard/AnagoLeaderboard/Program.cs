@@ -12,6 +12,7 @@ builder.Services.AddCors(
         options.AddPolicy(
             "AllowReactApp",
             builder => builder.WithOrigins(
+                    "http://localhost:3000",
                     "http://localhost:3001",
                     "https://localhost:3000",
                     "http://rik-dev/tafelvoetbal",
@@ -39,9 +40,13 @@ builder.Services.AddSwaggerGen(
                 ? controllerActionDescriptor.MethodInfo.Name
                 : d.ActionDescriptor.AttributeRouteInfo?.Name);
     });
-builder.Services.AddDbContext<DatabaseContext>(
-    options =>
-        options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection"))
+builder.Services.AddDbContext<DatabaseContext>(options =>
+{
+    var dataBasePath = builder.Configuration.GetSection("FileSystem")["BasePath"];
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    options.UseSqlite($"Data Source={Path.Combine(dataBasePath, connectionString)}");
+    
+}
 );
 
 

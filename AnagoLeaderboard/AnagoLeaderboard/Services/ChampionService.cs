@@ -54,7 +54,7 @@ public class ChampionService
         
         var gamesPerDay = GetGamesPerDay(games);
         
-        for (var currentDate = games[0].CreatedAt; currentDate <= DateTime.Now; currentDate = currentDate.AddDays(1))
+        for (var currentDate = games[0].CreatedAt.Date; currentDate <= DateTime.Now; currentDate = currentDate.AddDays(1))
         {
             if (daysSinceChampionPlayed > 15)
             {
