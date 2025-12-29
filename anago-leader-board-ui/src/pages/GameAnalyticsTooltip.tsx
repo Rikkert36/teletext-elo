@@ -6,14 +6,12 @@ import {
   AccordionDetails,
   Theme,
   FormControlLabel,
-  Checkbox
+  Checkbox,
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ChartsReferenceLine,
   LineChart,
-  useItemTooltip,
-  ChartsTooltip,
 } from "@mui/x-charts";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { GameWithAnalytics } from "../clients/server.generated";
@@ -33,6 +31,7 @@ const useStyles = makeStyles((theme: Theme) =>
     playerNames: {
       color: "#ffff00", // Yellow
       background: "black",
+      fontSize: '1.1rem'
     },
   })
 );
@@ -68,21 +67,41 @@ type GameAnalyticsTooltipProps = {
   game: GameWithAnalytics;
 };
 
-function LoggingItemTooltip() {
-  const tooltip = useItemTooltip();
-
-  useEffect(() => {
-    if (!tooltip) return;
-    console.log("Hovered item:", tooltip);
-  }, [tooltip]);
-
-  return <ChartsTooltip />;
-}
-
 const toScore = (score: number) => {
   const team1Score = score <= 10 ? 10 : 10 - (score - 10);
   const team2Score = score >= 10 ? 10 : 10 - (10 - score);
   return `${team1Score}-${team2Score}`;
+};
+
+const axisTooltipContent = (axisData: any, game: GameWithAnalytics) => {
+  const dataIndex: number | null =
+    axisData?.axis?.dataIndex ?? axisData?.dataIndex ?? null;
+
+  if (dataIndex == null) return null;
+
+  const score = scoreLabels[dataIndex];
+  const prob = (game.probabilityPerScore?.[dataIndex] ?? 0) * 100;
+  const probRounded = Math.round(prob * 100) / 100;
+
+  const delta = game.deltaPerScore?.[dataIndex];
+
+  return (
+    <div
+      style={{ padding: 8, background: "black", border: "1px solid #00ff00" }}
+    >
+      <div style={{ color: "#ffff00" }}>
+        Score: <span style={{ color: "#ffff00" }}>{score}</span>
+      </div>
+
+      <div style={{ color: "#ffff00" }}>
+        Kans: <span style={{ color: "cyan" }}>{probRounded}%</span>
+      </div>
+
+      <div style={{ color: "#ffff00" }}>
+        Punten: <span style={{ color: "#ffff00" }}>{delta!.toFixed(0)}</span>
+      </div>
+    </div>
+  );
 };
 
 const GameAnalyticsTooltip: React.FC<GameAnalyticsTooltipProps> = ({
@@ -136,7 +155,7 @@ const GameAnalyticsTooltip: React.FC<GameAnalyticsTooltipProps> = ({
               },
               "& .MuiAccordionSummary-content": {
                 ml: 0, // no extra left margin
-                fontSize: "1.125rem", // make summary text bigger (~18px)
+      fontSize: "1.0em",
                 fontWeight: 700, // optional: bolder
                 color: "#ffff00",
               },
@@ -146,7 +165,7 @@ const GameAnalyticsTooltip: React.FC<GameAnalyticsTooltipProps> = ({
           >
             <Typography
               component="span"
-              sx={{ fontSize: "1.0rem", fontWeight: 100, color: "#ffff00" }}
+              sx={{ fontSize: "1.0em", fontWeight: 100, color: "#ffff00" }}
             >
               Statistieken voor nerds
             </Typography>
@@ -159,32 +178,9 @@ const GameAnalyticsTooltip: React.FC<GameAnalyticsTooltipProps> = ({
               margin={{ top: 16, right: 80, bottom: 28, left: 56 }}
               tooltip={{
                 trigger: "axis",
-                axisContent: () => (
-                  <div style={{ padding: 8 }}>gdsgsdgsdgsdgdsg</div>
-                ),
-              }}
-              onHighlightChange={(highlighted) => {
-                console.log(highlighted);
-                if (!highlighted || highlighted.dataIndex == null) return;
-
-                const { seriesId, dataIndex } = highlighted;
-
-                const xLabel = scoreLabels[dataIndex];
-
-                const yValue =
-                  seriesId === "pvId"
-                    ? game.probabilityPerScore?.[dataIndex]
-                    : seriesId === "dtpsId"
-                    ? game.deltaPerScore?.[dataIndex]
-                    : undefined;
-
-                console.log({
-                  seriesId,
-                  dataIndex,
-                  xLabel,
-                  yValue,
-                });
-              }}
+                axisContent: (axisData) =>
+                  axisTooltipContent(axisData, game),
+              }}              
               slotProps={{
                 legend: { hidden: true }, // <-- hides the legend
               }}
@@ -251,7 +247,7 @@ const GameAnalyticsTooltip: React.FC<GameAnalyticsTooltipProps> = ({
                   stroke: "#00ff00",
                 },
                 "& .MuiChartsAxis-tick": {
-                  stroke: "#00ff00",
+                  stroke: "#00ff00 !important",
                 },
                 ".MuiLineElement-series-pvMarker, .MuiLineElement-series-dtpsMarker":
                   { stroke: "transparent" },
@@ -301,6 +297,7 @@ const GameAnalyticsTooltip: React.FC<GameAnalyticsTooltipProps> = ({
                 }}
                 labelStyle={{ fill: probColor }}
                 labelAlign="start" // put label above the line (top)
+                label={scoreLabels[game.expectedScore!]}
               />
               <ChartsReferenceLine
                 x={scoreLabels[game.actualScore!]} // or x={expectedIdx} if your X scale uses indices
@@ -311,6 +308,7 @@ const GameAnalyticsTooltip: React.FC<GameAnalyticsTooltipProps> = ({
                 }}
                 labelStyle={{ fill: "#00ff00" }}
                 labelAlign="start" // put label above the line (top)
+                label={scoreLabels[game.actualScore!]}
               />
             </LineChart>
             <FormControlLabel
@@ -324,7 +322,7 @@ const GameAnalyticsTooltip: React.FC<GameAnalyticsTooltipProps> = ({
                   }}
                 />
               }
-              label="Toon Delta"
+              label="Toon winst/verlies punten"
               sx={{ color: "#ffff00" }}
             />
           </AccordionDetails>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect} from "react";
 import {
   Paper,
   CircularProgress,
@@ -8,7 +8,6 @@ import {
   Modal,
   Select,
   MenuItem,
-  Tooltip,
 } from "@mui/material";
 import { styled } from "@mui/system";
 import { Link } from "react-router-dom";
@@ -17,7 +16,8 @@ import {
   numberInputClasses,
   Unstable_NumberInput as NumberInput,
 } from "@mui/base/Unstable_NumberInput";
-import GameAnalyticsTooltip from "./GameAnalyticsTooltip";
+
+import GameAnalyticsTooltipWrapper from "./GameAnalyticsTooltipWrapper";
 import AddIcon from "@mui/icons-material/Add";
 import { Theme } from "@mui/material";
 import { makeStyles, createStyles } from "@mui/styles";
@@ -57,11 +57,11 @@ const useStyles = makeStyles((theme: Theme) =>
       justifyContent: "center",
     },
     modalPaper: {
-      backgroundColor: "#111", // Black
+      backgroundColor: "#111",
       boxShadow: theme.shadows[5],
       padding: theme.spacing(4),
       borderRadius: theme.shape.borderRadius,
-      color: "#fff", // White text color
+      color: "#fff",
     },
 
     menuContainer: {
@@ -74,8 +74,8 @@ const useStyles = makeStyles((theme: Theme) =>
       margin: "2rem",
       padding: "0",
       height: 0,
-      background: "#000", // Dark green color
-      color: "#00ff00", // lime green
+      background: "#000",
+      color: "#00ff00",
     },
     buttonText: {
       fontFamily: "Teletext",
@@ -83,11 +83,11 @@ const useStyles = makeStyles((theme: Theme) =>
       textTransform: "none",
     },
     banner: {
-      background: "#FF0000", // Teletekst red
+      background: "#FF0000",
       fontFamily: "Teletext",
       fontSize: "2rem",
       padding: "2rem",
-      color: "#ffff00", // Yellow
+      color: "#ffff00",
       display: "flex",
       justifyContent: "center",
     },
@@ -98,7 +98,7 @@ const useStyles = makeStyles((theme: Theme) =>
       marginTop: "2rem",
       textTransform: "none",
       height: 0,
-      background: "#000", // Dark green color
+      background: "#000",
       color: "#00ff00",
     },
     addPlayerBack: {
@@ -108,11 +108,11 @@ const useStyles = makeStyles((theme: Theme) =>
       padding: "0",
       textTransform: "none",
       height: 0,
-      background: "#000", // Dark green color
+      background: "#000",
       color: "#FF0000",
     },
     dayPaper: {
-      color: "#00ff00", // lime green
+      color: "#00ff00",
       background: "#000",
       fontSize: "1.2em",
     },
@@ -124,24 +124,16 @@ const useStyles = makeStyles((theme: Theme) =>
     matchPaperHighlight: {
       outline: "2px solid #00ff00",
     },
-    tooltipPaper: {
-      background: "#030",
-      fontSize: "1.2em",
-      padding: "0.4rem",
-    },
     playerNames: {
-      color: "#ffff00", // Yellow
+      color: "#ffff00",
       background: "black",
     },
     matchScore: {
-      color: "#00ff00", // lime green
-    },
-    ratingChange: {
-      color: "#ffff00", // Yellow
+      color: "#00ff00",
     },
     playerNameTypo: {
       fontSize: "1.0em",
-      color: "#ffff00", // Yellow
+      color: "#ffff00",
     },
     link: {
       "&:hover": {
@@ -149,7 +141,7 @@ const useStyles = makeStyles((theme: Theme) =>
       },
     },
     modalBanner: {
-      color: "#ffff00", // Yellow
+      color: "#ffff00",
     },
     select: {
       margin: 10,
@@ -163,32 +155,28 @@ const useStyles = makeStyles((theme: Theme) =>
       position: "fixed",
       bottom: 0,
       fontSize: "2rem",
-      left: "50%", // Center the element horizontally
-      transform: "translateX(-50%)", // Adjust for centering
+      left: "50%",
+      transform: "translateX(-50%)",
       width: "30%",
-      height: "3rem", // Set the height as needed
-      backgroundColor: "#FF0000", // Same color as the banner
-      color: "#ffff00", // Same text color as the banner
+      height: "3rem",
+      backgroundColor: "#FF0000",
+      color: "#ffff00",
       display: "flex",
       justifyContent: "center",
       alignItems: "center",
-      zIndex: theme.zIndex.drawer + 1, // Set zIndex to make it appear above other elements
+      zIndex: theme.zIndex.drawer + 1,
     },
     vorigevolgendebutton: {
       fontSize: "2rem",
-      backgroundColor: "#FF0000", // Same color as the banner
-      color: "#ffff00", // Same text color as the banner
+      backgroundColor: "#FF0000",
+      color: "#ffff00",
       display: "flex",
       justifyContent: "center",
       alignItems: "center",
-
-      // Remove transition effect
       transition: "none",
-
       "&:hover": {
-        // No hover effect
-        backgroundColor: "#FF0000", // Same color as the banner
-        color: "#ffff00", // Same text color as the banner
+        backgroundColor: "#FF0000",
+        color: "#ffff00",
       },
     },
   })
@@ -248,20 +236,17 @@ const toDutchMonth = (month: number): string => {
   }
 };
 
-const daysAreEqual = (date1: Date, date2: Date) => {
-  return (
-    date1.getDate() === date2.getDate() &&
-    date1.getMonth() === date2.getMonth() &&
-    date1.getFullYear() === date2.getFullYear()
-  );
-};
+const daysAreEqual = (date1: Date, date2: Date) =>
+  date1.getDate() === date2.getDate() &&
+  date1.getMonth() === date2.getMonth() &&
+  date1.getFullYear() === date2.getFullYear();
 
 const insertDateInMatchDays = (
   result: GamesPerDayList,
   sameDate: GamesPerDay
 ) => {
   if (result.matchesPerDay.length > 0) {
-    var insertAt = result.matchesPerDay.length;
+    let insertAt = result.matchesPerDay.length;
     for (let i = 0; i < result.matchesPerDay.length; i++) {
       if (sameDate.day > result.matchesPerDay[i].day) {
         insertAt = i;
@@ -276,38 +261,38 @@ const insertDateInMatchDays = (
 
 const sortMatchesPerDay = (matches: Game[]): GamesPerDayList => {
   const result = { matchesPerDay: [] } as GamesPerDayList;
-  for (var match of matches) {
-    var sameDate = result.matchesPerDay.find((matchesPerDay) =>
-      daysAreEqual(matchesPerDay.day, match.createdAt!)
+  for (const match of matches) {
+    let sameDate = result.matchesPerDay.find((x) =>
+      daysAreEqual(x.day, match.createdAt!)
     );
-    if (sameDate === null || sameDate === undefined) {
+    if (!sameDate) {
       sameDate = { day: match.createdAt, games: [] } as GamesPerDay;
       insertDateInMatchDays(result, sameDate);
     }
-    sameDate?.games.unshift(match);
+    sameDate.games.unshift(match as any);
   }
   return result;
 };
 
 const GamesPage: React.FC = () => {
   const classes = useStyles();
-  const client = new Client(window.TAFELVOETBAL_SERVER_URL);
-  const [games, setGames] = useState<Game[]>();
-  const [duplicateGame, setDuplicateGame] = useState<GameForm>();
+  const client = new Client((window as any).TAFELVOETBAL_SERVER_URL);
+
   const [gamesPerDayList, setGamesPerDay] = useState<GamesPerDayList>();
   const [players, setPlayers] = useState<DynamicRatingPlayer[]>();
+
   const [isModalOpen, setModalOpen] = useState(false);
   const [isDuplicateGameDialogOpen, setDuplicateGameDialogOpen] =
     useState(false);
+  const [duplicateGame, setDuplicateGame] = useState<GameForm>();
   const [isSaving, setIsSaving] = useState(false);
+
   const [weekIndex, setWeekIndex] = useState(0);
   const [loadGames, setLoadGames] = useState(true);
   const [weekIndexUpdated, setWeekIndexUpdated] = useState(true);
   const [thereArePreviousWeeks, setThereArePreviousWeeks] = useState(true);
-  const [openMatchId, setOpenMatchId] = useState<string | null>(null);
-  const [highlightedMatchId, setHighlightedMatchId] = useState<string | null>(
-    null
-  );
+
+
   const [newMatchForm, setNewMatchForm] = useState({
     team1_player1: 0,
     team1_player2: 0,
@@ -323,72 +308,50 @@ const GamesPage: React.FC = () => {
       setWeekIndexUpdated(false);
       refreshMatches();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   });
 
   const refreshPlayers = async () => {
-    const players: DynamicRatingPlayer[] = await client.getPlayers(true);
-    players.sort((a: DynamicRatingPlayer, b: DynamicRatingPlayer) =>
-      a.name! > b.name! ? 1 : b.name! > a.name! ? -1 : 0
-    );
-    setPlayers(players);
-    const team1_player2 = Math.min(1, players.length);
-    const team2_player1 = Math.min(2, players.length);
-    const team2_player2 = Math.min(3, players.length);
-    setNewMatchForm({
-      ...newMatchForm,
+    const p: DynamicRatingPlayer[] = await client.getPlayers(true);
+    p.sort((a, b) => (a.name! > b.name! ? 1 : b.name! > a.name! ? -1 : 0));
+    setPlayers(p);
+
+    const team1_player2 = Math.min(1, p.length);
+    const team2_player1 = Math.min(2, p.length);
+    const team2_player2 = Math.min(3, p.length);
+    setNewMatchForm((prev) => ({
+      ...prev,
       team1_player2,
       team2_player1,
       team2_player2,
-    });
+    }));
   };
 
   const refreshMatches = async () => {
     const [start, end] = getStartAndEndOfWeek();
     const games: GamesInRange = await client.getGamesInRange(start, end);
-    setGames(games.games);
     setThereArePreviousWeeks(games.gamesBefore!);
-    const gamesPerDayList = sortMatchesPerDay(games.games!);
-    setGamesPerDay(gamesPerDayList);
+    const list = sortMatchesPerDay(games.games!);
+    setGamesPerDay(list);
     setLoadGames(false);
   };
 
-  const mapToMondayFirst = (index: number) => {
-    if (index == 0) return 6;
-    return index - 1;
-  };
+  const mapToMondayFirst = (index: number) => (index === 0 ? 6 : index - 1);
 
   const getStartAndEndOfWeek = (): [Date, Date] => {
     const now = new Date();
-    const today = mapToMondayFirst(now.getDay()); // Get current day of the week (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+    const today = mapToMondayFirst(now.getDay());
     const startOfWeek = new Date(now);
     const endOfWeek = new Date(now);
 
     const daysAgo = weekIndex * 7;
+    startOfWeek.setDate(now.getDate() - today - daysAgo);
+    endOfWeek.setDate(now.getDate() + (6 - today) - daysAgo);
 
-    startOfWeek.setDate(now.getDate() - today - daysAgo); // Set to the first day of the week (Monday)
-    endOfWeek.setDate(now.getDate() + (6 - today) - daysAgo); // Set to the last day of the week (Sunday)
-
-    // Adjust to midnight
     startOfWeek.setHours(0, 0, 0, 0);
     endOfWeek.setHours(23, 59, 59, 999);
 
     return [startOfWeek, endOfWeek];
-  };
-
-  const openDuplicateGameDialog = () => {
-    setDuplicateGameDialogOpen(true);
-  };
-
-  const closeDuplicateGameDialog = () => {
-    setDuplicateGameDialogOpen(false);
-  };
-
-  const handleOpenModal = () => {
-    setModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setModalOpen(false);
   };
 
   const getDateInRightFormat = (d: Date) => {
@@ -400,6 +363,7 @@ const GamesPage: React.FC = () => {
 
   const handleSaveMatch = async () => {
     setIsSaving(true);
+
     const game = {
       firstTeamForm: {
         firstPlayerId: players![newMatchForm.team1_player1].id,
@@ -414,182 +378,158 @@ const GamesPage: React.FC = () => {
     };
 
     const gameForm = new GameForm();
-    gameForm.init(game);
-    var gameIsDuplicate = await client.isGameDuplicate(gameForm);
+    gameForm.init(game as any);
+
+    const gameIsDuplicate = await client.isGameDuplicate(gameForm);
     if (gameIsDuplicate) {
       setDuplicateGame(gameForm);
-      openDuplicateGameDialog();
+      setDuplicateGameDialogOpen(true);
     } else {
       await saveGame(gameForm);
     }
   };
 
-  const showRatingAndDelta = (playerInfo: PlayerPerformance) => {
-    var delta = playerInfo.newRating! - playerInfo.oldRating!;
-    var sign = delta >= 0 ? "+" : "";
-    return `(${playerInfo.oldRating} ${sign}${delta})`;
-  };
-
-  const showTeam = (team: TeamPerformance) => {
-    return (
-      <>
-        <Grid item xs={3} className={classes.playerNames}>
-          <Link
-            className={classes.playerNameTypo}
-            style={{ textDecoration: "none" }}
-            to={`../speler/${team.firstPlayer!.playerId}`}
-          >
-            <Typography
-              className={classes.playerNameTypo}
-              gutterBottom
-              noWrap
-              style={{ width: "100%" }}
-            >
-              {team.firstPlayer!.name}
-            </Typography>
-          </Link>
-          <Link
-            className={classes.playerNameTypo}
-            style={{ textDecoration: "none" }}
-            to={`../speler/${team.secondPlayer!.playerId}`}
-          >
-            <Typography
-              className={classes.playerNameTypo}
-              gutterBottom
-              noWrap
-              style={{ width: "100%" }}
-            >
-              {team.secondPlayer!.name}
-            </Typography>
-          </Link>
-        </Grid>
-        <Grid item xs={2} className={classes.playerNames}>
-          <Typography
-            className={classes.playerNameTypo}
-            gutterBottom
-            noWrap
-            style={{ width: "100%" }}
-          >
-            {showRatingAndDelta(team.firstPlayer!)}
-          </Typography>
-          <Typography
-            className={classes.playerNameTypo}
-            gutterBottom
-            noWrap
-            style={{ width: "100%" }}
-          >
-            {showRatingAndDelta(team.secondPlayer!)}
-          </Typography>
-        </Grid>
-        <Grid item xs={1} className={classes.matchScore}>
-          {team.goals}
-        </Grid>
-      </>
-    );
-  };
-
-  const handleOpen = (id: string) => {
-    setOpenMatchId(id);
-    console.log(openMatchId);
-  }
-  const handleClose = () => setOpenMatchId(null);
-
-  const showMatchesOnDay = (day: GamesPerDay) => {
-    return day.games.map((match) => (
-      <Tooltip
-        key={match.id} // ensure your GameWithAnalytics has a stable id
-        open={Boolean(match.id && openMatchId === match.id)} // ✅ REQUIRED
-        title={<GameAnalyticsTooltip game={match} />}
-        componentsProps={{
-          tooltip: {
-            sx: {
-              maxWidth: "2000px",
-              minWidth: "300px",
-              backgroundColor: "black",
-              borderRadius: "4px",
-              padding: "0.5rem 0.75rem",
-              border: "2px solid #00ff00",
-              position: "relative",
-              overflow: "visible",
-              isolation: "isolate",
-              pointerEvents: "auto", // allow clicking checkbox
-            },
-            // keep open when mouse enters the tooltip itself
-            onMouseEnter: () => handleOpen(match.id!),
-            onMouseLeave: handleClose,
-          },
-        }}
-        enterDelay={150}
-        disableInteractive={false}
-        disableFocusListener
-        disableTouchListener
-        disableHoverListener
-      >
-        <div
-          onMouseEnter={() => handleOpen(match.id!)}
-          onMouseLeave={handleClose}
-        >
-          <Paper
-            className={`${classes.matchPaper} ${
-              highlightedMatchId === match.id ? classes.matchPaperHighlight : ""
-            }`}
-            onMouseEnter={() => setHighlightedMatchId(match.id!)}
-            onMouseLeave={() => setHighlightedMatchId(null)}
-          >
-            <Grid container>
-              {showTeam(match.firstTeam!)}
-              {showTeam(match.secondTeam!)}
-            </Grid>
-          </Paper>
-        </div>
-      </Tooltip>
-    ));
-  };
-
-  const showMatches = () => {
-    if (loadGames) {
-      return <CircularProgress />;
-    } else if (gamesPerDayList && gamesPerDayList!.matchesPerDay.length > 0) {
-      return gamesPerDayList!.matchesPerDay!.map((day, index) => (
-        <div>
-          <Paper className={classes.dayPaper}>
-            {getDateInRightFormat(day.day) + ":"}
-          </Paper>
-          {showMatchesOnDay(day)}
-        </div>
-      ));
-    } else {
-      return <div>Geen wedstrijden gespeeld deze week.</div>;
+  const saveGame = async (gameForm: GameForm) => {
+    try {
+      await client.createGame(gameForm);
+    } catch (ex) {
+      console.log(ex);
+    } finally {
+      closeGameModal();
     }
   };
 
+  const closeGameModal = () => {
+    setNewMatchForm({
+      team1_player1: 0,
+      team1_player2: 1,
+      team2_player1: 2,
+      team2_player2: 3,
+      team1_score: 0,
+      team2_score: 0,
+    });
+    setModalOpen(false);
+    setIsSaving(false);
+    refreshMatches();
+  };
+
   const inValidMatch = (): boolean => {
-    const noWinner = newMatchForm.team1_score == newMatchForm.team2_score;
+    const noWinner = newMatchForm.team1_score === newMatchForm.team2_score;
     const playerSet = new Set([
       newMatchForm.team1_player1,
       newMatchForm.team1_player2,
       newMatchForm.team2_player1,
       newMatchForm.team2_player2,
     ]);
-    const duplicatePlayers = playerSet.size != 4;
-    return noWinner || duplicatePlayers;
+    return noWinner || playerSet.size !== 4;
   };
 
-  const showSaveButtonOrLoading = () => {
-    if (!isSaving) {
-      return (
-        <Button
-          onClick={handleSaveMatch}
-          className={classes.addPlayerSave}
-          disabled={inValidMatch()}
-        >
-          opslaan
-        </Button>
-      );
-    } else {
-      return <CircularProgress />;
-    }
+  const showRatingAndDelta = (playerInfo: PlayerPerformance) => {
+    const delta = playerInfo.newRating! - playerInfo.oldRating!;
+    const sign = delta >= 0 ? "+" : "";
+    return `(${playerInfo.oldRating} ${sign}${delta})`;
   };
+
+  const showTeam = (team: TeamPerformance) => (
+    <>
+      <Grid item xs={3} className={classes.playerNames}>
+        <Link
+          className={classes.playerNameTypo}
+          style={{ textDecoration: "none" }}
+          to={`../speler/${team.firstPlayer!.playerId}`}
+        >
+          <Typography
+            className={classes.playerNameTypo}
+            gutterBottom
+            noWrap
+            style={{ width: "100%" }}
+          >
+            {team.firstPlayer!.name}
+          </Typography>
+        </Link>
+        <Link
+          className={classes.playerNameTypo}
+          style={{ textDecoration: "none" }}
+          to={`../speler/${team.secondPlayer!.playerId}`}
+        >
+          <Typography
+            className={classes.playerNameTypo}
+            gutterBottom
+            noWrap
+            style={{ width: "100%" }}
+          >
+            {team.secondPlayer!.name}
+          </Typography>
+        </Link>
+      </Grid>
+
+      <Grid item xs={2} className={classes.playerNames}>
+        <Typography
+          className={classes.playerNameTypo}
+          gutterBottom
+          noWrap
+          style={{ width: "100%" }}
+        >
+          {showRatingAndDelta(team.firstPlayer!)}
+        </Typography>
+        <Typography
+          className={classes.playerNameTypo}
+          gutterBottom
+          noWrap
+          style={{ width: "100%" }}
+        >
+          {showRatingAndDelta(team.secondPlayer!)}
+        </Typography>
+      </Grid>
+
+      <Grid item xs={1} className={classes.matchScore}>
+        {team.goals}
+      </Grid>
+    </>
+  );
+
+const showMatchesOnDay = (day: GamesPerDay) =>
+  day.games.map((match) => (
+    <GameAnalyticsTooltipWrapper game={match} >
+      <Paper className={classes.matchPaper} elevation={0} sx={{ boxShadow: "none" }}>
+        <Grid container>
+          {showTeam(match.firstTeam!)}
+          {showTeam(match.secondTeam!)}
+        </Grid>
+      </Paper>
+    </GameAnalyticsTooltipWrapper>
+  ));
+
+  const showMatches = () => {
+    if (loadGames) return <CircularProgress />;
+
+    if (gamesPerDayList && gamesPerDayList.matchesPerDay.length > 0) {
+      return gamesPerDayList.matchesPerDay.map((day) => (
+        <div key={day.day.toISOString()}>
+          <Paper className={classes.dayPaper}>
+            {getDateInRightFormat(day.day) + ":"}
+          </Paper>
+          {showMatchesOnDay(day)}
+        </div>
+      ));
+    }
+
+    return <div>Geen wedstrijden gespeeld deze week.</div>;
+  };
+
+  // ---- your existing modal/dialog UI left as-is (trimmed in this snippet) ----
+  const showSaveButtonOrLoading = () =>
+    !isSaving ? (
+      <Button
+        onClick={handleSaveMatch}
+        className={classes.addPlayerSave}
+        disabled={inValidMatch()}
+      >
+        opslaan
+      </Button>
+    ) : (
+      <CircularProgress />
+    );
 
   const blue = {
     100: "#DAECFF",
@@ -598,7 +538,6 @@ const GamesPage: React.FC = () => {
     500: "#007FFF",
     600: "#0072E5",
   };
-
   const grey = {
     50: "#F3F6F9",
     100: "#E5EAF2",
@@ -614,130 +553,102 @@ const GamesPage: React.FC = () => {
 
   const StyledInputRoot = styled("div")(
     ({ theme }) => `
-    font-weight: 400;
-    border-radius: 8px;
-    color: ${theme.palette.mode === "dark" ? grey[300] : grey[900]};
-    background: ${theme.palette.mode === "dark" ? grey[900] : "#fff"};
-    border: 1px solid ${theme.palette.mode === "dark" ? grey[700] : grey[200]};
-    box-shadow: 0px 2px 2px ${
-      theme.palette.mode === "dark" ? grey[900] : grey[50]
-    };
-    display: grid;
-    grid-template-columns: 1fr 19px;
-    grid-template-rows: 1fr 1fr;
-    overflow: hidden;
-    column-gap: 8px;
-    padding: 4px;
-    width: 4rem;
-
-  
-    &.${numberInputClasses.focused} {
+      font-weight: 400;
+      border-radius: 8px;
+      color: ${theme.palette.mode === "dark" ? grey[300] : grey[900]};
+      background: ${theme.palette.mode === "dark" ? grey[900] : "#fff"};
+      border: 1px solid ${
+        theme.palette.mode === "dark" ? grey[700] : grey[200]
+      };
+      box-shadow: 0px 2px 2px ${
+        theme.palette.mode === "dark" ? grey[900] : grey[50]
+      };
+      display: grid;
+      grid-template-columns: 1fr 19px;
+      grid-template-rows: 1fr 1fr;
+      overflow: hidden;
+      column-gap: 8px;
+      padding: 4px;
+      width: 4rem;
+      &.${numberInputClasses.focused} {
         border-color: ${blue[400]};
         box-shadow: 0 0 0 3px ${
           theme.palette.mode === "dark" ? blue[600] : blue[200]
         };
       }
-    
-      &:hover {
-        border-color: ${blue[400]};
-      }
-
-    // firefox
-    &:focus-visible {
-      outline: 0;
-    }
-  `
+      &:hover { border-color: ${blue[400]}; }
+      &:focus-visible { outline: 0; }
+    `
   );
 
   const StyledInputElement = styled("input")(
-    ({ theme }) => `
-    font-size: 0.875rem;
-    font-family: inherit;
-    font-weight: 400;
-    line-height: 1.5;
-    grid-column: 1/2;
-    grid-row: 1/3;
-    color: grey;
-    background: inherit;
-    border: none;
-    border-radius: inherit;
-    outline: 0;
-    width: 90%;
-  `
+    () => `
+      font-size: 0.875rem;
+      font-family: inherit;
+      font-weight: 400;
+      line-height: 1.5;
+      grid-column: 1/2;
+      grid-row: 1/3;
+      color: grey;
+      background: inherit;
+      border: none;
+      border-radius: inherit;
+      outline: 0;
+      width: 90%;
+    `
   );
 
   const StyledButton = styled("button")(
     ({ theme }) => `
-    display: flex;
-    flex-flow: row nowrap;
-    justify-content: center;
-    align-items: center;
-    appearance: none;
-    padding: 0;
-    width: 19px;
-    height: 19px;
-    font-family: system-ui, sans-serif;
-    font-size: 0.875rem;
-    line-height: 1;
-    box-sizing: border-box;
-    background: ${theme.palette.mode === "dark" ? grey[900] : "#fff"};
-    border: 0;
-    color: ${theme.palette.mode === "dark" ? grey[300] : grey[900]};
-    transition-property: all;
-    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 120ms;
-  
-    &:hover {
-      background: ${theme.palette.mode === "dark" ? grey[800] : grey[50]};
-      border-color: ${theme.palette.mode === "dark" ? grey[600] : grey[300]};
-      cursor: pointer;
-    }
-  
-    &.${numberInputClasses.incrementButton} {
-      grid-column: 2/3;
-      grid-row: 1/2;
-      border-top-left-radius: 4px;
-      border-top-right-radius: 4px;
-      border: 1px solid;
-      border-bottom: 0;
+      display: flex;
+      flex-flow: row nowrap;
+      justify-content: center;
+      align-items: center;
+      appearance: none;
+      padding: 0;
+      width: 19px;
+      height: 19px;
+      font-family: system-ui, sans-serif;
+      font-size: 0.875rem;
+      line-height: 1;
+      box-sizing: border-box;
+      background: ${theme.palette.mode === "dark" ? grey[900] : "#fff"};
+      border: 0;
+      color: ${theme.palette.mode === "dark" ? grey[300] : grey[900]};
+      transition: 120ms;
       &:hover {
+        background: ${theme.palette.mode === "dark" ? grey[800] : grey[50]};
         cursor: pointer;
-        background: ${blue[400]};
-        color: ${grey[50]};
       }
-  
-    border-color: ${theme.palette.mode === "dark" ? grey[800] : grey[200]};
-    background: ${theme.palette.mode === "dark" ? grey[900] : grey[50]};
-    color: ${theme.palette.mode === "dark" ? grey[200] : grey[900]};
-    }
-  
-    &.${numberInputClasses.decrementButton} {
-      grid-column: 2/3;
-      grid-row: 2/3;
-      border-bottom-left-radius: 4px;
-      border-bottom-right-radius: 4px;
-      border: 1px solid;
-      &:hover {
-        cursor: pointer;
-        background: ${blue[400]};
-        color: ${grey[50]};
+      &.${numberInputClasses.incrementButton} {
+        grid-column: 2/3;
+        grid-row: 1/2;
+        border-top-left-radius: 4px;
+        border-top-right-radius: 4px;
+        border: 1px solid;
+        border-bottom: 0;
+        &:hover { background: ${blue[400]}; color: ${grey[50]}; }
+        border-color: ${theme.palette.mode === "dark" ? grey[800] : grey[200]};
+        background: ${theme.palette.mode === "dark" ? grey[900] : grey[50]};
       }
-  
-    border-color: ${theme.palette.mode === "dark" ? grey[800] : grey[200]};
-    background: ${theme.palette.mode === "dark" ? grey[900] : grey[50]};
-    color: ${theme.palette.mode === "dark" ? grey[200] : grey[900]};
-    }
-    & .arrow {
-      transform: translateY(-1px);
-    }
-  `
+      &.${numberInputClasses.decrementButton} {
+        grid-column: 2/3;
+        grid-row: 2/3;
+        border-bottom-left-radius: 4px;
+        border-bottom-right-radius: 4px;
+        border: 1px solid;
+        &:hover { background: ${blue[400]}; color: ${grey[50]}; }
+        border-color: ${theme.palette.mode === "dark" ? grey[800] : grey[200]};
+        background: ${theme.palette.mode === "dark" ? grey[900] : grey[50]};
+      }
+    `
   );
 
   function showDuplicateGameDialog() {
     return (
       <Modal
         open={isDuplicateGameDialogOpen}
-        onClose={closeDuplicateGameDialog}
+        onClose={() => setDuplicateGameDialogOpen(false)}
         className={classes.modal}
         style={{ maxWidth: "none" }}
       >
@@ -749,7 +660,11 @@ const GamesPage: React.FC = () => {
           <Grid container justifyContent="center" spacing={2}>
             <Grid item>
               <Button
-                onClick={handleSaveDuplicateGame}
+                onClick={async () => {
+                  await saveGame(duplicateGame!);
+                  setDuplicateGame(undefined);
+                  setDuplicateGameDialogOpen(false);
+                }}
                 className={classes.addPlayerSave}
               >
                 ja
@@ -757,7 +672,10 @@ const GamesPage: React.FC = () => {
             </Grid>
             <Grid item>
               <Button
-                onClick={handleCloseDialog}
+                onClick={() => {
+                  setDuplicateGame(undefined);
+                  setDuplicateGameDialogOpen(false);
+                }}
                 className={classes.addPlayerBack}
               >
                 nee
@@ -769,55 +687,11 @@ const GamesPage: React.FC = () => {
     );
   }
 
-  const handleSaveDuplicateGame = async () => {
-    await saveGame(duplicateGame!);
-    handleCloseDialog();
-  };
-
-  const handleCloseDialog = () => {
-    setDuplicateGame(undefined);
-    closeDuplicateGameDialog();
-    closeGameModal();
-  };
-
-  const saveGame = async (gameForm: GameForm) => {
-    try {
-      await client.createGame(gameForm);
-    } catch (ex) {
-      console.log(ex);
-    } finally {
-      closeGameModal();
-    }
-  };
-
-  const closeGameModal = () => {
-    const team1_player2 = Math.min(1, players!.length);
-    const team2_player1 = Math.min(2, players!.length);
-    const team2_player2 = Math.min(3, players!.length);
-    setNewMatchForm({
-      ...newMatchForm,
-      team1_player2,
-      team2_player1,
-      team2_player2,
-    });
-    setNewMatchForm({
-      team1_player1: 0,
-      team1_player2: 1,
-      team2_player1: 2,
-      team2_player2: 3,
-      team1_score: 0,
-      team2_score: 0,
-    });
-    setModalOpen(false);
-    setIsSaving(false);
-    refreshMatches();
-  };
-
   function showModal() {
     return (
       <Modal
         open={isModalOpen}
-        onClose={handleCloseModal}
+        onClose={() => setModalOpen(false)}
         className={classes.modal}
         style={{ maxWidth: "none" }}
       >
@@ -825,6 +699,7 @@ const GamesPage: React.FC = () => {
           <Typography variant="h6" gutterBottom className={classes.modalBanner}>
             wedstrijdformulier inleveren
           </Typography>
+
           <Grid
             container
             spacing={2}
@@ -849,9 +724,11 @@ const GamesPage: React.FC = () => {
                 }
                 className={classes.select}
               >
-                {players?.map((player, index) => {
-                  return <MenuItem value={index}>{player.name}</MenuItem>;
-                })}
+                {players?.map((player, index) => (
+                  <MenuItem key={player.id} value={index}>
+                    {player.name}
+                  </MenuItem>
+                ))}
               </Select>
               <br />
               <Select
@@ -864,11 +741,14 @@ const GamesPage: React.FC = () => {
                 }
                 className={classes.select}
               >
-                {players?.map((player, index) => {
-                  return <MenuItem value={index}>{player.name}</MenuItem>;
-                })}
+                {players?.map((player, index) => (
+                  <MenuItem key={player.id + "-2"} value={index}>
+                    {player.name}
+                  </MenuItem>
+                ))}
               </Select>
             </Grid>
+
             <Grid item xs={2}>
               <NumberInput
                 slots={{
@@ -878,20 +758,17 @@ const GamesPage: React.FC = () => {
                   decrementButton: StyledButton,
                 }}
                 slotProps={{
-                  incrementButton: {
-                    children: "▴",
-                  },
-                  decrementButton: {
-                    children: "▾",
-                  },
+                  incrementButton: { children: "▴" },
+                  decrementButton: { children: "▾" },
                 }}
                 min={0}
                 value={newMatchForm.team1_score}
-                onChange={(e, val) =>
+                onChange={(_, val) =>
                   setNewMatchForm({ ...newMatchForm, team1_score: val })
                 }
               />
             </Grid>
+
             <Grid item xs={2} justifyContent={"center"}>
               <NumberInput
                 slots={{
@@ -901,20 +778,17 @@ const GamesPage: React.FC = () => {
                   decrementButton: StyledButton,
                 }}
                 slotProps={{
-                  incrementButton: {
-                    children: "▴",
-                  },
-                  decrementButton: {
-                    children: "▾",
-                  },
+                  incrementButton: { children: "▴" },
+                  decrementButton: { children: "▾" },
                 }}
                 min={0}
                 value={newMatchForm.team2_score}
-                onChange={(e, val) =>
+                onChange={(_, val) =>
                   setNewMatchForm({ ...newMatchForm, team2_score: val })
                 }
               />
             </Grid>
+
             <Grid item spacing={0} xs={4}>
               Team 2 <br />
               <Select
@@ -928,9 +802,11 @@ const GamesPage: React.FC = () => {
                 }
                 className={classes.select}
               >
-                {players?.map((player, index) => {
-                  return <MenuItem value={index}>{player.name}</MenuItem>;
-                })}
+                {players?.map((player, index) => (
+                  <MenuItem key={player.id + "-3"} value={index}>
+                    {player.name}
+                  </MenuItem>
+                ))}
               </Select>
               <br />
               <Select
@@ -943,17 +819,20 @@ const GamesPage: React.FC = () => {
                 }
                 className={classes.select}
               >
-                {players?.map((player, index) => {
-                  return <MenuItem value={index}>{player.name}</MenuItem>;
-                })}
+                {players?.map((player, index) => (
+                  <MenuItem key={player.id + "-4"} value={index}>
+                    {player.name}
+                  </MenuItem>
+                ))}
               </Select>
             </Grid>
           </Grid>
+
           <Grid container justifyContent="center" spacing={2}>
             <Grid item>{showSaveButtonOrLoading()}</Grid>
             <Grid item>
               <Button
-                onClick={handleCloseModal}
+                onClick={() => setModalOpen(false)}
                 className={classes.addPlayerBack}
               >
                 terug
@@ -965,42 +844,36 @@ const GamesPage: React.FC = () => {
     );
   }
 
-  const showVorigeButton = () => {
-    if (thereArePreviousWeeks && !loadGames) {
-      return (
-        <Typography
-          style={{ textTransform: "none" }}
-          className={classes.vorigevolgendebutton}
-        >
-          vorige
-        </Typography>
-      );
-    }
-  };
+  const showVorigeButton = () =>
+    thereArePreviousWeeks && !loadGames ? (
+      <Typography
+        style={{ textTransform: "none" }}
+        className={classes.vorigevolgendebutton}
+      >
+        vorige
+      </Typography>
+    ) : null;
 
-  const showVolgendeButton = () => {
-    if (weekIndex != 0 && !loadGames) {
-      return (
-        <Typography
-          style={{ textTransform: "none" }}
-          className={classes.vorigevolgendebutton}
-        >
-          volgende
-        </Typography>
-      );
-    }
-  };
+  const showVolgendeButton = () =>
+    weekIndex !== 0 && !loadGames ? (
+      <Typography
+        style={{ textTransform: "none" }}
+        className={classes.vorigevolgendebutton}
+      >
+        volgende
+      </Typography>
+    ) : null;
 
   const clickVorigeButton = async () => {
     setWeekIndexUpdated(true);
     setLoadGames(true);
-    setWeekIndex((prevWeekIndex) => prevWeekIndex + 1);
+    setWeekIndex((prev) => prev + 1);
   };
 
   const clickVolgendeButton = async () => {
     setWeekIndexUpdated(true);
     setLoadGames(true);
-    setWeekIndex((prevWeekIndex) => prevWeekIndex - 1);
+    setWeekIndex((prev) => prev - 1);
   };
 
   const showStartAndEndOfWeek = () => {
@@ -1013,21 +886,22 @@ const GamesPage: React.FC = () => {
   };
 
   return (
-    <div className={classes.centerContainer} style={{ paddingBottom: "10rem" }}>
+    <div className={classes.centerContainer} style={{ paddingBottom: "40rem" }}>
       <Grid container spacing={2}>
-        <Grid item xs={2}></Grid>
+        <Grid item xs={2} />
         <Grid item xs={8}>
           <Paper className={classes.banner}>
             tafelvoetbal uitslagen, {showStartAndEndOfWeek()}
           </Paper>
         </Grid>
-        <Grid item xs={2}></Grid>
+        <Grid item xs={2} />
+
         <Grid item xs={2} className={classes.menuContainer}>
           <div className={classes.menuContainer}>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
-              onClick={handleOpenModal}
+              onClick={() => setModalOpen(true)}
               className={classes.addButton}
             >
               <Typography variant="h6" className={classes.buttonText}>
@@ -1036,17 +910,16 @@ const GamesPage: React.FC = () => {
             </Button>
           </div>
         </Grid>
+
         <Grid item xs={8}>
           {showMatches()}
         </Grid>
-        <Grid item xs={2}></Grid>
 
-        <Grid item xs={2}></Grid>
+        <Grid item xs={2} />
+
+        <Grid item xs={2} />
         <Grid item xs={8}>
           <Paper className={classes.floatingPaper}>
-            {/* Content for the floating paper element */}
-            {/* You can customize the content and styles as needed */}
-
             <Grid item xs={4}>
               <Button
                 variant="text"
@@ -1056,11 +929,10 @@ const GamesPage: React.FC = () => {
                 {showVorigeButton()}
               </Button>
             </Grid>
-
             <Grid item xs={4}>
               <Button
                 variant="text"
-                disabled={weekIndex == 0 || loadGames}
+                disabled={weekIndex === 0 || loadGames}
                 onClick={clickVolgendeButton}
               >
                 {showVolgendeButton()}
@@ -1068,8 +940,9 @@ const GamesPage: React.FC = () => {
             </Grid>
           </Paper>
         </Grid>
-        <Grid item xs={2}></Grid>
+        <Grid item xs={2} />
       </Grid>
+
       {showDuplicateGameDialog()}
       {showModal()}
     </div>
