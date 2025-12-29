@@ -46,84 +46,65 @@ namespace AnagoLeaderboard.Services
                 .Where(player => player.Active)
                 .ToList();
         }
-
+        
         public async Task<(List<DynamicRatingPlayer>, List<Game>)> GetLeaderBoard(int? year = null)
         {
-            var allGames = year == null
+            var allGames = year is null
                 ? await _gameService.GetGames()
-                : await _gameService.GetGamesUntilYear(year!.Value);
+                : await _gameService.GetGamesUntilYear(year.Value);
 
-            Dictionary<
-                    string,
-                    (int rating, double std, int gamesPlayed, int gamesWon, int gamesLost, int goalsFor, int
-                    goalsAgainst)
-                >
-                playerIdToRating = new();
+            var playersById = await _dbContext.Players.ToDictionaryAsync(p => p.Id);
 
-            var allPlayers = await _dbContext.Players.ToListAsync();
+            var statsByPlayerId = new Dictionary<string, PlayerStats>();
+
             foreach (var game in allGames)
             {
-                var playerIds = game.GetPlayerIds();
-                playerIds
-                    .Where(playerIds => !playerIdToRating.ContainsKey(playerIds)).ToList()
-                    .ForEach(playerId => playerIdToRating.Add(playerId, (1000, 1000, 0, 0, 0, 0, 0)));
+                var gamePlayerIds = game.GetPlayerIds(); // T1P1, T1P2, T2P1, T2P2
 
-                var gamesPlayed = playerIds
-                    .Select(playerId => playerIdToRating[playerId].gamesPlayed)
-                    .ToList();
+                EnsurePlayers(gamePlayerIds, statsByPlayerId);
 
-                var currentValues = playerIds
-                    .Select(playerId => (
-                        playerIdToRating[playerId].rating,
-                        playerIdToRating[playerId].std,
-                        playerIdToRating[playerId].gamesWon,
-                        playerIdToRating[playerId].gamesLost,
-                        playerIdToRating[playerId].goalsFor,
-                        playerIdToRating[playerId].goalsAgainst
-                    ))
-                    .ToList();
+                var ratingCalculator = new RatingCalculator(game);
 
-                var ratingCalculator = new RatingCalculator(game, gamesPlayed);
-                var updatedValues = ratingCalculator.GetUpdates(currentValues);
+                var updates = ratingCalculator.GetUpdates(gamePlayerIds.Select(id => statsByPlayerId[id]).ToList());
 
-                var (_, _, _, _, _, _, _, delta1) = updatedValues[0];
-                var (_, _, _, _, _, _, _, delta2) = updatedValues[2];
+                game.FirstTeam.DeltaPoints = updates[0].Delta;
+                game.SecondTeam.DeltaPoints = updates[2].Delta;
 
-                game.FirstTeam.DeltaPoints = delta1;
-                game.SecondTeam.DeltaPoints = delta2;
-
-                for (int i = 0; i < playerIds.Count; i++)
-                {
-                    var (rating, std, totalGamesPlayed, gamesWon, gamesLost, goalsFor, goalsAgainst, _) =
-                        updatedValues[i];
-                    playerIdToRating[playerIds[i]] = (rating, std, totalGamesPlayed, gamesWon, gamesLost, goalsFor,
-                        goalsAgainst);
-                }
+                for (int i = 0; i < gamePlayerIds.Count; i++)
+                    statsByPlayerId[gamePlayerIds[i]] = updates[i].Stats;
             }
 
-            var result = playerIdToRating
+            var rated = statsByPlayerId
                 .Select(kvp => new DynamicRatingPlayer(
-                    allPlayers.Find(player => player.Id.Equals(kvp.Key)),
-                    kvp.Value.rating,
-                    kvp.Value.std,
-                    kvp.Value.gamesPlayed,
-                    kvp.Value.gamesWon,
-                    kvp.Value.gamesLost,
-                    kvp.Value.goalsFor,
-                    kvp.Value.goalsAgainst)
-                )
-                .OrderByDescending(player => player.VisibleRating)
+                    playersById[kvp.Key],
+                    kvp.Value.Rating,
+                    kvp.Value.Std,
+                    kvp.Value.GamesPlayed,
+                    kvp.Value.GamesWon,
+                    kvp.Value.GamesLost,
+                    kvp.Value.GoalsFor,
+                    kvp.Value.GoalsAgainst
+                ))
+                .OrderByDescending(p => p.VisibleRating)
                 .ToList();
 
-            var zeroRatingPlayers = allPlayers
-                .Where(player => !playerIdToRating.ContainsKey(player.Id))
-                .Select(player => new DynamicRatingPlayer(player, 1000, 1000, 0, 0, 0, 0, 0))
+            var unrated = playersById.Values
+                .Where(p => !statsByPlayerId.ContainsKey(p.Id))
+                .Select(p => new DynamicRatingPlayer(p, 1000, 1000, 0, 0, 0, 0, 0))
                 .ToList();
 
-            result.AddRange(zeroRatingPlayers);
-            return (result, allGames);
+            rated.AddRange(unrated);
+            return (rated, allGames);
         }
-
+        
+        private static void EnsurePlayers(
+            IEnumerable<string> playerIds,
+            IDictionary<string, PlayerStats> statsByPlayerId)
+        {
+            foreach (var id in playerIds)
+                statsByPlayerId.TryAdd(id, PlayerStats.NewPlayer);
+        }
+        
         public async Task<List<DynamicRatingPlayer>> GetLeaderBoardByYear(int year)
         {
             var (players, games) = await GetLeaderBoard(year);

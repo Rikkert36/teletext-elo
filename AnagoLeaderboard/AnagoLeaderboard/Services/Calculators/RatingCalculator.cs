@@ -6,7 +6,6 @@ namespace AnagoLeaderboard.Services
     public class RatingCalculator
     {
         private readonly Game _game;
-        private readonly List<int> _gamesPlayed;
         private readonly int _team1Goals;
         private readonly int _team2Goals;
 
@@ -21,103 +20,75 @@ namespace AnagoLeaderboard.Services
         /// </summary>
         /// <param name="game"></param>
         /// <param name="gamesPlayed"></param>
-        public RatingCalculator(Game game, List<int> gamesPlayed)
+        public RatingCalculator(Game game)
         {
             _game = game;
-            _gamesPlayed = gamesPlayed;
             _team1Goals = game.FirstTeam.Goals;
             _team2Goals = game.SecondTeam.Goals;
         }
-
-        internal List<(int rating, double std, int gamesPlayed, int gamesWon, int gamesLost, int goalsFor, int
-                goalsAgainst, int delta)>
-            GetUpdates(
-                List<(int rating, double std, int gamesWon, int gamesLost, int goalsFor, int goalsAgainst)>
-                    currentValues)
+        
+        internal List<PlayerUpdate> GetUpdates(List<PlayerStats> currentPlayers)
         {
-            var result = CalculateOutcome(
-                currentValues.Select(value => (value.rating)).ToList(),
-                currentValues.Select(value => (value.gamesWon)).ToList(),
-                currentValues.Select(value => (value.gamesLost)).ToList(),
-                currentValues.Select(value => (value.goalsFor)).ToList(),
-                currentValues.Select(value => (value.goalsAgainst)).ToList()
-            );
+            var result = CalculateOutcome(currentPlayers);
 
-            _game.FirstTeam.FirstPlayer.NewRating = (int)Math.Round(result[0].rating - result[0].std);
-            _game.FirstTeam.SecondPlayer.NewRating = (int)Math.Round(result[1].rating - result[1].std);
-            _game.SecondTeam.FirstPlayer.NewRating = (int)Math.Round(result[2].rating - result[2].std);
-            _game.SecondTeam.SecondPlayer.NewRating = (int)Math.Round(result[3].rating - result[3].std);
+            var players = _game.GetPlayers();
 
-            _game.FirstTeam.FirstPlayer.SetStandardDeviation(currentValues[0].std, result[0].std);
-            _game.FirstTeam.SecondPlayer.SetStandardDeviation(currentValues[1].std, result[1].std);
-            _game.SecondTeam.FirstPlayer.SetStandardDeviation(currentValues[2].std, result[2].std);
-            _game.SecondTeam.SecondPlayer.SetStandardDeviation(currentValues[3].std, result[3].std);
-
-            _game.FirstTeam.FirstPlayer.OldRating = (int)Math.Round(currentValues[0].rating - currentValues[0].std);
-            _game.FirstTeam.SecondPlayer.OldRating = (int)Math.Round(currentValues[1].rating - currentValues[1].std);
-            _game.SecondTeam.FirstPlayer.OldRating = (int)Math.Round(currentValues[2].rating - currentValues[2].std);
-            _game.SecondTeam.SecondPlayer.OldRating = (int)Math.Round(currentValues[3].rating - currentValues[3].std);
-            return result;
-        }
-
-        private List<(int rating, double std, int gamesPlayed, int gamesWon, int gamesLost, int goalsFor, int
-                goalsAgainst, int delta)>
-            CalculateOutcome(
-                List<int> rating,
-                List<int> gamesWon,
-                List<int> gamesLost,
-                List<int> goalsFor,
-                List<int> goalsAgainst)
-        {
-            var delta = GetDelta(rating[0], rating[1], rating[2], rating[3], _team1Goals, _team2Goals);
-
-            var team1Delta = delta;
-            var team2Delta = delta * -1;
-
-            var team1Player1ExperienceFactor = Math.Max(1, 2 - (0.1 * _gamesPlayed[0]));
-            var team1Player2ExperienceFactor = Math.Max(1, 2 - (0.1 * _gamesPlayed[1]));
-            var team2Player1ExperienceFactor = Math.Max(1, 2 - (0.1 * _gamesPlayed[2]));
-            var team2Player2ExperienceFactor = Math.Max(1, 2 - (0.1 * _gamesPlayed[3]));
-
-            var roundedTeam1Player1Delta = (int)Math.Round(team1Delta * team1Player1ExperienceFactor, 0);
-            var roundedTeam1Player2Delta = (int)Math.Round(team1Delta * team1Player2ExperienceFactor, 0);
-            var roundedTeam2Player1Delta = (int)Math.Round(team2Delta * team2Player1ExperienceFactor, 0);
-            var roundedTeam2Player2Delta = (int)Math.Round(team2Delta * team2Player2ExperienceFactor, 0);
-
-            var stdValues = new double[4];
             for (int i = 0; i < 4; i++)
             {
-                double decreaseFactor = Math.Exp(-Lambda * (_gamesPlayed[i] + 1));
-                stdValues[i] = 1000 * decreaseFactor;
+                var oldStats = currentPlayers[i];
+                var newStats = result[i].Stats;
+
+                players[i].NewRating = (int)Math.Round(newStats.Rating - newStats.Std);
+                players[i].OldRating = (int)Math.Round(oldStats.Rating - oldStats.Std);
+                players[i].SetStandardDeviation(oldStats.Std, newStats.Std);
             }
 
-            var deltas = new List<int>()
-            {
-                roundedTeam1Player1Delta,
-                roundedTeam1Player2Delta,
-                roundedTeam2Player1Delta,
-                roundedTeam2Player2Delta
-            };
-            
-            var team1Score = _team1Goals > _team2Goals ? 1 : 0;
-            var team2Score = _team2Goals > _team1Goals ? 1 : 0;
+            return result;
+        }
+        
+        private List<PlayerUpdate> CalculateOutcome(IReadOnlyList<PlayerStats> players)
+        {
+            var baseDelta = GetDelta(
+                players[0].Rating, players[1].Rating, players[2].Rating, players[3].Rating,
+                _team1Goals, _team2Goals);
 
-            List<(int rating, double std, int gamesPlayed, int gameWon, int gamesLost, int goalsFor, int goalsAgainst,
-                int delta)> result = [];
+            var teamDelta = new[] { baseDelta, -baseDelta };
+            var teamGoals = new[] { _team1Goals, _team2Goals };
+
+            var teamScore = new[]
+            {
+                _team1Goals > _team2Goals ? 1 : 0,
+                _team2Goals > _team1Goals ? 1 : 0
+            };
+
+            var result = new List<PlayerUpdate>(capacity: 4);
+
             for (int i = 0; i < 4; i++)
             {
-                result.Add(
-                    (
-                        rating[i] + deltas[i],
-                        stdValues[i],
-                        _gamesPlayed[i] + 1,
-                        gamesWon[i] + (i < 2 ? team1Score : team2Score),
-                        gamesLost[i] + (i < 2 ? team2Score : team1Score),
-                        goalsFor[i] + (i < 2 ? _team1Goals : _team2Goals),
-                        goalsAgainst[i] + (i < 2 ? _team2Goals : _team1Goals),
-                        i < 2 ? (int)Math.Round(team1Delta, 0) : (int)Math.Round(team2Delta, 0)
-                    )
-                );
+                var p = players[i];
+
+                int team = GetTeamIndex(i);
+                int opp = GetOppTeamIndex(team);
+
+                int adjustedDelta = (int)Math.Round(
+                    teamDelta[team] * ExperienceFactor(p.GamesPlayed),
+                    0);
+
+                var updatedStats = p with
+                {
+                    Rating = p.Rating + adjustedDelta,
+                    Std = NewStd(p.GamesPlayed),
+                    GamesPlayed = p.GamesPlayed + 1,
+                    GamesWon = p.GamesWon + teamScore[team],
+                    GamesLost = p.GamesLost + teamScore[opp],
+                    GoalsFor = p.GoalsFor + teamGoals[team],
+                    GoalsAgainst = p.GoalsAgainst + teamGoals[opp]
+                };
+
+                result.Add(new PlayerUpdate(
+                    Stats: updatedStats,
+                    Delta: (int)Math.Round(teamDelta[team], 0)
+                ));
             }
 
             return result;
@@ -151,6 +122,19 @@ namespace AnagoLeaderboard.Services
             double team1Expected = 1 / (Math.Pow(10, team1Ratio) + 1);
 
             return team1Expected;
+        }
+        
+        private static int GetTeamIndex(int playerIndex) => playerIndex / 2;
+
+        private static int GetOppTeamIndex(int teamIndex) => 1 - teamIndex;
+
+        private static double ExperienceFactor(int gamesPlayed) =>
+            Math.Max(1, 2 - (0.1 * gamesPlayed));
+
+        private static double NewStd(int gamesPlayed)
+        {
+            double decreaseFactor = Math.Exp(-Lambda * (gamesPlayed + 1));
+            return 1000 * decreaseFactor;
         }
     }
 }
