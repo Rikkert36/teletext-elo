@@ -46,6 +46,14 @@ import {
   PlayerPerformance,
 } from "../clients/server.generated";
 
+type WinStreak = {
+  games: Game[];
+  length: number;
+  // Optional metadata that can be handy
+  startIndex: number;
+  endIndex: number;
+};
+
 // Define styles using makeStyles
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -324,6 +332,97 @@ const PlayerPage: React.FC = () => {
     }
   };
 
+  const gameWon = (game: Game) => {
+    const winningTeam =
+      game.firstTeam!.goals! > game.secondTeam!.goals!
+        ? game.firstTeam
+        : game.secondTeam;
+
+    return (
+      id === winningTeam?.firstPlayer?.playerId ||
+      id === winningTeam?.secondPlayer?.playerId
+    );
+  };
+
+  const getTopWinStreaks = (max = 10): WinStreak[] => {
+    if (!allPlayerGames?.length) return [];
+
+    const streaks: WinStreak[] = [];
+
+    let currentStreak: Game[] = [];
+    let currentStartIndex = 0;
+
+    for (let i = 0; i < allPlayerGames.length; i++) {
+      const game = allPlayerGames[i];
+
+      if (gameWon(game)) {
+        if (currentStreak.length === 0) {
+          currentStartIndex = i;
+        }
+        currentStreak.push(game);
+      } else if (currentStreak.length > 0) {
+        streaks.push({
+          games: currentStreak,
+          length: currentStreak.length,
+          startIndex: currentStartIndex,
+          endIndex: i - 1,
+        });
+        currentStreak = [];
+      }
+    }
+
+    // If it ends with a streak, flush it
+    if (currentStreak.length > 0) {
+      streaks.push({
+        games: currentStreak,
+        length: currentStreak.length,
+        startIndex: currentStartIndex,
+        endIndex: allPlayerGames.length - 1,
+      });
+    }
+
+    // Sort by length desc, then most recent streak first (higher endIndex)
+    streaks.sort((a, b) => b.length - a.length || b.endIndex - a.endIndex);
+
+    return streaks.slice(0, max);
+  };
+
+  const getCurrentWinStreak = (): WinStreak => {
+    if (!allPlayerGames?.length) {
+      return {
+        games: [],
+        length: 0,
+        startIndex: -1,
+        endIndex: -1,
+      };
+    }
+
+    const endIndex = allPlayerGames.length - 1;
+    const lastWasWin = gameWon(allPlayerGames[endIndex]);
+
+    const games: Game[] = [];
+    let startIndex = endIndex;
+
+    // Walk backwards while result matches last game
+    for (let i = endIndex; i >= 0; i--) {
+      const game = allPlayerGames[i];
+
+      if (gameWon(game) !== lastWasWin) break;
+
+      startIndex = i;
+      games.unshift(game); // keep chronological order
+    }
+
+    const length = lastWasWin ? games.length : -games.length;
+
+    return {
+      games,
+      length,
+      startIndex,
+      endIndex,
+    };
+  };
+
   const showSaveButtonOrLoading = () => {
     if (!isSaving) {
       return (
@@ -422,13 +521,6 @@ const PlayerPage: React.FC = () => {
   };
 
   function getThreshold(gamesPlayed: PlayerGameNumberTuple[]) {
-    // const playedAtLeast10Times = gamesPlayed.filter(
-    //   player => player.numberOfGames! >= 10);
-
-    // if (playedAtLeast10Times.length >= 10) {
-    //   return 10;
-    // }
-
     const playedAtLeast5TimesWith = gamesPlayed.filter(
       (player) => player.numberOfGames! >= 5
     );
@@ -453,6 +545,15 @@ const PlayerPage: React.FC = () => {
     const dayOfMonth = d.getDate();
     const month = toDutchMonth(d.getMonth());
     return `${weekDay}, ${dayOfMonth} ${month}`;
+  };
+
+  const getDateInStreakFormat = (d: Date | undefined) => {
+    if (!d) return "-";
+
+    const weekDay = toDutchDay(d.getDay());
+    const dayOfMonth = d.getDate();
+    const month = toDutchMonth(d.getMonth());
+    return `${weekDay.toLocaleLowerCase()} ${dayOfMonth} ${month}`;
   };
 
   const toDutchDay = (day: number): string => {
@@ -584,6 +685,9 @@ const PlayerPage: React.FC = () => {
     if (playerLoading || playerRank == null) {
       return <CircularProgress />;
     } else {
+      const winstreaks: WinStreak[] = getTopWinStreaks();
+      const currentStreak: WinStreak = getCurrentWinStreak();
+
       return (
         <Grid
           container
@@ -629,6 +733,51 @@ const PlayerPage: React.FC = () => {
               {player!.numberOfLosses}
             </Typography>
             <Typography className={classes.stats}>{winstPercText()}</Typography>
+          </Grid>
+          <Grid container item>
+            <Grid item xs={6} className={classes.stats}>
+              <Typography className={classes.stats}>
+                huidige winstreak{" "}
+              </Typography>
+            </Grid>
+            <Grid item xs={6} className={classes.stats}>
+              <Typography className={classes.stats}>
+                {currentStreak.length}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} className={classes.stats}>
+              <Typography
+                className={classes.playerNames}
+                gutterBottom
+                noWrap
+                style={{ width: "100%" }}
+              >
+                vanaf {getDateInStreakFormat(currentStreak.games[0]?.createdAt)}
+              </Typography>
+            </Grid>
+          </Grid>
+          <Grid container item>
+            <Grid item xs={6} className={classes.stats}>
+              <Typography className={classes.stats}>
+                hoogste winstreak{" "}
+              </Typography>
+            </Grid>
+            <Grid item xs={6} className={classes.stats}>
+              <Typography className={classes.stats}>
+                {winstreaks[0]?.length ?? 0}
+              </Typography>
+            </Grid>
+            <Grid item xs={12} className={classes.stats}>
+              <Typography
+                className={classes.playerNames}
+                gutterBottom
+                noWrap
+                style={{ width: "100%" }}
+              >
+                {getDateInStreakFormat(winstreaks[0]?.games[0].createdAt)} -{" "}
+                {getDateInStreakFormat(winstreaks[0]?.games!.at(-1)!.createdAt)}
+              </Typography>
+            </Grid>
           </Grid>
         </Grid>
       );
@@ -732,7 +881,7 @@ const PlayerPage: React.FC = () => {
   };
 
   const showCoolStatsOrLoading = () => {
-    if (playerStats == null) {
+    if (playerStats == null || !player?.numberOfGames) {
       return <CircularProgress />;
     } else {
       const winstMagneets = getRelations(playerStats.gamesWith!).slice(0, 10);
