@@ -737,7 +737,7 @@ const PlayerPage: React.FC = () => {
           <Grid container item>
             <Grid item xs={6} className={classes.stats}>
               <Typography className={classes.stats}>
-                huidige winstreak{" "}
+                huidige winreeks{" "}
               </Typography>
             </Grid>
             <Grid item xs={6} className={classes.stats}>
@@ -759,7 +759,7 @@ const PlayerPage: React.FC = () => {
           <Grid container item>
             <Grid item xs={6} className={classes.stats}>
               <Typography className={classes.stats}>
-                hoogste winstreak{" "}
+                hoogste winreeks{" "}
               </Typography>
             </Grid>
             <Grid item xs={6} className={classes.stats}>
