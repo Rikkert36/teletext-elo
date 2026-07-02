@@ -52,6 +52,9 @@ namespace AnagoLeaderboard.Services
             var allGames = year is null
                 ? await _gameService.GetGames()
                 : await _gameService.GetGamesUntilYear(year.Value);
+            
+            var totalNumberOfGoals = allGames.Sum(game => game.FirstTeam.Goals + game.SecondTeam.Goals);
+
 
             var playersById = await _dbContext.Players.ToDictionaryAsync(p => p.Id);
 
