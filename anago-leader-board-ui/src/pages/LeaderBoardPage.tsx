@@ -16,6 +16,7 @@ import {
   Grid,
   Modal,
   CircularProgress,
+  useMediaQuery,
 } from '@mui/material';
 import {Link} from"react-router-dom"
 import SearchIcon from '@mui/icons-material/Search';
@@ -232,8 +233,9 @@ const useStyles = makeStyles((theme: Theme) =>
       justifyContent: 'center',
       textAlign: 'center',
       [theme.breakpoints.down('sm')]: {
-        fontSize: '1.1rem',
-        padding: '1rem',
+        fontSize: '1.15rem',
+        padding: '1rem 0.4rem',
+        whiteSpace: 'nowrap',
       },
     },
     detailCell: {
@@ -302,6 +304,7 @@ const useStyles = makeStyles((theme: Theme) =>
 const LeaderboardPage: React.FC = () => {
   const classes = useStyles();
   const isMobile = useIsMobile();
+  const bannerShort = useMediaQuery('(max-width:420px)');
   const client = new Client(window.TAFELVOETBAL_SERVER_URL);
   const [players, setPlayers] = useState<RankedPlayer[]>();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -492,7 +495,9 @@ const LeaderboardPage: React.FC = () => {
         <Grid item md={2} sx={{ display: { xs: 'none', md: 'block' } }} />
         <Grid item xs={12} md={8} >
           <Paper className={classes.banner}>
-            tafelvoetbal,stand per {getDateInRightFormat()}
+            {bannerShort
+              ? `tafelvoetbal, ${getDateInRightFormat()}`
+              : `tafelvoetbal,stand per ${getDateInRightFormat()}`}
           </Paper>
         </Grid>
         <Grid item md={2} sx={{ display: { xs: 'none', md: 'block' } }} />

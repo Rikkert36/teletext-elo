@@ -1,10 +1,11 @@
 import { Outlet, Link } from "react-router-dom";
-import { AppBar, Toolbar, Typography, Container, Paper, Button } from '@mui/material';
+import { AppBar, Toolbar, Typography, Container, Paper, Button, Menu, MenuItem } from '@mui/material';
 import { makeStyles, createStyles } from '@mui/styles';
 import { Theme } from '@mui/material';
 import TeletextFont from '../fonts/MODE7GX3.TTF';
+import useIsMobile from '../hooks/useIsMobile';
 
-import React from 'react';
+import React, { useState } from 'react';
 
 const useStyles = makeStyles((theme: Theme) => ({
   appBar: {
@@ -15,11 +16,18 @@ const useStyles = makeStyles((theme: Theme) => ({
     display: 'flex',
     justifyContent: 'center', // Center the content horizontally
     alignItems: 'center',
+    [theme.breakpoints.down('sm')]: {
+      paddingLeft: theme.spacing(0.5),
+      paddingRight: theme.spacing(0.5),
+      minHeight: 'auto',
+    },
   },
   buttonContainer: {
     display: 'flex',
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
   },
   grow: {
     flexGrow: 1,
@@ -28,7 +36,13 @@ const useStyles = makeStyles((theme: Theme) => ({
     margin: theme.spacing(1),
     fontFamily: 'Teletext',
     fontSize: '1.5rem',
-    textTransform: 'none'
+    textTransform: 'none',
+    [theme.breakpoints.down('sm')]: {
+      fontSize: '1.05rem',
+      margin: theme.spacing(0.25),
+      minWidth: 'auto',
+      padding: theme.spacing(0.5, 0.5),
+    },
   },
   ranglijstButton: {
     color: '#FF0000', // Teletekst red
@@ -41,11 +55,68 @@ const useStyles = makeStyles((theme: Theme) => ({
   },
   historyButton: {
     color: '#00ffff', // Bright blue
-  }
+  },
+  meerButton: {
+    color: '#ffff00', // Yellow
+  },
+  menuItemFaq: {
+    fontFamily: 'Teletext',
+    textTransform: 'none',
+    fontSize: '1rem',
+    color: '#ffff00', // Yellow
+  },
+  menuItemHist: {
+    fontFamily: 'Teletext',
+    textTransform: 'none',
+    fontSize: '1rem',
+    color: '#00ffff', // Bright blue
+  },
 }));
 
 const NavBar = () => {
   const classes = useStyles();
+  const isMobile = useIsMobile();
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const menuOpen = Boolean(anchorEl);
+  const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => setAnchorEl(event.currentTarget);
+  const handleCloseMenu = () => setAnchorEl(null);
+
+  const secondaryButtons = (
+    <>
+      <Button component={Link} to="/about" className={classes.button + ' ' + classes.waaromButton}>
+        vaak gevragen vragen
+      </Button>
+      <Button component={Link} to="/historie" className={classes.button + ' ' + classes.historyButton}>
+        historie
+      </Button>
+    </>
+  );
+
+  const secondaryMenu = (
+    <>
+      <Button
+        onClick={handleOpenMenu}
+        className={classes.button + ' ' + classes.meerButton}
+      >
+        {menuOpen ? 'meer ▴' : 'meer ▾'}
+      </Button>
+      <Menu
+        anchorEl={anchorEl}
+        open={menuOpen}
+        onClose={handleCloseMenu}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'center' }}
+        PaperProps={{ sx: { bgcolor: '#000', border: '1px solid #333' } }}
+      >
+        <MenuItem component={Link} to="/about" onClick={handleCloseMenu} className={classes.menuItemFaq}>
+          vaak gevragen vragen
+        </MenuItem>
+        <MenuItem component={Link} to="/historie" onClick={handleCloseMenu} className={classes.menuItemHist}>
+          historie
+        </MenuItem>
+      </Menu>
+    </>
+  );
 
   return (
     <AppBar sx={{bgcolor: "black"}}position="static" className={classes.appBar }>
@@ -57,12 +128,7 @@ const NavBar = () => {
           <Button component={Link} to="/wedstrijden" className={classes.button + ' ' + classes.wedstrijdenButton}>
             wedstrijden
           </Button>
-          <Button component={Link} to="/about" className={classes.button + ' ' + classes.waaromButton}>
-            vaak gevragen vragen
-          </Button>
-          <Button component={Link} to="/historie" className={classes.button + ' ' + classes.historyButton}>
-            historie
-          </Button>
+          {isMobile ? secondaryMenu : secondaryButtons}
         </div>
       </Toolbar>
     </AppBar>
