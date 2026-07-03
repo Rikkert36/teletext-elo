@@ -8,9 +8,11 @@ import {
   Modal,
   Select,
   MenuItem,
+  useMediaQuery,
 } from "@mui/material";
 import { styled } from "@mui/system";
 import { Link } from "react-router-dom";
+import useIsMobile from "../hooks/useIsMobile";
 
 import {
   numberInputClasses,
@@ -50,6 +52,10 @@ const useStyles = makeStyles((theme: Theme) =>
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
+      [theme.breakpoints.down("sm")]: {
+        paddingLeft: theme.spacing(1.5),
+        paddingRight: theme.spacing(1.5),
+      },
     },
     modal: {
       display: "flex",
@@ -62,12 +68,25 @@ const useStyles = makeStyles((theme: Theme) =>
       padding: theme.spacing(4),
       borderRadius: theme.shape.borderRadius,
       color: "#fff",
+      maxWidth: "100%",
+      [theme.breakpoints.down("sm")]: {
+        width: "100vw",
+        height: "100vh",
+        maxWidth: "100vw",
+        borderRadius: 0,
+        padding: theme.spacing(3),
+        overflowY: "auto",
+      },
     },
 
     menuContainer: {
       display: "flex",
       justifyContent: "flex-end",
       marginBottom: theme.spacing(1),
+      [theme.breakpoints.down("sm")]: {
+        justifyContent: "center",
+        marginBottom: 0,
+      },
     },
     addButton: {
       fontFamily: "Teletext",
@@ -76,11 +95,21 @@ const useStyles = makeStyles((theme: Theme) =>
       height: 0,
       background: "#000",
       color: "#00ff00",
+      [theme.breakpoints.down("sm")]: {
+        margin: theme.spacing(0.5),
+        marginBottom: 0,
+        height: "auto",
+        padding: theme.spacing(0.25, 0.5),
+      },
     },
     buttonText: {
       fontFamily: "Teletext",
       fontSize: "1.0rem",
       textTransform: "none",
+      [theme.breakpoints.down("sm")]: {
+        fontSize: "0.85rem",
+        whiteSpace: "nowrap",
+      },
     },
     banner: {
       background: "#FF0000",
@@ -90,6 +119,12 @@ const useStyles = makeStyles((theme: Theme) =>
       color: "#ffff00",
       display: "flex",
       justifyContent: "center",
+      textAlign: "center",
+      [theme.breakpoints.down("sm")]: {
+        fontSize: "1.15rem",
+        padding: "1rem 0.4rem",
+        whiteSpace: "nowrap",
+      },
     },
     addPlayerSave: {
       fontFamily: "Teletext",
@@ -115,11 +150,66 @@ const useStyles = makeStyles((theme: Theme) =>
       color: "#00ff00",
       background: "#000",
       fontSize: "1.2em",
+      [theme.breakpoints.down("sm")]: {
+        fontSize: "1.15rem",
+        marginTop: theme.spacing(1.5),
+        marginBottom: theme.spacing(0.25),
+        paddingLeft: "0.5rem",
+      },
     },
     matchPaper: {
       background: "#000",
       fontSize: "1.2em",
       padding: "0.4rem",
+    },
+    matchCardMobile: {
+      background: "#000",
+      padding: "0.4rem 0.25rem",
+      marginBottom: "0.4rem",
+    },
+    teamRowMobile: {
+      display: "flex",
+      alignItems: "center",
+      width: "100%",
+      padding: "0.1rem 0",
+    },
+    teamNamesMobile: {
+      flex: 1,
+      minWidth: 0,
+      paddingLeft: "0.25rem",
+      paddingRight: "0.5rem",
+    },
+    playerLineMobile: {
+      display: "flex",
+      alignItems: "baseline",
+      width: "100%",
+      minWidth: 0,
+      padding: "0.2rem 0",
+    },
+    deltaMobile: {
+      color: "#ffff00",
+      fontFamily: "Teletext",
+      fontSize: "1.05rem",
+      flexShrink: 0,
+      paddingLeft: "0.5rem",
+      whiteSpace: "nowrap",
+    },
+    nameTruncate: {
+      display: "block",
+      maxWidth: "100%",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    },
+    matchScoreMobile: {
+      color: "#00ff00",
+      fontSize: "1.2rem",
+      fontFamily: "Teletext",
+      minWidth: "2rem",
+      textAlign: "right",
+      flexShrink: 0,
+      paddingLeft: "0.5rem",
+      marginRight: "0.5rem",
     },
     matchPaperHighlight: {
       outline: "2px solid #00ff00",
@@ -134,6 +224,10 @@ const useStyles = makeStyles((theme: Theme) =>
     playerNameTypo: {
       fontSize: "1.0em",
       color: "#ffff00",
+      [theme.breakpoints.down("sm")]: {
+        fontSize: "1.1rem",
+        lineHeight: 1.3,
+      },
     },
     link: {
       "&:hover": {
@@ -146,6 +240,10 @@ const useStyles = makeStyles((theme: Theme) =>
     select: {
       margin: 10,
       width: "15rem",
+      [theme.breakpoints.down("sm")]: {
+        width: "100%",
+        margin: "8px 0",
+      },
     },
     numberinput: {
       width: "3rem",
@@ -165,6 +263,11 @@ const useStyles = makeStyles((theme: Theme) =>
       justifyContent: "center",
       alignItems: "center",
       zIndex: theme.zIndex.drawer + 1,
+      [theme.breakpoints.down("sm")]: {
+        width: "100%",
+        height: "2.75rem",
+        fontSize: "1.15rem",
+      },
     },
     vorigevolgendebutton: {
       fontSize: "2rem",
@@ -177,6 +280,9 @@ const useStyles = makeStyles((theme: Theme) =>
       "&:hover": {
         backgroundColor: "#FF0000",
         color: "#ffff00",
+      },
+      [theme.breakpoints.down("sm")]: {
+        fontSize: "1.15rem",
       },
     },
   })
@@ -276,6 +382,9 @@ const sortMatchesPerDay = (matches: Game[]): GamesPerDayList => {
 
 const GamesPage: React.FC = () => {
   const classes = useStyles();
+  const isMobile = useIsMobile();
+  const bannerShort = useMediaQuery("(max-width:520px)");
+  const bannerVeryShort = useMediaQuery("(max-width:360px)");
   const client = new Client((window as any).TAFELVOETBAL_SERVER_URL);
 
   const [gamesPerDayList, setGamesPerDay] = useState<GamesPerDayList>();
@@ -430,6 +539,12 @@ const GamesPage: React.FC = () => {
     return `(${playerInfo.oldRating} ${sign}${delta})`;
   };
 
+  const showDeltaOnly = (playerInfo: PlayerPerformance) => {
+    const delta = playerInfo.newRating! - playerInfo.oldRating!;
+    const sign = delta >= 0 ? "+" : "";
+    return `${playerInfo.oldRating} ${sign}${delta}`;
+  };
+
   const showTeam = (team: TeamPerformance) => (
     <>
       <Grid item xs={3} className={classes.playerNames}>
@@ -488,25 +603,62 @@ const GamesPage: React.FC = () => {
     </>
   );
 
+  const playerLineMobile = (playerInfo: PlayerPerformance) => (
+    <div className={classes.playerLineMobile}>
+      <Link
+        className={classes.playerNameTypo}
+        style={{ textDecoration: "none", display: "block", flex: 1, minWidth: 0, overflow: "hidden" }}
+        to={`../speler/${playerInfo.playerId}`}
+      >
+        <Typography className={classes.playerNameTypo + " " + classes.nameTruncate} noWrap>
+          {playerInfo.name}
+        </Typography>
+      </Link>
+      <span className={classes.deltaMobile}>{showDeltaOnly(playerInfo)}</span>
+    </div>
+  );
+
+  const showTeamMobile = (team: TeamPerformance) => (
+    <div className={classes.teamRowMobile}>
+      <div className={classes.teamNamesMobile}>
+        {playerLineMobile(team.firstPlayer!)}
+        {playerLineMobile(team.secondPlayer!)}
+      </div>
+      <div className={classes.matchScoreMobile}>{team.goals}</div>
+    </div>
+  );
+
 const showMatchesOnDay = (day: GamesPerDay) =>
-  day.games.map((match) => (
-    <GameAnalyticsTooltipWrapper game={match} >
-      <Paper className={classes.matchPaper} elevation={0} sx={{ boxShadow: "none" }}>
-        <Grid container>
-          {showTeam(match.firstTeam!)}
-          {showTeam(match.secondTeam!)}
-        </Grid>
-      </Paper>
-    </GameAnalyticsTooltipWrapper>
-  ));
+  day.games.map((match) =>
+    isMobile ? (
+      <GameAnalyticsTooltipWrapper game={match}>
+        <Paper className={classes.matchCardMobile} elevation={0} sx={{ boxShadow: "none" }}>
+          {showTeamMobile(match.firstTeam!)}
+          {showTeamMobile(match.secondTeam!)}
+        </Paper>
+      </GameAnalyticsTooltipWrapper>
+    ) : (
+      <GameAnalyticsTooltipWrapper game={match} >
+        <Paper className={classes.matchPaper} elevation={0} sx={{ boxShadow: "none" }}>
+          <Grid container>
+            {showTeam(match.firstTeam!)}
+            {showTeam(match.secondTeam!)}
+          </Grid>
+        </Paper>
+      </GameAnalyticsTooltipWrapper>
+    )
+  );
 
   const showMatches = () => {
     if (loadGames) return <CircularProgress />;
 
     if (gamesPerDayList && gamesPerDayList.matchesPerDay.length > 0) {
-      return gamesPerDayList.matchesPerDay.map((day) => (
+      return gamesPerDayList.matchesPerDay.map((day, index) => (
         <div key={day.day.toISOString()}>
-          <Paper className={classes.dayPaper}>
+          <Paper
+            className={classes.dayPaper}
+            style={index === 0 ? { marginTop: 0 } : undefined}
+          >
             {getDateInRightFormat(day.day) + ":"}
           </Paper>
           {showMatchesOnDay(day)}
@@ -652,7 +804,7 @@ const showMatchesOnDay = (day: GamesPerDay) =>
         className={classes.modal}
         style={{ maxWidth: "none" }}
       >
-        <div className={classes.modalPaper} style={{ width: "60rem" }}>
+        <div className={classes.modalPaper} style={{ width: isMobile ? "100%" : "60rem" }}>
           <Typography variant="h6" gutterBottom className={classes.modalBanner}>
             Een wedstrijd met dezelfde uitslag was vandaag al ingevuld. Weet je
             zeker dat je dit wedstrijdformulier in wil leveren?
@@ -695,7 +847,7 @@ const showMatchesOnDay = (day: GamesPerDay) =>
         className={classes.modal}
         style={{ maxWidth: "none" }}
       >
-        <div className={classes.modalPaper} style={{ width: "60rem" }}>
+        <div className={classes.modalPaper} style={{ width: isMobile ? "100%" : "60rem" }}>
           <Typography variant="h6" gutterBottom className={classes.modalBanner}>
             wedstrijdformulier inleveren
           </Typography>
@@ -704,12 +856,12 @@ const showMatchesOnDay = (day: GamesPerDay) =>
             container
             spacing={2}
             alignItems="center"
-            style={{ width: "100%", flexWrap: "nowrap" }}
+            style={{ width: "100%", flexWrap: isMobile ? "wrap" : "nowrap" }}
           >
             <Grid
               item
               spacing={1}
-              xs={4}
+              xs={isMobile ? 12 : 4}
               style={{ flex: "1 1 auto", width: "100%" }}
             >
               Team 1 <br />
@@ -749,7 +901,7 @@ const showMatchesOnDay = (day: GamesPerDay) =>
               </Select>
             </Grid>
 
-            <Grid item xs={2}>
+            <Grid item xs={isMobile ? 6 : 2}>
               <NumberInput
                 slots={{
                   root: StyledInputRoot,
@@ -769,7 +921,7 @@ const showMatchesOnDay = (day: GamesPerDay) =>
               />
             </Grid>
 
-            <Grid item xs={2} justifyContent={"center"}>
+            <Grid item xs={isMobile ? 6 : 2} justifyContent={"center"}>
               <NumberInput
                 slots={{
                   root: StyledInputRoot,
@@ -789,7 +941,7 @@ const showMatchesOnDay = (day: GamesPerDay) =>
               />
             </Grid>
 
-            <Grid item spacing={0} xs={4}>
+            <Grid item spacing={0} xs={isMobile ? 12 : 4}>
               Team 2 <br />
               <Select
                 variant="outlined"
@@ -886,17 +1038,21 @@ const showMatchesOnDay = (day: GamesPerDay) =>
   };
 
   return (
-    <div className={classes.centerContainer} style={{ paddingBottom: "40rem" }}>
+    <div className={classes.centerContainer} style={{ paddingBottom: isMobile ? "4rem" : "40rem" }}>
       <Grid container spacing={2}>
-        <Grid item xs={2} />
-        <Grid item xs={8}>
+        <Grid item md={2} sx={{ display: { xs: "none", md: "block" } }} />
+        <Grid item xs={12} md={8}>
           <Paper className={classes.banner}>
-            tafelvoetbal uitslagen, {showStartAndEndOfWeek()}
+            {bannerVeryShort
+              ? showStartAndEndOfWeek()
+              : bannerShort
+              ? `uitslagen, ${showStartAndEndOfWeek()}`
+              : `tafelvoetbal uitslagen, ${showStartAndEndOfWeek()}`}
           </Paper>
         </Grid>
-        <Grid item xs={2} />
+        <Grid item md={2} sx={{ display: { xs: "none", md: "block" } }} />
 
-        <Grid item xs={2} className={classes.menuContainer}>
+        <Grid item xs={12} md={2} className={classes.menuContainer}>
           <div className={classes.menuContainer}>
             <Button
               variant="contained"
@@ -911,14 +1067,14 @@ const showMatchesOnDay = (day: GamesPerDay) =>
           </div>
         </Grid>
 
-        <Grid item xs={8}>
+        <Grid item xs={12} md={8}>
           {showMatches()}
         </Grid>
 
-        <Grid item xs={2} />
+        <Grid item md={2} sx={{ display: { xs: "none", md: "block" } }} />
 
-        <Grid item xs={2} />
-        <Grid item xs={8}>
+        <Grid item md={2} sx={{ display: { xs: "none", md: "block" } }} />
+        <Grid item xs={12} md={8}>
           <Paper className={classes.floatingPaper}>
             <Grid item xs={4}>
               <Button
@@ -940,7 +1096,7 @@ const showMatchesOnDay = (day: GamesPerDay) =>
             </Grid>
           </Paper>
         </Grid>
-        <Grid item xs={2} />
+        <Grid item md={2} sx={{ display: { xs: "none", md: "block" } }} />
       </Grid>
 
       {showDuplicateGameDialog()}

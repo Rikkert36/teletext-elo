@@ -142,10 +142,17 @@ const useStyles = makeStyles((theme: Theme) =>
       },
     },
     mobileAddButtonContainer: {
+      position: 'fixed',
+      bottom: 0,
+      left: 0,
+      right: 0,
       display: 'flex',
       justifyContent: 'center',
-      width: '100%',
-      marginTop: theme.spacing(2),
+      alignItems: 'center',
+      backgroundColor: '#000',
+      borderTop: '1px solid #222',
+      padding: theme.spacing(0.75),
+      zIndex: theme.zIndex.drawer + 1,
     },
     centerContainer: {
       display: 'flex',
@@ -154,6 +161,7 @@ const useStyles = makeStyles((theme: Theme) =>
       [theme.breakpoints.down('sm')]: {
         paddingLeft: theme.spacing(1.5),
         paddingRight: theme.spacing(1.5),
+        paddingBottom: theme.spacing(7),
       },
     },
     modal: {
@@ -212,6 +220,11 @@ const useStyles = makeStyles((theme: Theme) =>
       height: 0,
       background: '#000', // Dark green color
       color: '#00ff00',
+      [theme.breakpoints.down('sm')]: {
+        margin: 0,
+        height: 'auto',
+        padding: theme.spacing(0.25, 0.5),
+      },
     },
     buttonText: {
       fontFamily: 'Teletext',

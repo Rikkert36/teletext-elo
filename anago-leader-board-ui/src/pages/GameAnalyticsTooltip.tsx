@@ -16,6 +16,7 @@ import {
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 import { GameWithAnalytics } from "../clients/server.generated";
 import { makeStyles, createStyles } from "@mui/styles";
+import useIsMobile from "../hooks/useIsMobile";
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -108,6 +109,7 @@ const GameAnalyticsTooltip: React.FC<GameAnalyticsTooltipProps> = ({
   game,
 }) => {
   const classes = useStyles();
+  const isMobile = useIsMobile();
   const [showDelta, setShowDelta] = useState(false);
   const prob = game.probabilityPerScore![game.actualScore!]! * 100;
   const rounded = Math.round(prob * 100) / 100;
@@ -116,34 +118,48 @@ const GameAnalyticsTooltip: React.FC<GameAnalyticsTooltipProps> = ({
       container
       spacing={0.5}
       direction="column"
-      style={{ minWidth: 450, maxWidth: 2000, background: "black" }}
+      style={{ minWidth: isMobile ? 0 : 450, width: isMobile ? "100%" : undefined, maxWidth: 2000, background: "black" }}
     >
-      <Grid item xs={7}>
+      <Grid item xs={12}>
         <Typography
-          noWrap
+          noWrap={!isMobile}
           title={game.expectedScore?.toString() ?? ""}
           className={classes.playerNames}
           style={{ maxWidth: "100%" }}
         >
-          Voorspelde uitslag:{" "}
+          {isMobile ? "Voorspeld:" : "Voorspelde uitslag:"}{" "}
           <span style={{ color: "cyan" }}>
             {toScore(game.expectedScore!) ?? ""}
           </span>
         </Typography>
       </Grid>
-      <Grid item xs={5}>
+      <Grid item xs={12}>
         <Typography
-          noWrap
+          noWrap={!isMobile}
           title={game.probabilityPerScore![game.actualScore!].toString() ?? ""}
           className={classes.playerNames}
           style={{ maxWidth: "100%" }}
         >
-          Werkelijke uitslag: {toScore(game.actualScore!) + " -> "}kans:
+          {isMobile ? "Werkelijk:" : "Werkelijke uitslag:"}{" "}
+          {toScore(game.actualScore!) + " -> "}kans:
           <span style={{ color: "cyan" }}> {rounded}%</span>
         </Typography>
       </Grid>
       <Grid item className={classes.chartTooltipAbove}>
-        <Accordion className={classes.playerNames}>
+        <Accordion
+          className={classes.playerNames}
+          defaultExpanded={isMobile}
+          sx={
+            isMobile
+              ? {
+                  boxShadow: "none",
+                  background: "black",
+                  "&:before": { display: "none" },
+                }
+              : undefined
+          }
+        >
+          {!isMobile && (
           <AccordionSummary
             expandIcon={<ArrowDropDownIcon />}
             sx={{
@@ -170,12 +186,18 @@ const GameAnalyticsTooltip: React.FC<GameAnalyticsTooltipProps> = ({
               Statistieken voor nerds
             </Typography>
           </AccordionSummary>
-          <AccordionDetails>
+          )}
+          <AccordionDetails sx={{ px: isMobile ? 0 : undefined }}>
             <LineChart
               className={classes.chartTooltipAbove}
-              height={400}
-              width={600}
-              margin={{ top: 16, right: 80, bottom: 28, left: 56 }}
+              height={isMobile ? 320 : 400}
+              width={isMobile ? undefined : 600}
+              margin={{
+                top: 16,
+                right: isMobile ? (showDelta ? 48 : 14) : 80,
+                bottom: 28,
+                left: isMobile ? 44 : 56,
+              }}
               tooltip={{
                 trigger: "axis",
                 axisContent: (axisData) =>
