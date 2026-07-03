@@ -23,6 +23,7 @@ import AddIcon from '@mui/icons-material/Add';
 import { Theme} from '@mui/material';
 import {   makeStyles,  createStyles, ThemeProvider} from '@mui/styles';
 import { Client, FileParameter, DynamicRatingPlayer } from '../clients/server.generated';
+import useIsMobile from '../hooks/useIsMobile';
 
 // interface Player {
 //   id: number;
@@ -99,6 +100,21 @@ const useStyles = makeStyles((theme: Theme) =>
       border: 'none', // Remove table cell borders
       textOverflow: "ellipsis",
       maxWidth: '11rem',
+      [theme.breakpoints.down('sm')]: {
+        fontSize: '1.2rem',
+        padding: theme.spacing(1.5, 1),
+        maxWidth: 'none',
+      },
+    },
+    nameTruncate: {
+      display: 'block',
+      maxWidth: '18rem',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      [theme.breakpoints.down('sm')]: {
+        maxWidth: '100%',
+      },
     },
     searchFieldContainer: {
       display: 'flex',
@@ -118,10 +134,26 @@ const useStyles = makeStyles((theme: Theme) =>
       margin: 'auto', // Center the table
       background: '#000', // black
     },
+    mobileFixedTable: {
+      [theme.breakpoints.down('sm')]: {
+        tableLayout: 'fixed',
+        width: '100%',
+      },
+    },
+    mobileAddButtonContainer: {
+      display: 'flex',
+      justifyContent: 'center',
+      width: '100%',
+      marginTop: theme.spacing(2),
+    },
     centerContainer: {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
+      [theme.breakpoints.down('sm')]: {
+        paddingLeft: theme.spacing(1.5),
+        paddingRight: theme.spacing(1.5),
+      },
     },
     modal: {
       display: 'flex',
@@ -134,6 +166,15 @@ const useStyles = makeStyles((theme: Theme) =>
       padding: theme.spacing(4),
       borderRadius: theme.shape.borderRadius,
       color: '#fff', // White text color
+      maxWidth: '100%',
+      [theme.breakpoints.down('sm')]: {
+        width: '100vw',
+        height: '100vh',
+        maxWidth: '100vw',
+        borderRadius: 0,
+        padding: theme.spacing(3),
+        overflowY: 'auto',
+      },
     },
     
     tableRow: {
@@ -188,7 +229,32 @@ const useStyles = makeStyles((theme: Theme) =>
       padding: '2rem',
       color: '#ffff00', // Yellow
       display: 'flex',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      textAlign: 'center',
+      [theme.breakpoints.down('sm')]: {
+        fontSize: '1.1rem',
+        padding: '1rem',
+      },
+    },
+    detailCell: {
+      padding: theme.spacing(1),
+      fontFamily: 'Teletext',
+      background: '#000',
+      color: '#00ff00', // Very bright green
+      border: 'none',
+      fontSize: '1rem',
+    },
+    detailRowLabel: {
+      color: '#00ff00', // Very bright green
+    },
+    expandCaret: {
+      color: '#00ff00', // Very bright green
+      display: 'inline-block',
+      transition: 'transform 0.15s ease',
+      fontSize: '1.2rem',
+    },
+    expandCaretOpen: {
+      transform: 'rotate(180deg)',
     },
     addPlayerSave: {
       fontFamily: 'Teletext',
@@ -235,12 +301,18 @@ const useStyles = makeStyles((theme: Theme) =>
 
 const LeaderboardPage: React.FC = () => {
   const classes = useStyles();
+  const isMobile = useIsMobile();
   const client = new Client(window.TAFELVOETBAL_SERVER_URL);
   const [players, setPlayers] = useState<RankedPlayer[]>();
-  const [isSearchOpen, setIsSearchOpen] = useState(false); 
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isModalOpen, setModalOpen] = useState(false);
   const [playersLoading, setPlayersLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const toggleExpanded = (id: string) => {
+    setExpandedId((prev) => (prev === id ? null : id));
+  };
   const [playerForm, setPlayerForm] = useState({
     name: '',
     avatar: null as Blob | null,
@@ -342,79 +414,113 @@ const LeaderboardPage: React.FC = () => {
     };
   };
 
+  const renderNameCell = (player: RankedPlayer) => (
+    <TableCell className={classes.tableCell + ' ' + (player.rank == 1 ? classes.firstPlayerName : classes.playerName)}>
+      <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+        <Avatar alt='?' src={getAvatarLink(player.player.id!)} className={classes.avatar} style={{ flexShrink: 0, marginRight: '0.9rem' }} />
+        <Link style={{ textDecoration: 'none', display: 'block', flex: 1, minWidth: 0, overflow: 'hidden' }}
+          className={classes.link + ' ' + (player.rank == 1 ? classes.firstPlayerName : classes.playerName)}
+          to={`speler/${player.player.id}`}>
+          <Typography className={classes.playernameTypography + ' ' + classes.nameTruncate} gutterBottom noWrap>
+            {player.player.name}
+          </Typography>
+        </Link>
+      </div>
+    </TableCell>
+  );
+
+  const renderAddButton = () => (
+    <Button
+      variant="contained"
+      startIcon={<AddIcon />}
+      onClick={handleOpenModal}
+      className={classes.addButton}
+    >
+      <Typography variant="h6" className={classes.buttonText}>
+        speler toevoegen
+      </Typography>
+    </Button>
+  );
+
   const showPlayers = () => {
-    if (players) {
-      return players!.map((player, index) => (
-        <TableRow key={player.player.id} className={classes.tableRow}>
-          <TableCell style={{width:'0.5rem'}}className={classes.tableCell + ' ' + classes.otherRowValue}>{player.rank + '.'}</TableCell>
-          <TableCell className={classes.tableCell + ' ' + (player.rank == 1 ? classes.firstPlayerName : classes.playerName)}>
-            <Grid container display={'-ms-flexbox'} alignItems="center">
-              <Grid item xs={2}>
-                <Avatar alt='?' src={getAvatarLink(player.player.id!)} className={classes.avatar} />
-              </Grid> 
-              <Grid item xs={10} style={{ overflow: 'hidden', display: 'flex' }}>
-                <Link style={{ textDecoration: 'none' }}  
-                  className={classes.link + ' ' + (player.rank == 1 ? classes.firstPlayerName : classes.playerName)} 
-                  to={`speler/${player.player.id}`}>
-                  <Typography className={classes.playernameTypography} gutterBottom noWrap style={{ width: '100%' }}>
-                    {player.player.name}
-                  </Typography>
-                </Link>
-              </Grid>
-            </Grid>
-          </TableCell>
-          <TableCell className={classes.tableCell + ' ' + classes.otherRowValue}>{player.player.numberOfGames}</TableCell>
-          <TableCell className={classes.tableCell + ' ' + classes.otherRowValue}>{player.player.numberOfWins}</TableCell>
-          <TableCell className={classes.tableCell + ' ' + classes.otherRowValue}>{player.player.numberOfLosses}</TableCell>
-          <TableCell className={classes.tableCell + ' ' + classes.otherRowValue}>{player.player.goalsFor + ' - '+ player.player.goalsAgainst}</TableCell>
-          <TableCell className={classes.tableCell + ' ' + classes.otherRowValue}>{player.player.visibleRating}</TableCell>
-        </TableRow>
+    if (!players) return null;
+
+    if (isMobile) {
+      return players.map((player) => (
+        <React.Fragment key={player.player.id}>
+          <TableRow className={classes.tableRow} onClick={() => toggleExpanded(player.player.id!)}>
+            <TableCell style={{ width: '3rem', paddingRight: 0 }} className={classes.tableCell + ' ' + classes.otherRowValue}>{player.rank + '.'}</TableCell>
+            {renderNameCell(player)}
+            <TableCell style={{ width: '4.5rem' }} className={classes.tableCell + ' ' + classes.otherRowValue}>{player.player.visibleRating}</TableCell>
+            <TableCell style={{ width: '1.75rem', paddingLeft: 0 }} className={classes.tableCell + ' ' + classes.otherRowValue}>
+              <span className={classes.expandCaret + (expandedId === player.player.id ? ' ' + classes.expandCaretOpen : '')}>▾</span>
+            </TableCell>
+          </TableRow>
+          {expandedId === player.player.id && (
+            <TableRow>
+              <TableCell colSpan={4} className={classes.detailCell}>
+                <Grid container spacing={1}>
+                  <Grid item xs={6}><span className={classes.detailRowLabel}>gespeeld</span> {player.player.numberOfGames}</Grid>
+                  <Grid item xs={6}><span className={classes.detailRowLabel}>gewonnen</span> {player.player.numberOfWins}</Grid>
+                  <Grid item xs={6}><span className={classes.detailRowLabel}>verloren</span> {player.player.numberOfLosses}</Grid>
+                  <Grid item xs={6}><span className={classes.detailRowLabel}>doelp.</span> {player.player.goalsFor + ' - ' + player.player.goalsAgainst}</Grid>
+                </Grid>
+              </TableCell>
+            </TableRow>
+          )}
+        </React.Fragment>
       ));
     }
+
+    return players.map((player) => (
+      <TableRow key={player.player.id} className={classes.tableRow}>
+        <TableCell style={{ width: '0.5rem' }} className={classes.tableCell + ' ' + classes.otherRowValue}>{player.rank + '.'}</TableCell>
+        {renderNameCell(player)}
+        <TableCell className={classes.tableCell + ' ' + classes.otherRowValue}>{player.player.numberOfGames}</TableCell>
+        <TableCell className={classes.tableCell + ' ' + classes.otherRowValue}>{player.player.numberOfWins}</TableCell>
+        <TableCell className={classes.tableCell + ' ' + classes.otherRowValue}>{player.player.numberOfLosses}</TableCell>
+        <TableCell className={classes.tableCell + ' ' + classes.otherRowValue}>{player.player.goalsFor + ' - ' + player.player.goalsAgainst}</TableCell>
+        <TableCell className={classes.tableCell + ' ' + classes.otherRowValue}>{player.player.visibleRating}</TableCell>
+      </TableRow>
+    ));
   };
 
   return (
     <div className={classes.centerContainer}>
 
       <Grid container spacing={2} >
-        <Grid item xs={2}>
-
-        </Grid>
-        <Grid item xs={8} >
+        <Grid item md={2} sx={{ display: { xs: 'none', md: 'block' } }} />
+        <Grid item xs={12} md={8} >
           <Paper className={classes.banner}>
             tafelvoetbal,stand per {getDateInRightFormat()}
           </Paper>
-        </Grid> 
-        <Grid item xs={2}>
-
         </Grid>
-        <Grid item xs={2} className={classes.menuContainer}>
-          <div className={classes.menuContainer}>
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={handleOpenModal}
-              className={classes.addButton}
-            >
-              <Typography variant="h6" className={classes.buttonText}>
-                speler toevoegen
-              </Typography>
-            </Button>
-          </div>
-        </Grid>
-        <Grid item xs={8}>
+        <Grid item md={2} sx={{ display: { xs: 'none', md: 'block' } }} />
+        {!isMobile && (
+          <Grid item md={2} className={classes.menuContainer}>
+            <div className={classes.menuContainer}>
+              {renderAddButton()}
+            </div>
+          </Grid>
+        )}
+        <Grid item xs={12} md={8}>
           <TableContainer component={Paper} className={classes.narrowTable}>
-            <Table className={classes.table}>
+            <Table className={classes.table + ' ' + classes.mobileFixedTable}>
               <TableBody>
                 {showPlayersOrLoading()}
               </TableBody>
             </Table>
           </TableContainer>
         </Grid>
-        <Grid item xs={2}>
-
-        </Grid>
-      </Grid>      
+        <Grid item md={2} sx={{ display: { xs: 'none', md: 'block' } }} />
+        {isMobile && (
+          <Grid item xs={12}>
+            <div className={classes.mobileAddButtonContainer}>
+              {renderAddButton()}
+            </div>
+          </Grid>
+        )}
+      </Grid>
 
       <Modal
         open={isModalOpen}
