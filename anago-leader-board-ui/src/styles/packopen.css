@@ -310,25 +310,52 @@
  * tell an 80 from a 90 at a glance mid-build; here the only difference is how far
  * along one identical ramp you get.
  */
-.opener__flip--building .opener__face .card {
+/*
+ * The radiance is its own layer, not a box-shadow on the card, for two reasons.
+ *
+ * 1. A filled (`forwards`) animation outranks every normal declaration, so while
+ *    this ran on `.card` it permanently owned that element's `box-shadow` — and
+ *    the green "new" rim, which is also a box-shadow on the same card, simply
+ *    never appeared on a gold pull at any tier. The two glows are independent
+ *    facts and must be able to show at once.
+ * 2. It sits outside `.opener__flip`, like the shimmer, so it stays flat while the
+ *    card turns instead of foreshortening and mirroring with it.
+ *
+ * Geometry matches the card exactly — same box via `inset: 0` on the riser, same
+ * corner radius — so the halo still follows the card's shape rather than reading
+ * as a rectangle or an oval behind it.
+ */
+.opener__radiance {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  pointer-events: none;
   animation: opener-glow-grow var(--radiate-ms, 1200ms) linear var(--shimmer-ms, 700ms) forwards;
 }
 
-.opener__flip--held .opener__face .card {
+.opener__radiance--held {
   animation-play-state: paused;
 }
 
+/*
+ * Four transparent zero-blur shadows rather than `none`, because `none` does not
+ * interpolate — the count has to match the target for the ramp to be continuous.
+ * The card's own drop shadow stays on the card and is no longer part of this.
+ */
 @keyframes opener-glow-grow {
   from {
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    box-shadow:
+      0 0 0 rgba(255, 236, 168, 0),
+      0 0 0 rgba(255, 206, 92, 0),
+      0 0 0 rgba(255, 180, 50, 0),
+      0 0 0 rgba(255, 172, 44, 0);
   }
   to {
     box-shadow:
       0 0 24px rgba(255, 236, 168, 0.75),
       0 0 60px rgba(255, 206, 92, 0.48),
       0 0 124px rgba(255, 180, 50, 0.26),
-      0 0 200px rgba(255, 172, 44, 0.14),
-      0 12px 32px rgba(0, 0, 0, 0.5);
+      0 0 200px rgba(255, 172, 44, 0.14);
   }
 }
 
@@ -520,16 +547,6 @@
  * Four stacked shadows: a thin ring hugging the edge, then progressively wider
  * and softer falloff.
  */
-/*
- * While a card is flying into the row it carries a plain shadow instead of its
- * glow, because `transform: scale()` scales box-shadows too — a 42px halo drawn
- * at 100px becomes a 100px halo at 2.4x. Higher specificity than the glow rules
- * below, so it wins for the duration of the flight.
- */
-.opener__revealed .opener__slot--flying .card {
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
-}
-
 .opener__slot--new .card,
 .opener__flip--new .opener__face--front .card,
 .opener__flip--new.opener__flip--up .opener__face--front .card {
@@ -555,6 +572,54 @@
 .opener__stage .card,
 .opener__slot .card {
   transition: box-shadow calc(240ms * var(--anim, 1)) ease-out;
+}
+
+/* ---------------------------------------------------------------- *
+ * Shadows during the FLIP
+ *
+ * `transform: scale()` scales box-shadows along with the element, so a glow
+ * authored at the slot's final 100px arrives inflated by the scale factor — at
+ * 2.4x a 42px halo is drawn 100px wide, which reads as the card puffing up for
+ * an instant before it travels.
+ *
+ * The first fix was to drop the glow for the flight. That took the green "new"
+ * rim with it, so a card lost the one marking that said it had actually filled a
+ * hole in the album at exactly the moment it flew into that hole — and the rim
+ * then faded back in on landing, drawing attention to the seam.
+ *
+ * So instead: divide every offset and blur by the live scale factor. PackOpener
+ * publishes it as `--flip-scale` and transitions it on the same curve as the
+ * transform, so the *apparent* glow is constant for the whole flight.
+ *
+ * **These must stay below both the glow rules and the box-shadow transition
+ * above.** They tie with `.opener__slot .card` on specificity, so source order is
+ * the only thing making them win — and `transition: none` is load-bearing:
+ * a 240ms box-shadow transition chases every per-frame change of `--flip-scale`
+ * and smears the rim across the flight.
+ * ---------------------------------------------------------------- */
+
+@property --flip-scale {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 1;
+}
+
+.opener__slot--flying .card {
+  transition: none;
+  box-shadow:
+    0 calc(6px / var(--flip-scale, 1)) calc(16px / var(--flip-scale, 1))
+      rgba(0, 0, 0, 0.45);
+}
+
+.opener__slot--flying.opener__slot--new .card {
+  transition: none;
+  box-shadow:
+    0 0 0 calc(1px / var(--flip-scale, 1)) rgba(216, 255, 234, 0.8),
+    0 0 calc(8px / var(--flip-scale, 1)) rgba(152, 255, 206, 0.5),
+    0 0 calc(20px / var(--flip-scale, 1)) rgba(108, 242, 182, 0.3),
+    0 0 calc(42px / var(--flip-scale, 1)) rgba(84, 230, 164, 0.16),
+    0 calc(3px / var(--flip-scale, 1)) calc(9px / var(--flip-scale, 1))
+      rgba(0, 0, 0, 0.5);
 }
 
 /* Particle burst. Direction comes from --angle, set per element in JS. */
@@ -636,6 +701,18 @@
 
 .opener__result {
   animation: opener-settle calc(260ms * var(--anim, 1)) ease-out backwards;
+  position: relative;
+}
+
+/*
+ * Reached by the final FLIP rather than by a skip: the cards are already
+ * travelling in from the row, so the entrance animation has to go. It is not
+ * merely redundant — a CSS animation outranks an inline style, so `opener-settle`
+ * would beat the inverted transform and nothing would move.
+ */
+.opener__results--settled .opener__result {
+  animation: none;
+  will-change: transform;
 }
 
 @keyframes opener-settle {
@@ -656,6 +733,8 @@
   .opener__riser--first,
   .opener__riser--next,
   .opener__flip,
+  /* Was covered by `.opener__stage .card` while the ramp lived on the card. */
+  .opener__radiance,
   .opener__shimmer,
   .opener__shimmer::before,
   .opener__sweep::before,

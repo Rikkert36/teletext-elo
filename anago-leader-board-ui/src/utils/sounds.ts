@@ -711,7 +711,9 @@ const PAYOFFS: PayoffSpec[] = [
     release: 1.9,
     cutoffTo: 1900,
     impact: 0.13,
-    booms: [[D2, 0.85, 0.17]],
+    booms: [
+      //[D2, 0.85, 0.17]
+      ],
     bellGain: 0.034,
     sparkle: 6,
   },

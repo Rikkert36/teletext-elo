@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { unstable_batchedUpdates } from 'react-dom';
 import {
   Pack,
   RevealedCard,
@@ -122,6 +123,11 @@ const PackOpener: React.FC<PackOpenerProps> = ({ pack, onOpen, onFinished, fastM
    * travelling to the row, lighting up an empty stage.
    */
   const [blooming, setBlooming] = useState(false);
+  /**
+   * True when the results grid was arrived at by the final FLIP rather than by a
+   * skip. Suppresses the grid's own entrance animation, which would fight it.
+   */
+  const [settledByFlip, setSettledByFlip] = useState(false);
 
   const timers = useRef<number[]>([]);
   const cardsRef = useRef<RevealedCard[]>([]);
@@ -167,49 +173,63 @@ const PackOpener: React.FC<PackOpenerProps> = ({ pack, onOpen, onFinished, fastM
       const to = el.getBoundingClientRect();
       if (to.width === 0) return;
 
-      let dx: number;
-      let dy: number;
-      let scale = 1;
+      /*
+       * The arriving card travels from the big reveal card. Everything already in
+       * the row travels too, because the row is centred and re-centres on every
+       * addition — and on the final hand-off the row becomes the results grid,
+       * which is a different layout at a different card size, so they all move.
+       */
+      const from = index === arriving ? heroRect.current : prevRects.current.get(index);
+      if (!from) return;
 
-      if (index === arriving) {
-        // The new card travels from the big reveal card's position and size.
-        const from = heroRect.current;
-        if (!from) return;
-        dx = from.left + from.width / 2 - (to.left + to.width / 2);
-        dy = from.top + from.height / 2 - (to.top + to.height / 2);
-        scale = from.width / to.width;
-      } else {
-        // Everything already in the row slides, because the row is centred and
-        // re-centres on every addition. Without this the existing cards jump.
-        const from = prevRects.current.get(index);
-        if (!from) return;
-        dx = from.left - to.left;
-        dy = from.top - to.top;
-        if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-      }
+      // Centre-based, because transform-origin is the centre — offsetting by the
+      // top-left corner only agrees with that while the scale is exactly 1.
+      const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+      const dy = from.top + from.height / 2 - (to.top + to.height / 2);
+      const scale = from.width / to.width;
 
-      if (index === arriving) {
-        /*
-         * Only the arriving slot is scaled, and `transform: scale()` scales
-         * box-shadows with it — its glow is drawn at 100px then blown up 2.4x, so
-         * the ring and halo arrive far fatter than the hero card's were. That
-         * shows as the card puffing up for an instant before it travels.
-         *
-         * Suppressed for the flight and restored on landing, where the existing
-         * box-shadow transition fades the glow in.
-         */
-        el.classList.add('opener__slot--flying');
-        timers.current.push(
-          window.setTimeout(() => el.classList.remove('opener__slot--flying'), duration + 20),
-        );
-      }
+      const still =
+        Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(scale - 1) < 0.005;
+      if (still && index !== arriving) return;
+
+      /*
+       * `transform: scale()` scales box-shadows with it, so a glow authored at the
+       * slot's final size arrives inflated by the scale factor — the card visibly
+       * puffs up before it travels.
+       *
+       * This used to be solved by dropping the glow for the flight, which took the
+       * green "new" rim with it: a card would lose the one marking that said it
+       * had actually filled a hole in the album at exactly the moment it flew into
+       * it. Instead the factor is published and the CSS divides every offset and
+       * blur by it. `--flip-scale` is registered with `@property` so it
+       * interpolates in step with the transform, holding the *apparent* glow
+       * constant across the whole flight.
+       */
+      el.classList.add('opener__slot--flying');
+      timers.current.push(
+        window.setTimeout(() => {
+          el.classList.remove('opener__slot--flying');
+          el.style.removeProperty('--flip-scale');
+        }, duration + 20),
+      );
 
       el.style.transition = 'none';
+      el.style.setProperty('--flip-scale', String(scale));
       el.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
       // Force the inverted position to be committed before releasing it.
       void el.offsetWidth;
-      el.style.transition = `transform ${duration}ms ${easing}`;
+      el.style.transition = `transform ${duration}ms ${easing}, --flip-scale ${duration}ms ${easing}`;
+      if (!el.style.transition) {
+        /*
+         * One invalid item invalidates a whole comma-separated declaration, so a
+         * browser that will not transition a custom property would drop the
+         * transform with it and the FLIP would snap. The glow then steps rather
+         * than interpolating, which is only a degradation.
+         */
+        el.style.transition = `transform ${duration}ms ${easing}`;
+      }
       el.style.transform = '';
+      el.style.setProperty('--flip-scale', '1');
     });
 
     prevRects.current.clear();
@@ -314,27 +334,49 @@ const PackOpener: React.FC<PackOpenerProps> = ({ pack, onOpen, onFinished, fastM
 
   /** Hands the current card off to the row, then brings on card `index`. */
   const revealFrom = (index: number) => {
-    if (index >= cardsRef.current.length) {
-      finish();
-      return;
-    }
-
     if (index === 0) {
       playCard(0);
       return;
     }
 
-    // Measure everything before the row grows: the outgoing card, and every slot
-    // already in the row so they can slide to their new positions rather than
+    const isLast = index >= cardsRef.current.length;
+
+    // Measure everything before the layout changes: the outgoing card, and every
+    // slot already in the row so they can slide to their new positions rather than
     // snapping.
     prevRects.current.clear();
     slotRefs.current.forEach((el, i) => prevRects.current.set(i, el.getBoundingClientRect()));
     heroRect.current = heroRef.current?.getBoundingClientRect() ?? null;
     pendingFlip.current = index - 1;
-    setLanded(index);
-    setHeroVisible(false);
 
-    after(HANDOFF_MS, () => playCard(index));
+    /*
+     * `index.tsx` mounts with legacy `ReactDOM.render`, which does **not** batch
+     * state updates inside a timeout — each one commits on its own and runs the
+     * FLIP layout effect on its own. Everything here therefore has to land in a
+     * single commit.
+     *
+     * For the last card that was fatal. `setLanded` alone committed while the phase
+     * was still `revealing`, so the effect flew the card into the row it was about
+     * to leave and nulled `pendingFlip`; `setPhase('done')` then threw that DOM
+     * away and mounted the results grid with no FLIP pending. Every other card
+     * survived because its flight runs on elements that persist across the
+     * following commits — the last card is the only one whose flight spans a
+     * subtree swap, which is exactly why it was the only one that never moved.
+     *
+     * `--settled` then turns the grid's entrance animation off: a CSS animation
+     * outranks an inline style, so `opener-settle` would beat the inverted
+     * transform and nothing would move even once the FLIP does survive.
+     */
+    unstable_batchedUpdates(() => {
+      setLanded(index);
+      setHeroVisible(false);
+      if (isLast) {
+        setSettledByFlip(true);
+        finish();
+      }
+    });
+
+    if (!isLast) after(HANDOFF_MS, () => playCard(index));
   };
 
   stepRef.current = revealFrom;
@@ -472,14 +514,20 @@ const PackOpener: React.FC<PackOpenerProps> = ({ pack, onOpen, onFinished, fastM
               className={`opener__riser opener__riser--${cursor === 0 ? 'first' : 'next'}`}
               style={heroVisible ? undefined : { visibility: 'hidden' }}
             >
+              {/* Behind the flip and outside it, so it stays flat through the turn
+                  and leaves the card's own box-shadow free for the "new" rim.
+                  One shared ramp; `--held` freezes it at the turn, so a low tier
+                  keeps a faint glow and a high one a bright one. */}
+              {glowing ? (
+                <div
+                  className={`opener__radiance${faceUp ? ' opener__radiance--held' : ''}`}
+                />
+              ) : null}
+
               <div
                 className={[
                   'opener__flip',
                   faceUp ? 'opener__flip--up' : '',
-                  // One shared ramp; `--held` freezes it at the turn, so a low
-                  // tier keeps a faint glow and a high one a bright one.
-                  glowing ? 'opener__flip--building' : '',
-                  glowing && faceUp ? 'opener__flip--held' : '',
                   flagged && current.isNew ? 'opener__flip--new' : '',
                 ]
                   .filter(Boolean)
@@ -520,12 +568,15 @@ const PackOpener: React.FC<PackOpenerProps> = ({ pack, onOpen, onFinished, fastM
 
       {phase === 'done' ? (
         <>
-          <div className="opener__results">
+          <div
+            className={`opener__results${settledByFlip ? ' opener__results--settled' : ''}`}
+          >
             {cards.map((card, i) => (
               <div
                 key={`${card.player.id}-${i}`}
+                ref={setSlotRef(i)}
                 className={`opener__result opener__slot${card.isNew ? ' opener__slot--new' : ''}`}
-                style={{ animationDelay: `${i * 55}ms` }}
+                style={settledByFlip ? undefined : { animationDelay: `${i * 55}ms` }}
               >
                 <PlayerCard card={card} />
               </div>
