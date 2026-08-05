@@ -168,6 +168,9 @@ const useStyles = makeStyles((theme: Theme) =>
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      [theme.breakpoints.down('sm')]: {
+        alignItems: 'flex-start',
+      },
     },
     modalPaper: {
       backgroundColor: '#111', // Black
@@ -178,7 +181,7 @@ const useStyles = makeStyles((theme: Theme) =>
       maxWidth: '100%',
       [theme.breakpoints.down('sm')]: {
         width: '100vw',
-        height: '100vh',
+        height: '100dvh',
         maxWidth: '100vw',
         borderRadius: 0,
         padding: theme.spacing(3),

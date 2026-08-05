@@ -4,13 +4,16 @@ import {
   Alert,
   Avatar,
   CircularProgress,
+  ClickAwayListener,
   IconButton,
   Modal,
   Snackbar,
   TextField,
   Theme,
   Tooltip,
+  useMediaQuery,
 } from "@mui/material";
+import useIsMobile from "../hooks/useIsMobile";
 import { LineChart } from "@mui/x-charts/LineChart";
 import {
   ChartsItemContentProps,
@@ -54,17 +57,75 @@ type WinStreak = {
   endIndex: number;
 };
 
+const tooltipStyle = {
+  tooltip: {
+    style: {
+      maxWidth: "450px",
+      minWidth: "300px",
+      backgroundColor: "black",
+      borderRadius: "4px",
+      padding: "0.5rem 0.75rem",
+    },
+  },
+};
+
+// Cool-stats relations use a hover Tooltip on desktop. Touch devices have no
+// hover, so on mobile the same tooltip becomes tap-to-open: controlled `open`
+// state toggled by tapping the block, dismissed by tapping away. Desktop hover
+// behaviour is left untouched.
+const TapTooltip: React.FC<{
+  title: React.ReactNode;
+  isMobile: boolean;
+  children: React.ReactElement;
+}> = ({ title, isMobile, children }) => {
+  const [open, setOpen] = useState(false);
+
+  if (!isMobile) {
+    return (
+      <Tooltip title={title} componentsProps={tooltipStyle}>
+        {children}
+      </Tooltip>
+    );
+  }
+
+  return (
+    <ClickAwayListener onClickAway={() => setOpen(false)}>
+      <Tooltip
+        title={title}
+        componentsProps={tooltipStyle}
+        open={open}
+        disableHoverListener
+        disableFocusListener
+        disableTouchListener
+      >
+        {React.cloneElement(children, {
+          onClick: () => setOpen((prev) => !prev),
+          style: { ...(children.props.style || {}), cursor: "pointer" },
+        })}
+      </Tooltip>
+    </ClickAwayListener>
+  );
+};
+
 // Define styles using makeStyles
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
     root: {
       flexGrow: 1,
+      [theme.breakpoints.down("sm")]: {
+        paddingLeft: theme.spacing(1.5),
+        paddingRight: theme.spacing(1.5),
+      },
     },
     avatar: {
       marginRight: theme.spacing(1),
       marginUp: "10rem",
       height: "10rem",
       width: "10rem",
+      [theme.breakpoints.down("sm")]: {
+        height: "4.5rem",
+        width: "4.5rem",
+      },
     },
     modalAvatar: {
       marginRight: theme.spacing(1),
@@ -96,6 +157,12 @@ const useStyles = makeStyles((theme: Theme) =>
       color: "#ffff00", // Yellow
       display: "flex",
       justifyContent: "center",
+      textAlign: "center",
+      [theme.breakpoints.down("sm")]: {
+        fontSize: "1.15rem",
+        padding: "1rem 0.4rem",
+        whiteSpace: "nowrap",
+      },
     },
     modal: {
       display: "flex",
@@ -138,16 +205,32 @@ const useStyles = makeStyles((theme: Theme) =>
       padding: theme.spacing(4),
       borderRadius: theme.shape.borderRadius,
       color: "#fff", // White text color
+      maxWidth: "100%",
+      [theme.breakpoints.down("sm")]: {
+        width: "100vw",
+        height: "100vh",
+        maxWidth: "100vw",
+        borderRadius: 0,
+        padding: theme.spacing(3),
+        overflowY: "auto",
+      },
     },
     modalBanner: {
       color: "#ffff00", // Yellow
     },
     name: {
       fontSize: "1.6rem",
+      [theme.breakpoints.down("sm")]: {
+        fontSize: "1.2rem",
+        wordBreak: "break-word",
+      },
     },
     stats: {
       fontSize: "1.2rem",
       color: "#00ff00", // Very bright green
+      [theme.breakpoints.down("sm")]: {
+        fontSize: "1rem",
+      },
     },
     editButton: {
       fontSize: "1.6rem",
@@ -155,6 +238,10 @@ const useStyles = makeStyles((theme: Theme) =>
       width: "100%",
       height: "12rem",
       color: "#ffff00", // Yellow
+      [theme.breakpoints.down("sm")]: {
+        height: "auto",
+        fontSize: "1.2rem",
+      },
     },
     playerNames: {
       color: "#ffff00", // Yellow
@@ -176,6 +263,9 @@ const useStyles = makeStyles((theme: Theme) =>
       alignItems: "center",
       justifyContent: "center",
       height: "100%",
+      [theme.breakpoints.down("sm")]: {
+        flexWrap: "wrap",
+      },
     },
     grow: {
       flexGrow: 1,
@@ -185,6 +275,11 @@ const useStyles = makeStyles((theme: Theme) =>
       fontFamily: "Teletext",
       fontSize: "1.0rem",
       textTransform: "none",
+      [theme.breakpoints.down("sm")]: {
+        fontSize: "0.8rem",
+        margin: theme.spacing(0.5),
+        minWidth: 0,
+      },
     },
     ranglijstButton: {
       color: "#FF0000", // Teletekst red
@@ -205,6 +300,8 @@ const useStyles = makeStyles((theme: Theme) =>
 const PlayerPage: React.FC = () => {
   // Use the defined styles
   const classes = useStyles();
+  const isMobile = useIsMobile();
+  const bannerVeryShort = useMediaQuery("(max-width:360px)");
   const { id } = useParams();
 
   const [player, setPlayer] = useState<DynamicRatingPlayer>();
@@ -868,18 +965,6 @@ const PlayerPage: React.FC = () => {
     </Grid>
   );
 
-  const tooltipStyle = {
-    tooltip: {
-      style: {
-        maxWidth: "450px",
-        minWidth: "300px",
-        backgroundColor: "black",
-        borderRadius: "4px",
-        padding: "0.5rem 0.75rem",
-      },
-    },
-  };
-
   const showCoolStatsOrLoading = () => {
     if (playerStats == null || !player?.numberOfGames) {
       return <CircularProgress />;
@@ -912,9 +997,9 @@ const PlayerPage: React.FC = () => {
           spacing={2}
         >
           {/* Winstmagneet */}
-          <Tooltip
+          <TapTooltip
             title={tooltipPlayers(winstMagneets)}
-            componentsProps={tooltipStyle}
+            isMobile={isMobile}
           >
             <Grid container item>
               <Grid item xs={6} className={classes.stats}>
@@ -936,12 +1021,12 @@ const PlayerPage: React.FC = () => {
                 </Typography>
               </Grid>
             </Grid>
-          </Tooltip>
+          </TapTooltip>
 
           {/* Partner in pijn */}
-          <Tooltip
+          <TapTooltip
             title={tooltipPlayers(partnerInPains)}
-            componentsProps={tooltipStyle}
+            isMobile={isMobile}
           >
             <Grid container item>
               <Grid item xs={6} className={classes.stats}>
@@ -965,12 +1050,12 @@ const PlayerPage: React.FC = () => {
                 </Typography>
               </Grid>
             </Grid>
-          </Tooltip>
+          </TapTooltip>
 
           {/* BFF */}
-          <Tooltip
+          <TapTooltip
             title={tooltipBffPlayers(bffs)}
-            componentsProps={tooltipStyle}
+            isMobile={isMobile}
           >
             <Grid container item>
               <Grid item xs={6} className={classes.stats}>
@@ -992,12 +1077,12 @@ const PlayerPage: React.FC = () => {
                 </Typography>
               </Grid>
             </Grid>
-          </Tooltip>
+          </TapTooltip>
 
           {/* Oefenmateriaal */}
-          <Tooltip
+          <TapTooltip
             title={tooltipPlayers(practiceMaterials)}
-            componentsProps={tooltipStyle}
+            isMobile={isMobile}
           >
             <Grid container item>
               <Grid item xs={6} className={classes.stats}>
@@ -1021,12 +1106,12 @@ const PlayerPage: React.FC = () => {
                 </Typography>
               </Grid>
             </Grid>
-          </Tooltip>
+          </TapTooltip>
 
           {/* Angstgegner */}
-          <Tooltip
+          <TapTooltip
             title={tooltipPlayers(nemeses)}
-            componentsProps={tooltipStyle}
+            isMobile={isMobile}
           >
             <Grid container item>
               <Grid item xs={6} className={classes.stats}>
@@ -1048,12 +1133,12 @@ const PlayerPage: React.FC = () => {
                 </Typography>
               </Grid>
             </Grid>
-          </Tooltip>
+          </TapTooltip>
 
           {/* aartsrivaal */}
-          <Tooltip
+          <TapTooltip
             title={tooltipBffPlayers(archnemesis)}
-            componentsProps={tooltipStyle}
+            isMobile={isMobile}
           >
             <Grid container item>
               <Grid item xs={6} className={classes.stats}>
@@ -1075,7 +1160,7 @@ const PlayerPage: React.FC = () => {
                 </Typography>
               </Grid>
             </Grid>
-          </Tooltip>
+          </TapTooltip>
         </Grid>
       );
     }
@@ -1454,7 +1539,7 @@ const PlayerPage: React.FC = () => {
               },
             ]}
             grid={{ horizontal: true }}
-            height={600}
+            height={isMobile ? 320 : 600}
             sx={{
               ".MuiLineElement-series-pvId": {
                 strokeDasharray: "2 2", // Dashed line for the first series
@@ -1543,17 +1628,17 @@ const PlayerPage: React.FC = () => {
         </Alert>
       </Snackbar>
       <Grid container spacing={2}>
-        <Grid item xs={2}></Grid>
-        <Grid item xs={8}>
+        <Grid item md={2} sx={{ display: { xs: "none", md: "block" } }} />
+        <Grid item xs={12} md={8}>
           <Paper className={classes.banner} style={{ marginBottom: "1rem" }}>
-            speler profiel
+            {bannerVeryShort ? "profiel" : "speler profiel"}
           </Paper>
           <Grid container spacing={2}>
-            <Grid item xs={6}>
+            <Grid item xs={12} md={6}>
               {showProfileOrloading()}
               {showBasicStatsOrLoading()}
             </Grid>
-            <Grid item xs={6}>
+            <Grid item xs={12} md={6}>
               {showCoolStatsOrLoading()}
             </Grid>
             <Grid item xs={12}>
@@ -1561,8 +1646,8 @@ const PlayerPage: React.FC = () => {
             </Grid>
           </Grid>
         </Grid>
+        <Grid item md={2} sx={{ display: { xs: "none", md: "block" } }} />
       </Grid>
-      <Grid item xs={2}></Grid>
       {editPlayerModal()}
     </div>
   );
