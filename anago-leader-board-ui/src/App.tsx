@@ -9,6 +9,7 @@ import theme from "./styles/theme";
 import GamesPage from "./pages/GamesPage";
 import PlayerPage from "./pages/PlayerPage";
 import HistoryPage from "./pages/HistoryPage";
+import CollectionPage from "./pages/CollectionPage";
 
 declare global {
   interface Window {
@@ -24,6 +25,7 @@ function App() {
         <Route path="/" element={<LeaderBoardPage/>} />
         <Route path="wedstrijden" element={<GamesPage/>} />
         <Route path="speler/:id" element={<PlayerPage/>} />
+        <Route path="collectie" element={<CollectionPage />} />
         <Route path="about" element={<AboutPage />} />
         <Route path="historie" element={<HistoryPage />} />
         <Route path="*" element={<NoPage />} />

@@ -1,0 +1,680 @@
+/**
+ * Pack opening: five beats — wrapper, tear, stack rises, reveal, settle.
+ *
+ * Everything animates transform and opacity only, so it composites on the GPU
+ * and stays smooth on a phone.
+ *
+ * Timing budget matters more than polish here: at three games a day this plays
+ * roughly a thousand times a year, so a common pack has to be done in under two
+ * seconds and a click has to skip it. Ceremony is reserved for 85+.
+ *
+ * Every duration below is multiplied by `var(--anim, 1)`, written to :root by
+ * utils/animationSpeed.ts. That is the single pacing knob — the JS sequencing in
+ * PackOpener derives from the same multiplier, so the two layers cannot drift
+ * apart.
+ */
+
+.opener {
+  --pack-w: clamp(180px, 17vw, 240px);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-height: 62vh;
+  justify-content: center;
+  position: relative;
+  font-family: Tahoma, Verdana, sans-serif;
+}
+
+.opener__hint {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  color: #a89b7c;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  min-height: 16px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Beat 1 — the wrapper
+ * ---------------------------------------------------------------- */
+
+.pack {
+  position: relative;
+  width: var(--pack-w);
+  aspect-ratio: 5 / 7;
+  cursor: pointer;
+  border-radius: 5px;
+  overflow: hidden;
+  animation: pack-sheen 2.6s linear infinite;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  transition: transform 160ms ease;
+  flex: none;
+}
+
+/**
+ * The foil paint, shared by the whole wrapper and by each torn half.
+ *
+ * The halves must carry it themselves rather than `inherit` it, because tearing
+ * strips the paint off the parent — and inherit would then resolve to `none`.
+ * Painting the parent during the tear was the original bug: both halves flew off
+ * over a fully intact wrapper, so no wrapper ever appeared to come off.
+ */
+.pack,
+.pack__half {
+  background-color: #1b3f8f;
+  background-image:
+    linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.55) 47%, transparent 56%),
+    repeating-linear-gradient(
+      70deg,
+      rgba(255, 255, 255, 0.09) 0 3px,
+      rgba(0, 0, 0, 0.09) 3px 6px
+    ),
+    linear-gradient(160deg, #2f6fd0 0%, #14306e 45%, #2a5cb0 100%);
+  background-size: 250% 100%, auto, auto;
+  background-position: -60% 0, 0 0, 0 0;
+}
+
+.pack:hover {
+  transform: translateY(-3px) scale(1.02);
+}
+
+@keyframes pack-sheen {
+  from {
+    background-position: -60% 0, 0 0, 0 0;
+  }
+  to {
+    background-position: 160% 0, 0 0, 0 0;
+  }
+}
+
+.pack__label {
+  position: absolute;
+  inset: auto 0 18px;
+  text-align: center;
+  color: #fff;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.pack__size {
+  position: absolute;
+  inset: 22px 0 auto;
+  text-align: center;
+  color: #ffe9a0;
+  font-size: 34px;
+  font-weight: bold;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.pack__size small {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #cfe0ff;
+  font-weight: normal;
+}
+
+.pack__reason {
+  position: absolute;
+  inset: auto 8px 4px;
+  text-align: center;
+  color: #cfe0ff;
+  font-size: 9px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Beat 2 — the tear
+ *
+ * The trick: the jagged edge is baked into each half's clip-path and never
+ * animates. Only the two halves move. Animating a polygon would cost far more
+ * for a barely different result.
+ * ---------------------------------------------------------------- */
+
+/* Strip the parent's paint so only the two halves are visible during the tear. */
+.pack--tearing {
+  background: none;
+  animation: none;
+  cursor: default;
+  box-shadow: none;
+}
+
+.pack__half {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * The jagged edge is baked into each half's clip-path and never animates — only
+ * the halves move. Animating the polygon itself would cost far more for a
+ * barely different result.
+ *
+ * Only the TOP strip comes off. The bottom stays put and sinks away as the cards
+ * rise out of it, because that is what tearing a packet actually does — both
+ * halves flying apart read as an explosion rather than an opening.
+ */
+.pack__half--top {
+  clip-path: polygon(
+    0 0, 100% 0, 100% 26%, 88% 30%, 76% 25%, 64% 31%, 52% 26%,
+    40% 32%, 28% 27%, 16% 33%, 0 28%
+  );
+  animation: pack-tear-top calc(380ms * var(--anim, 1)) cubic-bezier(0.36, 0, 0.66, -0.25) forwards;
+}
+
+.pack__half--bottom {
+  clip-path: polygon(
+    0 28%, 16% 33%, 28% 27%, 40% 32%, 52% 26%, 64% 31%, 76% 25%,
+    88% 30%, 100% 26%, 100% 100%, 0 100%
+  );
+  animation: pack-tear-bottom calc(380ms * var(--anim, 1)) ease-in forwards;
+}
+
+@keyframes pack-tear-top {
+  30% {
+    transform: translate(2px, -8px) rotate(-2deg);
+  }
+  to {
+    transform: translate(26px, -190px) rotate(18deg);
+    opacity: 0;
+  }
+}
+
+@keyframes pack-tear-bottom {
+  40% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(26px) scale(0.97);
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Beats 3 & 4 — stack rises, then reveals
+ * ---------------------------------------------------------------- */
+
+.opener__stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--pack-w) * 1.4);
+}
+
+/**
+ * The entrance and the flip live on separate elements, deliberately.
+ *
+ * Both animate `transform`, and a running CSS animation always beats a
+ * class-driven value — so putting them on one element meant the rotateY was
+ * suppressed for the whole entrance and then snapped with no transition. That
+ * was why the card never visibly flipped.
+ */
+.opener__riser {
+  position: relative;
+  width: var(--pack-w);
+  aspect-ratio: 5 / 7;
+}
+
+.opener__riser--first {
+  animation: opener-rise calc(180ms * var(--anim, 1)) ease-out;
+}
+
+.opener__riser--next {
+  animation: opener-slide-in calc(180ms * var(--anim, 1)) ease-out;
+}
+
+.opener__flip {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform calc(320ms * var(--anim, 1)) cubic-bezier(0.4, 0.05, 0.25, 1);
+}
+
+.opener__flip--up {
+  transform: rotateY(180deg);
+}
+
+/* The first card rises out of the torn wrapper. */
+@keyframes opener-rise {
+  from {
+    transform: translateY(52px) scale(0.9);
+    opacity: 0;
+  }
+}
+
+/* Subsequent cards come in from the side — faster, and it reads as "next". */
+@keyframes opener-slide-in {
+  from {
+    transform: translateX(38px);
+    opacity: 0;
+  }
+}
+
+.opener__face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Type needs no override — the card sizes its own text from its width. */
+.opener__face .card {
+  --card-width: var(--pack-w);
+}
+
+.opener__face--front {
+  transform: rotateY(180deg);
+}
+
+/*
+ * The reveal card's own shadow.
+ *
+ * The base card shadow hugs the edge, which at reveal size reads as a dark
+ * outline around the card. Offset down with a wide blur instead — and this also
+ * overrides the dark 1px ring the top tier carries, which was the other half of
+ * that border.
+ */
+.opener__stage .card {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * The held beat before a gold reveal: a warm glow swelling around the card while
+ * it is still face down. Follows the card's shape rather than being a circle
+ * behind it.
+ *
+ * Four levels, each building on the one below — a barely-there shimmer at the
+ * bottom of gold up to a flood at the top. Combined with the build *length*
+ * (see ceremonyBuildRatio in cardMock) the tier is readable before the card ever
+ * turns over.
+ *
+ * `--glow-ms` is set inline per card, because each level swells for a different
+ * length of time.
+ */
+/*
+ * One ramp for every level, delayed until the shimmer phase is over, running for
+ * the longest radiation window (`--radiate-ms`) toward one target. The card turns
+ * earlier at lower levels and `--held` pauses the animation, freezing the glow
+ * wherever it reached.
+ *
+ * The delay is what keeps a 75 clean: it turns over exactly as the delay expires,
+ * so its glow never starts. Per-level targets or per-level rates would let you
+ * tell an 80 from a 90 at a glance mid-build; here the only difference is how far
+ * along one identical ramp you get.
+ */
+.opener__flip--building .opener__face .card {
+  animation: opener-glow-grow var(--radiate-ms, 1200ms) linear var(--shimmer-ms, 700ms) forwards;
+}
+
+.opener__flip--held .opener__face .card {
+  animation-play-state: paused;
+}
+
+@keyframes opener-glow-grow {
+  from {
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+  to {
+    box-shadow:
+      0 0 24px rgba(255, 236, 168, 0.75),
+      0 0 60px rgba(255, 206, 92, 0.48),
+      0 0 124px rgba(255, 180, 50, 0.26),
+      0 0 200px rgba(255, 172, 44, 0.14),
+      0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/*
+ * A gold shimmer travelling across the card while it is still face down — light
+ * catching foil.
+ *
+ * This is the base layer of the ceremony, present at every level, and at level 1
+ * it is essentially the whole effect. Higher levels keep it and add spread, the
+ * bloom, the sweep and the particles on top.
+ *
+ * Sits outside the flip so it does not rotate with the card, which is what makes
+ * it read as light on the surface rather than as printing.
+ */
+.opener__shimmer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/*
+ * A single pass filling the whole shimmer phase — identical whether the card is a
+ * 75 or a 90, and the entire effect for a 75.
+ *
+ * Linear rather than eased: an ease-in-out concentrates the travel in the middle,
+ * which is what made it feel snatched.
+ */
+.opener__shimmer::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(
+    100deg,
+    transparent 34%,
+    rgba(255, 226, 150, 0.5) 46%,
+    rgba(255, 248, 214, 0.8) 50%,
+    rgba(255, 226, 150, 0.5) 54%,
+    transparent 66%
+  );
+  transform: translateX(-125%);
+  animation: opener-shimmer var(--shimmer-ms, 700ms) linear 1 forwards;
+}
+
+@keyframes opener-shimmer {
+  from {
+    transform: translateX(-125%);
+  }
+  to {
+    transform: translateX(125%);
+  }
+}
+
+/*
+ * No level draws a hard gold edge — every shadow above is blurred. An outline
+ * reads as a border printed on the card rather than as light coming off it.
+ */
+
+/* ---------------------------------------------------------------- *
+ * Top-tier build-up
+ *
+ * Only for 90+, and only during the build. A single layer — an earlier version
+ * added rotating sunburst beams behind the card, which were too much on top of
+ * the glow.
+ * ---------------------------------------------------------------- */
+
+/*
+ * One big gold glow filling the screen, swelling steadily through the build
+ * rather than flashing.
+ *
+ * This replaced a three-flash strobe: calmer, grander, and it sidesteps the
+ * photosensitivity problem that repeated flashing carries.
+ */
+/*
+ * Driven by a class rather than a keyframe animation, deliberately.
+ *
+ * An animation with `forwards` pins the final opacity, so there is no way back —
+ * removing it snaps to zero. A transition goes both ways: the swell uses the
+ * build-up length, and the base rule's shorter duration takes over when the class
+ * comes off, so it recedes instead of cutting.
+ *
+ * The gradient runs all the way to 100% so no ring edge is visible on any
+ * viewport, and the empty stage is not left lit after the card has dropped.
+ */
+/*
+ * Two elements, deliberately.
+ *
+ * The inner one *ramps* on the shared `--build-ms` animation and is paused at the
+ * turn, exactly like the card's glow, so it too is identical at any timestamp.
+ * The outer one only *fades out* afterwards.
+ *
+ * They cannot be one element: an animation with `forwards` pins the final value,
+ * so there is no way to transition away from a paused ramp. Splitting them lets
+ * the fade multiply whatever the ramp froze at.
+ */
+.opener__bloom {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity calc(620ms * var(--anim, 1)) ease-out;
+}
+
+.opener__bloom--out {
+  opacity: 0;
+}
+
+.opener__bloom-inner {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 45%,
+    rgba(255, 232, 164, 0.58) 0%,
+    rgba(255, 196, 78, 0.32) 38%,
+    rgba(255, 176, 46, 0.13) 66%,
+    rgba(255, 168, 40, 0.04) 86%,
+    transparent 100%
+  );
+  opacity: 0;
+  animation: opener-bloom-grow var(--radiate-ms, 1200ms) linear var(--shimmer-ms, 700ms) forwards;
+}
+
+.opener__bloom--held .opener__bloom-inner {
+  animation-play-state: paused;
+}
+
+@keyframes opener-bloom-grow {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Light sweep across the top tier's face, on top of the static card sheen. */
+.opener__sweep {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.opener__sweep::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(
+    100deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.85) 50%,
+    transparent 60%
+  );
+  transform: translateX(-120%);
+  animation: opener-sweep calc(900ms * var(--anim, 1)) ease-in-out calc(120ms * var(--anim, 1));
+}
+
+@keyframes opener-sweep {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * New-card glow
+ *
+ * Marks what is NEW rather than dimming what is duplicate. Duplicates become the
+ * majority within a couple of months — a mature collection holds ~34 of the
+ * commonest player — so darkening them would make almost every pack read as a
+ * failure.
+ *
+ * Deliberately cool green-white, so it never reads as the same signal as the
+ * warm gold rarity ceremony.
+ * ---------------------------------------------------------------- */
+
+.opener__slot {
+  position: relative;
+}
+
+/*
+ * The glow follows the card's own edge and fades outward from it. An earlier
+ * version put a radial gradient behind the card, which showed as a visible oval
+ * that had nothing to do with the card's shape.
+ *
+ * Four stacked shadows: a thin ring hugging the edge, then progressively wider
+ * and softer falloff.
+ */
+/*
+ * While a card is flying into the row it carries a plain shadow instead of its
+ * glow, because `transform: scale()` scales box-shadows too — a 42px halo drawn
+ * at 100px becomes a 100px halo at 2.4x. Higher specificity than the glow rules
+ * below, so it wins for the duration of the flight.
+ */
+.opener__revealed .opener__slot--flying .card {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+.opener__slot--new .card,
+.opener__flip--new .opener__face--front .card,
+.opener__flip--new.opener__flip--up .opener__face--front .card {
+  position: relative;
+  box-shadow:
+    0 0 0 1px rgba(216, 255, 234, 0.8),
+    0 0 8px rgba(152, 255, 206, 0.5),
+    0 0 20px rgba(108, 242, 182, 0.3),
+    0 0 42px rgba(84, 230, 164, 0.16),
+    0 3px 9px rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * Lets the rim bloom in rather than snap on. Only fires where the class is added
+ * after mount — the reveal card, once its flip has landed. Cards in the strip and
+ * the results already carry the class when they mount, so no transition runs
+ * there, which is right: their entrance animation is doing that job.
+ *
+ * Must comfortably finish inside the card's remaining hold. The glow starts when
+ * the flip lands, so at 240ms it completes well before the card moves on; at the
+ * 520ms this was first set to, it was still fading in when the card left.
+ */
+.opener__stage .card,
+.opener__slot .card {
+  transition: box-shadow calc(240ms * var(--anim, 1)) ease-out;
+}
+
+/* Particle burst. Direction comes from --angle, set per element in JS. */
+.opener__particles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.opener__particle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  border-radius: 50%;
+  background: #ffe9a0;
+  animation: opener-particle calc(850ms * var(--anim, 1)) ease-out forwards;
+}
+
+@keyframes opener-particle {
+  from {
+    transform: rotate(var(--angle)) translateX(20px) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: rotate(var(--angle)) translateX(190px) scale(0.2);
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Cards already revealed, accumulating under the stage.
+ *
+ * Without this the reveal is disjointed: each card appeared, flipped, then
+ * blinked out of existence when the next arrived, and the results row only
+ * showed up at the very end. Seeing the pile grow is what ties the beats
+ * together.
+ * ---------------------------------------------------------------- */
+
+.opener__revealed {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  min-height: 148px;
+  align-items: flex-start;
+}
+
+.opener__revealed .card {
+  --card-width: 100px;
+}
+
+/*
+ * No entrance animation here on purpose. The slot's arrival is driven by the FLIP
+ * in PackOpener — it starts at the big card's position and size and travels in.
+ * A keyframe animation on the card would fight that, since both target
+ * `transform`.
+ */
+.opener__revealed .opener__slot {
+  will-change: transform;
+}
+
+/* ---------------------------------------------------------------- *
+ * Beat 5 — settle
+ * ---------------------------------------------------------------- */
+
+.opener__results {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 900px;
+}
+
+.opener__results .card {
+  --card-width: clamp(110px, 12vw, 160px);
+}
+
+.opener__result {
+  animation: opener-settle calc(260ms * var(--anim, 1)) ease-out backwards;
+}
+
+@keyframes opener-settle {
+  from {
+    transform: translateY(-18px) scale(0.92);
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Reduced motion: the reveal still completes, it just does not move.
+ * ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .pack,
+  .pack__half--top,
+  .pack__half--bottom,
+  .opener__riser--first,
+  .opener__riser--next,
+  .opener__flip,
+  .opener__shimmer,
+  .opener__shimmer::before,
+  .opener__sweep::before,
+  .opener__particle,
+  .opener__revealed .card,
+  .opener__result,
+  .opener__stage .card,
+  .opener__slot .card {
+    animation: none;
+    transition: none;
+  }
+
+  /* Appears and disappears without the swell, but is still there. */
+  .opener__bloom {
+    transition: none;
+  }
+
+  .opener__bloom--in {
+    transition: none;
+    opacity: 0.32;
+  }
+}

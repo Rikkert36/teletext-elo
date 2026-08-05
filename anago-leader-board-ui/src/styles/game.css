@@ -1,0 +1,1023 @@
+/**
+ * The stage the album sits on.
+ *
+ * Everything here is driven by custom properties, so a visual direction is a
+ * block of token overrides plus a background — see the five theme blocks at the
+ * bottom. The theme is a class on <html> (utils/stageTheme.ts) so it can be
+ * switched live.
+ *
+ * The book and the cards are deliberately untouched by the themes; only the
+ * surface, the chrome and the accents change.
+ */
+
+.game-stage {
+  /* --- tokens: defaults are the Brass direction --- */
+  --accent: #a9853c;
+  --accent-light: #e6c98a;
+  --accent-dark: #4a3712;
+  --ink: #f0e6cd;
+  --ink-dim: #a89b7c;
+
+  --title-font: Georgia, "Times New Roman", serif;
+  --title-ink: #e6c98a;
+  --title-shadow: 0 2px 0 #2b2008, 0 3px 10px rgba(0, 0, 0, 0.8);
+  --title-spacing: 2px;
+  --title-transform: uppercase;
+
+  --plate-from: #34291a;
+  --plate-to: #1f180e;
+  --plate-border: #4a3712;
+
+  --btn-from: #e2c17c;
+  --btn-mid: #b8933f;
+  --btn-to: #8a6a28;
+  --btn-ink: #2a1f08;
+  --btn-border: #4a3712;
+  --btn-hi: rgba(255, 250, 222, 0.75);
+  --btn-text-shadow: 0 1px 0 rgba(255, 245, 205, 0.55);
+
+  --input-bg: #14100a;
+  --meter-from: #cfe58a;
+  --meter-mid: #7aa832;
+  --meter-to: #4d7315;
+
+  /* Inside covers of the book, so the binding does not clash with the stage. */
+  --book-inside: linear-gradient(150deg, #35592c 0%, #223d1b 60%, #2d4d24 100%);
+
+  position: relative;
+  min-height: 78vh;
+  padding: 18px clamp(8px, 3vw, 40px) 28px;
+  box-sizing: border-box;
+  font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
+  color: var(--ink);
+  overflow: hidden;
+
+  /* Wood panelling under a warm lamp. */
+  background-color: #2a1d10;
+  background-image:
+    repeating-linear-gradient(
+      92deg,
+      rgba(0, 0, 0, 0.16) 0 3px,
+      rgba(255, 255, 255, 0.03) 3px 7px,
+      rgba(0, 0, 0, 0.1) 7px 11px
+    ),
+    radial-gradient(ellipse 70% 45% at 50% 6%, rgba(255, 226, 160, 0.22), transparent 72%),
+    radial-gradient(ellipse 95% 85% at 50% 45%, #4a3520 0%, #2c1e11 60%, #150e07 100%);
+  box-shadow: inset 0 0 180px rgba(0, 0, 0, 0.85);
+}
+
+.game-rule {
+  height: 3px;
+  margin: 12px 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent-dark) 8%,
+    var(--accent) 50%,
+    var(--accent-dark) 92%,
+    transparent 100%
+  );
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* ---------------------------------------------------------------- *
+ * Header
+ * ---------------------------------------------------------------- */
+
+.game-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.game-title {
+  font-family: var(--title-font);
+  font-size: clamp(20px, 2.6vw, 32px);
+  font-weight: bold;
+  letter-spacing: var(--title-spacing);
+  text-transform: var(--title-transform);
+  color: var(--title-ink);
+  text-shadow: var(--title-shadow);
+  margin: 0;
+  line-height: 1;
+}
+
+.game-subtitle {
+  font-family: var(--title-font);
+  font-size: 13px;
+  font-style: italic;
+  color: var(--ink-dim);
+}
+
+.game-spacer {
+  flex: 1;
+}
+
+/* ---------------------------------------------------------------- *
+ * Plates
+ * ---------------------------------------------------------------- */
+
+.game-plate {
+  background: linear-gradient(180deg, var(--plate-from) 0%, var(--plate-to) 100%);
+  border: 1px solid var(--plate-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 0 24px rgba(0, 0, 0, 0.35),
+    0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+.game-plate__label {
+  font-family: var(--title-font);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--accent-light);
+  display: block;
+  margin-bottom: 7px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Controls
+ * ---------------------------------------------------------------- */
+
+.game-button {
+  font-family: Tahoma, Verdana, sans-serif;
+  font-size: 12px;
+  font-weight: bold;
+  color: var(--btn-ink);
+  text-shadow: var(--btn-text-shadow);
+  background: linear-gradient(180deg, var(--btn-from) 0%, var(--btn-mid) 46%, var(--btn-to) 100%);
+  border: 1px solid var(--btn-border);
+  border-radius: 3px;
+  padding: 7px 15px;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 var(--btn-hi),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.22),
+    0 3px 6px rgba(0, 0, 0, 0.45);
+}
+
+.game-button:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+
+.game-button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.45);
+}
+
+.game-button:disabled {
+  background: linear-gradient(180deg, #6b6149 0%, #4b422f 100%);
+  color: var(--ink-dim);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  cursor: default;
+  border-color: var(--accent-dark);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 4px rgba(0, 0, 0, 0.4);
+  filter: none;
+}
+
+.game-button--small {
+  padding: 4px 9px;
+  font-size: 11px;
+}
+
+.game-input {
+  font-family: Tahoma, Verdana, sans-serif;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--input-bg);
+  border: 1px solid var(--accent-dark);
+  border-radius: 3px;
+  padding: 6px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.game-input::placeholder {
+  color: var(--ink-dim);
+}
+
+.game-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--accent);
+}
+
+.game-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  user-select: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * Tabs
+ * ---------------------------------------------------------------- */
+
+.game-tabs {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+
+.game-tab {
+  font-family: var(--title-font);
+  font-size: 13px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  background: linear-gradient(180deg, var(--plate-from) 0%, var(--plate-to) 100%);
+  border: 1px solid var(--plate-border);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 7px 20px 8px;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.game-tab--active {
+  color: var(--btn-ink);
+  background: linear-gradient(180deg, var(--btn-from) 0%, var(--btn-mid) 100%);
+  text-shadow: var(--btn-text-shadow);
+}
+
+.game-tab:disabled {
+  color: var(--ink-dim);
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------- *
+ * Progress
+ * ---------------------------------------------------------------- */
+
+.game-meter {
+  height: 18px;
+  background: var(--input-bg);
+  border: 1px solid var(--accent-dark);
+  border-radius: 3px;
+  padding: 2px;
+  display: flex;
+  gap: 2px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+}
+
+.game-meter__chunk {
+  flex: 1;
+  background: linear-gradient(
+    180deg,
+    var(--meter-from) 0%,
+    var(--meter-mid) 48%,
+    var(--meter-to) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.game-meter__chunk--empty {
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * Readouts and layout
+ * ---------------------------------------------------------------- */
+
+.game-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.game-readout {
+  font-family: var(--title-font);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.game-readout strong {
+  color: var(--accent-light);
+  font-size: 17px;
+}
+
+.game-muted {
+  color: var(--ink-dim);
+  font-size: 12px;
+}
+
+.game-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.game-notice {
+  text-align: center;
+  padding: 48px 20px;
+  font-family: var(--title-font);
+  font-size: 15px;
+  color: var(--ink-dim);
+  line-height: 1.7;
+}
+
+.album-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: clamp(10px, 1.6vw, 26px);
+}
+
+.album-side {
+  flex: none;
+  width: clamp(148px, 14vw, 216px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.album-side__packs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.album-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.game-button--stacked {
+  text-align: left;
+  white-space: normal;
+  line-height: 1.35;
+  padding: 8px 11px;
+}
+
+.game-button--stacked small {
+  display: block;
+  font-weight: normal;
+  font-size: 10.5px;
+  opacity: 0.8;
+}
+
+@media (max-width: 900px) {
+  .album-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .album-side {
+    width: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+/* ================================================================ *
+ * THEMES
+ *
+ * Five genuinely different styles, not five palettes. Each changes the geometry,
+ * the depth model and the shape language, not just the colours — so every theme
+ * overrides structure as well as tokens.
+ *
+ * Once one is picked, fold it into the base rules above and delete the rest along
+ * with utils/stageTheme.ts and the switcher in the test panel.
+ * ================================================================ */
+
+/* --- A · TELETEKST -----------------------------------------------------
+ * Matches the rest of the site. Zero depth: no gradients, no shadows, no
+ * rounded corners, no bevels anywhere. Pure black, saturated Mode-7 RGB, solid
+ * colour blocks for controls. Structurally the opposite of every other theme.
+ * -------------------------------------------------------------------- */
+
+.stage-teletext .game-stage {
+  --ink: #ffffff;
+  --ink-dim: #00ffff;
+  --accent: #ffff00;
+  --accent-light: #ffff00;
+  --accent-dark: #ffffff;
+  --input-bg: #000000;
+  --book-inside: #0000aa;
+
+  font-family: "Teletext", "Courier New", monospace;
+  background: #000;
+  box-shadow: none;
+}
+
+.stage-teletext .game-title {
+  font-family: "Teletext", monospace;
+  color: #ffff00;
+  text-shadow: none;
+  letter-spacing: 2px;
+}
+
+.stage-teletext .game-subtitle,
+.stage-teletext .game-readout,
+.stage-teletext .game-notice,
+.stage-teletext .game-muted,
+.stage-teletext .game-check {
+  font-family: "Teletext", monospace;
+  font-style: normal;
+}
+
+/* The classic colour bar. */
+.stage-teletext .game-rule {
+  height: 10px;
+  background: linear-gradient(
+    90deg,
+    #ff0000 0 16.66%,
+    #00ff00 16.66% 33.33%,
+    #ffff00 33.33% 50%,
+    #0000ff 50% 66.66%,
+    #ff00ff 66.66% 83.33%,
+    #00ffff 83.33% 100%
+  );
+  box-shadow: none;
+}
+
+.stage-teletext .game-button {
+  font-family: "Teletext", monospace;
+  background: #00ff00;
+  color: #000;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  text-shadow: none;
+  filter: none;
+}
+
+.stage-teletext .game-button:hover:not(:disabled) {
+  background: #ffff00;
+  filter: none;
+}
+
+.stage-teletext .game-button:active:not(:disabled) {
+  transform: none;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.stage-teletext .game-button:disabled {
+  background: #555;
+  color: #000;
+  box-shadow: none;
+  border: none;
+}
+
+.stage-teletext .game-plate,
+.stage-teletext .game-tab {
+  background: #000;
+  border: 2px solid #00ffff;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.stage-teletext .game-plate__label {
+  font-family: "Teletext", monospace;
+  color: #00ffff;
+}
+
+.stage-teletext .game-tab--active {
+  background: #ffff00;
+  color: #000;
+  text-shadow: none;
+}
+
+.stage-teletext .game-input {
+  font-family: "Teletext", monospace;
+  border: 2px solid #00ffff;
+  border-radius: 0;
+  box-shadow: none;
+  color: #fff;
+}
+
+.stage-teletext .game-meter {
+  border: 2px solid #00ffff;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.stage-teletext .game-meter__chunk {
+  background: #00ff00;
+  box-shadow: none;
+}
+
+.stage-teletext .album__nav-label {
+  font-family: "Teletext", monospace;
+}
+
+/* --- B · BROADCAST -----------------------------------------------------
+ * 2002 sports television. Everything is a diagonal: buttons and plates are
+ * sheared parallelograms, the rules are skewed, the title is huge and italic.
+ * Rectangles are the exception rather than the rule.
+ * -------------------------------------------------------------------- */
+
+.stage-broadcast .game-stage {
+  --ink: #ffffff;
+  --ink-dim: #8fa6d4;
+  --accent: #e8342f;
+  --accent-light: #ffd24a;
+  --accent-dark: #0a1c44;
+  --input-bg: #071433;
+  --book-inside: linear-gradient(150deg, #12295e 0%, #071433 60%, #0d1f47 100%);
+
+  background-color: #05102a;
+  background-image:
+    linear-gradient(
+      110deg,
+      transparent 38%,
+      rgba(232, 52, 47, 0.14) 38% 42%,
+      transparent 42% 46%,
+      rgba(255, 210, 74, 0.1) 46% 48%,
+      transparent 48%
+    ),
+    linear-gradient(
+      110deg,
+      transparent 60%,
+      rgba(255, 255, 255, 0.05) 60% 72%,
+      transparent 72%
+    ),
+    linear-gradient(160deg, #113a7a 0%, #071634 55%, #03091c 100%);
+  box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.7);
+}
+
+.stage-broadcast .game-title {
+  font-family: "Bahnschrift SemiCondensed", Bahnschrift, "DIN Condensed", Impact, sans-serif;
+  font-size: clamp(26px, 3.6vw, 46px);
+  font-style: italic;
+  color: #fff;
+  text-shadow: 3px 3px 0 var(--accent);
+  letter-spacing: 1px;
+}
+
+.stage-broadcast .game-rule {
+  height: 6px;
+  background: linear-gradient(90deg, var(--accent) 0 22%, #ffd24a 22% 30%, #0d2a5e 30% 100%);
+  transform: skewX(-24deg);
+  box-shadow: none;
+}
+
+/* Sheared on both edges, with a thick signal bar down the leading side. */
+.stage-broadcast .game-button {
+  clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
+  border: none;
+  border-radius: 0;
+  background: linear-gradient(90deg, var(--accent) 0 5px, #12326e 5px 100%);
+  color: #fff;
+  font-family: "Bahnschrift SemiCondensed", Bahnschrift, "Segoe UI", sans-serif;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  box-shadow: none;
+  padding: 8px 20px;
+}
+
+.stage-broadcast .game-button:hover:not(:disabled) {
+  background: linear-gradient(90deg, #ffd24a 0 5px, #1a4290 5px 100%);
+  filter: none;
+}
+
+.stage-broadcast .game-button:disabled {
+  background: linear-gradient(90deg, #3d4a68 0 5px, #16203a 5px 100%);
+  color: #7d89a5;
+  box-shadow: none;
+}
+
+.stage-broadcast .game-plate {
+  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
+  border: none;
+  border-radius: 0;
+  background: linear-gradient(100deg, #12326e 0%, #0a1c44 100%);
+  box-shadow: none;
+  padding: 12px 24px;
+}
+
+.stage-broadcast .game-tab {
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  border: none;
+  border-radius: 0;
+  background: #0d2a5e;
+  font-style: italic;
+  box-shadow: none;
+}
+
+.stage-broadcast .game-tab--active {
+  background: var(--accent);
+  color: #fff;
+  text-shadow: none;
+}
+
+/* --- C · PLAKBOEK ------------------------------------------------------
+ * A physical scrapbook. Nothing is square to the page: labels are cut paper,
+ * slightly rotated, taped down. Depth comes from paper stacking rather than
+ * bevels, and the irregularity is the point.
+ * -------------------------------------------------------------------- */
+
+.stage-scrapbook .game-stage {
+  --ink: #3b3227;
+  --ink-dim: #7b6b53;
+  --accent: #9c4a32;
+  --accent-light: #6b4a2a;
+  --accent-dark: #c9b393;
+  --input-bg: #fffdf6;
+  --book-inside: linear-gradient(150deg, #7a6242 0%, #52402a 60%, #675031 100%);
+
+  background-color: #cdb894;
+  background-image:
+    repeating-linear-gradient(
+      48deg,
+      rgba(120, 92, 56, 0.06) 0 2px,
+      transparent 2px 6px
+    ),
+    repeating-linear-gradient(
+      -42deg,
+      rgba(120, 92, 56, 0.05) 0 2px,
+      transparent 2px 7px
+    ),
+    radial-gradient(ellipse 95% 85% at 50% 40%, #dcc9a6 0%, #c9b591 60%, #a8916c 100%);
+  box-shadow: inset 0 0 120px rgba(110, 82, 46, 0.5);
+}
+
+.stage-scrapbook .game-title {
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--accent);
+  text-shadow: none;
+  letter-spacing: 3px;
+  transform: rotate(-1.2deg);
+  border: 3px double var(--accent);
+  padding: 2px 12px;
+  opacity: 0.85;
+}
+
+.stage-scrapbook .game-rule {
+  height: 8px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(190, 170, 130, 0.85) 0 14px,
+    rgba(160, 138, 96, 0.7) 14px 16px
+  );
+  transform: rotate(-0.3deg);
+  box-shadow: 0 2px 3px rgba(90, 68, 38, 0.2);
+}
+
+/* Hand-cut paper labels, dashed like a cut line, each sitting slightly askew. */
+.stage-scrapbook .game-button {
+  background: #fdf8ea;
+  color: #3b3227;
+  border: 1px dashed #9a8560;
+  border-radius: 1px;
+  font-family: Georgia, "Times New Roman", serif;
+  text-shadow: none;
+  box-shadow: 1px 2px 4px rgba(90, 68, 38, 0.28);
+  transform: rotate(-0.7deg);
+}
+
+.stage-scrapbook .game-button:nth-of-type(even) {
+  transform: rotate(0.8deg);
+}
+
+.stage-scrapbook .game-button:hover:not(:disabled) {
+  background: #fffdf6;
+  transform: rotate(0deg) translateY(-1px);
+  filter: none;
+}
+
+.stage-scrapbook .game-button:disabled {
+  background: #e4dbc6;
+  color: #9a8f78;
+  box-shadow: none;
+}
+
+.stage-scrapbook .game-plate {
+  background: #f6efdc;
+  border: 1px solid #bda887;
+  border-radius: 1px;
+  box-shadow: 2px 3px 6px rgba(90, 68, 38, 0.25);
+  transform: rotate(-0.35deg);
+  position: relative;
+}
+
+/* Tape across the top-left corner. */
+.stage-scrapbook .game-plate::before {
+  content: "";
+  position: absolute;
+  top: -9px;
+  left: -14px;
+  width: 58px;
+  height: 20px;
+  background: rgba(232, 222, 190, 0.72);
+  border-left: 1px solid rgba(255, 255, 255, 0.5);
+  border-right: 1px solid rgba(160, 140, 100, 0.35);
+  transform: rotate(-38deg);
+}
+
+.stage-scrapbook .game-plate__label {
+  font-family: Georgia, serif;
+  color: var(--accent);
+}
+
+.stage-scrapbook .game-tab {
+  background: #efe6cf;
+  border: 1px solid #bda887;
+  border-bottom: none;
+  border-radius: 3px 3px 0 0;
+  box-shadow: none;
+  transform: rotate(-0.4deg);
+}
+
+.stage-scrapbook .game-tab--active {
+  background: #fdf8ea;
+  color: var(--accent);
+  text-shadow: none;
+}
+
+.stage-scrapbook .game-input,
+.stage-scrapbook .game-meter {
+  border: 1px solid #bda887;
+  box-shadow: inset 0 2px 4px rgba(120, 96, 60, 0.18);
+}
+
+/* --- D · VITRINE ------------------------------------------------------
+ * The album as a museum exhibit. No textures, no gradients, no shadows on the
+ * chrome at all. Hairlines, wide letter-spacing and a great deal of air;
+ * controls are text with a rule under them rather than objects.
+ * -------------------------------------------------------------------- */
+
+.stage-vitrine .game-stage {
+  --ink: #26292c;
+  --ink-dim: #83898f;
+  --accent: #26292c;
+  --accent-light: #4a5056;
+  --accent-dark: #cfd3d7;
+  --input-bg: #ffffff;
+  --book-inside: linear-gradient(150deg, #3c4247 0%, #23272a 60%, #313639 100%);
+
+  background: #e9ebed;
+  box-shadow: none;
+  padding-top: 34px;
+}
+
+.stage-vitrine .game-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: normal;
+  font-size: clamp(16px, 1.7vw, 22px);
+  letter-spacing: 9px;
+  color: #26292c;
+  text-shadow: none;
+}
+
+.stage-vitrine .game-subtitle {
+  font-style: normal;
+  letter-spacing: 2px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.stage-vitrine .game-rule {
+  height: 1px;
+  background: #cfd3d7;
+  box-shadow: none;
+  margin: 20px 0;
+}
+
+.stage-vitrine .game-button {
+  background: none;
+  border: none;
+  border-bottom: 1px solid #26292c;
+  border-radius: 0;
+  color: #26292c;
+  font-size: 10px;
+  font-weight: normal;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  text-shadow: none;
+  box-shadow: none;
+  padding: 5px 2px;
+}
+
+.stage-vitrine .game-button:hover:not(:disabled) {
+  border-bottom-color: #8a9096;
+  color: #6a7076;
+  filter: none;
+}
+
+.stage-vitrine .game-button:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.stage-vitrine .game-button:disabled {
+  background: none;
+  border-bottom: 1px solid #d6dade;
+  color: #b3b8bd;
+  box-shadow: none;
+}
+
+.stage-vitrine .game-plate {
+  background: none;
+  border: 1px solid #d6dade;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 16px 18px;
+}
+
+.stage-vitrine .game-plate__label {
+  color: #83898f;
+  letter-spacing: 3px;
+}
+
+.stage-vitrine .game-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  box-shadow: none;
+  color: #83898f;
+  letter-spacing: 3px;
+  font-size: 11px;
+}
+
+.stage-vitrine .game-tab--active {
+  background: none;
+  border-bottom: 2px solid #26292c;
+  color: #26292c;
+  text-shadow: none;
+}
+
+.stage-vitrine .game-input {
+  border: none;
+  border-bottom: 1px solid #b3b8bd;
+  border-radius: 0;
+  box-shadow: none;
+  color: #26292c;
+}
+
+.stage-vitrine .game-meter {
+  border: 1px solid #d6dade;
+  border-radius: 0;
+  box-shadow: none;
+  height: 8px;
+}
+
+.stage-vitrine .game-meter__chunk {
+  background: #26292c;
+  box-shadow: none;
+}
+
+.stage-vitrine .game-meter__chunk--empty {
+  background: #dfe2e5;
+}
+
+/* --- E · ARCADE ------------------------------------------------------
+ * Late-90s game menu. Dithered checkerboards instead of gradients, hard 2px
+ * pixel bevels instead of soft ones, no curves and no anti-aliased shading
+ * anywhere. High contrast, limited palette.
+ * -------------------------------------------------------------------- */
+
+.stage-arcade .game-stage {
+  --ink: #ffffff;
+  --ink-dim: #9fb0e8;
+  --accent: #ffcf3a;
+  --accent-light: #ffe98a;
+  --accent-dark: #16277a;
+  --input-bg: #0b1244;
+  --book-inside: #202a6e;
+
+  background-color: #141c56;
+  /* Dither: a 4px checkerboard, the era's substitute for a gradient. */
+  background-image:
+    repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      rgba(255, 255, 255, 0.045) 0% 25%,
+      transparent 25% 50%
+    ),
+    linear-gradient(180deg, #2a3796 0%, #141c56 55%, #070b2c 100%);
+  background-size: 8px 8px, auto;
+  box-shadow: inset 0 0 0 4px #070b2c;
+}
+
+.stage-arcade .game-title {
+  font-family: "Courier New", monospace;
+  font-weight: bold;
+  color: #ffcf3a;
+  letter-spacing: 3px;
+  text-shadow: 3px 3px 0 #070b2c;
+}
+
+.stage-arcade .game-subtitle {
+  font-family: "Courier New", monospace;
+  font-style: normal;
+}
+
+.stage-arcade .game-rule {
+  height: 6px;
+  background: repeating-linear-gradient(
+    90deg,
+    #ffcf3a 0 6px,
+    #070b2c 6px 12px
+  );
+  box-shadow: none;
+}
+
+/* Hard two-pixel bevel: light top-left, dark bottom-right, nothing in between. */
+.stage-arcade .game-button {
+  font-family: "Courier New", monospace;
+  font-weight: bold;
+  background: #3a5bd9;
+  color: #fff;
+  border: none;
+  border-radius: 0;
+  text-shadow: 1px 1px 0 #0b1244;
+  box-shadow:
+    inset 2px 2px 0 #8fa8ff,
+    inset -2px -2px 0 #16277a;
+}
+
+.stage-arcade .game-button:hover:not(:disabled) {
+  background: #5171ef;
+  filter: none;
+}
+
+.stage-arcade .game-button:active:not(:disabled) {
+  transform: none;
+  box-shadow:
+    inset 2px 2px 0 #16277a,
+    inset -2px -2px 0 #8fa8ff;
+}
+
+.stage-arcade .game-button:disabled {
+  background: #3b4272;
+  color: #7d84ad;
+  box-shadow:
+    inset 2px 2px 0 #565d94,
+    inset -2px -2px 0 #23284f;
+}
+
+.stage-arcade .game-plate {
+  background: #202a6e;
+  border: none;
+  border-radius: 0;
+  box-shadow:
+    inset 2px 2px 0 #4a58a8,
+    inset -2px -2px 0 #0b1244;
+}
+
+.stage-arcade .game-plate__label {
+  font-family: "Courier New", monospace;
+  color: #ffcf3a;
+}
+
+.stage-arcade .game-tab {
+  font-family: "Courier New", monospace;
+  background: #202a6e;
+  border: none;
+  border-radius: 0;
+  box-shadow:
+    inset 2px 2px 0 #4a58a8,
+    inset -2px -2px 0 #0b1244;
+}
+
+.stage-arcade .game-tab--active {
+  background: #ffcf3a;
+  color: #070b2c;
+  text-shadow: none;
+  box-shadow:
+    inset 2px 2px 0 #fff3c0,
+    inset -2px -2px 0 #a37d10;
+}
+
+.stage-arcade .game-input {
+  font-family: "Courier New", monospace;
+  border: none;
+  border-radius: 0;
+  box-shadow:
+    inset 2px 2px 0 #0b1244,
+    inset -2px -2px 0 #4a58a8;
+}
+
+.stage-arcade .game-meter {
+  border: none;
+  border-radius: 0;
+  box-shadow:
+    inset 2px 2px 0 #0b1244,
+    inset -2px -2px 0 #4a58a8;
+}
+
+.stage-arcade .game-meter__chunk {
+  background: #ffcf3a;
+  box-shadow: none;
+}

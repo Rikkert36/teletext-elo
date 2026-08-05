@@ -50,6 +50,9 @@ const useStyles = makeStyles((theme: Theme) => ({
   wedstrijdenButton: {
     color: '#00ff00', // Very bright green
   },
+  albumButton: {
+    color: '#ff00ff', // Teletekst magenta
+  },
   waaromButton: {
     color: '#ffff00', // Yellow
   },
@@ -127,6 +130,9 @@ const NavBar = () => {
           </Button>
           <Button component={Link} to="/wedstrijden" className={classes.button + ' ' + classes.wedstrijdenButton}>
             wedstrijden
+          </Button>
+          <Button component={Link} to="/collectie" className={classes.button + ' ' + classes.albumButton}>
+            album
           </Button>
           {isMobile ? secondaryMenu : secondaryButtons}
         </div>

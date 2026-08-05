@@ -1,0 +1,388 @@
+/**
+ * The card face — Panini layout, EA-style richness.
+ *
+ * The photo fills almost the whole card. The tier shows as a streaked metal
+ * frame, an embossed plate carrying the overall in the top-left corner, and a
+ * matching name plate along the bottom. No statistics anywhere.
+ *
+ * Each tier exposes its palette as custom properties:
+ *   --tier-a / --tier-b : the tint multiplied over the photo
+ *   --tier-ink          : the number and name
+ */
+
+.card {
+  --card-width: 150px;
+  /*
+   * DIN — stadium signage and kit numbers, which is exactly the register a
+   * football card wants. Windows 10 ships it as Bahnschrift, macOS as DIN
+   * Condensed, so no web font is needed.
+   *
+   * Third attempt: Impact/Haettenschweiler read as a poster face, and
+   * Franklin Gothic/Segoe UI read as a UI font with no character of its own.
+   * DIN is condensed and precise without being heavy, and its numerals are
+   * distinctive in a way a generic humanist sans is not.
+   */
+  --card-display: "Bahnschrift SemiCondensed", Bahnschrift, "DIN Condensed",
+    "DIN Alternate", "Agency FB", "Franklin Gothic Medium", "Segoe UI", Tahoma, sans-serif;
+
+  /*
+   * Broad angular facets rather than fine stripes. Repeating stripes read as
+   * brushed metal, which is busier and cheaper-looking than the crystalline
+   * shimmer on the reference cards.
+   */
+  --facets:
+    linear-gradient(
+      112deg,
+      rgba(255, 255, 255, 0.16) 0 16%,
+      transparent 16% 33%,
+      rgba(255, 255, 255, 0.09) 33% 45%,
+      transparent 45%
+    ),
+    linear-gradient(
+      58deg,
+      rgba(255, 255, 255, 0.11) 0 20%,
+      transparent 20% 54%,
+      rgba(255, 255, 255, 0.06) 54% 66%,
+      transparent 66%
+    );
+
+  position: relative;
+  width: var(--card-width);
+  aspect-ratio: 5 / 7;
+  border-radius: 6px;
+  overflow: hidden;
+  /*
+   * Makes the card a size container so its type can be expressed in `cqw`
+   * (percent of the card's own width).
+   *
+   * Type used to be absolute px while the card width varied per context, so the
+   * ratio of text to card differed everywhere it was rendered — 0.13 on the
+   * reveal hero against 0.23 on an album page. Now one set of ratios covers every
+   * context and they cannot drift apart again. The ratios are taken from the
+   * results row, which is the reference.
+   */
+  container-type: inline-size;
+  font-family: Tahoma, Verdana, sans-serif;
+  user-select: none;
+  flex: none;
+  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.55);
+}
+
+.card__inner {
+  position: absolute;
+  inset: 0;
+}
+
+/* ---------------------------------------------------------------- *
+ * Tier metals
+ *
+ * A diagonal streak layer over the base gradient — a flat gradient reads as
+ * plastic, the streaks read as brushed metal.
+ * ---------------------------------------------------------------- */
+
+.card--brons {
+  --tier-a: #f2d3ae;
+  --tier-b: #b07a45;
+  --tier-ink: #2c1608;
+
+  background-image: var(--facets),
+    linear-gradient(160deg, #e0b184 0%, #a3653a 32%, #7a4522 58%, #cf9868 100%);
+}
+
+.card--zilver {
+  /* Cool grey, deliberately not white — a white tint multiplies to nothing,
+     which is why silver cards on studio backdrops read as blank paper. */
+  --tier-a: #dde7f0;
+  --tier-b: #8e9dae;
+  --tier-ink: #1c222a;
+
+  background-image: var(--facets),
+    linear-gradient(160deg, #f6f8fa 0%, #bcc5ce 32%, #8b95a1 58%, #e6ecf1 100%);
+}
+
+.card--goud {
+  --tier-a: #fdeeb0;
+  --tier-b: #c9a03a;
+  --tier-ink: #2b2205;
+
+  background-image: var(--facets),
+    linear-gradient(160deg, #fbe9a3 0%, #dcb64a 32%, #b8901f 58%, #f7e293 100%);
+}
+
+/* The top tier. Still gold — there is no Icoon tier above it. */
+.card--goudZeldzaam {
+  --tier-a: #fff6c6;
+  --tier-b: #b8901f;
+  --tier-ink: #2b2205;
+
+  background-image: var(--facets),
+    linear-gradient(160deg, #fff6cf 0%, #f5d772 26%, #8c6b12 56%, #ffeeae 100%);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6), 0 0 0 1px #6d520c;
+}
+
+/* Foil sheen across the whole card. Static; only animates on a rare reveal. */
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 32%,
+    rgba(255, 255, 255, 0.17) 46%,
+    rgba(255, 255, 255, 0.04) 53%,
+    transparent 66%
+  );
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ---------------------------------------------------------------- *
+ * Photo — fills everything inside the frame
+ * ---------------------------------------------------------------- */
+
+/*
+ * Full-bleed and edge-masked, so the photo dissolves into the metal instead of
+ * sitting in a bordered window.
+ *
+ * This is the structural difference that makes the reference cards elegant:
+ * their photos are transparent cutouts floating on the card, with no hard edge
+ * anywhere. Ours are rectangular headshots, but fading the bottom strip and the
+ * top-left corner gets most of the way there — and it clears the metal that the
+ * number and the name then sit on directly, which is what lets both plates go.
+ *
+ * The two masks are intersected. If `mask-composite` is unsupported they union
+ * instead, which simply shows more of the photo — a graceful degradation rather
+ * than a broken card.
+ */
+.card__portrait {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  /* Contains the tint's blend so it acts on the photo only, and does not
+     multiply a second time against the card's own metal underneath. */
+  isolation: isolate;
+
+  /*
+   * The fade reaches further in than it first did (bottom 20–40%, corner 10–32%,
+   * up from 5–30%). Two reasons: the tier metal now has enough area to read as a
+   * colour rather than a hairline at the edges, and the photo is fully gone below
+   * 20% — so the name sits on solid metal instead of on a half-transparent ramp,
+   * which was washing it out.
+   */
+  -webkit-mask-image:
+    linear-gradient(to top, transparent 20%, #000 40%),
+    linear-gradient(135deg, transparent 10%, #000 32%);
+  mask-image:
+    linear-gradient(to top, transparent 20%, #000 40%),
+    linear-gradient(135deg, transparent 10%, #000 32%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+
+.card__portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Favour the top of the frame — these are headshots, so bias to the face. */
+  object-position: center 22%;
+  display: block;
+}
+
+/*
+ * Tints the photo toward the tier.
+ *
+ * `multiply` means white pixels take the tint while dark pixels stay dark — so a
+ * studio backdrop picks up the metal colour and the subject is barely touched.
+ * That is what unifies the card: previously a white background sat next to white
+ * silver with nothing to separate or connect them.
+ *
+ * Kept at 0.42 rather than full strength, which would be closer to background
+ * removal and would wreck the photos that are not shot on white.
+ */
+.card__portrait::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(160deg, var(--tier-a) 0%, var(--tier-b) 100%);
+  mix-blend-mode: multiply;
+  opacity: 0.42;
+}
+
+/* Fallback when a player has no avatar on disk. */
+.card__initials {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--card-display);
+  font-size: 36px;
+  font-size: 22.5cqw;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.42);
+  background: linear-gradient(160deg, #4a4a4a, #232323);
+}
+
+/* ---------------------------------------------------------------- *
+ * Overall — an embossed plate anchored in the corner
+ * ---------------------------------------------------------------- */
+
+/*
+ * No plate at all — the number is printed on the metal, which the mask has
+ * cleared for it. Every boxed version of this read as a badge stuck onto the
+ * photo; the reference cards never put anything in a box.
+ */
+.card__header {
+  position: absolute;
+  top: 4%;
+  left: 7.5%;
+  z-index: 2;
+  color: var(--tier-ink);
+}
+
+.card__overall {
+  font-family: var(--card-display);
+  /* px first as a fallback for anything without container queries. */
+  font-size: 33px;
+  font-size: 20.5cqw;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.015em;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.14);
+}
+
+/* ---------------------------------------------------------------- *
+ * Name plate along the bottom
+ * ---------------------------------------------------------------- */
+
+/*
+ * Also unplated, in mixed case rather than all-caps — the reference sets names as
+ * "Messi", not "MESSI", and the difference in refinement is larger than it
+ * sounds. Separated from the photo by an engraved hairline instead of a filled
+ * panel: dark border above, light inset line below.
+ */
+.card__name {
+  position: absolute;
+  left: 9%;
+  right: 9%;
+  bottom: 7%;
+  z-index: 2;
+  text-align: center;
+  font-family: var(--card-display);
+  font-size: 16px;
+  font-size: 10cqw;
+  font-weight: normal;
+  letter-spacing: 0.045em;
+  line-height: 1.2;
+  padding-top: 0.28em;
+  /* First names always fit on one line, so the band is a fixed height on every
+     card — the two-line clamp made it jump between "Bo" and "Marie Versteeg". */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--tier-ink);
+  border-top: 1px solid rgba(0, 0, 0, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.card__legend {
+  position: absolute;
+  top: 4%;
+  right: 4%;
+  z-index: 2;
+  font-family: Tahoma, Verdana, sans-serif;
+  font-size: 6.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #f0e4c4;
+  background: rgba(0, 0, 0, 0.78);
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Empty slot: the silhouette that drives completion
+ *
+ * Overriding the tier properties greys the frame, both plates and the numerals
+ * together.
+ * ---------------------------------------------------------------- */
+
+.card--empty {
+  --tier-a: #55503f;
+  --tier-b: #2a2721;
+  --tier-ink: #8d8778;
+
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.07) 0 6px,
+    rgba(255, 255, 255, 0.03) 6px 12px
+  );
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+.card--empty::after {
+  display: none;
+}
+
+.card--empty .card__portrait {
+  background: #1a1a1a;
+}
+
+.card--empty .card__portrait img {
+  filter: grayscale(1) brightness(0) opacity(0.45);
+}
+
+.card--empty .card__initials {
+  color: rgba(255, 255, 255, 0.14);
+  background: #1a1a1a;
+}
+
+.card--empty .card__overall,
+.card--empty .card__name {
+  text-shadow: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * Card back, for the face-down state during a reveal
+ * ---------------------------------------------------------------- */
+
+.card--back {
+  background-image:
+    repeating-linear-gradient(
+      115deg,
+      rgba(255, 255, 255, 0.06) 0 2px,
+      transparent 2px 10px
+    ),
+    linear-gradient(150deg, #4a3a22 0%, #241a0b 50%, #4a3a22 100%);
+  color: #e6c98a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6), 0 0 0 1px #6b5325;
+}
+
+.card--back__mark {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 30px;
+  font-size: 19cqw;
+  font-weight: bold;
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+
+/* ---------------------------------------------------------------- *
+ * Sizes — width only.
+ *
+ * Type needs no per-size rules any more: every text element is expressed in
+ * `cqw`, so it scales with the card automatically.
+ * ---------------------------------------------------------------- */
+
+.card--sm {
+  --card-width: 104px;
+}
+
+.card--lg {
+  --card-width: 232px;
+}

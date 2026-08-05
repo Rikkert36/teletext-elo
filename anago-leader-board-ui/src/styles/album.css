@@ -1,0 +1,350 @@
+/**
+ * The album: a stiff 3D page flip.
+ *
+ * Stiff rather than soft-curling is deliberate. Bending a page needs a
+ * deformable mesh — a WebGL shader or a sliced plane — and CSS cannot do it. But
+ * Encarta and the XP Help viewer flipped stiffly and snappily, so the CSS limit
+ * and the 2002 target land in the same place. A photorealistic curl would read
+ * as a 2010s iPad bookshelf app.
+ *
+ * Leaf model: leaf i carries page 2i on its front and page 2i+1 on its back.
+ * Leaves are anchored at the spine (the book's centre) and rotate from 0 to
+ * -180deg. z-index reshuffles around the flip so the correct leaf is on top of
+ * each stack — see `leafZ` in Album.tsx.
+ */
+
+/**
+ * Sizing is driven by viewport HEIGHT first, then width.
+ *
+ * A purely width-driven book grew taller than the viewport on shorter screens,
+ * which pushed the page controls below the fold. Taking the smaller of the two
+ * budgets keeps the whole spread on screen without scrolling.
+ */
+.album-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1.4vw, 18px);
+}
+
+.album {
+  --page-w: min(40vw, calc(56vh * 0.78), 520px);
+  --page-h: calc(var(--page-w) / 0.78);
+
+  perspective: 2600px;
+  perspective-origin: 50% 42%;
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.album__book {
+  position: relative;
+  width: calc(var(--page-w) * 2);
+  height: var(--page-h);
+  transform-style: preserve-3d;
+  border-radius: 4px;
+  /* Tooled leather binding with a brass edge, sitting on the felt. */
+  background: linear-gradient(180deg, #4a3a22 0%, #33270f 100%);
+  box-shadow:
+    0 0 0 2px #6b5325,
+    0 26px 50px rgba(0, 0, 0, 0.65),
+    0 6px 14px rgba(0, 0, 0, 0.5);
+}
+
+/* Inside covers sitting under the leaves on each half. Without these, the half
+   with nothing flipped onto it shows raw binding colour and reads as a bug —
+   the left half on page 1, the right half after the final flip. */
+.album__backing {
+  position: absolute;
+  top: 0;
+  width: var(--page-w);
+  height: var(--page-h);
+  z-index: 0;
+  /* Follows the stage theme, so the binding never clashes with the surface. */
+  background: var(--book-inside, linear-gradient(150deg, #35592c 0%, #223d1b 60%, #2d4d24 100%));
+}
+
+.album__backing--left {
+  left: 0;
+  border-radius: 3px 0 0 3px;
+  box-shadow: inset -12px 0 24px -12px rgba(0, 0, 0, 0.7);
+}
+
+/* An embossed title, so the inside cover reads as intentional rather than as a
+   blank half-book on the first spread. */
+.album__backing--left::after {
+  content: "TAFELVOETBAL";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(14px, 1.6vw, 22px);
+  letter-spacing: 5px;
+  color: var(--accent-light, #e6c98a);
+  opacity: 0.24;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+.album__backing--right {
+  left: 50%;
+  border-radius: 0 3px 3px 0;
+  box-shadow: inset 12px 0 24px -12px rgba(0, 0, 0, 0.7);
+}
+
+.album__leaf {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: var(--page-w);
+  height: var(--page-h);
+  transform-origin: left center;
+  transform-style: preserve-3d;
+  /* Scaled by the shared pacing knob — see utils/animationSpeed.ts. */
+  transition: transform calc(620ms * var(--anim, 1)) cubic-bezier(0.4, 0.05, 0.25, 1);
+}
+
+.album__leaf--flipped {
+  transform: rotateY(-180deg);
+}
+
+.album__face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+}
+
+/**
+ * Both faces need an explicit 3D transform.
+ *
+ * `backface-visibility: hidden` is ignored on an element that isn't itself
+ * 3D-transformed, so the front face — which previously had no transform at all —
+ * stayed visible after its leaf rotated, showing mirrored through the back of
+ * the page. The `translateZ` also keeps the two faces from z-fighting.
+ */
+.album__face--front {
+  transform: rotateY(0deg) translateZ(1px);
+}
+
+.album__face--back {
+  transform: rotateY(180deg) translateZ(1px);
+}
+
+/* ---------------------------------------------------------------- *
+ * The page itself
+ * ---------------------------------------------------------------- */
+
+.album__page {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 18px 22px 12px;
+  background: #f4efdd;
+  background-image:
+    radial-gradient(circle at 50% 0%, #fffcf0 0%, #e8e1c9 100%);
+  display: flex;
+  flex-direction: column;
+  font-family: Tahoma, "MS Sans Serif", Verdana, sans-serif;
+  color: #3a3222;
+}
+
+/* Pages darken toward the spine, which is what actually sells the binding. */
+.album__face--front .album__page {
+  box-shadow: inset 12px 0 24px -12px rgba(0, 0, 0, 0.45);
+  border-radius: 0 3px 3px 0;
+}
+
+.album__face--back .album__page {
+  box-shadow: inset -12px 0 24px -12px rgba(0, 0, 0, 0.45);
+  border-radius: 3px 0 0 3px;
+}
+
+.album__page-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border-bottom: 2px solid rgba(107, 83, 37, 0.45);
+  padding-bottom: 6px;
+  margin-bottom: 16px;
+  flex: none;
+}
+
+.album__page-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 15px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: #4a3a1c;
+}
+
+.album__page-sub {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  color: #7a6f56;
+  margin-left: auto;
+}
+
+.album__slots {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px 14px;
+  justify-items: stretch;
+  align-content: start;
+}
+
+/* Cards fill their grid cell rather than keeping a fixed pixel width — a fixed
+   width overflows the column at any page size we can actually fit on screen.
+   `aspect-ratio` on .card takes care of the height. */
+.album__slots .card {
+  --card-width: 100%;
+}
+
+.album__page-number {
+  flex: none;
+  text-align: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 12px;
+  color: #8a7f64;
+  padding-top: 8px;
+}
+
+/* Cover: the page you land on before the collection proper. */
+.album__cover {
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: linear-gradient(150deg, #5a4526 0%, #35270f 55%, #4a3820 100%);
+  color: #e6c98a;
+  text-align: center;
+  padding: 24px;
+  border-radius: 0 3px 3px 0;
+  box-shadow: inset 12px 0 24px -12px rgba(0, 0, 0, 0.7);
+}
+
+.album__cover-title {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(18px, 2.2vw, 28px);
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  text-shadow: 0 2px 0 #241a05, 0 3px 8px rgba(0, 0, 0, 0.7);
+}
+
+.album__cover-rule {
+  width: 60%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #a9853c 50%, transparent);
+}
+
+.album__cover-sub {
+  font-size: 11px;
+  opacity: 0.85;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------- *
+ * Controls
+ * ---------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------- *
+ * Page controls — flanking the book, not underneath it
+ * ---------------------------------------------------------------- */
+
+.album__arrow {
+  flex: none;
+  width: clamp(34px, 3.4vw, 46px);
+  height: clamp(64px, 9vh, 104px);
+  font-size: clamp(18px, 1.8vw, 24px);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.album__nav-label {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  text-align: center;
+  color: var(--accent-light, #e6c98a);
+  padding-bottom: 6px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Mobile: one page at a time, sliding rather than flipping.
+ *
+ * A two-page spread cannot fit a phone, and a leaf inherently carries two faces
+ * so the flip model does not degrade to a single page. A horizontal slide is
+ * both simpler and more usable here.
+ * ---------------------------------------------------------------- */
+
+.album--mobile {
+  --page-w: min(80vw, calc(58vh * 0.72), 380px);
+  --page-h: calc(var(--page-w) / 0.72);
+
+  perspective: none;
+  overflow: hidden;
+}
+
+.album--mobile .album__book {
+  width: var(--page-w);
+  background: none;
+  box-shadow: none;
+  overflow: hidden;
+  border-radius: 3px;
+}
+
+.album--mobile .album__slide {
+  position: absolute;
+  inset: 0;
+  transition:
+    transform calc(320ms * var(--anim, 1)) ease,
+    opacity calc(320ms * var(--anim, 1)) ease;
+}
+
+.album--mobile .album__slide--current {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.album--mobile .album__slide--out-left {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.album--mobile .album__slide--out-right {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+.album--mobile .album__page,
+.album--mobile .album__cover {
+  border-radius: 3px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+/* Three columns, not two: six slots in two columns needs ~790px of page height
+   against ~490px available, so a two-column phone page overflows. */
+.album--mobile .album__slots {
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px 8px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Reduced motion: keep the page changes, drop the movement.
+ * ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .album__leaf,
+  .album--mobile .album__slide {
+    transition: none;
+  }
+}
