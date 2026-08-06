@@ -1,0 +1,296 @@
+/**
+ * The card viewer: one card, held up, with its caption.
+ *
+ * Sizing is driven by viewport HEIGHT first, exactly as the album's is — a card is
+ * 5:7, so a width-led number grows 1.4× as fast vertically as it does horizontally
+ * and runs off a short window long before it runs off a narrow one.
+ *
+ * `--viewer-card-w` is declared on the root of the overlay rather than on the card,
+ * because the scrim's clear centre is measured in card widths and a parent cannot
+ * read a variable declared on its child. Same reason the packet's geometry lives on
+ * `.opener` rather than on `.pack`.
+ */
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+
+  --viewer-card-w: min(52vh, 76vw, 380px);
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(12px, 2.4vh, 26px);
+  padding: 16px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * The scrim
+ *
+ * A vignette rather than a flat wash, and the clear middle is sized in card widths
+ * rather than in percentages: a percentage radius on a viewport-sized layer tracks
+ * the window instead of the card, so on a short window it closes in over the card's
+ * own corners. The lesson is `.opener__dim`'s, and it cost a round there.
+ * ---------------------------------------------------------------- */
+
+.viewer__scrim {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background: radial-gradient(
+    circle at 50% 46%,
+    rgba(0, 0, 0, 0.55) calc(var(--viewer-card-w) * 0.75),
+    rgba(0, 0, 0, 0.78) calc(var(--viewer-card-w) * 1.5),
+    rgba(0, 0, 0, 0.9) 100%
+  );
+  animation: viewer-scrim-in calc(160ms * var(--anim, 1)) ease-out both;
+}
+
+@keyframes viewer-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Card and caption
+ * ---------------------------------------------------------------- */
+
+/* `position: relative` on both this and the nav, so they paint over the scrim by
+   DOM order without either needing a z-index of its own. */
+.viewer__panel {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: clamp(18px, 3.4vw, 46px);
+  animation: viewer-rise calc(180ms * var(--anim, 1)) cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+
+@keyframes viewer-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.viewer__card {
+  flex: none;
+}
+
+/*
+ * The card's own shadow comes back. `.album__slots .card` suppresses it because a
+ * card in an album is mounted flat against the page — this one genuinely is lifted
+ * off it, so it casts, and rather more than the default 150px card does.
+ */
+.viewer__card .card {
+  --card-width: var(--viewer-card-w);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.7);
+}
+
+/*
+ * Silhouettes are NOT faded here. `.card--empty` already greys the frame and the
+ * numerals on its own; the per-album-style opacity rules are scoped to the book,
+ * where a ghost has to sit back behind the cards around it. Nothing sits beside
+ * this one, and dimming a card you deliberately opened to look at is backwards.
+ *
+ * It does need its own rule, though: `.card--empty`'s hairline is an *inset*
+ * box-shadow, and the drop shadow above outranks it on specificity, so the two have
+ * to be spelt out together or the silhouette loses the edge that reads as a die-cut.
+ */
+.viewer__card .card--empty {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 18px 44px rgba(0, 0, 0, 0.7);
+}
+
+.viewer__detail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 0;
+  max-width: min(46vw, 320px);
+}
+
+.viewer__name {
+  font-family: var(--title-font, Georgia, serif);
+  font-size: clamp(19px, 2.6vh, 30px);
+  line-height: 1.15;
+  color: var(--ink, #f0e4c4);
+}
+
+.viewer__nick {
+  font-family: var(--title-font, Georgia, serif);
+  font-size: clamp(13px, 1.7vh, 17px);
+  font-style: italic;
+  color: var(--accent-light, #e6c98a);
+}
+
+.viewer__rule {
+  align-self: stretch;
+  height: 1px;
+  margin: 10px 0;
+  background: var(--accent-dark, #6b5325);
+}
+
+.viewer__stat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.viewer__stat-value {
+  font-family: var(--title-font, Georgia, serif);
+  font-size: clamp(20px, 2.7vh, 30px);
+  color: var(--accent-light, #e6c98a);
+}
+
+/* The tier is a word, not a numeral, and set at a numeral's size it shouts. */
+.viewer__stat-value--small {
+  font-size: clamp(14px, 1.9vh, 19px);
+}
+
+.viewer__stat-label {
+  font-family: Tahoma, Verdana, sans-serif;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--ink-dim, #a89a74);
+}
+
+.viewer__flag {
+  margin-top: 6px;
+  font-family: Tahoma, Verdana, sans-serif;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1.4px;
+  color: #f0e4c4;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--accent-dark, #6b5325);
+  border-radius: 2px;
+  padding: 2px 6px;
+}
+
+/* The one fact the album has never shown anywhere, so it gets the last word. */
+.viewer__owned {
+  margin-top: 12px;
+  font-family: var(--title-font, Georgia, serif);
+  font-size: clamp(14px, 1.9vh, 19px);
+  color: var(--ink, #f0e4c4);
+}
+
+.viewer__owned--none {
+  color: var(--ink-dim, #a89a74);
+  font-style: italic;
+}
+
+/* ---------------------------------------------------------------- *
+ * Navigation: the position readout *is* the control
+ * ---------------------------------------------------------------- */
+
+.viewer__nav {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.viewer__count {
+  font-family: var(--title-font, Georgia, serif);
+  font-size: 14px;
+  color: var(--ink-dim, #a89a74);
+  /* Fixed width, so the chevrons do not shuffle sideways as the number grows. */
+  min-width: 7ch;
+  text-align: center;
+}
+
+/*
+ * Type, not a plate. `.game-button` chrome around a chevron would be the only
+ * pressed-metal object on a page whose own navigation is an unlit page edge.
+ */
+.viewer__step {
+  font-family: var(--title-font, Georgia, serif);
+  font-size: 30px;
+  line-height: 1;
+  color: var(--accent-light, #e6c98a);
+  background: none;
+  border: 0;
+  border-radius: 3px;
+  /* Comfortably tappable while the glyph itself stays small. */
+  padding: 2px 12px 6px;
+  cursor: pointer;
+  transition: color 90ms ease;
+}
+
+.viewer__step:hover:not(:disabled) {
+  color: #fff9e2;
+}
+
+.viewer__step:focus-visible {
+  outline: 2px solid var(--accent, #a9853c);
+  outline-offset: 1px;
+}
+
+/* Dimmed rather than removed: at either end the counter still needs its brackets. */
+.viewer__step:disabled {
+  color: var(--accent-dark, #6b5325);
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------- *
+ * Narrow screens: the caption goes under the card
+ * ---------------------------------------------------------------- */
+
+@media (max-width: 719.95px) {
+  .viewer {
+    /* Shorter, because the caption now costs vertical space rather than horizontal. */
+    --viewer-card-w: min(44vh, 72vw, 320px);
+  }
+
+  .viewer__panel {
+    flex-direction: column;
+    gap: clamp(10px, 2vh, 18px);
+  }
+
+  .viewer__detail {
+    align-items: center;
+    text-align: center;
+    max-width: 84vw;
+  }
+
+  .viewer__rule {
+    /* A full-width rule under centred type reads as a divider between two blocks
+       rather than as the caption's own hairline, so it goes. */
+    display: none;
+  }
+
+  .viewer__owned,
+  .viewer__flag {
+    margin-top: 6px;
+  }
+
+  .viewer__stat {
+    gap: 6px;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Reduced motion: keep the scrim, drop the movement.
+ * ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .viewer__panel {
+    animation: none;
+  }
+}

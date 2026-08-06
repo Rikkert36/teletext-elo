@@ -15,7 +15,13 @@
  */
 
 .opener {
-  --pack-w: clamp(180px, 17vw, 240px);
+  /*
+   * The card's width. The sealed packet is derived from it and ends up ~1.7× this
+   * tall, so the viewport height is in the clamp as well — on a short window the
+   * wrapper would otherwise be taller than the room it has, and the hint under it
+   * would fall off the bottom.
+   */
+  --pack-w: clamp(150px, min(17vw, 22vh), 240px);
 
   display: flex;
   flex-direction: column;
@@ -25,6 +31,46 @@
   justify-content: center;
   position: relative;
   font-family: Tahoma, Verdana, sans-serif;
+}
+
+/**
+ * Packet geometry, derived from the card width in one place.
+ *
+ * Declared on the two containers that set `--pack-w` rather than on `.pack` itself,
+ * because the opener's stage has to reserve the packet's height — and the stage is
+ * `.pack`'s parent, so it cannot read a variable declared on the child. The tooth
+ * size has to live here for the same reason: `--pack-h` is computed from it.
+ *
+ * **The coloured panel is exactly one card.** A chrome seal at each end is added
+ * outside it, and the saw teeth are cut *through* those seals rather than added
+ * beyond them — which is what pinking shears do to a heat seal:
+ *
+ *     --pack-h = card height + 2 × --crimp        (and --crimp includes its teeth)
+ *
+ * The panel is the part of the film with a card behind it. A crimp is flattened film
+ * sealed to itself with nothing inside it, so the pouch ends where the colour ends,
+ * and the seam shadow under each seal is the film lifting over the card's edge — the
+ * same line arrived at from the other side. The width takes no margin at all, because
+ * the panel runs the full width of the packet.
+ *
+ * That is the rule the whole thing is scaled by, and it is why the shelf can be sized
+ * off the album below: **a packet on the table holds a card from the book.** It stands
+ * about a fifth taller than one — that is the two seals — and is exactly as wide.
+ *
+ * Both wrong versions came from measuring to the wrong edge. Measuring the *whole*
+ * packet against a card made the panel too short for one to fit; measuring the packet
+ * less its teeth put the card behind the seals. Only the coloured panel is the pouch.
+ */
+.opener,
+.pack-shelf {
+  /* ~90° sawtooth. `--tooth-w` must stay under 2 × `--tooth-h` × tan(44°) ≈
+     1.93 × `--tooth-h`, or consecutive teeth stop meeting and the seam between
+     the teeth and the body shows as a row of notches. */
+  --tooth-w: 7px;
+  --tooth-h: 4px;
+  /* Depth of one sealed end, teeth included — the blade cuts *through* the seal. */
+  --crimp: calc(var(--pack-w) * 0.15);
+  --pack-h: calc(var(--pack-w) * 1.4 + 2 * var(--crimp));
 }
 
 .opener__hint {
@@ -37,19 +83,95 @@
 
 /* ---------------------------------------------------------------- *
  * Beat 1 — the wrapper
+ *
+ * This has to read as a *sachet*. The first version was foil paint on a 5:7
+ * rounded rectangle, which is the geometry of the thing inside it — so it read as
+ * a card with an unfamiliar back rather than as something a card comes out of.
+ * Texture could not fix that; the silhouette had to change. Three things do it:
+ *
+ * 1. **Pinked edges.** A heat-sealed packet is cut with a serrated blade, so its
+ *    two sealed ends are zigzags, not straight lines. This is the single strongest
+ *    cue — nothing else in the UI has a jagged outline, and a card certainly does
+ *    not.
+ * 2. **Chrome seals.** A brushed-metal strip at each end with a dark seam where it
+ *    meets the body: the fold the blade sealed. The tear then takes the top one
+ *    off, which is what tearing a packet actually does. Metal rather than ribbed
+ *    foil because the logo is full of chrome frames and bars, and because ribbing
+ *    was one of two sets of stripes that made the whole wrapper look woven.
+ * 3. **The coloured panel is exactly one card** — see `--pack-h` above. The seals are
+ *    outside it, and the shelf is sized off the album, so a packet on the table holds
+ *    a card from the book.
+ *
+ * The rest of the surface follows the logo: a near-black field with the type colour
+ * glowing out of the middle of it, an outer neon rim, and the count set like the
+ * logo's own LED scoreboard. **No stripes** — the diagonal foil grain and the crimp
+ * ribbing are both gone. What sells foil is the moving sheen and the side-to-side
+ * bulge, not texture.
+ *
+ * Teeth are sized in px, not %, so the packets on the shelf are serrated like the
+ * big one instead of carrying a shrunken version of the same pattern — a real
+ * blade does not scale with the bag.
  * ---------------------------------------------------------------- */
 
 .pack {
   position: relative;
+  /*
+   * The width is the card width with no margin, because the coloured panel runs the
+   * full width — there is no seal down the sides. The height adds a seal at each end;
+   * see `--pack-h` above.
+   *
+   * There was a 1.1× margin here on the theory that a wrapper has to be wider than its
+   * contents. It does in life; on screen it only broke the match with the album, which
+   * is the thing that makes a packet on the table read as holding one of the cards on
+   * the page.
+   */
   width: var(--pack-w);
-  aspect-ratio: 5 / 7;
+  height: var(--pack-h);
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: 2px;
   overflow: hidden;
   animation: pack-sheen 2.6s linear infinite;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  /*
+   * A drop-shadow *filter*, not a box-shadow. A mask clips box shadows away
+   * completely — the packet ended up looking pasted flat onto the wood. The filter
+   * is computed from the masked silhouette instead, so the shadow is serrated too.
+   *
+   * Two passes: the packet's own colour bleeding out of the foil, the way the badge
+   * glows in the logo, and then the shadow it casts on the table.
+   */
+  filter: drop-shadow(0 0 7px var(--glow, transparent))
+    drop-shadow(0 7px 12px rgba(0, 0, 0, 0.6));
   transition: transform 160ms ease;
   flex: none;
+}
+
+/**
+ * The serrated silhouette: a tooth strip at each end plus the solid body between.
+ *
+ * A mask rather than a `clip-path` polygon, because the teeth then have a fixed
+ * physical size at any packet size and there is no 40-point polygon to maintain.
+ * It also applies to the whole subtree, so the torn halves and the crimp bands
+ * are shaped by it for free.
+ *
+ * Each conic tile is a wedge with its apex on the outer edge; the body layer is
+ * inset by exactly one tooth top and bottom so it meets the tile bases flush.
+ */
+.pack,
+.pack__half {
+  -webkit-mask:
+    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) 50% 0 /
+      var(--tooth-w) var(--tooth-h) repeat-x,
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% 100% /
+      var(--tooth-w) var(--tooth-h) repeat-x,
+    linear-gradient(#000, #000) 0 var(--tooth-h) / 100% calc(100% - 2 * var(--tooth-h))
+      no-repeat;
+  mask:
+    conic-gradient(from 135deg at top, #0000, #000 1deg 89deg, #0000 90deg) 50% 0 /
+      var(--tooth-w) var(--tooth-h) repeat-x,
+    conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) 50% 100% /
+      var(--tooth-w) var(--tooth-h) repeat-x,
+    linear-gradient(#000, #000) 0 var(--tooth-h) / 100% calc(100% - 2 * var(--tooth-h))
+      no-repeat;
 }
 
 /**
@@ -59,20 +181,102 @@
  * strips the paint off the parent — and inherit would then resolve to `none`.
  * Painting the parent during the tear was the original bug: both halves flew off
  * over a fully intact wrapper, so no wrapper ever appeared to come off.
+ *
+ * Four layers, top to bottom: the travelling sheen, the field, the bulge, the base.
+ * `background-position` has to list all four (a short list is repeated cyclically,
+ * which would hand the static layers the sheen's offset).
+ *
+ * - **Field.** A soft pool of the packet's colour in the middle of a near-black
+ *   surface, which is how the logo is lit. This replaced a diagonal stripe grain
+ *   that made the foil look woven and, next to the badge, cheap.
+ * - **Bulge.** Dark down both sides, a soft highlight left of centre. A flat sheet
+ *   of foil is a card back; foil stretched over a few cards is a packet.
+ *
+ * `--foil-*` is the only hue in the stack — everything else is black and white over
+ * it, so one colour re-paints the whole packet. `utils/packFoil.ts` sets it per pack
+ * *type*; the fallbacks are a neutral dark so a `.pack` with no vars set still reads.
  */
 .pack,
 .pack__half {
-  background-color: #1b3f8f;
+  background-color: var(--foil-lo, #10131a);
   background-image:
-    linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.55) 47%, transparent 56%),
-    repeating-linear-gradient(
-      70deg,
-      rgba(255, 255, 255, 0.09) 0 3px,
-      rgba(0, 0, 0, 0.09) 3px 6px
+    linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.4) 47%, transparent 56%),
+    radial-gradient(
+      ellipse 78% 52% at 50% 44%,
+      var(--foil-hi, #2b3444) 0%,
+      rgba(0, 0, 0, 0) 100%
     ),
-    linear-gradient(160deg, #2f6fd0 0%, #14306e 45%, #2a5cb0 100%);
-  background-size: 250% 100%, auto, auto;
-  background-position: -60% 0, 0 0, 0 0;
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.55) 0%,
+      rgba(0, 0, 0, 0.12) 12%,
+      rgba(255, 255, 255, 0.1) 34%,
+      rgba(255, 255, 255, 0.02) 52%,
+      rgba(0, 0, 0, 0.16) 82%,
+      rgba(0, 0, 0, 0.58) 100%
+    ),
+    linear-gradient(
+      165deg,
+      var(--foil-mid, #1b2130) 0%,
+      var(--foil-lo, #0c0f14) 55%,
+      var(--foil-mid, #171d29) 100%
+    );
+  background-size: 250% 100%, auto, auto, auto;
+  background-position: -60% 0, 0 0, 0 0, 0 0;
+  /*
+   * A thin printed edge line in the packet's own colour. An *inset* shadow, which is
+   * only usable because its top and bottom runs are hidden behind the chrome seals —
+   * the mask would otherwise chew them into the teeth. It belongs here with the paint
+   * rather than on `.pack`, so that each torn half keeps its own edge and the intact
+   * parent can drop it: an inset shadow is drawn whether or not there is a
+   * background, so `.pack--tearing` would otherwise leave a coloured ring around a
+   * wrapper that is supposed to have come apart.
+   */
+  box-shadow: inset 0 0 0 1px var(--edge, rgba(255, 255, 255, 0.16));
+}
+
+/**
+ * The two sealed ends: brushed chrome, like every frame and bar in the logo.
+ *
+ * `::before` is the top seal, `::after` the bottom one — one strip each rather than
+ * two no-repeat layers in the shared paint, so the seam shadow can be a box-shadow
+ * on the strip instead of another gradient to keep aligned.
+ *
+ * The gradient is the whole trick: a bright top lip, a hard dark line where the
+ * metal turns, and a second highlight below it. Four stops read as a rolled edge;
+ * the ribbing that used to be here read as corduroy.
+ */
+.pack::before,
+.pack::after,
+.pack__half::before,
+.pack__half::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: var(--crimp);
+  pointer-events: none;
+  background-image: linear-gradient(
+    to bottom,
+    #e8edf2 0%,
+    #b3bcc6 22%,
+    #6f7982 46%,
+    #4b545c 52%,
+    #9aa4ae 74%,
+    #dfe6ec 100%
+  );
+}
+
+.pack::before,
+.pack__half::before {
+  top: 0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.55);
+}
+
+.pack::after,
+.pack__half::after {
+  bottom: 0;
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.55);
 }
 
 .pack:hover {
@@ -81,94 +285,273 @@
 
 @keyframes pack-sheen {
   from {
-    background-position: -60% 0, 0 0, 0 0;
+    background-position: -60% 0, 0 0, 0 0, 0 0;
   }
   to {
-    background-position: 160% 0, 0 0, 0 0;
+    background-position: 160% 0, 0 0, 0 0, 0 0;
   }
 }
 
-.pack__label {
+/* ---------------------------------------------------------------- *
+ * The print: the badge, and the number. Nothing else.
+ *
+ * It carried "OPENEN" and the grant reason ("testpakje", "gewonnen") as well, and
+ * both are gone. Neither is printing — a real wrapper does not caption itself with
+ * the instruction for opening it, and the reason is metadata about the grant rather
+ * than about the product. They also crowded the badge, which is the thing that
+ * makes these read as rik-dev packets at all. The reason still reaches anyone who
+ * wants it, as the tile's `title` and `aria-label`; the opener's own hint under the
+ * packet says what to do.
+ *
+ * Everything is placed and sized in % of the packet, so one set of rules serves the
+ * opener and the shelf with no overrides at either size — which only works now that
+ * the two are within ~1.7× of each other rather than 4×. Nothing may sit inside
+ * `--crimp` at either end: the seals are a fold, and print does not survive a fold.
+ * ---------------------------------------------------------------- */
+
+/**
+ * The rik-dev badge.
+ *
+ * The asset is trimmed to the artwork's own alpha bounds, so this box *is* the badge
+ * — hence the odd `aspect-ratio`, which is the trimmed 320×256. Both go together: if
+ * the asset is ever replaced, re-trim it or fix the ratio, or the badge letterboxes
+ * inside its box and stops sitting where these percentages say it does.
+ *
+ * The first version of the asset was the badge on a black field rather than on
+ * transparency, and it needed a radial mask to dissolve that black into the foil or it
+ * read as a sticker stuck on the packet. The mask is gone with it — the alpha channel
+ * does the same job properly, and the badge's own neon now meets the foil directly.
+ *
+ * A shallow dark shadow and nothing else: enough to seat the ink on the film, not
+ * enough to lift the badge off it as a separate object.
+ *
+ * `--pack-mark` is the imported asset URL, set inline by `packFoil` — the packet is
+ * styled from one place and this keeps webpack's hashed filename out of the CSS.
+ */
+.pack__mark {
   position: absolute;
-  inset: auto 0 18px;
-  text-align: center;
-  color: #fff;
-  font-size: 13px;
-  font-weight: bold;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+  top: 16%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 84%;
+  aspect-ratio: 320 / 256;
+  background: center / contain no-repeat var(--pack-mark, none);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
+  pointer-events: none;
 }
 
+/**
+ * How many cards are in it — or, on a forced debug pack, its guarantee (`80+`).
+ *
+ * Set like the scoreboard in the logo: the type colour at full brightness on a
+ * near-black field, with a tight halo of its own colour under it. The logo's LED
+ * display is the one place a number appears in the brand, so this is the one place
+ * the packet can borrow from directly, and it makes the number legible on the shelf
+ * at any size without a second colour being introduced.
+ *
+ * Sized from `--pack-w` rather than in px, so it is the same share of the front on
+ * the opener and on the table.
+ */
 .pack__size {
   position: absolute;
-  inset: 22px 0 auto;
+  inset: auto 0 20%;
   text-align: center;
-  color: #ffe9a0;
-  font-size: 34px;
+  color: var(--ink, #cfd8e4);
+  font-size: calc(var(--pack-w) * 0.26);
+  line-height: 1;
   font-weight: bold;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.7);
+  letter-spacing: -0.02em;
+  text-shadow:
+    0 0 calc(var(--pack-w) * 0.05) var(--glow, rgba(0, 0, 0, 0)),
+    0 2px 5px rgba(0, 0, 0, 0.85);
 }
 
-.pack__size small {
+/* ---------------------------------------------------------------- *
+ * The unopened packets, waiting beside the album
+ *
+ * These used to be buttons captioned "3 kaarten". A button that *describes* a
+ * packet is a worse object than the packet: you already know what one looks
+ * like, because you see it full size two seconds later when you open it. So the
+ * shelf renders the same `.pack` — same foil, same sheen, same tear waiting to
+ * happen — and opening one is the packet growing into the one on the opener screen
+ * rather than a screen replacing a screen.
+ *
+ * They lie at slightly different angles (`--tilt`, set per index by PackTile) and
+ * their sheens are offset (`--sheen-delay`), because four identical packets
+ * flashing in lockstep reads as a UI element repeated, not as a pile of packets.
+ * ---------------------------------------------------------------- */
+
+/**
+ * **A packet on the table is the size of a card in the book.**
+ *
+ * `--album-card-w` is one slot of the album's grid, declared on :root in album.css
+ * precisely so this can reach it. Feeding it in as `--pack-w` makes the flat part of
+ * the wrapper exactly as tall as a card on the page opposite — see `--pack-h`.
+ *
+ * These used to be a quarter size, on an independent `clamp()` that had nothing to
+ * do with the book. Next to album cards two or three times their height they read as
+ * icons of packets rather than as packets, and the two scales were free to drift
+ * apart on any viewport.
+ *
+ * A knock-on: at this size the packet needs no separate type or tooth sizes, so the
+ * whole `.pack--mini` face-scaling block is gone. What is left is that it is a
+ * `<button>` and that it lies at an angle.
+ */
+.pack-shelf {
+  --pack-w: var(--album-card-w, 96px);
+  /* Slightly finer teeth than the opener's hero packet, since a real blade does not
+     scale with the bag and these are the smaller of the two. */
+  --tooth-w: 6px;
+  --tooth-h: 3px;
+
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  justify-content: center;
+  /* Two rows of card-sized packets. It was 46vh, from when they were quarter-size
+     tiles and four of them fitted in one. */
+  max-height: 56vh;
+  overflow-y: auto;
+  /*
+   * Room for a packet to lift.
+   *
+   * A scroll container clips at its padding box, so at the old 4px the top row's hover
+   * — 4px of lift, ~5px of growth from `scale(1.04)`, and a 7px glow — was cut off
+   * against an edge with nothing visible at it. Padding is the fix rather than
+   * `overflow: visible`, which would drop the scrolling this needs once there are more
+   * than four packets.
+   */
+  padding: 16px 11px 18px;
+}
+
+.pack--mini {
+  /* It is a <button>: strip the widget, keep the wrapper. */
+  appearance: none;
+  padding: 0;
+  border: none;
+  font: inherit;
   display: block;
-  font-size: 10px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: #cfe0ff;
-  font-weight: normal;
+  transform: rotate(var(--tilt, 0deg));
+  animation-delay: var(--sheen-delay, 0s);
 }
 
-.pack__reason {
-  position: absolute;
-  inset: auto 8px 4px;
-  text-align: center;
-  color: #cfe0ff;
-  font-size: 9px;
+.pack--mini:hover {
+  transform: rotate(var(--tilt, 0deg)) translateY(-4px) scale(1.04);
+}
+
+/*
+ * The focus ring is a pair of stacked drop-shadows, not an `outline`.
+ *
+ * A mask clips everything the element paints, an outline included, so a 2px ring
+ * survived only at the tooth tips. Two passes of the same tight glow build a ring
+ * dense enough to read, and it follows the serrated silhouette. It replaces the
+ * packet's own colour glow for as long as it has focus, so the two never add up
+ * into an indistinct haze.
+ */
+.pack--mini:focus-visible {
+  outline: none;
+  filter: drop-shadow(0 0 2px #fff3c4) drop-shadow(0 0 3px #ffe9a0)
+    drop-shadow(0 7px 12px rgba(0, 0, 0, 0.6));
 }
 
 /* ---------------------------------------------------------------- *
  * Beat 2 — the tear
  *
- * The trick: the jagged edge is baked into each half's clip-path and never
- * animates. Only the two halves move. Animating a polygon would cost far more
- * for a barely different result.
+ * The trick: the tear line is baked into each half's clip-path and never animates.
+ * Only the two halves move. Animating a polygon would cost far more for a barely
+ * different result — and since it is static, the line can carry as many vertices as
+ * it needs to look torn rather than cut.
  * ---------------------------------------------------------------- */
 
-/* Strip the parent's paint so only the two halves are visible during the tear. */
+/*
+ * Strip the parent's paint so only the two halves are visible during the tear.
+ *
+ * `background: none` is not enough now that the crimp bands are pseudo-elements —
+ * they are not background, so both ends of an intact wrapper went on being drawn
+ * under the halves. Same failure as the original: nothing appears to come off.
+ *
+ * The parent's mask and `overflow` go too, so the torn strip can actually leave.
+ * While the parent still clipped, the strip slid up and vanished the moment it
+ * passed y=0, which read as the top of the packet dissolving. Each half masks and
+ * shadows itself, so the shape and the shadow survive the parent dropping both.
+ */
 .pack--tearing {
   background: none;
+  /* An inset shadow is painted with or without a background, so without this the
+     wrapper keeps a coloured edge line while its two halves fly off it. */
+  box-shadow: none;
   animation: none;
   cursor: default;
-  box-shadow: none;
+  overflow: visible;
+  -webkit-mask: none;
+  mask: none;
+  filter: none;
+}
+
+.pack--tearing::before,
+.pack--tearing::after {
+  display: none;
 }
 
 .pack__half {
   position: absolute;
   inset: 0;
+  filter: drop-shadow(0 4px 7px rgba(0, 0, 0, 0.5));
 }
 
 /*
- * The jagged edge is baked into each half's clip-path and never animates — only
- * the halves move. Animating the polygon itself would cost far more for a
- * barely different result.
+ * The tear line is baked into each half's clip-path and never animates — only the
+ * halves move. Animating the polygon itself would cost far more for a barely
+ * different result, and the vertex count below is free for the same reason.
  *
  * Only the TOP strip comes off. The bottom stays put and sinks away as the cards
  * rise out of it, because that is what tearing a packet actually does — both
  * halves flying apart read as an explosion rather than an opening.
+ *
+ * The line sits just under the top seal, so what comes off is the sealed end plus a
+ * sliver of panel. It used to run at 26–33%, which tore the wrapper across the middle
+ * of its face — a plausible way to open a card sleeve and no way at all to open a bag.
+ *
+ * **It is a tear, not a pinked edge.** This was eight big regular triangles, which is
+ * the pattern a serrated blade leaves — the same shape as the packet's own sealed
+ * ends, and so plainly a decoration applied twice. Torn film looks nothing like that:
+ *
+ * - locally almost straight: the jitter is ~0.8% of the packet height, about 3px at
+ *   full size, where the teeth swung 5.5% (~22px)
+ * - irregular spacing, so no wavelength is legible in it
+ * - an overall drift instead — 10.6% on the left to 13.7% on the right. You tear from
+ *   one corner, so the line runs downhill away from where you started, and that drift
+ *   is now most of the total 10.6–14.2% spread
+ * - one deeper nick (at x=62, to 15.4%) where the film caught and gave way at once. A
+ *   single large feature among many small ones is most of what reads as "torn"
+ *
+ * The BOTTOM half's copy is the one that matters: it stays on screen underneath the
+ * card for the whole reveal, while the top strip is gone in 380ms. The two must remain
+ * exact complements — every point below appears in both lists, reversed — or a seam of
+ * background shows between them for the first few frames.
+ *
+ * Percentages of the packet's height, so they track `--crimp`: one seal is
+ * `0.15 / 1.70` ≈ 8.8% of the whole. Change the panel height or the seal depth and all
+ * of these move.
  */
 .pack__half--top {
   clip-path: polygon(
-    0 0, 100% 0, 100% 26%, 88% 30%, 76% 25%, 64% 31%, 52% 26%,
-    40% 32%, 28% 27%, 16% 33%, 0 28%
+    0 0, 100% 0,
+    100% 13.7%, 96% 14.2%, 92% 13.4%, 88% 13.9%, 84% 13.1%, 80% 13.6%, 75% 12.8%,
+    71% 13.4%, 66% 12.9%, 62% 15.4%, 59% 12.2%, 55% 12.6%, 50% 11.9%, 45% 12.4%,
+    41% 11.6%, 36% 12.1%, 31% 11.5%, 27% 11.4%, 22% 11.9%, 18% 11.1%, 13% 11.5%,
+    9% 10.8%, 4% 11.2%, 0 10.6%
   );
   animation: pack-tear-top calc(380ms * var(--anim, 1)) cubic-bezier(0.36, 0, 0.66, -0.25) forwards;
 }
 
 .pack__half--bottom {
   clip-path: polygon(
-    0 28%, 16% 33%, 28% 27%, 40% 32%, 52% 26%, 64% 31%, 76% 25%,
-    88% 30%, 100% 26%, 100% 100%, 0 100%
+    0 10.6%, 4% 11.2%, 9% 10.8%, 13% 11.5%, 18% 11.1%, 22% 11.9%, 27% 11.4%,
+    31% 11.5%, 36% 12.1%, 41% 11.6%, 45% 12.4%, 50% 11.9%, 55% 12.6%, 59% 12.2%,
+    62% 15.4%, 66% 12.9%, 71% 13.4%, 75% 12.8%, 80% 13.6%, 84% 13.1%, 88% 13.9%,
+    92% 13.4%, 96% 14.2%, 100% 13.7%,
+    100% 100%, 0 100%
   );
   animation: pack-tear-bottom calc(380ms * var(--anim, 1)) ease-in forwards;
 }
@@ -198,12 +581,32 @@
  * Beats 3 & 4 — stack rises, then reveals
  * ---------------------------------------------------------------- */
 
+/**
+ * The stage holds the sealed packet, the tear, and every card that rises out of
+ * it — one box, all five beats.
+ *
+ * That is the whole point of it. While the sealed wrapper was a sibling of the
+ * stage instead of its occupant, the two phases were different layouts: the
+ * wrapper phase had no revealed row under it and reserved the card's height rather
+ * than the packet's, so the column re-centred at the tear and the first card rose
+ * somewhere the packet had never been. You clicked one thing and a different thing
+ * answered, a few dozen pixels away.
+ *
+ * So the height is fixed at `--pack-h` — the tallest occupant — for every phase,
+ * and `PackOpener` renders the empty revealed row during the sealed and tearing
+ * beats too. Nothing in the column moves from the click to the last card.
+ *
+ * The centring then does something better than merely holding still. The packet is a
+ * card-sized coloured panel with an equal seal at each end, so a card centred in a box
+ * one packet tall lands exactly on that panel — same width, same height, same place.
+ * The first card rises from precisely where it was sealed.
+ */
 .opener__stage {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: calc(var(--pack-w) * 1.4);
+  height: var(--pack-h);
 }
 
 /**
@@ -255,9 +658,26 @@
   }
 }
 
+/**
+ * **Both faces need a 3D transform of their own**, which is what the `translateZ` is for.
+ *
+ * `backface-visibility: hidden` is ignored on an element that is not itself
+ * 3D-transformed, and the back face had no transform at all — so it was never culled and
+ * showed straight through the front. It went unnoticed while the back was a dark brown
+ * field: there was nothing on it bright enough to see through a card. Putting the badge
+ * on it made the leak obvious.
+ *
+ * This is the same trap `album.css` records for the book's leaves, and the same fix.
+ *
+ * 1px in each face's own local space, so after the 180° turn the two planes are 2px
+ * apart and never coplanar. There is no `perspective` anywhere in the opener — the flip
+ * is deliberately orthographic — so this costs nothing visually and changes no
+ * measurement the FLIP takes; it only gives the compositor an order to sort by.
+ */
 .opener__face {
   position: absolute;
   inset: 0;
+  transform: translateZ(1px);
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
   display: flex;
@@ -271,7 +691,7 @@
 }
 
 .opener__face--front {
-  transform: rotateY(180deg);
+  transform: rotateY(180deg) translateZ(1px);
 }
 
 /*
@@ -318,18 +738,26 @@
  *    the green "new" rim, which is also a box-shadow on the same card, simply
  *    never appeared on a gold pull at any tier. The two glows are independent
  *    facts and must be able to show at once.
- * 2. It sits outside `.opener__flip`, like the shimmer, so it stays flat while the
- *    card turns instead of foreshortening and mirroring with it.
+ * 2. It sits *inside* `.opener__flip`, so it turns with the card. Foreshortening
+ *    is the point rather than a cost: the halo has to track the card's projected
+ *    silhouette, and it has to go edge-on when the card does. A flat layer stayed
+ *    full-size through the turn while the card thinned to nothing, so for a few
+ *    frames you were looking at the light source itself.
  *
- * Geometry matches the card exactly — same box via `inset: 0` on the riser, same
- * corner radius — so the halo still follows the card's shape rather than reading
- * as a rectangle or an oval behind it.
+ * Geometry matches the card exactly — same box via `inset: 0`, same corner radius
+ * — so the halo follows the card's shape rather than reading as a rectangle or an
+ * oval behind it.
+ *
+ * `translateZ(-1px)` keeps it off the faces' plane; without it the three are
+ * coplanar in the preserve-3d context and z-fight. After 180deg it ends up in
+ * front, which is harmless because it paints nothing inside the card's outline.
  */
 .opener__radiance {
   position: absolute;
   inset: 0;
   border-radius: 6px;
   pointer-events: none;
+  transform: translateZ(-1px);
   animation: opener-glow-grow var(--radiate-ms, 1200ms) linear var(--shimmer-ms, 700ms) forwards;
 }
 
@@ -341,6 +769,11 @@
  * Four transparent zero-blur shadows rather than `none`, because `none` does not
  * interpolate — the count has to match the target for the ramp to be continuous.
  * The card's own drop shadow stays on the card and is no longer part of this.
+ *
+ * **No background fill.** An outer box-shadow is clipped to outside its border
+ * box, so these halos ring a hole cut to the card's silhouette — and anything
+ * that fills that hole is gold sitting where the card is. The hole is never
+ * exposed now that the layer turns with the card, so it does not need plugging.
  */
 @keyframes opener-glow-grow {
   from {
@@ -352,10 +785,10 @@
   }
   to {
     box-shadow:
-      0 0 24px rgba(255, 236, 168, 0.75),
-      0 0 60px rgba(255, 206, 92, 0.48),
-      0 0 124px rgba(255, 180, 50, 0.26),
-      0 0 200px rgba(255, 172, 44, 0.14);
+      0 0 28px rgba(255, 240, 180, 0.85),
+      0 0 68px rgba(255, 206, 92, 0.56),
+      0 0 140px rgba(255, 180, 50, 0.3),
+      0 0 210px rgba(255, 172, 44, 0.15);
   }
 }
 
@@ -417,11 +850,17 @@
  */
 
 /* ---------------------------------------------------------------- *
- * Top-tier build-up
+ * Screen-level build-up
  *
- * Only for 90+, and only during the build. A single layer — an earlier version
- * added rotating sunburst beams behind the card, which were too much on top of
- * the glow.
+ * Runs at *every* level, not just 90+ — an earlier comment here claimed top tier
+ * only, which was wrong. Like the card's halo it is delayed by `--shimmer-ms` and
+ * frozen at the turn, so a level 1 turns over as the delay expires and never
+ * visibly ramps. That is the mechanism, not a level check; adding one would break
+ * the governing rule.
+ *
+ * Two layers, and only two: the bloom lifting the centre and the vignette pulling
+ * the surround down. An earlier version added rotating sunburst beams behind the
+ * card, which were too much on top of the glow.
  * ---------------------------------------------------------------- */
 
 /*
@@ -471,10 +910,10 @@
   inset: 0;
   background: radial-gradient(
     circle at 50% 45%,
-    rgba(255, 232, 164, 0.58) 0%,
-    rgba(255, 196, 78, 0.32) 38%,
-    rgba(255, 176, 46, 0.13) 66%,
-    rgba(255, 168, 40, 0.04) 86%,
+    rgba(255, 240, 190, 0.7) 0%,
+    rgba(255, 205, 96, 0.44) 48%,
+    rgba(255, 182, 54, 0.22) 74%,
+    rgba(255, 170, 42, 0.08) 90%,
     transparent 100%
   );
   opacity: 0;
@@ -491,6 +930,249 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+/*
+ * The other half of the bloom: everything that is *not* the card is pulled down
+ * as the gold comes up.
+ *
+ * Contrast, not output. The glow had been pushed brighter and then wider and read
+ * as neither — a big soft gradient with nothing dark next to it just makes the
+ * screen faintly yellow, and past a point extra width actively lowers the
+ * card-to-surround contrast that does the reading. Darkening the surround costs
+ * no extra light and cannot wash the card out.
+ *
+ * Same two-element split, same clock and the same freeze as the bloom, so it
+ * obeys the governing rule: identical at any timestamp whatever the level, and
+ * paused wherever the turn lands. It is *not* a keyframe on one element for the
+ * reason recorded above — `forwards` pins the final value and there is no way to
+ * transition back out of it.
+ *
+ * Sits at z-index 39, below the bloom's 40, so the bloom's gold still reads on
+ * top of the darkened field rather than being muted by it.
+ */
+.opener__dim {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity calc(620ms * var(--anim, 1)) ease-out;
+}
+
+.opener__dim--out {
+  opacity: 0;
+}
+
+/*
+ * The clear centre is measured in card widths, not percentages. A percentage
+ * radius on a viewport-sized layer means the hole tracks the window instead of
+ * the card, so it clipped the card's corners on a short window and left a wide
+ * undarkened margin on a large one. `--pack-w` is inherited from `.opener`.
+ *
+ * 0.95 clears the card's half-diagonal (~0.86 × width at 5/7), so the card and
+ * its rim are never touched — only what surrounds them.
+ */
+.opener__dim-inner {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 45%,
+    rgba(0, 0, 0, 0) calc(var(--pack-w) * 0.95),
+    rgba(0, 0, 0, 0.5) calc(var(--pack-w) * 1.35),
+    rgba(0, 0, 0, 0.78) calc(var(--pack-w) * 2.1),
+    rgba(0, 0, 0, 0.88) 100%
+  );
+  opacity: 0;
+  animation: opener-dim-grow var(--radiate-ms, 1200ms) linear var(--shimmer-ms, 700ms) forwards;
+}
+
+.opener__dim--held .opener__dim-inner {
+  animation-play-state: paused;
+}
+
+@keyframes opener-dim-grow {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * Gold motes drawn *inward* through the build — light gathering into the card.
+ *
+ * The third layer of the build, and the only one with motion the eye can track:
+ * the bloom and the vignette are both smooth monotonic ramps, which is why adding
+ * intensity to them kept hitting diminishing returns. This is deliberately close
+ * to the line — "too much on top of the glow" is what killed the sunburst beams —
+ * and it stays the right side of it by being small, sparse and slow.
+ *
+ * Distinct from `.opener__particles`, which is the outward burst *after* the turn
+ * and is top-tier only. These run during the build, at every level.
+ *
+ * Same three-flag drive and the same two-element split as the bloom and vignette:
+ * the wrapper fades, the inner layer ramps on the shared clock and freezes at the
+ * turn. The motes' own drift is paused at the turn too — a stream still flowing
+ * while every other layer had frozen was the one thing that read as a glitch.
+ */
+.opener__motes {
+  position: absolute;
+  inset: 0;
+  /* Above the bloom's 40: these are small, and the bloom washed them out below it. */
+  z-index: 41;
+  pointer-events: none;
+  opacity: 1;
+  /*
+   * Shorter than the bloom's 620, and deliberately not mirroring it. This fade is a
+   * safety net behind the drain rather than the thing that clears the layer — by the
+   * time it runs the motes have already landed and are held at zero opacity — so it
+   * only has to close quickly enough that the fallback path, where nothing drains,
+   * does not leave motes hanging over a stage the card has left.
+   */
+  transition: opacity calc(240ms * var(--anim, 1)) ease-out;
+}
+
+.opener__motes--out {
+  opacity: 0;
+}
+
+.opener__motes-inner {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: opener-motes-grow var(--radiate-ms, 1200ms) linear var(--shimmer-ms, 700ms) forwards;
+}
+
+/*
+ * Only the intensity ramp freezes at the turn. The motes themselves keep drifting
+ * for as long as they can be seen.
+ *
+ * The distinction matters: the ramp freezing is what makes an 80 a 90 that stopped
+ * early, and it has to hold. Mote *velocity* carries none of that — the build is
+ * over by the turn — and pausing it too left a field of dead dots sitting still
+ * through the whole fade, which is worse than either extreme.
+ */
+.opener__motes--held .opener__motes-inner {
+  animation-play-state: paused;
+}
+
+@keyframes opener-motes-grow {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * Travel measured in card widths, like the vignette's clear radius and for the
+ * same reason — anchored to the card rather than to the window.
+ *
+ * `--mote-near` (0.72) is *inside* the vignette's clear centre (0.95), so a mote
+ * has faded to nothing by the time it reaches the card's own rim. Nothing ever
+ * visibly touches the card.
+ */
+.opener__mote {
+  /*
+   * `--mote-far-k` and `--mote-cycle` arrive per mote from `MOTES` in PackOpener —
+   * every mote gets its own distance and its own duration, which is what stops the
+   * stream from repeating. The fallbacks here are mid-range, for the case where the
+   * inline properties are somehow absent.
+   *
+   * Distance is still measured in card widths, anchored to the card rather than the
+   * window, like the vignette's clear radius.
+   */
+  --mote-far: calc(var(--pack-w) * var(--mote-far-k, 3.5));
+  --mote-near: calc(var(--pack-w) * 0.72);
+
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: #ffeec0;
+  box-shadow: 0 0 7px rgba(255, 212, 116, 0.9);
+  /*
+   * Invisible unless the animation says otherwise. The keyframes drive opacity for
+   * the whole run, so this only shows through if an animation is ever removed or
+   * finishes unfilled — in which case the mote also has no transform and is sitting
+   * dead centre on the card. Belt and braces with the drain's `fill: 'forwards'`.
+   */
+  opacity: 0;
+  /*
+   * The delay is a unitless fraction of a cycle rather than a ready-made time, so it
+   * still lines up when each mote carries a different cycle length. Negative, so the
+   * stream is already populated on the first frame instead of every mote setting out
+   * from the rim together.
+   *
+   * Both references must use the same fallback, or a mote missing its inline cycle
+   * would space itself against a length it does not run for.
+   */
+  animation: opener-mote-in var(--mote-cycle, 610ms) linear infinite;
+  animation-delay: calc(var(--mote-t, 0) * var(--mote-cycle, 610ms));
+}
+
+/*
+ * A smaller, dimmer third of them, so the stream has some depth.
+ *
+ * Size and brightness only — this used to override the duration too, which put all
+ * 14 motes into one of two speeds and was half of what made the stream read as a
+ * repeating wheel. Durations are per mote now and must not be bucketed here again.
+ */
+.opener__mote:nth-child(3n) {
+  width: 3px;
+  height: 3px;
+  margin: -1.5px 0 0 -1.5px;
+  background: #ffe4a4;
+  box-shadow: 0 0 5px rgba(255, 200, 96, 0.7);
+}
+
+/*
+ * The mote flies over the first 30% of its cycle — `MOTE_FLIGHT` in PackOpener, which
+ * must be kept equal to it — and spends the remaining 70% landed and invisible.
+ *
+ * This split is the whole reason flight speed and cycle length are separate numbers.
+ * Velocity is distance over *flight time*, so shortening the flight makes a mote fly
+ * faster without shortening the cycle, and the cycle is what governs how often the
+ * stream repeats. Trying to buy speed from the cycle made the stream churn; trying to
+ * buy it from distance pushed the fade-in off the edge of the screen. Flight fraction
+ * is the lever that costs neither.
+ *
+ * The last two stops hold the landed position rather than travelling on, so the tail
+ * is genuinely idle. Its transform does not match 0%, which is fine: opacity is zero
+ * across the whole tail, so the wrap back out to `--mote-far` is never seen.
+ *
+ * `MOTE_DRAIN_MS` in PackOpener.tsx is derived from the 30% as well: it is the longest
+ * flight remaining, at the drain rate. Change one and the others have to move.
+ *
+ * The opacity stops are scaled to the flight, not to the cycle — 7% and 24% are the
+ * old 10% and 36% taken as fractions of it. Left where they were, a mote would still
+ * be fading in after it had already landed.
+ */
+@keyframes opener-mote-in {
+  0% {
+    transform: rotate(var(--angle)) translateX(var(--mote-far)) scale(0.5);
+    opacity: 0;
+  }
+  7% {
+    opacity: 1;
+  }
+  24% {
+    opacity: 1;
+  }
+  30% {
+    transform: rotate(var(--angle)) translateX(var(--mote-near)) scale(1);
+    opacity: 0;
+  }
+  100% {
+    transform: rotate(var(--angle)) translateX(var(--mote-near)) scale(1);
+    opacity: 0;
   }
 }
 
@@ -747,13 +1429,33 @@
     transition: none;
   }
 
-  /* Appears and disappears without the swell, but is still there. */
-  .opener__bloom {
+  /* Appear and disappear without the swell, but are still there. */
+  .opener__bloom,
+  .opener__dim {
     transition: none;
   }
 
   .opener__bloom--in {
     transition: none;
     opacity: 0.32;
+  }
+
+  /*
+   * Held at a fixed depth rather than ramped. Shallower than the full swell,
+   * because with no build to earn it the dimming arrives all at once.
+   */
+  .opener__dim-inner {
+    animation: none;
+    opacity: 0.6;
+  }
+
+  /*
+   * Dropped outright rather than stilled. The motes *are* the motion — with the
+   * drift removed they collapse onto their un-transformed origin and sit in a
+   * heap at the centre of the card. The bloom and the vignette still carry the
+   * build here.
+   */
+  .opener__motes {
+    display: none;
   }
 }

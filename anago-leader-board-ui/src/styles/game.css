@@ -10,6 +10,16 @@
  * surface, the chrome and the accents change.
  */
 
+/*
+ * The stage's side padding, on :root rather than inline in `.game-stage`, because
+ * `.album-layout` has to subtract it from the viewport to work out how much table
+ * is left beside the book. If the two drift apart the pack shelf starts overlapping
+ * the book, so they read from one value.
+ */
+:root {
+  --stage-pad: clamp(8px, 3vw, 40px);
+}
+
 .game-stage {
   /* --- tokens: defaults are the Brass direction --- */
   --accent: #a9853c;
@@ -46,7 +56,7 @@
 
   position: relative;
   min-height: 78vh;
-  padding: 18px clamp(8px, 3vw, 40px) 28px;
+  padding: 18px var(--stage-pad) 28px;
   box-sizing: border-box;
   font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
   color: var(--ink);
@@ -218,43 +228,6 @@
 }
 
 /* ---------------------------------------------------------------- *
- * Tabs
- * ---------------------------------------------------------------- */
-
-.game-tabs {
-  display: flex;
-  gap: 6px;
-  justify-content: center;
-}
-
-.game-tab {
-  font-family: var(--title-font);
-  font-size: 13px;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  color: var(--ink-dim);
-  background: linear-gradient(180deg, var(--plate-from) 0%, var(--plate-to) 100%);
-  border: 1px solid var(--plate-border);
-  border-bottom: none;
-  border-radius: 6px 6px 0 0;
-  padding: 7px 20px 8px;
-  cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
-}
-
-.game-tab--active {
-  color: var(--btn-ink);
-  background: linear-gradient(180deg, var(--btn-from) 0%, var(--btn-mid) 100%);
-  text-shadow: var(--btn-text-shadow);
-}
-
-.game-tab:disabled {
-  color: var(--ink-dim);
-  opacity: 0.6;
-  cursor: default;
-}
-
-/* ---------------------------------------------------------------- *
  * Progress
  * ---------------------------------------------------------------- */
 
@@ -328,61 +301,133 @@
   line-height: 1.7;
 }
 
+/*
+ * The book is centred on the stage, and the shelf lies in the margin beside it.
+ *
+ * This was a two-column flex row, which meant the book centred inside whatever
+ * width the aside left rather than on the stage — so it sat `(aside + gap) / 2`
+ * (~190px at 1600×900) right of centre while you held packets, and snapped back
+ * the instant you opened your last one. The book is the heaviest thing on the
+ * page and the only one that moved, and it moved on returning from the opener,
+ * which is the worst moment available.
+ *
+ * So the aside comes out of flow entirely: `.album-main` spans the full width and
+ * the book centres in it always, packets or not. Nothing is reserved on the right
+ * to balance the aside — the margin the book already leaves is what the packets
+ * lie in.
+ */
 .album-layout {
-  display: flex;
-  align-items: flex-start;
-  gap: clamp(10px, 1.6vw, 26px);
+  --shelf-gap: clamp(10px, 1.6vw, 26px);
+
+  /*
+   * How much table is left beside the book, per side. Every term is
+   * viewport-relative (`--book-w` is `--page-w × 2`, and `--page-w` is vw/vh), so
+   * this can be resolved in CSS without measuring anything — which is what lets
+   * the shelf size itself to the room it actually has.
+   *
+   * `100vw` counts the scrollbar and `.album-layout` does not, hence the 16px:
+   * it keeps the shelf off the book on a scrolled page rather than under it.
+   */
+  --shelf-room: calc(
+    (100vw - 2 * var(--stage-pad) - var(--book-w)) / 2 - var(--shelf-gap) - 16px
+  );
+
+  /* Containing block for the aside. */
+  position: relative;
 }
 
+/*
+ * Wide enough for two packets side by side.
+ *
+ * It was 14vw / 216px max, from when the packets were quarter-size tiles. They are
+ * now the size of a card in the book (see `.pack-shelf`), so that column fitted one
+ * per row and cut the second one off at `max-height` — a scrolling strip of one and a
+ * half packets. Two columns of four is the pile; one column of 1.4 is a list.
+ *
+ * Capped by `--shelf-room` so it can never reach the book: on a 1600-wide window
+ * the margin is ~320px and the full 352 is unreachable anyway. Below that the
+ * shelf narrows rather than overlapping, and the packets step down with it.
+ *
+ * `max-height` keeps it inside the book's own height. Out of flow it contributes
+ * nothing to the layout box, so a shelf taller than the book would otherwise run
+ * down over whatever follows.
+ *
+ * There is no `.game-plate` around it either. The packets are objects lying next to
+ * the book, and a titled panel around them was the one thing on this page that
+ * admitted to being a UI.
+ */
 .album-side {
-  flex: none;
-  width: clamp(148px, 14vw, 216px);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: min(clamp(148px, 24vw, 352px), var(--shelf-room));
+  max-height: var(--page-h);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.album-side__packs {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 46vh;
-  overflow-y: auto;
+/*
+ * The packets themselves live in packopen.css — see `.pack-shelf`. Card-sized is
+ * the target, but the margin is not always that generous, so the size is the
+ * smallest of three things:
+ *
+ *   1. a card in the book, which is as large as a packet ever wants to be;
+ *   2. what one column can hold — the shelf less its 22px of side padding;
+ *   3. what two columns can hold — the shelf less that padding and its 12px
+ *      column gap, halved — but never under 96px.
+ *
+ * Two columns is what makes the packets read as a pile rather than a list, so
+ * (3) is what usually binds and the packets give up a few percent to keep it. The
+ * 96px floor is where that stops being worth it: below it (2) takes over and the
+ * shelf becomes one centred column at whatever size does fit.
+ */
+.album-side .pack-shelf {
+  --pack-w: min(
+    var(--album-card-w, 96px),
+    calc(var(--shelf-room) - 22px),
+    max(96px, calc((var(--shelf-room) - 34px) / 2))
+  );
+
+  max-height: min(56vh, var(--page-h));
 }
 
 .album-main {
-  flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
-.game-button--stacked {
-  text-align: left;
-  white-space: normal;
-  line-height: 1.35;
-  padding: 8px 11px;
-}
-
-.game-button--stacked small {
-  display: block;
-  font-weight: normal;
-  font-size: 10.5px;
-  opacity: 0.8;
-}
-
-@media (max-width: 900px) {
+/*
+ * Below this the margin cannot hold even one packet and the shelf goes back above
+ * the book, in flow. Two triggers, because the book grows with viewport *height*:
+ * a 1300×1400 window is wide by the first test but its book is 1040px and leaves
+ * 90px a side. Both cases stack, and stacking is symmetric, so the book stays
+ * centred there too.
+ */
+@media (max-width: 1150px), (max-width: 1400px) and (min-height: 1000px) {
   .album-layout {
+    display: flex;
     flex-direction: column;
     align-items: stretch;
+    gap: var(--shelf-gap);
   }
 
   .album-side {
+    position: static;
     width: auto;
+    max-height: none;
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
+  }
+
+  /* Back to the packopen.css defaults — there is no narrow margin to fit now. */
+  .album-side .pack-shelf {
+    --pack-w: var(--album-card-w, 96px);
+
+    max-height: 56vh;
   }
 }
 
@@ -477,23 +522,9 @@
   border: none;
 }
 
-.stage-teletext .game-plate,
-.stage-teletext .game-tab {
-  background: #000;
-  border: 2px solid #00ffff;
-  border-radius: 0;
-  box-shadow: none;
-}
-
 .stage-teletext .game-plate__label {
   font-family: "Teletext", monospace;
   color: #00ffff;
-}
-
-.stage-teletext .game-tab--active {
-  background: #ffff00;
-  color: #000;
-  text-shadow: none;
 }
 
 .stage-teletext .game-input {
@@ -606,21 +637,6 @@
   padding: 12px 24px;
 }
 
-.stage-broadcast .game-tab {
-  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
-  border: none;
-  border-radius: 0;
-  background: #0d2a5e;
-  font-style: italic;
-  box-shadow: none;
-}
-
-.stage-broadcast .game-tab--active {
-  background: var(--accent);
-  color: #fff;
-  text-shadow: none;
-}
-
 /* --- C · PLAKBOEK ------------------------------------------------------
  * A physical scrapbook. Nothing is square to the page: labels are cut paper,
  * slightly rotated, taped down. Depth comes from paper stacking rather than
@@ -730,21 +746,6 @@
   color: var(--accent);
 }
 
-.stage-scrapbook .game-tab {
-  background: #efe6cf;
-  border: 1px solid #bda887;
-  border-bottom: none;
-  border-radius: 3px 3px 0 0;
-  box-shadow: none;
-  transform: rotate(-0.4deg);
-}
-
-.stage-scrapbook .game-tab--active {
-  background: #fdf8ea;
-  color: var(--accent);
-  text-shadow: none;
-}
-
 .stage-scrapbook .game-input,
 .stage-scrapbook .game-meter {
   border: 1px solid #bda887;
@@ -838,24 +839,6 @@
 .stage-vitrine .game-plate__label {
   color: #83898f;
   letter-spacing: 3px;
-}
-
-.stage-vitrine .game-tab {
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  box-shadow: none;
-  color: #83898f;
-  letter-spacing: 3px;
-  font-size: 11px;
-}
-
-.stage-vitrine .game-tab--active {
-  background: none;
-  border-bottom: 2px solid #26292c;
-  color: #26292c;
-  text-shadow: none;
 }
 
 .stage-vitrine .game-input {
@@ -979,25 +962,6 @@
 .stage-arcade .game-plate__label {
   font-family: "Courier New", monospace;
   color: #ffcf3a;
-}
-
-.stage-arcade .game-tab {
-  font-family: "Courier New", monospace;
-  background: #202a6e;
-  border: none;
-  border-radius: 0;
-  box-shadow:
-    inset 2px 2px 0 #4a58a8,
-    inset -2px -2px 0 #0b1244;
-}
-
-.stage-arcade .game-tab--active {
-  background: #ffcf3a;
-  color: #070b2c;
-  text-shadow: none;
-  box-shadow:
-    inset 2px 2px 0 #fff3c0,
-    inset -2px -2px 0 #a37d10;
 }
 
 .stage-arcade .game-input {

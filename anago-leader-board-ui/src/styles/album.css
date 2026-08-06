@@ -19,6 +19,13 @@
  * A purely width-driven book grew taller than the viewport on shorter screens,
  * which pushed the page controls below the fold. Taking the smaller of the two
  * budgets keeps the whole spread on screen without scrolling.
+ *
+ * The height term is written as `Xvh * 0.78` against a `/ 0.78` page height, so
+ * the two cancel and **the page ends up exactly Xvh tall**. That makes the number
+ * directly comparable to anything else competing for vertical space: it went 56
+ * -> 59 when the Actief/Legendes tab strip was removed, which was ~32px, or about
+ * 3vh at a typical desktop height. Grow it further only by what you free up
+ * elsewhere, or the page controls go back under the fold.
  */
 .album-row {
   display: flex;
@@ -27,15 +34,60 @@
   gap: clamp(6px, 1.4vw, 18px);
 }
 
-.album {
-  --page-w: min(40vw, calc(56vh * 0.78), 520px);
+/**
+ * The page size, and the card slot derived from it, live on :root rather than on
+ * `.album` — because the pack shelf builds its packets to the size of a card in
+ * the book, and the shelf is a sibling of the album, not a descendant of it. A
+ * variable on `.album` is invisible from there.
+ *
+ * `--album-card-w` is one slot in the three-column grid: the page less its side
+ * padding and the two gaps. It has to track `.album__slots` — if the column count
+ * or the gap changes, change it here too.
+ *
+ * `--page-pad-x` is the page's own horizontal padding, and it is a variable rather
+ * than a literal because THREE things have to agree on it: the page's padding, the
+ * card slot width above, and the width of the page-turn strips. The strips must
+ * cover the margin and not one pixel of a card, now that cards are clickable — see
+ * the comment above `.album__turn`.
+ *
+ * `--book-w` is here for the same reason: the collection page centres the book on
+ * the stage and lays the pack shelf in the margin the book leaves beside it, so it
+ * has to know how wide the book is from outside `.album`.
+ */
+:root {
+  --page-w: min(40vw, calc(59vh * 0.78), 520px);
   --page-h: calc(var(--page-w) / 0.78);
+  --page-pad-x: 22px;
+  --album-card-w: calc((var(--page-w) - var(--page-pad-x) * 2 - 28px) / 3);
+  --book-w: calc(var(--page-w) * 2);
+}
 
+/*
+ * The phone book, which is a different page shape and a tighter grid.
+ *
+ * `.album--mobile` is applied by `useIsMobile`, which is MUI's `down('sm')` —
+ * exactly this query. The two must stay in step: the class styles the book, this
+ * sizes anything outside it that has to agree with the book.
+ */
+@media (max-width: 599.95px) {
+  :root {
+    --page-w: min(80vw, calc(58vh * 0.72), 380px);
+    --page-h: calc(var(--page-w) / 0.72);
+    /* Same page padding, tighter gaps — see `.album--mobile .album__slots`. */
+    --album-card-w: calc((var(--page-w) - var(--page-pad-x) * 2 - 16px) / 3);
+    /* One page on screen — see `.album--mobile`. */
+    --book-w: var(--page-w);
+  }
+}
+
+.album {
   perspective: 2600px;
   perspective-origin: 50% 42%;
   display: flex;
   justify-content: center;
   padding: 4px 0;
+  /* Containing block for the page-turn strips. */
+  position: relative;
 }
 
 .album__book {
@@ -43,8 +95,23 @@
   width: calc(var(--page-w) * 2);
   height: var(--page-h);
   transform-style: preserve-3d;
+  /* Slides the cover to centre when shut — see "The closed book" below. */
+  transition: transform calc(320ms * var(--anim, 1)) ease;
   border-radius: 4px;
-  /* Tooled leather binding with a brass edge, sitting on the felt. */
+}
+
+/*
+ * Tooled leather binding with a brass edge, sitting on the felt.
+ *
+ * Its own element rather than a background on `.album__book`, because the closed
+ * book has to hide it and bring it back on a delay — and `background` between
+ * `none` and a gradient does not transition, while an element's opacity does.
+ */
+.album__binding {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: 4px;
   background: linear-gradient(180deg, #4a3a22 0%, #33270f 100%);
   box-shadow:
     0 0 0 2px #6b5325,
@@ -94,6 +161,57 @@
   box-shadow: inset 12px 0 24px -12px rgba(0, 0, 0, 0.7);
 }
 
+/* ---------------------------------------------------------------- *
+ * The closed book
+ *
+ * `flipped === 0` means no leaf has turned, so the only thing showing is the
+ * cover — which lives on the right half, because leaves hang off the spine at
+ * the book's centre. Left as-is that reads as an open book with a cover printed
+ * on the right page, so the whole book slides half a page left to bring the
+ * cover to the middle.
+ *
+ * The binding and the inside covers are hidden rather than clipped: `clip-path`
+ * would flatten `preserve-3d` and break the very first page turn. The cover face
+ * already carries its own leather, so the only thing missing is the drop shadow,
+ * which moves to the leaf for the duration.
+ *
+ * **They come back only once the cover has finished falling.** Hiding is
+ * immediate, but revealing waits out the full 620ms leaf flip, because the cover
+ * lands on top of exactly the area they occupy. Without the delay they snapped to
+ * full opacity the instant the book started opening, so you watched the empty
+ * inside cover — "TAFELVOETBAL" and all — sit there while the cover fell into it.
+ * A 0s duration on a delay makes the change discrete, which is what is wanted:
+ * nothing should be seen fading, it should simply already be there underneath.
+ * ---------------------------------------------------------------- */
+
+.album--closed {
+  cursor: pointer;
+}
+
+.album--closed .album__book {
+  transform: translateX(calc(var(--page-w) / -2));
+}
+
+.album__binding,
+.album__backing {
+  transition: opacity 0s linear calc(620ms * var(--anim, 1));
+}
+
+.album--closed .album__binding,
+.album--closed .album__backing {
+  opacity: 0;
+  transition-delay: 0s;
+}
+
+/* Only the cover leaf: every leaf sits at the same place in the closed pile, so
+   shadowing all of them stacks a dozen copies into a black halo. */
+.album--closed .album__leaf--cover {
+  box-shadow:
+    0 0 0 2px #6b5325,
+    0 26px 50px rgba(0, 0, 0, 0.65),
+    0 6px 14px rgba(0, 0, 0, 0.5);
+}
+
 .album__leaf {
   position: absolute;
   top: 0;
@@ -138,17 +256,74 @@
  * The page itself
  * ---------------------------------------------------------------- */
 
+/*
+ * A printed page, not a tinted rectangle.
+ *
+ * Four layers, outermost first: a hairline keyline inset from the trim with a
+ * second rule just inside it, a very faint ruled grid the card slots sit on, a
+ * ghosted monogram in the middle of the leaf, and the aged paper itself. None of
+ * it competes with the cards — everything is within a few percent of the paper
+ * colour — but a page with nothing printed on it reads as a placeholder.
+ */
 .album__page {
   height: 100%;
   box-sizing: border-box;
-  padding: 18px 22px 12px;
-  background: #f4efdd;
-  background-image:
-    radial-gradient(circle at 50% 0%, #fffcf0 0%, #e8e1c9 100%);
+  /* Horizontal padding via the shared variable: the turn strips are exactly it. */
+  padding: 18px var(--page-pad-x) 12px;
+  position: relative;
+  background:
+    /* Ruled grid, one line per card row. */
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 calc(33.33% - 1px),
+      rgba(107, 83, 37, 0.07) calc(33.33% - 1px) 33.33%
+    ),
+    radial-gradient(circle at 50% 0%, #fffcf0 0%, #e8e1c9 100%),
+    #f4efdd;
   display: flex;
   flex-direction: column;
   font-family: Tahoma, "MS Sans Serif", Verdana, sans-serif;
   color: #3a3222;
+}
+
+/* The printed border: a keyline with a companion rule, as on a plate book. */
+.album__page::before {
+  content: "";
+  position: absolute;
+  inset: 8px;
+  z-index: 0;
+  pointer-events: none;
+  border: 1px solid rgba(107, 83, 37, 0.32);
+  box-shadow: inset 0 0 0 3px transparent, inset 0 0 0 4px rgba(107, 83, 37, 0.14);
+}
+
+/* Ghosted monogram, so the paper is never simply empty behind a missing card. */
+.album__page::after {
+  content: "T";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: Georgia, "Times New Roman", serif;
+  /* Page-relative: `cq` units would resolve against the card, not the page. */
+  font-size: calc(var(--page-w) * 0.42);
+  line-height: 1;
+  color: rgba(107, 83, 37, 0.05);
+}
+
+/*
+ * Printed matter is decoration and must stay behind the cards. Both pseudo
+ * elements are positioned, and `::after` is the last child, so without this it
+ * paints straight over the collection.
+ */
+.album__page-header,
+.album__slots,
+.album__page-number {
+  position: relative;
+  z-index: 1;
 }
 
 /* Pages darken toward the spine, which is what actually sells the binding. */
@@ -197,6 +372,103 @@
   align-content: start;
 }
 
+/*
+ * One slot per grid cell. The card sits inside it, and the slot draws whatever
+ * holds the card down — see the per-style mounts in albumstyle.css.
+ *
+ * The slot carries the card's aspect ratio so the two boxes are *identical*.
+ * Without it the slot is as tall as the grid row and a mount drawn on it cannot
+ * line up with the card at all.
+ *
+ * It is a `<button>`, because clicking a card opens it in the viewer and that has
+ * to work from the keyboard too. Everything a button brings with it is stripped
+ * back to the plain box the mounts were designed against, and the aspect ratio is
+ * the reason `display: block` is spelt out — a button's default `inline-block`
+ * would leave the ratio resolving against a shrink-to-fit width.
+ */
+.album__slot {
+  position: relative;
+  aspect-ratio: 5 / 7;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  /* The card's own radius, so the focus ring below follows the card's corners. */
+  border-radius: 6px;
+}
+
+/*
+ * The same inset ring the page-turn strips use. Inset, because a ring outside the
+ * slot would sit on the paper between two cards rather than on the card.
+ */
+.album__slot:focus-visible {
+  outline: 2px solid var(--accent, #a9853c);
+  outline-offset: -3px;
+}
+
+/*
+ * The mount. Exactly the card's box, corner radius included — never larger.
+ *
+ * A filled slot hides it completely, so the edges fall directly under the card.
+ * An empty slot has to *show* it, and the way to do that is to draw it over the
+ * ghost rather than to make it bigger: an outline a few pixels proud is not the
+ * position the card occupies, it is a slightly wrong rectangle drawn around it.
+ * The mount fills are all translucent tints, so on top they read as a die-cut
+ * edge on the exact footprint without hiding who is missing.
+ */
+.album__slot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 6px;
+}
+
+.album__slot--empty::before {
+  z-index: 2;
+}
+
+.album__slot .card {
+  position: relative;
+  z-index: 1;
+}
+
+/*
+ * **No drop shadow in the album.** A card in an album is glued, slipped or
+ * mounted flat — it is not hovering over the page, and the base card's
+ * `0 3px 9px` made every one of them float. Any depth belongs to the *mount*
+ * instead, as an inset on the slot, which is where a real recess casts it.
+ */
+.album__slots .card {
+  box-shadow: none;
+}
+
+/*
+ * The leather album's empty position: a dashed gilt rule on the card's exact
+ * footprint, like every other style. Corner ticks were tried and dropped — the
+ * edge is a dash everywhere, and brackets plus a dashed rule read as two ideas
+ * competing on one small rectangle.
+ */
+.album--leder .album__slot::before {
+  border: 2px dashed rgba(138, 112, 67, 0.55);
+  background: rgba(107, 83, 37, 0.05);
+}
+
+/* Printed placeholder, not a dark card sitting in a bright album. */
+.album--leder .album__slot--empty .card {
+  --tier-a: #e7ddc4;
+  --tier-b: #cec2a2;
+  --tier-ink: #8a7d5f;
+  opacity: 0.55;
+}
+
 /* Cards fill their grid cell rather than keeping a fixed pixel width — a fixed
    width overflows the column at any page size we can actually fit on screen.
    `aspect-ratio` on .card takes care of the height. */
@@ -230,6 +502,16 @@
   box-shadow: inset 12px 0 24px -12px rgba(0, 0, 0, 0.7);
 }
 
+/* "Verzamelalbum van", above the owner's name. Deliberately the smaller of the
+   two: the name is what the cover is for. */
+.album__cover-kicker {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(10px, 1.1vw, 13px);
+  font-style: italic;
+  letter-spacing: 1px;
+  opacity: 0.75;
+}
+
 .album__cover-title {
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(18px, 2.2vw, 28px);
@@ -252,22 +534,121 @@
 }
 
 /* ---------------------------------------------------------------- *
- * Controls
+ * Page controls — on the book, not beside it
+ *
+ * A strip down the outer edge of each open page. That edge is where a hand
+ * actually goes, and it is the only part of the page with nothing printed on it.
+ *
+ * **It is exactly the page's own margin and not a pixel more.** It used to run
+ * `clamp(28px, 3vw, 48px)`, which reached ~26px into a 144px card column — free at
+ * the time, because nothing in the album was clickable underneath it. Cards are
+ * clickable now, so that overlap became a dead zone on the one column a hand
+ * naturally lands on: ~18% of an outer card on a desktop, ~25% on a phone. Hence
+ * `--page-pad-x`, shared with `.album__page`'s padding so the two cannot drift.
+ *
+ * The cost is a narrower target, and it is paid differently on each: with a cursor
+ * 22px is a comfortable edge to hit, and on a phone swipe was always the primary
+ * gesture with the strip only ever the fallback.
+ *
+ * Pinned to the book rather than to `.album`, whose width is a flex result:
+ * `50% ± --book-w/2` lands on the book's own edges whether the container hugs it
+ * or is stretched wider, because the book is centred either way.
+ *
+ * Deliberately not `.game-button`, and **no arrow drawn on it**: a chrome button
+ * or a printed glyph would be the one thing on this page that is not part of the
+ * book. The whole affordance is the edge itself lighting under the cursor, plus
+ * the pointer — the same deal the closed cover already offers.
  * ---------------------------------------------------------------- */
 
-/* ---------------------------------------------------------------- *
- * Page controls — flanking the book, not underneath it
- * ---------------------------------------------------------------- */
-
-.album__arrow {
-  flex: none;
-  width: clamp(34px, 3.4vw, 46px);
-  height: clamp(64px, 9vh, 104px);
-  font-size: clamp(18px, 1.8vw, 24px);
+.album__turn {
+  position: absolute;
+  /* Matches `.album`'s own top padding, so the strip spans exactly the page. */
+  top: 4px;
+  height: var(--page-h);
+  /* The page margin, and nothing of any card. See above. */
+  width: var(--page-pad-x);
+  /* Above every leaf — `leafZ` tops out at leafCount + 2, never this. */
+  z-index: 40;
+  /*
+   * ...and z-index alone is not enough: `.album` has `perspective`, so its
+   * children share a 3D rendering context with the leaves, where paint order
+   * comes from depth rather than from z-index. The faces sit at `translateZ(1px)`
+   * (they need it, or they z-fight), which would put them in front. 2px clears
+   * that. It is not enough to be seen: at a 2600px perspective it scales the
+   * strip by 0.08%. A leaf mid-turn still sweeps far in front and passes over the
+   * strip, which is what a turning page should do.
+   */
+  transform: translateZ(2px);
+  border: 0;
   padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /*
+   * Invisible at rest. Not `background: none` on the element itself, because the
+   * wash has to fade rather than snap, and a gradient cannot transition from
+   * `none` — so it lives on the pseudo element at zero opacity instead.
+   */
+  background: none;
+  cursor: pointer;
+}
+
+.album__turn--prev {
+  left: calc(50% - var(--book-w) / 2);
+}
+
+.album__turn--next {
+  right: calc(50% - var(--book-w) / 2);
+}
+
+/*
+ * The wash: warm light gathering at the trim under the cursor, as if the edge
+ * were being lifted. It fades inward so it never reaches the cards, and it is the
+ * only thing announcing the control — hence a slow-ish fade in and a faster one
+ * out, which reads as light rather than as a UI state.
+ */
+.album__turn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 90ms ease;
+  border-radius: 3px;
+}
+
+.album__turn--prev::before {
+  background: linear-gradient(90deg, rgba(255, 249, 226, 0.5), transparent 88%);
+}
+
+.album__turn--next::before {
+  background: linear-gradient(270deg, rgba(255, 249, 226, 0.5), transparent 88%);
+}
+
+.album__turn:hover::before,
+.album__turn:focus-visible::before {
+  opacity: 1;
+  transition-duration: 160ms;
+}
+
+/* Pressed: the light dips, which is the only "click" the strip can show. */
+.album__turn:active::before {
+  opacity: 0.6;
+}
+
+/*
+ * Keyboard reaches the turn too, and with no glyph on the strip the wash alone is
+ * not a focus ring. Inset, because an outline outside the trim would float over
+ * the felt beside the book.
+ */
+.album__turn:focus-visible {
+  outline: 2px solid var(--accent, #a9853c);
+  outline-offset: -3px;
+}
+
+/*
+ * At either end the strip stops responding entirely rather than greying out.
+ * There is nothing drawn to grey out, and a book with no page left to turn simply
+ * does not light there.
+ */
+.album__turn:disabled {
+  pointer-events: none;
 }
 
 .album__nav-label {
@@ -286,18 +667,26 @@
  * both simpler and more usable here.
  * ---------------------------------------------------------------- */
 
+/* The page size itself comes from the `max-width: 599.95px` block at the top of
+   this file, which is the same breakpoint that adds this class — and so does
+   `--book-w`, which that block narrows to one page for the turn strips. */
 .album--mobile {
-  --page-w: min(80vw, calc(58vh * 0.72), 380px);
-  --page-h: calc(var(--page-w) / 0.72);
-
   perspective: none;
   overflow: hidden;
 }
 
+/*
+ * The strip is NOT widened on a phone. It was — `clamp(34px, 11vw, 56px)`, on the
+ * grounds that a thumb is not a cursor and no hover ever arrives to hint the strip
+ * is there. But that reached a quarter of the way across the outer card column, and
+ * with cards clickable a tap meant for a card turned the page instead. Swipe was
+ * always the primary gesture here and the strip only the fallback, so the fallback
+ * is the thing that gives way.
+ */
+
+/* No binding element is rendered on mobile, so there is no leather to suppress. */
 .album--mobile .album__book {
   width: var(--page-w);
-  background: none;
-  box-shadow: none;
   overflow: hidden;
   border-radius: 3px;
 }

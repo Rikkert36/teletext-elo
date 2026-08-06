@@ -67,8 +67,14 @@ const PlayerPicker: React.FC<PlayerPickerProps> = ({ players, value, onChange })
             margin: 0,
             padding: 0,
             listStyle: 'none',
-            background: '#1f180e',
-            border: '1px solid #6b5325',
+            /*
+             * Tokenised rather than hard-coded brass: the tabletop stages print
+             * this list on paper, where black-on-brass reads as a hole in the
+             * page. Fallbacks are the original values, so every other theme is
+             * untouched.
+             */
+            background: 'var(--menu-bg, #1f180e)',
+            border: '1px solid var(--menu-border, #6b5325)',
             borderRadius: 3,
             zIndex: 40,
             maxHeight: 210,
@@ -91,18 +97,18 @@ const PlayerPicker: React.FC<PlayerPickerProps> = ({ players, value, onChange })
                   padding: '6px 8px',
                   border: 'none',
                   background: 'transparent',
-                  color: '#f0e6cd',
+                  color: 'var(--menu-ink, #f0e6cd)',
                   font: 'inherit',
                   fontSize: 12,
                   cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#a9853c';
-                  e.currentTarget.style.color = '#241a05';
+                  e.currentTarget.style.background = 'var(--menu-hi, #a9853c)';
+                  e.currentTarget.style.color = 'var(--menu-hi-ink, #241a05)';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = '#f0e6cd';
+                  e.currentTarget.style.color = 'var(--menu-ink, #f0e6cd)';
                 }}
               >
                 {splitName(player.name).display}

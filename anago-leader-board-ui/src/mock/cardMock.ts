@@ -122,21 +122,45 @@ const ACTIVE_POOL: CardPlayer[] = [
  * rated on their all-time-high visibleRating — which only the backend can
  * compute, since it needs the full game replay. These exist purely so the
  * legends pages have something to render; replace wholesale in phase 2.
+ *
+ * Names are kept to a plausible length on purpose. They were "Legende —
+ * placeholder A", which at 23 characters is longer than any real name and
+ * ellipsized on the card at every font size worth using — so the placeholders
+ * were making a decision about type size look wrong that was actually fine.
  */
 const LEGEND_POOL: CardPlayer[] = [
-  { id: 'legend-placeholder-1', name: 'Legende — placeholder A', visibleRating: 1690, numberOfGames: 520, isLegend: true },
-  { id: 'legend-placeholder-2', name: 'Legende — placeholder B', visibleRating: 1420, numberOfGames: 310, isLegend: true },
-  { id: 'legend-placeholder-3', name: 'Legende — placeholder C', visibleRating: 1180, numberOfGames: 244, isLegend: true },
-  { id: 'legend-placeholder-4', name: 'Legende — placeholder D', visibleRating: 1075, numberOfGames: 190, isLegend: true },
-  { id: 'legend-placeholder-5', name: 'Legende — placeholder E', visibleRating: 960, numberOfGames: 122, isLegend: true },
-  { id: 'legend-placeholder-6', name: 'Legende — placeholder F', visibleRating: 845, numberOfGames: 88, isLegend: true },
+  { id: 'legend-placeholder-1', name: 'Legende A', visibleRating: 1690, numberOfGames: 520, isLegend: true },
+  { id: 'legend-placeholder-2', name: 'Legende B', visibleRating: 1420, numberOfGames: 310, isLegend: true },
+  { id: 'legend-placeholder-3', name: 'Legende C', visibleRating: 1180, numberOfGames: 244, isLegend: true },
+  { id: 'legend-placeholder-4', name: 'Legende D', visibleRating: 1075, numberOfGames: 190, isLegend: true },
+  { id: 'legend-placeholder-5', name: 'Legende E', visibleRating: 960, numberOfGames: 122, isLegend: true },
+  { id: 'legend-placeholder-6', name: 'Legende F', visibleRating: 845, numberOfGames: 88, isLegend: true },
 ];
 
 /* ------------------------------------------------------------------ *
  * The rating scale: piecewise-linear interpolation, 40..99.
  * ------------------------------------------------------------------ */
 
-/** [visibleRating, overall] anchors. Lives in appsettings.json in phase 2. */
+/**
+ * [visibleRating, overall] anchors. Lives in appsettings.json in phase 2.
+ *
+ * Everything up to 1851 is the original table and must stay that way: 1851 is the
+ * highest rating ever recorded (Petar, over 1746 games), it is pinned to exactly
+ * 90, and every player sits at or below it. Overall also drives the ticket
+ * weighting, so moving any anchor in that range silently re-balances rarity.
+ *
+ * Above 1851 the table used to run out to `4000 -> 98`, which reserved 9 of the
+ * 59 available points — 15% of the scale — for a region nobody has ever been
+ * near. Paying for that headroom made the top steep: a point cost 146 rating at
+ * 1851 and 400 by the end.
+ *
+ * Landing 99 at 3000 instead spends that span on ratings that are at least
+ * imaginable. Three even steps of +3, and the first of them continues the slope
+ * of the segment below almost exactly (117 -> 116 rating per point, a 0.99x
+ * kink), so 1500 through 3000 is now effectively one straight line.
+ *
+ * No player's overall changed, because nothing at or below 1851 moved.
+ */
 const SCALE_ANCHORS: ReadonlyArray<readonly [number, number]> = [
   [0, 40],
   [200, 47],
@@ -147,10 +171,9 @@ const SCALE_ANCHORS: ReadonlyArray<readonly [number, number]> = [
   [1250, 84],
   [1500, 87],
   [1851, 90],
-  [2200, 92],
-  [2600, 94],
-  [3200, 96],
-  [4000, 98],
+  [2200, 93],
+  [2600, 96],
+  [3000, 99],
 ];
 
 const OVERALL_CAP = 99;
@@ -207,13 +230,54 @@ export const TIER_LABELS: Record<Tier, string> = {
  * exactly when it ends, so a 75 shows the shimmer and **no radiation at all** —
  * radiation only begins once the 75 cutoff has passed.
  */
-const CEREMONY_SHIMMER = 0.34;
+/*
+ * Expressed as a nominal millisecond split and then divided, rather than as four
+ * hand-written fractions.
+ *
+ * Everything downstream needs *fractions* of `getCeremonyMs()`, because the debug
+ * panel can retune the total at runtime and the proportions have to survive that.
+ * But the thing anyone actually wants to change is "how long is the shimmer" and
+ * "how long is the radiation" — and with bare decimals those two are impossible to
+ * adjust independently: stretching the radiation means raising the total *and*
+ * lowering the shimmer fraction by exactly the compensating amount, then re-spacing
+ * every step. Deriving them keeps that arithmetic honest.
+ *
+ * The 680/1980 split is the settled one and matches `DEFAULT_CEREMONY_MS` (2660)
+ * in utils/animationSpeed.ts — at the ×2 multiplier, a 1360ms shimmer and up to
+ * 3960ms of radiation. Radiation was stretched 1.5× from an earlier 1320 with the
+ * shimmer held where it was: the shimmer is a single pass across the card and
+ * slowing it just made the highlight crawl, while the radiation is the part that
+ * carries the suspense.
+ */
+const CEREMONY_SHIMMER_MS = 680;
+const CEREMONY_RADIATE_MS = 1980;
+const CEREMONY_TOTAL_MS = CEREMONY_SHIMMER_MS + CEREMONY_RADIATE_MS;
+
+/**
+ * The build has two phases: a shimmer pass, then radiation.
+ *
+ * The shimmer comes first and is identical for everyone. Level 1 turns over
+ * exactly when it ends, so a 75 shows the shimmer and **no radiation at all** —
+ * radiation only begins once the 75 cutoff has passed.
+ */
+const CEREMONY_SHIMMER = CEREMONY_SHIMMER_MS / CEREMONY_TOTAL_MS;
+
+/**
+ * Levels 2–4 split the radiation window into equal thirds; level 1 gets none, so
+ * it lands exactly on the end of the shimmer.
+ *
+ * Even spacing is the point — the gap between consecutive tiers is what you are
+ * reading when the build fails to end, and an uneven one would make some tiers
+ * easier to tell apart than others.
+ */
+const ceremonyStepRatio = (level: number): number =>
+  (CEREMONY_SHIMMER_MS + (CEREMONY_RADIATE_MS * (level - 1)) / 3) / CEREMONY_TOTAL_MS;
 
 const CEREMONY_STEPS: ReadonlyArray<{ from: number; build: number }> = [
-  { from: 75, build: CEREMONY_SHIMMER },
-  { from: 80, build: 0.56 },
-  { from: 85, build: 0.78 },
-  { from: 90, build: 1 },
+  { from: 75, build: ceremonyStepRatio(1) },
+  { from: 80, build: ceremonyStepRatio(2) },
+  { from: 85, build: ceremonyStepRatio(3) },
+  { from: 90, build: ceremonyStepRatio(4) },
 ];
 
 /** Fraction of the build spent on the shimmer, before any radiation. */
@@ -477,6 +541,32 @@ export const firstNameOf = (name: string): string => {
 
 export const avatarUrl = (playerId: string): string =>
   `${window.TAFELVOETBAL_SERVER_URL}/api/player/${playerId}/avatar`;
+
+/**
+ * The one thing printed on the front of a packet: how many cards are in it.
+ *
+ * Nothing else. Not "kaarten", not why it was granted — the wrapper carries the
+ * badge and this number and that is all, so the number has to stand on its own.
+ *
+ * A forced pack from the test panel or the console shows its guarantee instead
+ * (`80+` for `guaranteeLevel: 2`); those are always single cards, so no count is
+ * lost. Debug packets are the only ones that ever print anything but a number, and
+ * the only orange ones (see `packFoil`) — a wrapper that is lying to you about the
+ * odds should look like it.
+ *
+ * The thresholds come from `CEREMONY_STEPS`, so the print cannot drift from the
+ * levels the draw actually guarantees.
+ */
+export const packPrint = (pack: Pack): string => {
+  const floor =
+    pack.guaranteeLevel === undefined ? undefined : CEREMONY_STEPS[pack.guaranteeLevel - 1]?.from;
+
+  if (floor !== undefined) return `${floor}+`;
+  if (pack.guaranteeTier) return TIER_LABELS[pack.guaranteeTier];
+  if (pack.guaranteePlayerId) return '1';
+
+  return `${pack.size}`;
+};
 
 /** Initials for the fallback portrait when a player has no avatar on disk. */
 export const initialsFor = (name: string): string => {

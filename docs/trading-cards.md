@@ -1,6 +1,6 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-05)
+## Where this stands (last updated 2026-08-06)
 
 **Phase 1 (frontend on mock data) is essentially complete.** Everything below the
 "Presentation layer" heading has been built and iterated on at length; the
@@ -11,10 +11,20 @@ Done and signed off: the mock data module, the `cardsClient` seam, the Panini ca
 face, the album's stiff 3D flip, the pack opener's five beats, the FLIP travel,
 the new-card marking, the four-level ceremony, and the D-minor payoff ladder.
 
-**The one open visual decision:** which of the five stage directions to use
-(`utils/stageTheme.ts`, switchable live from the test panel — see the table under
-"Framing"). Once picked, fold its tokens into `.game-stage` and delete the other
-four, `stageTheme.ts`, and the switcher.
+Newest: the **card viewer** — click any slot, including an empty one, and the card
+fills the screen with its full name, nickname, tier and duplicate count, browsable
+left and right through the whole book. The count also reaches the album's tooltip.
+The page-turn strips narrowed to the page margin to make room for the click.
+
+**The one open visual decision:** which stage direction to use
+(`utils/stageTheme.ts`, switchable live from the test panel — see the tables under
+"Framing"). Ten candidates in two families: **A–E** treat the stage as a screen the
+book is displayed on, **F–J** as a table it is lying on. Once one is picked, fold
+its tokens into `.game-stage` and delete the other nine, `stageTheme.ts`,
+`tabletop.css` and the switcher.
+
+A book style is being chosen separately and independently (`utils/albumStyle.ts`) —
+that is the book, this is what it lies on.
 
 **Then:** phase 2, the backend. Nothing in `AnagoLeaderboard/` has been touched.
 
@@ -60,7 +70,7 @@ sized by how well they did, and collections build toward a legends unlock.
 | Free pack | One 1-card pack per player per day. |
 | Pack expiry | **Hard.** Unrevealed at end of day = gone. |
 | Contents rolled | At reveal time. |
-| Duplicates | **Not** shown on the card at all. New cards are marked instead, with a glow at reveal. No conversion economy. |
+| Duplicates | **Not** shown on the card at all — but in the tooltip and the card viewer, which are off-face surfaces. New cards are marked instead, with a glow at reveal. No conversion economy. |
 | Card rating | **Live**, computed on read from `visibleRating`. No stat columns on the card. |
 | Card sub-stats | **Dropped.** Not worth it for ~15 active players. |
 | Rarity axis | Rating alone — no foils, no serials, one card per player. |
@@ -68,17 +78,16 @@ sized by how well they did, and collections build toward a legends unlock.
 | Legends | Completing the active set permanently unlocks inactive (≥10 games) players in packs, alongside actives. Rated on all-time-high. |
 | Cards ↔ games | `CardInstance.GameId` FK with cascade delete. |
 | Cards ↔ players | `SubjectPlayerId` FK, **also cascade**. Player deletion only ever happens for accidentally-created players, so losing their cards is correct. |
-| Presentation | Full-bleed 2002 **PC-game** screen, no OS chrome. Token-driven; **five directions still being chosen between**. |
+| Presentation | 2002 **PC-game** screen, no OS chrome. Token-driven; **ten directions still being chosen between**, in two families — five screens (A–E) and five wooden tabletops (F–J). |
 | Album | Hand-rolled stiff CSS 3D page flip. No new dependency. |
 | Card face | **Panini**: photo near-full-bleed and masked into the metal, no plates, first name only, DIN type, no stats. |
 | Sound | Fully **synthesised** (WebAudio, no assets). Default on, persisted mute. |
-| Pacing | Two knobs — `DEFAULT_SCALE` (2) and `DEFAULT_CEREMONY_MS` (1500). Everything derives from them. |
+| Pacing | Two knobs — `DEFAULT_SCALE` (2) and `DEFAULT_CEREMONY_MS` (2000). Both settled by ear on the sliders and baked in. |
 | Reveal ceremony | Graduated over four levels at 75/80/85/90 overall. Identical at any timestamp `t`; only the *length* differs. |
 
 Deferred: trading between collections.
 
-Still open: **which of the five stage directions to use** — the last remaining
-visual decision.
+Still open: **which stage direction to use** — the last remaining visual decision.
 
 ## The legends pool
 
@@ -115,15 +124,49 @@ bend. So: **piecewise-linear interpolation** through an anchor table.
 | 1250 | 84 |
 | 1500 | 87 |
 | 1851 | 90 |
-| 2200 | 92 |
-| 2600 | 94 |
-| 3200 | 96 |
-| 4000 | 98 |
+| 2200 | 93 |
+| 2600 | 96 |
+| 3000 | 99 |
 | above | clamp 99 |
 
 Slope rises monotonically to a peak of `.05` in the 800–1000 band then falls
 monotonically — an S-curve inflecting exactly where the anchors demand. 99 is
 unreachable in practice.
+
+### Why 99 lands at 3000 and not 4000
+
+Everything up to **1851 is fixed** and must stay so. It is the highest rating ever
+recorded (Petar, over 1746 games), it is pinned to exactly 90, and every player
+sits at or below it — and since overall also feeds the ticket weighting, moving
+any anchor in that range silently re-balances rarity.
+
+The table originally ran on to `4000 → 98`, which reserved 9 of the 59 available
+points — **15% of the scale** — for ratings nobody has been near. That headroom is
+what made the top steep: a point cost 146 rating at 1851 and 400 by the end.
+
+Spending the same span on ratings that are at least imaginable gives three even
+steps of +3. The first continues the slope below it almost exactly — 117 → 116
+rating per point, a **0.99× kink** — so 1500 through 3000 is now effectively one
+straight line:
+
+| overall | old cutoff | new | width old | width new |
+|---:|---:|---:|---:|---:|
+| 90 | 1792 | 1792 | 146 | **117** |
+| 92 | 2113 | 2025 | 187 | 116 |
+| 94 | 2500 | 2267 | 250 | 133 |
+| 96 | 3050 | 2533 | 350 | 133 |
+| 98 | 3800 | 2800 | 200 | 133 |
+| 99 | 4000 | **3000** | — | — |
+
+**No player's overall changed** — 0 of 34 actives and 0 of the legend
+placeholders — so the odds table, the completion estimates and `DHigh` all stand
+untouched. That is the whole reason this change was safe to make on its own.
+
+Still open, and independent of this: the worst kink on the scale remains **3.13×
+at rating 1000**, where the slope snaps from 20 to 62.5 rating per point. Monotone
+cubic (PCHIP) interpolation over the same anchors would smooth it to 1.50× while
+passing through every anchor exactly; it moves four of forty cards by +1 and
+crosses no tier or ceremony boundary.
 
 Legends use the same scale applied to their **all-time-high** `visibleRating`.
 `GetLeaderBoard` already replays every game in chronological order, so tracking
@@ -459,6 +502,84 @@ palette:
 If **A** wins, the album itself needs rethinking — a leather-and-brass book on
 flat teletext black shares no visual language with it.
 
+#### The tabletop family (F–J)
+
+A second, later premise, in `styles/tabletop.css` and marked with an extra
+`stage-tabletop` class: A–E treat the stage as a **screen the book is displayed
+on**; F–J treat it as a **wooden table the book is lying on**, seen from straight
+above. Which changes far more than the background, and is why they are a family
+rather than five more themes.
+
+All five are **bare wood**, and differ only in the timber. Three rules the family
+follows, each of them arrived at by getting it wrong first:
+
+1. **The table is a table-sized object, not a background.** `width: min(1520px,
+   97vw)`, centred, with a chamfered edge that catches the light and a shadow on
+   the floor; the site's black is the room around it. Bleeding the wood to the
+   edges of the viewport made it a texture behind a page. The figure has to clear
+   the album, which sizes itself from the *viewport* rather than from its
+   container — at 1920×1080 the spread and the shelf cost ~1364px.
+2. **Nothing is spread on it.** An earlier pass put a felt blotter, a paper
+   placemat, a baize inlay and a café cloth under the book. Covering the wood with
+   a mat defeats the only thing these five are for. Bare wood, the book, the
+   packets and the keys.
+3. **Everything is an object or it is engraved.** There is no chrome to hang things
+   on, so a control is either a physical thing lying on the wood — a key, a packet,
+   a slot cut into the surface — or it is type cut into it. Nothing gets a panel:
+   the header, the footer and the packet shelf have no background at all, and the
+   shelf's label is simply engraved above the packets. Buttons become keys with a
+   light face, a hard bottom edge and 2px of travel.
+
+Hence `--table-ink` rather than a single ink token: it has to read against the
+actual timber, so it is light on walnut and dark on pine, and every text token maps
+to it. `--drop` and `--vignette` are the other two — the shadow everything casts
+and how far the light falls off. Objects disagreeing about where the light is kills
+it instantly. There are also no rules (`.game-rule` is hidden): a brass divider is
+screen furniture, and the space between two objects on a table is the divider.
+
+The test panel is deliberately exempt (`.game-plate--debug`): it is scaffolding,
+and it has to stay readable rather than in character.
+
+| | | timber | boards | light |
+| --- | --- | --- | --- | --- |
+| F | eiken | mid-warm quarter-sawn oak, real flake | 138px | lamp above left; coffee ring |
+| G | grenen | scrubbed pale pine, knots, no flake | 208px | flat daylight, almost no falloff |
+| H | mahonie | deep red-brown, ribbon figure, french-polished | none — one glued top | specular streak, hard corner vignette |
+| I | beuken | pale-to-mid beech, very tight, heavy fleck | 116px | even and neutral, no lamp |
+| J | noten | dark walnut, the strongest figure | 124px | lamp hung low, everything else dark |
+
+**The wood is real noise, not gradients.** The first pass faked grain with
+`repeating-linear-gradient` and read as corduroy — grain is noise stretched along
+one axis, irregular and self-similar at several scales, and a repeating gradient is
+by definition none of those. So the five share three inline `feTurbulence` layers
+as data URIs (`--grain-figure`, `--grain-tight`, `--grain-flake`) with
+`baseFrequency` stretched hard along x so the noise elongates into grain running
+the table's length, blended `overlay`/`soft-light` over a base tone, plus board
+seams and the lamp's sheen. No asset is fetched and nothing animates.
+
+Two details that are load-bearing:
+
+- Each grain layer is **stretched over the whole slab** (`100% 100%`), never tiled:
+  turbulence does not tile, and a stretched instance has no seam either.
+- **Strength is baked into each layer's colour matrix**, because CSS has no
+  per-layer background opacity. The matrix maps luminance into a band around
+  mid-grey, which is exactly the value `overlay` and `soft-light` leave untouched.
+
+A species is then a base colour, which of the three layers it uses, the board
+width and its light. Eight layers in a fixed order, so an unused one is spelt
+`none` rather than left out — the parallel `background-size` / `-repeat` /
+`-blend-mode` lists have to stay aligned.
+
+**Packets are packets.** The side panel used to hold buttons captioned
+"3 kaarten". A button that *describes* a packet is a worse object than the packet,
+especially two seconds before you see the real one full size — so the shelf
+renders the same `.pack` element the opener tears apart (`.pack--mini`), at the size
+of a card in the book. Tilts and sheen offsets come from the index, never random, so
+a re-render does not reshuffle the pile. This is not tabletop-only; it is better
+under all ten stages. What makes it work is that the packet is shaped like a packet
+and scaled like the album — see the wrapper bullets under
+[Pack opening](#pack-opening).
+
 ### The album: stiff CSS 3D flip
 
 Hand-rolled, no dependency:
@@ -482,9 +603,51 @@ Sizing is driven by viewport **height** first: `min(40vw, 56vh × 0.78, 520px)`.
 purely width-driven book grew taller than the viewport on shorter screens and
 pushed the controls below the fold.
 
-Page controls **flank the book** rather than sitting under it, with the page label
-as a single line above. Disabled buttons keep a brass outline — a flat dark fill
-vanished against the stage.
+**The page turn is on the book, not beside it.** A transparent strip down the
+outer edge of each open page (`.album__turn`). Clicking the shut cover already
+opened the album, so the same gesture now carries the whole navigation and there
+is no chrome around the furniture. The page label stays as a single line above,
+and it is what tells you where you are.
+
+**Nothing is drawn on the strip** — no arrow, no chevron. The affordance is the
+page edge warming under the cursor plus the pointer, and that is the whole
+control. A glyph printed on the paper is a button the book does not have, which
+is the same objection that removed the flanking arrows; drawing it smaller and
+fainter would only have been a quieter version of the thing being dropped. The
+cost is discoverability, which the cover-click precedent and the label above are
+carrying.
+
+- The strips are **siblings of `.album__book`**, not children. The book is
+  `preserve-3d`, so anything inside it joins the 3D scene and gets depth-sorted
+  against the turning leaves. Out here they are a flat overlay pinned to the
+  book's edges with `50% ± var(--book-w) / 2`, which lands correctly whether the
+  flex container hugs the book or is stretched wider, since the book is centred
+  either way. `--book-w` is one page on mobile.
+- **Not rendered while shut.** The whole cover is the target there, and a second
+  hit area over part of it only competes with that.
+- At either end the strip **stops lighting**, via `pointer-events: none` on
+  `:disabled`. With nothing drawn there is no disabled state to style, which is
+  the point: a book with no page left simply does not respond at that edge.
+- The wash lives on `::before` at zero opacity, not as a `background` on the
+  button — a gradient cannot transition from `none`, so it would snap.
+- It fades **in** over 160ms and **out** over 90ms. Light behaves that way;
+  matched durations read as a UI state toggling.
+- **The strip is exactly the page's own margin and not a pixel more.** It used to
+  run `clamp(28px, 3vw, 48px)` and reach a sliver into the outermost card column,
+  which was free while nothing in the album was clickable — and stopped being free
+  the moment cards opened the viewer, because that overlap became a dead zone on
+  ~18% of an outer card on a desktop and ~25% on a phone, on the one column a hand
+  naturally lands on. The width now comes from `--page-pad-x`, shared with
+  `.album__page`'s padding so the two cannot drift.
+  - The cost is a narrower target, paid differently on each: 22px is a comfortable
+    edge for a cursor, and on a phone swipe was always the primary gesture with the
+    strip only ever the fallback. So the mobile widening (`clamp(34px, 11vw, 56px)`,
+    justified by a thumb having no hover to hint with) is gone too — the fallback is
+    the thing that gives way.
+
+Previously two `.game-button` arrows flanked the book. They worked, but they were
+the one thing on the page that was not part of the book, and they cost horizontal
+space on every screen for a control used at most twice per spread.
 
 Missing cards render as ghosted silhouettes; that is the completion driver and the
 whole reason the album beats a grid. Mobile drops to one page with swipe.
@@ -518,21 +681,289 @@ The photo fills almost the whole card. Everything else is overlaid on it.
   differed in every context it rendered — 0.13 on the reveal hero against 0.23 on
   an album page. Ratios are taken from the results row. This deleted fifteen
   per-context font overrides.
-- No statistics anywhere, no duplicate count, no tier text. Tier reads from the
-  frame and the name plate colour.
+  - `.card__legend` was the last px holdout and has been converted at the ratios it
+    had on the default 150px card. It only became visible as a bug once the viewer
+    rendered a card at 380px, where the badge was a speck; it grows on the reveal
+    hero as a result, which is the correction rather than a regression.
+- No statistics anywhere, no duplicate count, no tier text **on the card**. Tier
+  reads from the frame and the name plate colour. The count and the tier name live
+  in the viewer — see below.
+
+### The card viewer
+
+A card in the book is ~144px wide on a 1920 screen and the photo is what
+disambiguates two Daans, so the album could be browsed cover to cover without ever
+really *seeing* a card. Clicking a slot lifts it out over a scrim, with
+`‹ 12 / 34 ›` beneath it, arrow keys and swipe.
+
+It exists to carry the two facts the face has no room for — the full name with its
+nickname, and how deep the duplicate pile is. **Both are off-face, which is why
+this does not reopen the no-stats decision.** The tooltip already carried the name
+and nickname for exactly that reason; the count simply joins them.
+
+- **The hover tooltip stays a native `title`.** A styled panel is not available
+  here: `.album__face` is `overflow: hidden` under an `.album` that carries
+  `perspective`, so a tooltip rendered inside the page is clipped *and* depth-sorted
+  against the leaves, and one rendered outside the book is the only piece of chrome
+  on a page that has none. The price is the browser's ~1s delay and nothing at all
+  on touch — accepted, because the viewer is the real surface and it is one click
+  away. `ownedLabel()` is shared between the two so they cannot phrase it two ways.
+- **Placeholders are in the sequence and open like any other slot.** Skipping them
+  would mean pressing right jumps two slots left onto the next row, so the sequence
+  would stop matching the page you are looking at. And a silhouette blown up large
+  is the completion driver the album exists for — it gets `nog niet in bezit` where
+  the count goes, and **no overall and no tier**, because the face already prints
+  `??` and greys its frame: what a missing card is worth is part of the hunt.
+- **The details are typeset beside the card, never on it.** On the card this is
+  precisely the statistics block that was designed out; off it, it is the caption a
+  display case has. Existing stage tokens throughout, so it follows whichever of the
+  ten stage directions wins.
+- **The position readout *is* the control.** `‹ 12 / 34 ›` — the counter is
+  information the album genuinely cannot give you, and that is what earns the two
+  chevrons attached to it their place on a page whose own navigation is an unlit
+  page edge. The album's trick does not transfer: over a dark scrim there is no page
+  edge to warm, so at rest there would be nothing there at all. They are type, not
+  `.game-button` plates, which would be the only pressed metal on the screen.
+- **Navigation clamps rather than wraps**, like the turn strips going dead at either
+  end of the book.
+- **The book follows the viewer, silently.** `focusPlayerId` turns to the spread of
+  whatever is on screen, so closing leaves the album where you ended up with no
+  close-time handling at all, and the 620ms leaf transition is never seen. It sets
+  the state directly rather than calling `turn()` — a page-turn sound with no page
+  visible to turn is unexplained noise.
+- **Focus goes back to the card you were last looking at, not the one you clicked**
+  (via `data-slot-player`), since the book has moved underneath. And a face rotated
+  away is still focusable, so `PageFace` takes a `visible` flag and puts every other
+  page's slots at `tabIndex={-1}` — without it, tabbing walks all 34 cards, most of
+  them invisible.
+- **No sound.** Browsing is not an event, and `playSlot` / `playPageTurn` /
+  `playFlip` each already mean something specific elsewhere.
+- **Sized from viewport height first** (`min(52vh, 76vw, 380px)`), as the album is
+  and for the same reason: a 5:7 card grows 1.4× faster vertically than
+  horizontally, so a width-led number runs off a short window long before a narrow
+  one. The scrim's clear centre is measured in **card widths, not percentages** —
+  `.opener__dim`'s lesson, which cost a round there.
+- The card gets its **drop shadow back**: `.album__slots .card` kills it because a
+  card in an album is mounted flat, and this one genuinely is lifted. Silhouettes
+  are **not** faded, though — the per-style opacity is scoped to the book, where a
+  ghost has to sit behind the cards beside it. Nothing sits beside this one.
+- Considered and not done: a **flip to a detail back**, which `cardMock.ts` gestures
+  at ("the nickname lands on the back of the card instead — a back that does not yet
+  exist"). `.card--back` is the wrapper's neutral foil, deliberately blank and shared
+  by every card in the game; giving it content contradicts that. A **FLIP from the
+  slot's rect** is also deliberately absent — the machinery exists in `PackOpener`,
+  but the source slot sits inside `perspective: 2600px` on a rotated face, so the
+  measured rect is a projection rather than layout geometry.
 
 ### Pack opening
 
 Five beats: wrapper → tear → the card arrives → reveal → hand-off to the row.
 
-- **Tear.** The jagged edge is baked into a `clip-path` on two halves and never
-  animates; only the halves move. Only the **top** strip comes off — both halves
-  flying apart read as an explosion, not an opening. `.pack--tearing` must strip
-  the parent's own background, or the halves fly away over a fully intact
-  wrapper and no wrapper ever appears to come off.
+- **The wrapper is a sachet, and the silhouette is what says so.** The first
+  version was foil paint on a 5:7 rounded rectangle — the geometry of the thing
+  inside it — so it read as a card with an unfamiliar back. No amount of texture
+  fixes that. Three things do: **pinked edges** (a heat-sealed bag is cut with a
+  serrated blade, and nothing else in the UI has a jagged outline), a **chrome seal**
+  at each end with a dark seam on the body side, and **size taken from the card** —
+  see the next bullet.
+  - The teeth are a **mask**, not a `clip-path` polygon: no 40-point polygon to
+    maintain, it applies to the torn halves and the seals for free, and the teeth
+    can be a fixed size in px so a packet on the shelf is serrated like the big
+    one rather than carrying a shrunken pattern.
+  - A mask clips box-shadows away entirely, so the packet's shadow is a
+    `filter: drop-shadow` — which is computed from the masked silhouette and is
+    therefore serrated too. Same reason the shelf's focus ring is a pair of
+    stacked drop-shadows: an `outline` survived only at the tooth tips. The one
+    surviving `box-shadow` is the *inset* edge line, and only because its top and
+    bottom runs are hidden behind the chrome; it lives with the shared paint so each
+    torn half keeps its own, and `.pack--tearing` must null it or the wrapper keeps
+    a coloured ring while its halves fly off.
+- **The coloured panel is exactly one card**, and everything that is not the pouch is
+  outside it: `--pack-h` is the card height plus one `--crimp` at each end, and the
+  saw teeth are cut *through* those seals rather than added beyond them, which is what
+  pinking shears do to a heat seal. The width takes no margin, because the panel runs
+  the packet's full width. So a packet stands about a fifth taller than a card — that
+  is the two seals — and is exactly as wide.
+  - **The panel is the measurement, because the panel is the pouch.** A crimp is
+    flattened film sealed to itself with nothing inside it, and the seam shadow under
+    each seal is the film lifting over the card's edge — the same line from the other
+    side. Measuring to the outer edge of the packet, or to the tooth bases, both put
+    the card behind the seals; measuring the *panel* is the only version with a
+    physical reason, and it was got wrong twice before it was got right.
+  - The shelf feeds it `--album-card-w` — one slot of the album's grid, declared on
+    `:root` in album.css precisely so a sibling of the album can read it — so **a
+    packet on the table holds a card from the book.** The packets used to be
+    quarter-size on a `clamp()` unrelated to the book, and next to album cards three
+    times their height they read as icons of packets.
+  - That parity is also what let the whole `.pack--mini` type-scaling block go: within
+    ~1.7× of the hero packet, one set of `%`-based print rules serves both sizes.
+  - Two knock-ons: `.album-side` widened to `clamp(148px, 24vw, 352px)` to fit two
+    packets per row (at 216px the shelf was a scrolling strip one and a half packets
+    tall), and the shelf's `max-height` went 46vh → 56vh so two rows fit.
+  - That width is now an upper bound rather than the width — see "The book does not
+    move" below.
+
+**The book does not move.** `.album-layout` was a two-column flex row, so the book
+centred inside whatever width the shelf left rather than on the stage: it sat
+`(aside + gap) / 2` — about 190px at 1600×900 — right of centre while you held
+packets and snapped back the moment you opened your last one. The book is the
+heaviest object on the page and the only one that moved, and it moved on returning
+from the opener.
+
+The shelf is **out of flow** instead (`position: absolute`, `.album-layout` is its
+containing block). `.album-main` spans the full width and the book centres on the
+stage always, packets or not. Nothing is reserved on the right to balance the shelf
+— the margin the book already leaves is what the packets lie in, which is also the
+truer reading of "objects lying next to the book".
+
+- The cost is that the shelf now gets the room the book leaves rather than asking
+  for 352px. `--shelf-room` on `.album-layout` computes it —
+  `(100vw - 2·--stage-pad - --book-w) / 2 - gap - 16px` — which is resolvable in CSS
+  because every term is viewport-relative. Hence `--book-w` moving from `.album` to
+  `:root` (same reason as `--album-card-w`) and the stage's side padding becoming
+  `--stage-pad`: if the padding in `.game-stage` and the padding in that formula
+  drift apart, the shelf starts overlapping the book.
+- The packets shrink to keep the pile **two columns** where they can, down to a 96px
+  floor, below which the shelf becomes one centred column at whatever size fits. Two
+  columns is what makes it read as a pile; a few percent off card parity is a
+  cheaper price than a list. Card-sized survives from ~1600px wide; 1440×900 gets
+  96px packets in two columns; tall windows (a big book, a thin margin) get one.
+- Below the width where even one packet fits, the shelf goes back above the book in
+  flow. Two triggers, because the book grows with viewport *height* as well:
+  `max-width: 1150px`, or `max-width: 1400px and min-height: 1000px` — a 1300×1400
+  window is wide by the first test but its book is 1040px and leaves 91px a side.
+  Stacking is symmetric, so the book stays centred there too. This replaces the old
+  900px breakpoint.
+- The shelf is also capped to `min(56vh, --page-h)`: out of flow it contributes no
+  height, so a shelf taller than the book would run down over the test panel.
+- Rejected: reserving a mirrored gutter on the right (keeps the book centred, but
+  spends ~700px of layout width on furniture), and animating the collapse with a
+  `grid-template-columns` transition (makes the jump graceful without removing it).
+- **The print is the badge and the number. Nothing else.** It carried "OPENEN" and
+  the grant reason ("testpakje", "gewonnen") too, and both are gone: a wrapper does
+  not caption itself with the instruction for opening it, and the reason is metadata
+  about the grant, not about the product. Both crowded the badge, which is the thing
+  that makes these read as rik-dev packets at all. The reason still reaches anyone who
+  wants it as the tile's `title`/`aria-label`; the opener's hint says what to do.
+  - A debug pack prints its guarantee instead of a count (`80+` for
+    `guaranteeLevel: 2`, thresholds read off `CEREMONY_STEPS` so the print cannot
+    drift from the draw). Those are always single cards, so no count is lost.
+  - Everything is positioned **and sized** in % of the packet, so one set of rules
+    serves the opener and the shelf with no overrides — which only works now the two
+    are within ~1.7× of each other rather than 4×. Nothing may sit inside `--crimp`
+    at either end: print does not survive a fold.
+  - The face is one component (`PackFace`) used in **four** places: the tile, the
+    sealed wrapper, and *both torn halves*. Giving each half the whole face and
+    letting its `clip-path` cut through is what makes the printing tear with the
+    foil; while the print lived on the parent it blinked out the instant you
+    clicked and the halves flew off blank.
+  - The badge asset is **trimmed to the artwork's own alpha bounds**, so its CSS box
+    *is* the badge — hence `aspect-ratio: 320 / 256` rather than a square. The two go
+    together: re-trim or fix the ratio if the asset is replaced, or the badge
+    letterboxes inside its box and stops sitting where the percentages say.
+    (The first asset was the badge on a **black field** and needed a radial mask to
+    dissolve that black into the foil, or it read as a sticker stuck on the packet.
+    A transparent version replaced it and the mask went with it.)
+- **The card back is the back of the wrapper.** Same near-black foil, same chrome, same
+  badge — you tear open a black-and-chrome packet and a black-and-chrome card comes out,
+  which is what a real card product does and what makes the five beats one object rather
+  than two. It replaced a brown leather field with a serif "T7" monogram, which belonged
+  to neither the packet nor the site and competed with the album's binding.
+  Chosen from seven rendered side by side — mosaic to the edge, mosaic vignetted, this
+  one, rings from behind the badge, the table's steel rods, the playfield, and a blind
+  emboss — on all three grounds it has to survive (opener, tabletop, teletekst black).
+  - **No colour of its own.** The packet is coloured by type; the back is the neutral
+    colourway of the same design (near enough the fallbacks in `packFoil.ts`). Every card
+    shares this back, so a coloured one would either leak what is coming or contradict
+    the packet it came from.
+  - **No pattern.** One pool of light behind the badge and one broad foil facet, at the
+    same angle as the face's `--facets` — which is also where the argument against
+    repeating stripes already lives. Every patterned candidate had the same problem: a
+    texture on the back has to be either meaningful or invisible, and a tiled one is
+    neither. Two were tried and dropped: diagonal stripes, and a Mode-7 checkerboard.
+  - **Solid black by the edge**, as the topmost background layer: clear over the middle,
+    black by the border, so the light pools and stops. That is the frame — no chrome rule
+    inside the art, nothing for the eye to catch on. An inset rule was tried and cut.
+  - **No text.** It carried "TAFELVOETBAL" in the Teletekst face for one revision; a back
+    does not need to name the product it is the back of, and it crowded the badge.
+  - The vignette goes **in the background stack**, and the 1px edge is a `::before`
+    element rather than an inset shadow, for two separate reasons. `.card::after` is the
+    foil sheen every card carries, so a `.card--back::after` inherits that gradient and
+    its `z-index` while only partly overriding them (the back keeps the sheen, which is
+    right — it is the same foil as the face). And `.opener__stage .card` re-declares
+    `box-shadow` for the reveal card's drop shadow, outranking anything in card.css, so an
+    inset ring vanishes in the one place the back is on screen at full size.
+- **The surface follows the logo, and there are no stripes.** Near-black foil with the
+  packet's colour pooled in the middle of it (that is how the badge is lit), a neon
+  rim bleeding off the edges, chrome seals like every frame and bar on the badge, and
+  the count set like its LED scoreboard — the one place a number appears in the brand.
+  The diagonal foil grain and the seal ribbing are both deleted: two sets of stripes
+  made the wrapper look woven, and cheap next to the badge. What sells foil is the
+  moving sheen and the side-to-side bulge, not texture.
+- **One colour per *type* of packet** (`utils/packFoil.ts`), not per packet. A 3-card
+  packet is always the same blue, so you learn to recognise a five before you have
+  read the number on it — colour is a property of the product, as on a shelf of real
+  ones. Hues come off the badge: its green (1), its blue man (3), its red man (5), the
+  flame (debug-only forced packs). Fixed saturation and lightness; only the hue moves.
+  - An earlier version hashed `pack.id`, giving every individual packet its own hue
+    out of 21. It made the pile look varied and told you nothing, and no two packets
+    were ever the same product twice.
+  - One hue drives the foil, the rim, the edge line and the numeral together, so a
+    type is one colour rather than a colour plus an accent.
+- **One stage for all five beats.** The sealed wrapper is rendered *inside*
+  `.opener__stage`, the stage's height is fixed at `--pack-h` (its tallest
+  occupant, the packet), and the empty revealed row is rendered during the sealed
+  and tearing beats too. All three are needed: while the wrapper was a sibling of
+  the stage, the wrapper phase was a shorter column with no row beneath it, so
+  `justify-content: center` placed the packet lower than the stage that replaced
+  it and the first card rose dozens of pixels from where you clicked. You clicked
+  one thing and a different thing answered.
+  - The centring then gives something better than stillness for free: a packet is a
+    card plus one tooth at each end, so a card centred in a box one packet tall lands
+    exactly on the coloured panel the wrapper was — same width, same height, same
+    place. The card rises from precisely where it was lying.
+  - This is why the packet's geometry (`--crimp`, `--tooth-*`, `--pack-h`) is declared
+    on `.opener` / `.pack-shelf` and not on `.pack`: the stage has to reserve the
+    packet's height, and a parent cannot read a variable declared on its child. The
+    tooth size has to be up there for the same reason — `--pack-h` is computed from it.
+- **Tear.** The line is baked into a `clip-path` on two halves and never animates; only
+  the halves move. Only the **top** strip comes off — both halves flying apart read as
+  an explosion, not an opening. It tears **just under the top seal**, so what leaves is
+  the sealed end; the original line ran across the middle of the face, which is how you
+  open a sleeve, not a bag. `.pack--tearing`
+  must strip the parent's own background **and its edge line and its seal
+  pseudo-elements and its mask and `overflow`** — the first three leave the halves
+  flying away over an intact wrapper, and the last two clipped the strip out of
+  existence the moment it passed the top edge.
+  - **The line is torn, not cut.** It was eight big regular triangles, which is what a
+    serrated blade leaves — the same shape as the packet's own pinked seals, so the
+    decoration was applied twice and neither read as what it was. Torn film is nearly
+    straight locally (jitter ~0.8% of the packet height, ~3px, against the teeth's
+    5.5%), irregularly spaced so no wavelength is legible, **drifting** overall
+    (10.6% → 13.7% left to right: you tear from one corner and the line runs downhill
+    away from it), with **one deeper nick** where the film caught and gave way at once.
+    A single large feature among many small ones is most of what reads as torn.
+  - Since the clip-path is static, vertex count is free — 24 points per half. They must
+    stay **exact complements**, every point appearing in both lists reversed, or a seam
+    of background shows between the halves for the first frames. The *bottom* copy is
+    the one worth tuning: it sits under the card for the whole reveal, while the top
+    strip is gone in 380ms.
+  - Rejected: an SVG path (buys curves, but both halves then have to be exact
+    complements of a hand-drawn shape) and an `feTurbulence` displacement (genuinely
+    irregular, but a per-frame filter on an element that is mid-animation).
 - **Entrance and flip are on separate elements.** Both animate `transform`, and a
   running animation always beats a class-driven value — on one element the
   rotation was suppressed for the whole entrance and then snapped.
+- **Both faces of the flip need a 3D transform of their own** (`translateZ(1px)`), exactly
+  as the album's leaves do. `backface-visibility: hidden` is ignored on an element that is
+  not itself 3D-transformed, and the back face had none — so it was never culled and
+  showed through the front. It went unnoticed for as long as the back was a dark brown
+  field with nothing bright on it; putting the badge there made it obvious. There is no
+  `perspective` in the opener, so the translate costs nothing visually and changes no
+  measurement the FLIP takes.
+  - Nothing inside a face should carry a `z-index` it does not need, for the same reason:
+    it makes the element a candidate for promotion out of the flattened subtree that
+    back-face culling depends on.
 - **Hold is counted from the end of the flip**, not the start. A single "dwell"
   measured from the turn left the card readable for about 40ms.
 - **Hold depends on newness only** (340ms, +340ms if new). Rarity is expressed in
@@ -579,12 +1010,24 @@ instantly, and every early attempt did.
 
 Two phases:
 
-1. **Shimmer** — a single golden pass across the card, `CEREMONY_SHIMMER` (0.34)
-   of the full build. Identical at every level, including level 1, which is
-   shimmer *only*.
+1. **Shimmer** — a single golden pass across the card, `CEREMONY_SHIMMER` (~0.256
+   of the full build, 680ms nominal). Identical at every level, including level 1,
+   which is shimmer *only*.
 2. **Radiation** — light building out from the card's own edge, starting the
    instant the shimmer ends. Levels 2–4 differ only in where they cut off
-   (`CEREMONY_STEPS` in `mock/cardMock.ts`: 0.34 / 0.56 / 0.78 / 1).
+   (`CEREMONY_STEPS` in `mock/cardMock.ts`: ~0.256 / 0.504 / 0.752 / 1).
+
+Both are **derived from a nominal ms split** (`CEREMONY_SHIMMER_MS` 680 +
+`CEREMONY_RADIATE_MS` 1980) rather than written as fractions, because the two
+phases have to be tunable independently and with bare decimals they are not:
+stretching the radiation means raising the total, lowering the shimmer fraction by
+the exact compensating amount, and re-spacing all four steps. The ratios are still
+what ships — the debug panel retunes the total at runtime and the proportions have
+to survive it.
+
+The radiation was **stretched 1.5×** (1320 → 1980 nominal) with the shimmer left
+at 680. Slowing the shimmer too just makes the highlight crawl across the card;
+the radiation is the phase that carries the suspense.
 
 Implementation notes, each of which cost a round:
 
@@ -603,6 +1046,140 @@ Implementation notes, each of which cost a round:
   future value, which gutted the riser at every cutoff.
 - The glow **survives the turn**. Switching it off at reveal meant all that
   build-up resolved into a card that looked exactly like a common one.
+- **The build reads by contrast, not by output.** The gold was pushed brighter and
+  then wider and read as clearer for neither: a large soft gradient with nothing
+  dark beside it just tints the screen, and past roughly 200px the outer halo
+  lowers the card-to-surround contrast that actually does the work. What fixed it
+  was a vignette (`.opener__dim`) ramping the *surround* down on the same clock as
+  the gold comes up. Before reaching for more brightness or more spread again,
+  check whether the answer is less light elsewhere.
+  - It shares the bloom's `glowing` / `faceUp` / `blooming` flags rather than
+    holding state of its own, so the two halves cannot drift apart at the freeze
+    or the fade. Its clear centre is sized in `--pack-w` units, not percentages —
+    a percentage radius on a viewport-sized layer tracks the window instead of the
+    card, clipping the card's corners on a short window.
+- **Gold motes drawn inward** (`.opener__motes`), added on top of the vignette as
+  the third screen-level layer. The bloom and the vignette are both smooth
+  monotonic ramps with nothing for the eye to follow, which is the deeper reason
+  pushing either one harder kept hitting diminishing returns; the motes are the
+  only part of the build with trackable motion.
+  - This is knowingly close to the line that killed the sunburst beams. It stays
+    the right side of it by being small, sparse (14) and slow, and by being the
+    *only* moving element. Judge it before adding anything else — if the build
+    ever reads as busy, this is the layer to cut first.
+  - **The stream drains rather than fading out.** No new mote sets out, and the ones
+    already travelling finish their run into the card and are absorbed. Fading them
+    out mid-flight instead threw away the one thing the layer is about.
+  - **The drain begins on the turn itself.** Delaying it was tried twice and
+    abandoned both times: at the flip's *end* it collided with the bloom's recession
+    and was never really seen — worst at level 2, where the ramp only reaches about a
+    third to begin with — and at the flip's midpoint it still read as an afterthought.
+    - An early drain did at first make **the flip read as faster than its unchanged
+      640ms**, which is worth remembering as a general trap: nothing about the flip
+      had been touched. But the cause was the *contrast* between a slow stream and
+      a sudden rush, not the timing. Once the motes flew faster of their own accord
+      the gap narrowed and the early drain was fine — the fix was the base speed,
+      not the delay.
+    - `MOTE_DRAIN_RATE` is 3, bounded by the card's departure: every mote must be
+      absorbed before the card leaves for the row, or it is converging on nothing.
+      Worst case is the longest cycle in `MOTES` (760) on a mote that has just set
+      out — 253 at ×3 — so the layer empties about as the flip lands, well inside the
+      660 a duplicate stays up for. `MOTE_DRAIN_MS` (260) has to stay above that
+      figure, or the fade starts while the slowest motes are still travelling.
+  - **The motes' fade is its own flag (`motesOut`), not `blooming`.** Sharing
+    `blooming` is what made the drain invisible: the bloom and vignette must recede
+    the moment the card turns or they hang over an empty stage, which put a 620ms
+    fade directly on top of the drain. The motes need the opposite — to outlive that
+    recession long enough to finish travelling. The fade now trails the drain and is
+    only a safety net, since a drained mote is already held at zero opacity; it does
+    the real work only on the fallback path where nothing drains.
+    - **This is the one part that cannot be CSS.** Letting an in-flight iteration
+      finish means capping the count at "elapsed, plus this one", and CSS cannot
+      read how far along a running animation is. Reaching for
+      `animation-duration` instead is actively wrong: it preserves elapsed *time*,
+      not progress, so every mote jumps to a new spot on the path. The Web
+      Animations API is a browser API, not an animation library — the no-library
+      rule is intact and nothing is added to the bundle.
+    - `fill: 'forwards'` on the capped animation is **load-bearing**. A finished
+      unfilled mote reverts to no transform and lands dead centre on the card, with
+      nothing driving opacity — fourteen solid dots in a heap on the player's face.
+      `.opener__mote { opacity: 0 }` guards the same failure a second way.
+    - Considered and rejected in its place: **motes bouncing off the card** at the
+      turn. It would have collided with `.opener__particles`, the outward burst
+      that fires in the same instant and is top-tier only — doubling it up at
+      level 4 and handing levels 2–3 something close to the top tier's payoff. No
+      rule forbids it (it is after the turn, where level-specific effects are
+      already allowed) but it spends the top tier's distinctiveness, which is much
+      harder to win back than a bounce is to add.
+  - **Only the intensity ramp freezes at the turn; the motes keep drifting.** The
+    ramp freeze is load-bearing — it is what makes an 80 a 90 that stopped early.
+    Mote velocity carries none of that, because the build is already over by the
+    turn, and pausing it too left a field of dead dots sitting still through the
+    whole fade. Anything still visible should still be moving.
+  - **`--mote-cycle` is one variable feeding both the duration and the delay.** The
+    delay is a fraction *of a cycle*, used to spread the motes along the path, so a
+    delay computed against a different length than the animation runs for bunches
+    them up. Overriding the duration alone on the `nth-child(3n)` third did exactly
+    that.
+  - **Nothing about a mote may be uniform across the set — uniform is what produced
+    a visible rotating wheel.** The scatter lives in `MOTES` in `PackOpener.tsx`,
+    computed once at module load from a `fract(sin(n) * large)` hash.
+    - **Velocity is set and the duration derived from it** (`MOTE_SPEED`, ±8% per
+      mote), not the other way round. Drawing cycle length and distance independently
+      let a long cycle pair with a short distance, and the resulting 1.5× spread
+      between slowest and fastest read as a few motes *lagging* rather than as
+      variety. Distances still differ, so cycles are still all distinct.
+    - The killer was **shared cycle lengths**: two durations across 14 motes, with
+      phase offsets spaced evenly across the cycle, means the same ring of motes at
+      the same radii comes round again every cycle. All 14 durations are distinct
+      now, so the configuration only repeats at their common multiple — never,
+      within a build.
+    - Dealing angles out in **coprime strides did not help**, and the reason is
+      worth keeping: every angle was still used exactly once, so the ring stayed
+      evenly covered, which *is* the problem. Replaced by the **golden angle**
+      (137.508°), which never lands on a regular polygon at any count and puts
+      consecutive-in-time motes far apart.
+    - Start distance and phase are jittered too, so they neither appear out of one
+      ring nor set out in an even procession.
+    - The hash is **deterministic and module-level on purpose**. `Math.random()` in
+      the render would deal new values on every state change, and since these become
+      custom properties the keyframes read, a mote mid-flight would jump to a new
+      angle and distance each time `faceUp` or `motesOut` flipped.
+  - **Speed comes from the flight fraction, which is why cycle length and flight speed
+    are separate numbers.** A mote flies over the first **45%** of its cycle
+    (`opener-mote-in`) and spends the remaining 70% landed and invisible. Velocity is
+    distance over *flight time*, so the flight can be shortened — making a mote fly
+    faster — without touching the cycle, which is what governs how often the stream
+    repeats. Currently ~3× the original velocity at a cycle mean of ~1160, which is
+    exactly where the cycle started.
+    - **Lowering the flight fraction thins the stream**, since only that fraction of
+      the motes is airborne at any moment. `MOTE_COUNT` has to rise to compensate —
+      it went 14 → 24 when the fraction went 0.45 → 0.30, holding about 7 motes on
+      screen. Speeding them up without raising the count just empties the screen.
+    - Phase offsets stay spread across the **whole** cycle, not confined to the
+      flight window. Confining them puts every mote on screen at once on the first
+      frame and then leaves a gap behind them — a pulse rather than a stream.
+    - The other two levers were both tried and both cost something. **Shortening the
+      cycle** (to a mean of 626) makes the stream churn and repeat sooner — it is not
+      the same thing as flying faster, which is the distinction the whole layer turns
+      on. **Buying speed from distance** ran `farK` to 4.2, and a mote is fully faded
+      in only a fifth of the way along its path: past about 2.8 card widths that point
+      falls outside a 1080-tall window, so motes travelling vertically stopped fading
+      in and popped into view at the screen edge. Distance is capped by the viewport,
+      not by taste.
+    - For the record, since it looks like a free knob: keeping the current velocity at
+      the original cycle length through distance alone would need `farK` 5.93 — motes
+      starting 1410px out and not visible until 1137px. There is no version of that
+      which works.
+  - `--mote-t` is a *unitless fraction of a cycle* rather than a finished delay, so
+    the spacing still holds when every mote carries a different cycle length. Both
+    the duration and the delay must use the same fallback value, or a mote missing
+    its inline cycle spaces itself against a length it does not run for.
+  - `--mote-cycle` comes from JS and is therefore already through `ms()`; the CSS
+    cannot apply `--anim` to it a second time.
+  - Reduced motion drops the layer entirely rather than stilling it: with the
+    drift removed the motes collapse onto their origin and heap up at the card's
+    centre.
 - The bloom is **class-driven, not a keyframe**: an animation with `forwards`
   pins the final opacity so there is no way back. A transition goes both ways.
   It lives in its own `blooming` state, because `glowing` persists past the turn
@@ -619,37 +1196,42 @@ At three games a day this plays ~1,000 times a year, so it must be skippable and
 brisk. A click anywhere always jumps to the end state.
 
 - **`DEFAULT_SCALE`** (`utils/animationSpeed.ts`) is a duration multiplier,
-  currently **2**. Published to CSS as `--anim`; every CSS duration is
+  **settled at 2**. Published to CSS as `--anim`; every CSS duration is
   `calc(Xms * var(--anim, 1))` and every JS timing goes through `ms()`. The two
   layers cannot drift apart, which they would if tuned separately — a flip
   starting before the card finished arriving, a dwell ending mid-transition.
-- **`DEFAULT_CEREMONY_MS`**, currently **1500** (so 3000ms at ×2). This is the
-  length of the *longest* build, level 4; every other level and both phase
-  boundaries are fractions of it, so raising it slows the shimmer, the radiation
-  and all four cutoffs together. Published unitless as `--ceremony` so CSS can do
+
+  Worth knowing before editing any timing: **every base constant in
+  `PackOpener.tsx` and every duration in the CSS is written at half its real
+  length.** `FLIP_MS = 320` turns in 640ms; `SETTLE_MS = 460` travels in 920ms.
+- **`DEFAULT_CEREMONY_MS`** — **2660**, so **5320ms at ×2**. This is the length of
+  the *longest* build, level 4; every other level and both phase boundaries are
+  fractions of it, so raising it slows the shimmer, the radiation and all four
+  cutoffs together. Published unitless as `--ceremony` so CSS can do
   `calc(var(--ceremony) * 1ms * var(--anim))`.
+
+  It mirrors `CEREMONY_SHIMMER_MS + CEREMONY_RADIATE_MS` in `mock/cardMock.ts`,
+  which is where the split is decided. **Change it in both places** or the pacing
+  printed in the debug panel stops matching what actually plays.
+
+  **Settled, not provisional.** Chosen on the slider and then baked in. The four
+  builds it produces, in real time at the ×2 multiplier:
+
+  | level | entry | build | of which radiation |
+  |---|---|---:|---:|
+  | 1 | 75+ | 1360ms | — (shimmer only) |
+  | 2 | 80+ | 2680ms | 1320ms |
+  | 3 | 85+ | 4000ms | 2640ms |
+  | 4 | 90+ | 5320ms | 3960ms |
+
+  A 90+ now holds for over five seconds before it turns. That is a long time for
+  something that plays ~1,000 times a year, and it is only tolerable because a
+  click skips straight to the end state — if the skip ever stops working, this
+  number is the first thing to reconsider.
 
 One knob for both sound and visual is deliberate: a slider that only slowed the
 audio would drift out of step with the glow, and the riser has to *end* exactly
 as the card turns.
-
-Both are exposed as sliders in the phase-1 test panel. `prefers-reduced-motion` is
-honoured throughout.
-
-### Pacing: two knobs, and everything derives from them
-
-At three games a day this plays ~1,000 times a year, so it must be skippable and
-brisk. A click anywhere always jumps to the end state.
-
-- **`DEFAULT_SCALE`** (`utils/animationSpeed.ts`) is a duration multiplier,
-  currently **2**. Published to CSS as `--anim`; every CSS duration is
-  `calc(Xms * var(--anim, 1))` and every JS timing goes through `ms()`. The two
-  layers cannot drift apart, which they would if tuned separately — a flip
-  starting before the card finished arriving, a dwell ending mid-transition.
-- **`DEFAULT_CEREMONY_MS`**, currently **1100** (so 2200ms at ×2). The riser, the
-  glow's CSS transition, the bloom and the timeout before the card turns all
-  derive from it. A slider that only slowed the audio would drift out of step with
-  the glow — the riser has to *end* as the card turns.
 
 Both are exposed as sliders in the phase-1 test panel. `prefers-reduced-motion` is
 honoured throughout.
@@ -705,12 +1287,20 @@ All under `anago-leader-board-ui/src/`.
 ### Styles in plain CSS, not JSS
 
 `src/styles/game.css` (game-screen shell), `card.css`, `album.css` (book and
-flip), `packopen.css` (the five beats). Deliberately **not** `@mui/styles` — JSS
-is deprecated and unpleasant for multi-step keyframe sequences, and plain CSS is
-already an established pattern via `App.css`.
+flip), `packopen.css` (the five beats), `viewer.css` (the enlarged card).
+Deliberately **not** `@mui/styles` — JSS is deprecated and unpleasant for
+multi-step keyframe sequences, and plain CSS is already an established pattern via
+`App.css`.
 
 New components: `components/GameShell.tsx`, `Album.tsx`, `PlayerCard.tsx`,
-`PackOpener.tsx`, `PlayerPicker.tsx`.
+`PackOpener.tsx`, `PackTile.tsx`, `PackFace.tsx`, `PlayerPicker.tsx`,
+`CardViewer.tsx`.
+
+**One binary asset**, and only one: `src/assets/rik-dev-logo.png`, the mark printed on
+the wrapper. Imported through webpack rather than dropped in `public/`, so it is
+content-hashed and cannot go stale. It is the transparent-background original, cropped
+to its alpha bounds and scaled to 320×256 — the 1024² source is 1.6 MB and the badge is
+never drawn wider than ~140 CSS px.
 
 Sound effects are **synthesised with WebAudio** (`utils/sounds.ts`) rather than
 loaded from files — no binary assets to author, host or cache-bust, and short
@@ -802,7 +1392,16 @@ Order within phase 1: `XpWindow` → `PlayerCard` → `Album` with the flip →
 2. Flip forward and backward through all 4 spreads — z-index stays correct
    mid-flip, no flicker, no leaf showing through another.
 3. Missing cards are silhouettes; a duplicate occupies no second slot and shows
-   no count anywhere.
+   no count **on the card face** — only in its tooltip and in the viewer.
+3a. **Click the outermost cards of both open pages, at their outer edge.** The
+    viewer opens every time — this is what the turn strips were narrowed for, and
+    the regression to watch. The strips must still light on hover, still turn, and
+    still go dead at the first and last spread.
+3b. In the viewer: arrows, chevrons and swipe walk the whole book including
+    silhouettes, the counter matches, both ends clamp rather than wrap. Escape and a
+    click on the scrim close it; a click on the card does not. Closing leaves the
+    book on the spread of the card you ended on, having played **no page-turn sound**
+    while browsing. Tab reaches only the two visible pages' cards.
 4. Open a mock common pack: **stopwatch it under 2 seconds**, and a click
    mid-animation lands immediately on the end state.
 5. Force each ceremony level via `guaranteeLevel` and **screen-record two levels,

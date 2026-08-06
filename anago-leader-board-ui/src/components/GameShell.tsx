@@ -1,10 +1,15 @@
 import React, { ReactNode, useState } from 'react';
 import { isMuted, setMuted } from '../utils/sounds';
 import '../styles/game.css';
+import '../styles/tabletop.css';
 
 interface GameShellProps {
-  title: string;
-  /** Small italic line beside the title — usually whose album this is. */
+  /**
+   * Optional: the collection page prints whose album it is on the book's own
+   * cover instead, so repeating it in the header was saying it twice.
+   */
+  title?: string;
+  /** Small italic line beside the title. */
   subtitle?: ReactNode;
   /** Controls that sit at the top right, next to the sound toggle. */
   controls?: ReactNode;
@@ -39,7 +44,7 @@ const GameShell: React.FC<GameShellProps> = ({
   return (
     <div className="game-stage">
       <div className="game-header">
-        <h1 className="game-title">{title}</h1>
+        {title ? <h1 className="game-title">{title}</h1> : null}
         {subtitle ? <span className="game-subtitle">{subtitle}</span> : null}
         <span className="game-spacer" />
         {controls}

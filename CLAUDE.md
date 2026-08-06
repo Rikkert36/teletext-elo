@@ -12,9 +12,10 @@ Dutch Teletekst. All UI copy is in Dutch.
 design, every settled decision and the reasoning behind it lives in
 [docs/trading-cards.md](docs/trading-cards.md). **Read that file before touching
 anything under `src/mock/`, `src/styles/card.css`, `album.css`, `packopen.css`,
-`game.css`, `components/PackOpener.tsx`, `Album.tsx`, `PlayerCard.tsx`, or
-`utils/sounds.ts`.** It records a great many decisions that were arrived at by
-elimination and will otherwise be re-litigated or silently undone.
+`viewer.css`, `game.css`, `components/PackOpener.tsx`, `Album.tsx`,
+`PlayerCard.tsx`, `CardViewer.tsx`, or `utils/sounds.ts`.** It records a great many
+decisions that were arrived at by elimination and will otherwise be re-litigated or
+silently undone.
 
 Its "Where this stands" section at the top says what is done and what is next.
 

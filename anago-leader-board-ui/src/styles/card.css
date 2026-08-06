@@ -270,14 +270,33 @@
   z-index: 2;
   text-align: center;
   font-family: var(--card-display);
-  font-size: 16px;
-  font-size: 10cqw;
+  font-size: 14px;
+  /*
+   * Sized so the longest name fits on one line, with every card then using that
+   * same size. The band is a fixed height everywhere and the divider never moves,
+   * which is the whole reason this was first names only.
+   *
+   * Measured against the 82cqw between the 9% insets, at letter-spacing 0.045em,
+   * at the card widths actually rendered (100 / 130 / 160 / 240px). The widest
+   * real name is "Daan van der Beek", the only four-word one:
+   *
+   *   10cqw   98.5% of the box — 1.3px spare on a 100px card
+   *    8.5cqw 83.7% of the box
+   *
+   * 10cqw is arithmetically a fit and observably not one: a margin that thin is
+   * inside the noise of glyph rounding and whatever the browser rounds
+   * `scrollWidth` to, and it ellipsized in practice. 8.5cqw also clears the
+   * generic sans-serif a phone falls back to (ceiling 8.79cqw), since the DIN
+   * stack only resolves on Windows and macOS.
+   *
+   * Anything still too wide ellipsizes rather than wrapping, so the band holds its
+   * height regardless.
+   */
+  font-size: 8.5cqw;
   font-weight: normal;
   letter-spacing: 0.045em;
   line-height: 1.2;
   padding-top: 0.28em;
-  /* First names always fit on one line, so the band is a fixed height on every
-     card — the two-line clamp made it jump between "Bo" and "Marie Versteeg". */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -287,19 +306,27 @@
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.28);
 }
 
+/*
+ * The badge was the last thing on the card sized in px, and so the last thing whose
+ * ratio to the card differed in every context it rendered — a speck at 380px in the
+ * viewer, oversized at 100px in the revealed row. Converted at the ratios it had on
+ * the default 150px card (6.5px -> 4.33cqw and so on), which is the rule the rest of
+ * the face already follows. It grows on the pack-opener hero as a result; that is
+ * the correction, not a regression.
+ */
 .card__legend {
   position: absolute;
   top: 4%;
   right: 4%;
   z-index: 2;
   font-family: Tahoma, Verdana, sans-serif;
-  font-size: 6.5px;
-  letter-spacing: 1px;
+  font-size: 4.33cqw;
+  letter-spacing: 0.67cqw;
   text-transform: uppercase;
   color: #f0e4c4;
   background: rgba(0, 0, 0, 0.78);
-  padding: 2px 4px;
-  border-radius: 2px;
+  padding: 1.33cqw 2.67cqw;
+  border-radius: 1.33cqw;
 }
 
 /* ---------------------------------------------------------------- *
@@ -346,31 +373,104 @@
 
 /* ---------------------------------------------------------------- *
  * Card back, for the face-down state during a reveal
+ *
+ * **It is the back of the wrapper the card came out of.** Same near-black foil, same
+ * chrome, same badge — you tear open a black-and-chrome packet and a black-and-chrome
+ * card comes out of it, which is what a real card product does and what ties the five
+ * beats of the reveal into one object rather than two.
+ *
+ * It replaced a brown leather field with a serif "T7" monogram on it, which belonged to
+ * neither the packet nor the site and gave the album's leather binding a rival.
+ *
+ * Four deliberate restraints. Each was compared against six alternatives rendered side
+ * by side (mosaic, mosaic vignetted, rings, table rods, playfield, blind emboss) before
+ * this one was chosen:
+ *
+ * 1. **No colour of its own.** The packet is coloured by *type* (`utils/packFoil.ts`);
+ *    the card back is the neutral colourway of the same design — near enough the
+ *    fallbacks in that file. Every card in the game shares this back, and a coloured
+ *    one would either leak what is coming or contradict the packet it came from.
+ * 2. **No pattern.** One pool of light behind the badge and one broad foil facet, which
+ *    is the card *face's* own language — see `--facets` at the top of this file, and the
+ *    argument there against repeating stripes. Every patterned candidate had the same
+ *    problem: a texture on the back has to be either meaningful or invisible, and a
+ *    tiled one is neither. The two it replaced, diagonal stripes and a Mode-7
+ *    checkerboard, both read as material the card is not made of.
+ * 3. **Solid black by the edge.** The topmost background layer is a vignette — clear
+ *    over the middle, black by the border — so the light pools and stops. It is the
+ *    frame: no rule, no ring inside the art, nothing for the eye to catch on. This is
+ *    also why the layer goes *in the background stack* and not on `::after`: that
+ *    pseudo-element is already the foil sheen every card carries.
+ * 4. **No text.** It carried "TAFELVOETBAL" in the Teletekst face for one revision. A
+ *    back does not need to name the product it is the back of, and it crowded the badge.
  * ---------------------------------------------------------------- */
 
 .card--back {
+  background-color: #08090c;
   background-image:
-    repeating-linear-gradient(
-      115deg,
-      rgba(255, 255, 255, 0.06) 0 2px,
-      transparent 2px 10px
+    /* The vignette. Must stay first: it darkens the two layers under it, and anything
+       painted after it would be darkened in turn. */
+    radial-gradient(ellipse 96% 74% at 50% 46%, rgba(0, 0, 0, 0) 30%, #000 88%),
+    /* One broad facet, at the same angle as the face's. */
+    linear-gradient(
+      112deg,
+      rgba(255, 255, 255, 0.055) 0 17%,
+      transparent 17% 39%,
+      rgba(255, 255, 255, 0.03) 39% 50%,
+      transparent 50%
     ),
-    linear-gradient(150deg, #4a3a22 0%, #241a0b 50%, #4a3a22 100%);
-  color: #e6c98a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6), 0 0 0 1px #6b5325;
+    /* The pool of light the badge sits in, as on the wrapper. */
+    radial-gradient(ellipse 66% 48% at 50% 45%, #384457 0%, rgba(0, 0, 0, 0) 100%),
+    linear-gradient(165deg, #141a25 0%, #080a0e 62%, #10151e 100%);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6);
 }
 
-.card--back__mark {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 30px;
-  font-size: 19cqw;
-  font-weight: bold;
-  letter-spacing: 0.08em;
-  opacity: 0.75;
+/*
+ * The 1px edge, as an element rather than an inset shadow.
+ *
+ * `.opener__stage .card` re-declares `box-shadow` to give the reveal card its own drop
+ * shadow, and it outranks anything here — so an inset ring on `.card--back` disappears
+ * in the one place the back is on screen at full size. A pseudo-element is immune to
+ * that.
+ *
+ * **`::before`, not `::after`:** `.card::after` is the foil sheen every card carries, and
+ * a `.card--back::after` would inherit that gradient and its `z-index` while only partly
+ * overriding them. The back keeps the sheen, which is right — it is the same foil as the
+ * face.
+ */
+.card--back::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(196, 208, 222, 0.16);
+  border-radius: 6px;
+  pointer-events: none;
 }
+
+/*
+ * The badge, a whisker above centre — dead centre in a 5:7 box reads as low, because the
+ * artwork is wider than it is tall. `aspect-ratio` matches the trimmed asset (see
+ * `utils/brand.ts`): the box *is* the artwork, with no transparent margin in it.
+ */
+.card--back__mark {
+  position: absolute;
+  top: 47%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 72%;
+  aspect-ratio: 320 / 256;
+  background: center / contain no-repeat;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.65));
+}
+
+/*
+ * Neither the badge nor the edge above carries a `z-index`, deliberately. Both are
+ * positioned children, so they already paint over the background layers and under
+ * `.card::after` — the sheen, at `z-index: 3`, which should cross them. A `z-index: 2`
+ * on each was doing nothing but making them candidates for promotion out of a flattened
+ * subtree, which is the last thing wanted on a face that has to be back-face culled
+ * during the flip.
+ */
 
 /* ---------------------------------------------------------------- *
  * Sizes — width only.

@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import Album, { AlbumSection } from '../components/Album';
+import Album, { AlbumSection, albumSlotOrder } from '../components/Album';
+import CardViewer from '../components/CardViewer';
 import GameShell from '../components/GameShell';
 import PackOpener from '../components/PackOpener';
+import PackTile from '../components/PackTile';
 import PlayerPicker from '../components/PlayerPicker';
 import { CollectionState, mockCardsClient, mockDebug } from '../clients/cardsClient';
 import {
@@ -13,11 +15,10 @@ import {
   splitName,
 } from '../mock/cardMock';
 import {
+  DEFAULT_CEREMONY_MS,
+  DEFAULT_SCALE,
   getCeremonyMs,
-  getSpeed,
   ms,
-  setCeremonyMs,
-  setSpeed,
 } from '../utils/animationSpeed';
 import {
   STAGE_THEMES,
@@ -25,6 +26,12 @@ import {
   getStageTheme,
   setStageTheme,
 } from '../utils/stageTheme';
+import {
+  ALBUM_STYLES,
+  AlbumStyle,
+  getAlbumStyle,
+  setAlbumStyle,
+} from '../utils/albumStyle';
 import { playRareRise } from '../utils/sounds';
 import '../styles/game.css';
 
@@ -59,11 +66,11 @@ const CollectionPage: React.FC = () => {
   const [player, setPlayer] = useState<CardPlayer | null>(null);
   const [collection, setCollection] = useState<CollectionState | null>(null);
   const [openingPack, setOpeningPack] = useState<Pack | null>(null);
-  const [tab, setTab] = useState<'actief' | 'legendes'>('actief');
+  /** Index into `slotOrder` of the card being looked at, or null for none. */
+  const [viewing, setViewing] = useState<number | null>(null);
   const [fastMode, setFastMode] = useState(() => read(FAST_KEY) === 'true');
-  const [speed, setSpeedState] = useState(getSpeed);
   const [stageTheme, setStageThemeState] = useState<StageTheme>(getStageTheme);
-  const [ceremony, setCeremonyState] = useState(getCeremonyMs);
+  const [albumStyle, setAlbumStyleState] = useState<AlbumStyle>(getAlbumStyle);
 
   /** Auditions a level at exactly the length and intensity a real reveal uses. */
   const previewRiser = (level: number) =>
@@ -98,6 +105,7 @@ const CollectionPage: React.FC = () => {
     setPlayer(next);
     write(PLAYER_KEY, next.id);
     setOpeningPack(null);
+    setViewing(null);
   };
 
   const toggleFast = () => {
@@ -112,12 +120,58 @@ const CollectionPage: React.FC = () => {
     return map;
   }, [collection]);
 
+  /*
+   * One book. Legends are not a separate view behind a tab — they are simply more
+   * pages, appended once unlocked, so the album grows rather than splitting in
+   * two. Before the unlock they are absent entirely; the point of the unlock is
+   * discovering there is more book than you thought.
+   */
   const sections: AlbumSection[] = useMemo(() => {
     if (!collection) return [];
-    return tab === 'legendes'
-      ? [{ title: 'Legendes', players: collection.legends, counts }]
-      : [{ title: 'Actieve spelers', players: collection.pool, counts }];
-  }, [collection, counts, tab]);
+    /*
+     * Ascending by rating, so the book builds toward its best page: you open on
+     * the commons and the last spread is the players you are least likely to
+     * hold. Sorted explicitly rather than reversed, because the source order is
+     * the leaderboard's and should not be relied on here.
+     */
+    const ascending = (players: CardPlayer[]): CardPlayer[] =>
+      players.slice().sort((a, b) => a.visibleRating - b.visibleRating);
+
+    const all: AlbumSection[] = [
+      { title: 'Actieve spelers', players: ascending(collection.pool), counts },
+    ];
+    if (collection.legendsUnlocked && collection.legends.length > 0) {
+      all.push({ title: 'Legendes', players: ascending(collection.legends), counts });
+    }
+    return all;
+  }, [collection, counts]);
+
+  const ownerName = player ? splitName(player.name).display : undefined;
+
+  /*
+   * Every slot the book prints, in printed order, for the card viewer to walk.
+   *
+   * Built by the same function the album renders from, and fed the same owner —
+   * which affects the page list (the cover) and so must match, or the two disagree
+   * about which page a card is on.
+   */
+  const slotOrder = useMemo(() => albumSlotOrder(sections, ownerName), [sections, ownerName]);
+
+  /*
+   * The album can shrink under the viewer — a different player is picked, or a
+   * reveal refreshes the collection — so an index can outlive the slot it pointed
+   * at, and it does so *during* the render that shrank the list, before any effect
+   * gets a chance to tidy up. Hence the lookup rather than the index everywhere
+   * below, with the effect only resetting the state afterwards. Closing is the right
+   * answer rather than clamping: clamping silently shows a different card.
+   */
+  const viewingSlot = viewing === null ? undefined : slotOrder[viewing];
+
+  useEffect(() => {
+    setViewing((current) =>
+      current === null || current < slotOrder.length ? current : null,
+    );
+  }, [slotOrder.length]);
 
   const ownedActive = collection
     ? collection.pool.filter((p) => (counts.get(p.id) ?? 0) > 0).length
@@ -183,13 +237,9 @@ const CollectionPage: React.FC = () => {
     </>
   );
 
+  // No title or subtitle: the book's own cover says whose album it is.
   return (
-    <GameShell
-      title="Het Album"
-      subtitle={player ? splitName(player.name).display : undefined}
-      controls={controls}
-      footer={footer || undefined}
-    >
+    <GameShell controls={controls} footer={footer || undefined}>
       {!player ? (
         <div className="game-notice">
           Typ je naam hierboven om je album te openen.
@@ -218,60 +268,61 @@ const CollectionPage: React.FC = () => {
         </>
       ) : (
         <div className="album-layout">
-          <aside className="album-side">
-            <div className="game-plate">
-              <span className="game-plate__label">Jouw pakjes</span>
-              {collection && collection.packs.length > 0 ? (
-                <div className="album-side__packs">
-                  {collection.packs.map((pack) => (
-                    <button
-                      key={pack.id}
-                      type="button"
-                      className="game-button game-button--stacked"
-                      onClick={() => setOpeningPack(pack)}
-                    >
-                      {pack.size} {pack.size === 1 ? 'kaart' : 'kaarten'}
-                      <small>{pack.reason}</small>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <span className="game-muted">
-                  Geen pakjes meer vandaag. Speel een wedstrijd of kom morgen terug.
-                </span>
-              )}
-            </div>
-          </aside>
+          {/*
+            No plate, no "Jouw pakjes" label, and nothing at all when there are none.
+            The packets are objects lying next to the book — a titled panel around them
+            is the one piece of furniture on this page that admits to being a UI, and
+            it was also what the top row clipped against on hover.
+
+            An empty column is worse than no column, so the aside goes away entirely
+            when there is nothing to put in it. That used to move the book — it is
+            out of flow now, and the book is centred on the stage whether the aside
+            is there or not. See `.album-layout` in game.css.
+          */}
+          {collection && collection.packs.length > 0 ? (
+            <aside className="album-side">
+              <div className="pack-shelf">
+                {collection.packs.map((pack, i) => (
+                  <PackTile
+                    key={pack.id}
+                    pack={pack}
+                    index={i}
+                    /* The shelf is behind the viewer's scrim and so unreachable while
+                       one is open, but the opener replaces the album wholesale and a
+                       viewer left mounted over it would be layered on the reveal. */
+                    onOpen={(next) => {
+                      setViewing(null);
+                      setOpeningPack(next);
+                    }}
+                  />
+                ))}
+              </div>
+            </aside>
+          ) : null}
 
           <div className="album-main">
-            <div className="game-tabs">
-              <button
-                type="button"
-                className={`game-tab${tab === 'actief' ? ' game-tab--active' : ''}`}
-                onClick={() => setTab('actief')}
-              >
-                Actief
-              </button>
-              <button
-                type="button"
-                className={`game-tab${tab === 'legendes' ? ' game-tab--active' : ''}`}
-                onClick={() => setTab('legendes')}
-                disabled={!collection?.legendsUnlocked}
-                title={
-                  collection?.legendsUnlocked ? undefined : 'Verzamel eerst alle actieve spelers'
-                }
-              >
-                Legendes {collection?.legendsUnlocked ? '' : '🔒'}
-              </button>
-            </div>
-
-            <Album sections={sections} />
+            <Album
+              sections={sections}
+              owner={ownerName}
+              style={albumStyle}
+              onCardOpen={(id) => {
+                const found = slotOrder.findIndex((s) => s.card.player.id === id);
+                if (found >= 0) setViewing(found);
+              }}
+              /* Keeps the book on the spread of whatever the viewer is showing. */
+              focusPlayerId={viewingSlot?.card.player.id ?? null}
+            />
           </div>
         </div>
       )}
 
+      {/*
+        `--debug` keeps the tabletop stages (F–J) from dressing the test panel as a
+        piece of furniture along with everything else on the table. It is
+        scaffolding, and it has to stay readable rather than in character.
+      */}
       {SHOW_DEBUG ? (
-        <div className="game-plate" style={{ marginTop: 18 }}>
+        <div className="game-plate game-plate--debug" style={{ marginTop: 18 }}>
           <span className="game-plate__label">Testpaneel — fase 1</span>
           <div className="game-row">
             {/*
@@ -364,75 +415,70 @@ const CollectionPage: React.FC = () => {
           </div>
 
           {/*
-            The single pacing knob. Drives both the JS sequencing and every CSS
-            duration, so they cannot drift apart. Persists per browser; bake the
-            value you settle on into DEFAULT_SCALE in utils/animationSpeed.ts.
-          */}
-          <div className="game-row" style={{ marginTop: 10 }}>
-            <span className="game-muted" style={{ minWidth: 128 }}>
-              tempo ×{speed.toFixed(2)}
-            </span>
-            <input
-              type="range"
-              min={0.4}
-              max={4}
-              step={0.05}
-              value={speed}
-              onChange={(e) => setSpeedState(setSpeed(parseFloat(e.target.value)))}
-              style={{ flex: 1, maxWidth: 320 }}
-              aria-label="Animatietempo"
-            />
-            <button
-              type="button"
-              className="game-button game-button--small"
-              onClick={() => setSpeedState(setSpeed(1))}
-            >
-              1× terug
-            </button>
-            <span className="game-muted">hoger = langzamer</span>
-          </div>
-
-          {/*
             Stage-direction comparison. Swaps a class on <html>, which re-themes
             the chrome and the book's inside covers together. Delete once one is
             chosen.
           */}
+          {/*
+            Two rows, because the two families answer different questions. A–E ask
+            what screen the book is displayed on; F–J ask what table it is lying on
+            — and in those, the rest of the page becomes objects on that table too.
+          */}
+          {[
+            { label: 'achtergrond', tabletop: false },
+            { label: 'tafelblad', tabletop: true },
+          ].map((group) => (
+            <div key={group.label} className="game-row" style={{ marginTop: 10 }}>
+              <span className="game-muted" style={{ minWidth: 128 }}>
+                {group.label}
+              </span>
+              {STAGE_THEMES.filter((theme) => 'tabletop' in theme === group.tabletop).map(
+                (theme) => (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    className="game-button game-button--small"
+                    onClick={() => setStageThemeState(setStageTheme(theme.id))}
+                    disabled={stageTheme === theme.id}
+                  >
+                    {theme.label}
+                  </button>
+                ),
+              )}
+            </div>
+          ))}
+
+          {/*
+            Album candidates. Independent of the stage theme — that is the screen
+            the book sits on, this is the book. Delete once one is chosen, along
+            with utils/albumStyle.ts and styles/albumstyle.css.
+          */}
           <div className="game-row" style={{ marginTop: 10 }}>
             <span className="game-muted" style={{ minWidth: 128 }}>
-              achtergrond
+              album
             </span>
-            {STAGE_THEMES.map((theme) => (
+            {ALBUM_STYLES.map((option) => (
               <button
-                key={theme.id}
+                key={option.id}
                 type="button"
                 className="game-button game-button--small"
-                onClick={() => setStageThemeState(setStageTheme(theme.id))}
-                disabled={stageTheme === theme.id}
+                onClick={() => setAlbumStyleState(setAlbumStyle(option.id))}
+                disabled={albumStyle === option.id}
               >
-                {theme.label}
+                {option.label}
               </button>
             ))}
           </div>
 
           {/*
-            One slider for the whole build-up beat. The riser, the glow's CSS
-            transition and the timeout before the card turns all derive from this,
-            so sound and visual cannot drift apart.
+            Auditions the build-up sound for each level without opening a pack.
+            The pacing itself is settled (DEFAULT_SCALE and DEFAULT_CEREMONY_MS in
+            utils/animationSpeed.ts) and no longer adjustable here.
           */}
           <div className="game-row" style={{ marginTop: 10 }}>
             <span className="game-muted" style={{ minWidth: 128 }}>
-              opbouw {ceremony} ms
+              opbouw beluisteren
             </span>
-            <input
-              type="range"
-              min={350}
-              max={3200}
-              step={10}
-              value={ceremony}
-              onChange={(e) => setCeremonyState(setCeremonyMs(parseInt(e.target.value, 10)))}
-              style={{ flex: 1, maxWidth: 320 }}
-              aria-label="Lengte van de opbouw"
-            />
             {[
               { level: 1, label: '▶ 75+' },
               { level: 2, label: '▶ 80+' },
@@ -449,10 +495,29 @@ const CollectionPage: React.FC = () => {
               </button>
             ))}
             <span className="game-muted">
-              ×{speed.toFixed(2)} tempo → {ms(ceremony)} ms echt
+              ×{DEFAULT_SCALE.toFixed(2)} tempo → {ms(DEFAULT_CEREMONY_MS)} ms opbouw
             </span>
           </div>
         </div>
+      ) : null}
+
+      {/*
+        The viewer mounts here, as the last child of the shell — the same place
+        `.opener__bloom` proves works. `.game-stage` is `overflow: hidden` and
+        `position: relative` but carries no transform, filter or perspective, so a
+        fixed child escapes the clip.
+
+        **Never inside `.album`**, which sets `perspective: 2600px`: that both makes
+        it a containing block for fixed descendants and drops whatever is in it into
+        the turning leaves' depth sort.
+      */}
+      {viewing !== null && viewingSlot ? (
+        <CardViewer
+          slots={slotOrder}
+          index={viewing}
+          onIndex={setViewing}
+          onClose={() => setViewing(null)}
+        />
       ) : null}
     </GameShell>
   );

@@ -1,23 +1,33 @@
 /**
- * The single knob for animation pacing.
+ * Animation pacing. Two settled constants, published to CSS.
  *
  * Timings are split across two layers that must agree: JS constants sequence the
  * reveal (when to flip, when to advance), and CSS durations do the actual
  * movement. Tuning them separately desyncs the two — a flip that starts before
  * the card has finished arriving, or a dwell that ends mid-transition.
  *
- * Both layers therefore derive from `scale` here:
+ * Both layers therefore derive from the values here:
  *   - JS goes through `ms()`
  *   - CSS multiplies by `var(--anim)`, which this module writes to :root
  *
- * `scale` is a *duration multiplier*: 1 is as designed, 1.5 is 50% slower, 0.5
- * twice as fast. It persists per browser so it can be dialled in at runtime
- * without a rebuild, then baked into DEFAULT_SCALE once it feels right.
+ * Both were dialled in on sliders in the test panel and then baked in. The
+ * sliders are gone and **so is the localStorage persistence they wrote to** —
+ * with no UI left to correct it, a value stored during that tuning would have
+ * silently overridden the constant below forever, on that browser only, with no
+ * way back short of devtools. The constants are now the only source of truth.
+ *
+ * The setters remain because `window.cardDebug` still exposes them, but they
+ * apply for the session only.
  */
 
-const KEY = 'tafelvoetbal.cards.animSpeed';
-
-/** Change this to bake in a new default. */
+/**
+ * Duration multiplier: 1 is as designed, 1.5 is 50% slower, 0.5 twice as fast.
+ *
+ * **Settled at 2.** Every base timing in `PackOpener.tsx` and every duration in
+ * the CSS is therefore written at half its real length — `FLIP_MS = 320` turns in
+ * 640ms, `SETTLE_MS = 460` travels in 920ms. Read those constants with that in
+ * mind before "fixing" one.
+ */
 export const DEFAULT_SCALE = 2;
 
 const MIN_SCALE = 0.4;
@@ -26,16 +36,7 @@ const MAX_SCALE = 4;
 const clamp = (value: number): number =>
   Number.isFinite(value) ? Math.min(Math.max(value, MIN_SCALE), MAX_SCALE) : DEFAULT_SCALE;
 
-const load = (): number => {
-  try {
-    const stored = window.localStorage.getItem(KEY);
-    return stored === null ? DEFAULT_SCALE : clamp(parseFloat(stored));
-  } catch {
-    return DEFAULT_SCALE;
-  }
-};
-
-let scale = load();
+let scale = DEFAULT_SCALE;
 
 /** Publishes the multiplier to CSS. Every duration reads `var(--anim, 1)`. */
 const publish = (): void => {
@@ -46,13 +47,9 @@ publish();
 
 export const getSpeed = (): number => scale;
 
+/** Session-only; nothing persists it. */
 export const setSpeed = (value: number): number => {
   scale = clamp(value);
-  try {
-    window.localStorage.setItem(KEY, String(scale));
-  } catch {
-    /* private browsing — applies for this session only */
-  }
   publish();
   return scale;
 };
@@ -69,38 +66,37 @@ export const ms = (base: number): number => Math.round(base * scale);
  * How long a rare card glows before it turns. Separate from `scale` because it is
  * a dramatic choice rather than a pacing one.
  *
- * Deliberately one knob for both the sound and the visual. A slider that only
- * slowed the audio would drift out of step with the glow — the riser has to end
- * exactly when the card turns, so they must derive from the same number.
+ * Deliberately one number for both the sound and the visual. Slowing only the
+ * audio would drift out of step with the glow — the riser has to end exactly when
+ * the card turns, so they must derive from the same value.
  * ------------------------------------------------------------------ */
-
-const CEREMONY_KEY = 'tafelvoetbal.cards.ceremonyMs';
 
 /**
  * Length of the *longest* build (level 4). Every other level is a fraction of it
  * — see CEREMONY_STEPS in mock/cardMock.ts — so raising this slows the shimmer,
  * the radiation and every cutoff point together.
  *
- * Note this is the base: at the ×2 pacing multiplier the top build runs 3000ms.
+ * **Settled at 2660**, which is 5320ms real at the ×2 multiplier: a 1360ms shimmer
+ * and then up to 3960ms of radiation. The lower tiers cut that short at
+ * 0.256 / 0.504 / 0.752 of it, giving 1360 / 2680 / 4000ms real.
+ *
+ * This is not a free-standing number — it is `CEREMONY_SHIMMER_MS +
+ * CEREMONY_RADIATE_MS` from mock/cardMock.ts, which is where the shimmer and
+ * radiation lengths are actually decided. Change it there and mirror it here, or
+ * the printed pacing in the debug panel stops matching what plays.
  */
-export const DEFAULT_CEREMONY_MS = 1500;
+export const DEFAULT_CEREMONY_MS = 2660;
 
 const MIN_CEREMONY_MS = 350;
-const MAX_CEREMONY_MS = 3200;
+/** Comfortably above the settled 2660, so the debug slider can still overshoot it. */
+const MAX_CEREMONY_MS = 4200;
 
 const clampCeremony = (value: number): number =>
   Number.isFinite(value)
     ? Math.min(Math.max(Math.round(value), MIN_CEREMONY_MS), MAX_CEREMONY_MS)
     : DEFAULT_CEREMONY_MS;
 
-let ceremonyMs = (() => {
-  try {
-    const stored = window.localStorage.getItem(CEREMONY_KEY);
-    return stored === null ? DEFAULT_CEREMONY_MS : clampCeremony(parseInt(stored, 10));
-  } catch {
-    return DEFAULT_CEREMONY_MS;
-  }
-})();
+let ceremonyMs = DEFAULT_CEREMONY_MS;
 
 /** Published unitless so CSS can do `calc(var(--ceremony) * 1ms * var(--anim))`. */
 const publishCeremony = (): void => {
@@ -111,13 +107,9 @@ publishCeremony();
 
 export const getCeremonyMs = (): number => ceremonyMs;
 
+/** Session-only; nothing persists it. */
 export const setCeremonyMs = (value: number): number => {
   ceremonyMs = clampCeremony(value);
-  try {
-    window.localStorage.setItem(CEREMONY_KEY, String(ceremonyMs));
-  } catch {
-    /* private browsing — applies for this session only */
-  }
   publishCeremony();
   return ceremonyMs;
 };
