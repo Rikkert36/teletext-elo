@@ -718,6 +718,14 @@ and nickname for exactly that reason; the count simply joins them.
   precisely the statistics block that was designed out; off it, it is the caption a
   display case has. Existing stage tokens throughout, so it follows whichever of the
   ten stage directions wins.
+  - **The caption column is a fixed width, not a max-width.** The panel is centred,
+    so a column that shrinks to fit its text moves the panel and takes the card with
+    it: browsing from "Bo" to "Jeroen van Geel" slid the card sideways under the
+    cursor. The card's position has to be a property of the window, not of whose card
+    is on screen. Long names wrap inside the reserved column. Vertical needs no
+    equivalent — the card is by far the tallest thing in the panel, so a two-line
+    caption changes nothing. Same reason `.viewer__count` has a `min-width`: without
+    it the chevrons shuffle as the number gains a digit.
 - **The position readout *is* the control.** `‹ 12 / 34 ›` — the counter is
   information the album genuinely cannot give you, and that is what earns the two
   chevrons attached to it their place on a page whose own navigation is an unlit

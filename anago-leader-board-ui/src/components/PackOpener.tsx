@@ -866,7 +866,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({ pack, onOpen, onFinished, fastM
                   <CardBack />
                 </div>
                 <div className="opener__face opener__face--front">
-                  <PlayerCard card={current} />
+                  <PlayerCard card={current} eager />
                   {isPeak && faceUp ? <div className="opener__sweep" /> : null}
                 </div>
               </div>
@@ -884,7 +884,14 @@ const PackOpener: React.FC<PackOpenerProps> = ({ pack, onOpen, onFinished, fastM
                 ref={setSlotRef(i)}
                 className={`opener__slot${card.isNew ? ' opener__slot--new' : ''}`}
               >
-                <PlayerCard card={card} />
+                {/*
+                  `eager` is load-bearing here, not a precaution. The slot is a
+                  *fresh* element — the FLIP inverts it onto the hero's rect rather
+                  than moving the hero itself — so a lazy portrait misses the first
+                  frame of the descent and the card blinks to bare metal. See the
+                  prop's note in PlayerCard.
+                */}
+                <PlayerCard card={card} eager />
               </div>
             ))}
           </div>
@@ -907,7 +914,8 @@ const PackOpener: React.FC<PackOpenerProps> = ({ pack, onOpen, onFinished, fastM
                 className={`opener__result opener__slot${card.isNew ? ' opener__slot--new' : ''}`}
                 style={settledByFlip ? undefined : { animationDelay: `${i * 55}ms` }}
               >
-                <PlayerCard card={card} />
+                {/* Same again: reached by the final FLIP, so these mount fresh too. */}
+                <PlayerCard card={card} eager />
               </div>
             ))}
           </div>

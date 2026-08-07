@@ -122,8 +122,14 @@ const CardViewer: React.FC<CardViewerProps> = ({ slots, index, onIndex, onClose 
       <div className="viewer__scrim" onClick={onClose} aria-hidden="true" />
 
       <div className="viewer__panel">
+        {/*
+          `eager`, for the reason the prop documents: this is the one place the card
+          *is* the thing being looked at. Lazy loading never paints on the first
+          frame even from cache, so every step left or right would flash the bare
+          tier metal — and here that is a card at 380px, not a thumbnail.
+        */}
         <div className="viewer__card">
-          <PlayerCard card={slot.card} empty={empty} />
+          <PlayerCard card={slot.card} empty={empty} eager />
         </div>
 
         {/*

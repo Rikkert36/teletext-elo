@@ -35,6 +35,11 @@
  * rather than in percentages: a percentage radius on a viewport-sized layer tracks
  * the window instead of the card, so on a short window it closes in over the card's
  * own corners. The lesson is `.opener__dim`'s, and it cost a round there.
+ *
+ * **Depth, not only shape.** The stops began at 0.55 / 0.78 / 0.9, which left 45% of
+ * the album showing through the clear middle — and the middle is where the caption
+ * sits, so the page's headings and dashed slots read straight through the type. At
+ * 0.72 it is still a vignette; what it stops being is a tint.
  * ---------------------------------------------------------------- */
 
 .viewer__scrim {
@@ -43,9 +48,9 @@
   cursor: pointer;
   background: radial-gradient(
     circle at 50% 46%,
-    rgba(0, 0, 0, 0.55) calc(var(--viewer-card-w) * 0.75),
-    rgba(0, 0, 0, 0.78) calc(var(--viewer-card-w) * 1.5),
-    rgba(0, 0, 0, 0.9) 100%
+    rgba(0, 0, 0, 0.72) calc(var(--viewer-card-w) * 0.75),
+    rgba(0, 0, 0, 0.88) calc(var(--viewer-card-w) * 1.5),
+    rgba(0, 0, 0, 0.96) 100%
   );
   animation: viewer-scrim-in calc(160ms * var(--anim, 1)) ease-out both;
 }
@@ -109,18 +114,51 @@
  * to be spelt out together or the silhouette loses the edge that reads as a die-cut.
  */
 .viewer__card .card--empty {
+  /*
+   * **A silhouette has to be opaque here, and only here.**
+   *
+   * `.card--empty` carries no base layer at all: the tiers are opaque because their
+   * last background layer is a solid `linear-gradient(160deg, …)`, and the empty card
+   * replaces that stack with two whites at 7% and 3% alpha. So it is ~95%
+   * see-through, and the only solid thing on it — `.card__portrait`'s `#1a1a1a` — is
+   * eaten away by the portrait mask through the bottom third and the top-left corner.
+   *
+   * In the book that never showed, because a card there is glued to an opaque page.
+   * Lifted over the scrim it did: you could read the spread straight through the
+   * card, in exactly the mask's shape.
+   *
+   * Fixed here rather than on `.card--empty` itself, because the book's ghosting is
+   * *not* this transparency — it comes from the per-style rules in albumstyle.css
+   * that override `--tier-a`/`--tier-b` and apply `opacity`. Basing the empty card
+   * globally would leave those alone but turn `.album--leder`'s placeholders, which
+   * override to opaque cream, into solid cards on a cream page.
+   */
+  background-color: #211f19;
   box-shadow:
     inset 0 0 0 1px rgba(0, 0, 0, 0.4),
     0 18px 44px rgba(0, 0, 0, 0.7);
 }
 
+/*
+ * **A fixed width, not a max-width.** The panel is centred, so a caption column
+ * that shrinks to fit its text moves the whole panel — and the card with it. Browsing
+ * from "Bo" to "Jeroen van Geel" slid the card sideways under the cursor, which is
+ * the one thing a viewer for looking closely at a card must not do. Reserving the
+ * column makes the card's position a property of the window rather than of whose
+ * card is on screen.
+ *
+ * Vertical is already safe: the card is by far the tallest thing in the panel, so a
+ * caption that runs to two lines does not change the panel's height.
+ */
 .viewer__detail {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  min-width: 0;
-  max-width: min(46vw, 320px);
+  flex: none;
+  width: min(46vw, 320px);
+  /* Long names wrap rather than widening the reserved column or spilling out of it. */
+  overflow-wrap: break-word;
 }
 
 .viewer__name {
@@ -263,9 +301,12 @@
     gap: clamp(10px, 2vh, 18px);
   }
 
+  /* Stacked under the card and centred, so its width cannot move the card at all
+     and there is no reason to reserve one. */
   .viewer__detail {
     align-items: center;
     text-align: center;
+    width: auto;
     max-width: 84vw;
   }
 

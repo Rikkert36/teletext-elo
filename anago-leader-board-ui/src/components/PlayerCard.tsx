@@ -23,6 +23,24 @@ interface PlayerCardProps {
    * card you just pulled is marked new or not and the pile size is beside the point.
    */
   count?: number;
+  /**
+   * Loads and decodes the portrait up front instead of lazily.
+   *
+   * **Set this wherever the card is the thing being looked at.** `loading="lazy"`
+   * never paints on the element's first frame — not even from cache, because the
+   * lazy-load steps run after layout — and `decoding="async"` can cost another.
+   * With no photo, the masked portrait shows the bare tier metal under
+   * `.card__portrait::after`'s multiply tint, so the card dulls and the name band
+   * ends up on empty metal: it reads as a placeholder for a frame.
+   *
+   * That was visible in the pack opener, where the card handed down into the row
+   * is a *fresh* element — the FLIP inverts it onto the hero's rect rather than
+   * moving the hero itself — so it blinked at the start of every descent.
+   *
+   * Left off by default because the album renders the whole pool at once and most
+   * of it is off-screen, which is the case lazy loading is for.
+   */
+  eager?: boolean;
   className?: string;
   onClick?: () => void;
 }
@@ -41,7 +59,11 @@ export const ownedLabel = (count: number): string =>
  * and the write path is known to disagree with the read path, so a missing
  * image is an expected state rather than an error.
  */
-const Portrait: React.FC<{ card: Card; empty: boolean }> = ({ card, empty }) => {
+const Portrait: React.FC<{ card: Card; empty: boolean; eager: boolean }> = ({
+  card,
+  empty,
+  eager,
+}) => {
   const [failed, setFailed] = useState(false);
 
   return (
@@ -53,7 +75,13 @@ const Portrait: React.FC<{ card: Card; empty: boolean }> = ({ card, empty }) => 
           src={avatarUrl(card.player.id)}
           alt={empty ? '' : card.player.name}
           onError={() => setFailed(true)}
-          loading="lazy"
+          loading={eager ? 'eager' : 'lazy'}
+          /*
+           * Both halves are needed. `eager` only settles when the *load* starts;
+           * the decode is still deferred by default, which is a second frame the
+           * card can spend without a photo.
+           */
+          decoding={eager ? 'sync' : 'async'}
         />
       )}
     </div>
@@ -65,6 +93,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   size = 'md',
   empty = false,
   count,
+  eager = false,
   className = '',
   onClick,
 }) => {
@@ -113,7 +142,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
           <span className="card__overall">{empty ? '??' : card.overall}</span>
         </div>
 
-        <Portrait card={card} empty={empty} />
+        <Portrait card={card} empty={empty} eager={eager} />
 
         <div className="card__name">{cardName}</div>
       </div>
