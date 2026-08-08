@@ -10,6 +10,14 @@
  * Player ids, names, ratings and game counts are real, copied from
  * GET /api/leaderboard, so avatars resolve against the deployed API and the
  * rarity distribution feels exactly the way it will in production.
+ *
+ * One wrinkle: the bulk of this list is an older snapshot, while the four
+ * players the MIN_GAMES drop to 5 admitted (Yannick, Sevda, Dmitry, Sandra)
+ * were read from the API afterwards. The endpoint has drifted since — Petar is
+ * 1785 there now, not 1851, and Nynke has dropped off it entirely. Refreshing
+ * the whole list would move several overalls and is a separate decision, so the
+ * snapshot was left alone and only the four were added. Phase 2 reads live data
+ * and the question disappears.
  */
 
 export type Tier = 'brons' | 'zilver' | 'goud' | 'goudZeldzaam';
@@ -19,7 +27,7 @@ export interface CardPlayer {
   /** Full name as stored, nickname and all. */
   name: string;
   visibleRating: number;
-  /** Only used for the >= 10 games pool and eligibility gate — never on the card. */
+  /** Only used for the MIN_GAMES pool and eligibility gate — never on the card. */
   numberOfGames: number;
   isLegend: boolean;
 }
@@ -70,8 +78,27 @@ export interface Pack {
 }
 
 /* ------------------------------------------------------------------ *
- * The pool: active players with >= 10 games.
+ * The pool: active players with >= MIN_GAMES games.
  * ------------------------------------------------------------------ */
+
+/**
+ * Games needed both to appear on a card and to own a collection. The gate is
+ * deliberately symmetric — crossing it makes you collectable and a collector in
+ * the same moment.
+ *
+ * Lowered from 10 to 5. The floor exists because `visibleRating` is
+ * `rating − 1000·e^(−0.2303·games)`, so a short record reports attendance rather
+ * than skill; but that deduction is continuous and still ~316 at five games,
+ * which is enough to keep a three-game hot streak well away from the top of the
+ * scale. Five buys four more players into the pool (Yannick, Sevda, Dmitry,
+ * Sandra), all of whom land at overall 59–73 — mid-table, not near Petar.
+ *
+ * The cost is paid uniformly: every existing player's per-pack rate drops
+ * 14.4–15.5%, and the set is four cards longer, so median completion goes ~3
+ * months to ~3.5. Top-to-bottom rarity spread is unchanged at ~28×. `DHigh`
+ * stays at 2.5 — see "Why >= 5 games" in docs/trading-cards.md.
+ */
+export const MIN_GAMES = 5;
 
 const active = (
   id: string,
@@ -99,6 +126,7 @@ const ACTIVE_POOL: CardPlayer[] = [
   active('1e55c518-674f-4f55-8107-c9a6a96bbc31', 'Max "Paarse slip" Smedts', 981, 49),
   active('cfb66496-4e21-446b-8ff4-c44fdd7d0234', 'Niek "Nikos"', 952, 14),
   active('44c8a599-1faa-486e-939e-e3afcd90d334', 'Tanny', 919, 36),
+  active('432d8107-ac5d-4147-b690-150de744601b', 'Yannick', 867, 9),
   active('527c421f-d0ee-49c8-b87c-7340b71b0e96', 'Marie "Harde schreeuwer" Versteeg', 864, 388),
   active('32ff155d-cf56-44b1-88f3-10f234aaf2ec', 'Bo "IJskoud"', 829, 95),
   active('966faa86-037d-4666-832f-5d0b15c28d0e', 'Simon', 828, 44),
@@ -106,19 +134,22 @@ const ACTIVE_POOL: CardPlayer[] = [
   active('a70cf550-1ed4-4551-8106-78556e5dee6a', 'Ewan "Bradley Cooper" Deeley', 782, 14),
   active('f9e220a1-2290-46ad-9bac-fd3c65e5738f', "Rianne 'GIFjeskoningin' Meiberg", 767, 282),
   active('d77771b6-b714-4bb5-98d6-61511e50c123', 'Jeroen "Jerry" van Geel', 764, 35),
+  active('f4007378-c534-48c0-a5c3-a85abd907a1c', 'Sevda', 761, 9),
   active('8094ad42-794b-4d98-8228-a0894b59e762', 'Esther "Vrijwilliger"', 759, 113),
   active('1b6d918c-d0c6-4419-a286-ad6f94d49e89', 'Karin " Tijgah"', 740, 20),
   active('ab29240b-32d7-423f-b5ac-bb9f4ecbc682', 'Tim "Schuurmachine" Houthuijs', 732, 10),
   active('0a9a2736-30f5-477f-899c-368901dd0a63', 'Ida', 716, 179),
   active('5eb57dc9-4aac-42d8-818c-a670543ea5c4', 'Lotte "Functioneel doucher" Wesselman', 688, 26),
+  active('b1d1b114-0174-4daa-b518-c3f902afe6be', 'Dmitry', 627, 6),
   active('0b242a31-3aa5-4595-907b-965ba6369c2c', 'Fraser', 616, 27),
   active('e01b2a10-e1cf-40ce-9b37-946cb91436fe', 'Jasper "Kebabman" van Buul', 582, 112),
+  active('1c93d552-56dc-4c43-9cf1-07f6bf0faa2f', 'Sandra', 538, 7),
   active('3db685db-ae5f-4b79-b0a6-455c1d8634c4', 'Evie "Ik wil worst" Wijnhoven', 519, 103),
   active('068ae7c1-9818-47ee-ac41-07a7ca9430b2', 'Daria', 342, 76),
 ];
 
 /**
- * PLACEHOLDER legends. The real list is inactive players with >= 10 games,
+ * PLACEHOLDER legends. The real list is inactive players with >= MIN_GAMES games,
  * rated on their all-time-high visibleRating — which only the backend can
  * compute, since it needs the full game replay. These exist purely so the
  * legends pages have something to render; replace wholesale in phase 2.

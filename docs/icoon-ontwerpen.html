@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Icoon-kaarten — drie voorstellen</title>
+<style>
+  /* ================================================================
+     Presentatiepagina
+     ================================================================ */
+  :root {
+    --din: "Bahnschrift SemiCondensed", Bahnschrift, "DIN Condensed",
+           "DIN Alternate", "Agency FB", "Franklin Gothic Medium", "Segoe UI", Tahoma, sans-serif;
+    --ui: Tahoma, Verdana, sans-serif;
+    --bg: #0a0b0d;
+    --ink: #d8d4cb;
+    --dim: #8a877f;
+    --rule: rgba(255,255,255,.11);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 0 96px;
+    background:
+      radial-gradient(ellipse 120% 70% at 50% -10%, #16181d 0%, rgba(0,0,0,0) 70%),
+      var(--bg);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .wrap { max-width: 1380px; margin: 0 auto; padding: 0 28px; }
+
+  header.page { padding: 72px 0 40px; border-bottom: 1px solid var(--rule); }
+  h1 {
+    font-family: var(--din);
+    font-size: 54px; font-weight: 600; letter-spacing: .01em;
+    margin: 0 0 6px; color: #f2ede2;
+  }
+  .kicker {
+    font-family: var(--din);
+    font-size: 14px; letter-spacing: .34em; text-transform: uppercase;
+    color: #b79a52; margin: 0 0 18px;
+  }
+  header.page p { max-width: 76ch; color: var(--dim); margin: 0 0 10px; }
+  header.page strong { color: #cfc9bd; font-weight: normal; }
+
+  section.voorstel { padding: 62px 0 10px; border-bottom: 1px solid var(--rule); }
+  section.voorstel > h2 {
+    font-family: var(--din);
+    font-size: 34px; font-weight: 600; margin: 0 0 2px; color: #f2ede2;
+  }
+  section.voorstel > h2 .nr { display: inline-block; min-width: 1.9em; color: #b79a52; }
+  .lead { max-width: 80ch; color: var(--dim); margin: 0 0 34px; }
+  .lead em { color: #cfc9bd; font-style: normal; }
+
+  .showcase { display: flex; gap: 56px; align-items: flex-start; flex-wrap: wrap; }
+  .trio { display: flex; gap: 28px; flex-wrap: wrap; align-content: flex-start; flex: 1 1 430px; }
+  figure { margin: 0; }
+  figcaption {
+    font-family: var(--din);
+    font-size: 13px; letter-spacing: .26em; text-transform: uppercase;
+    color: #79746b; text-align: center; padding-top: 16px;
+  }
+  figcaption b { display: block; color: #cfc9bd; font-weight: normal; letter-spacing: .26em; }
+  .big figcaption { text-align: left; }
+
+  ul.notes {
+    list-style: none; padding: 0; margin: 44px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0 40px;
+  }
+  ul.notes li { padding: 12px 0; border-top: 1px solid var(--rule); color: var(--dim); }
+  ul.notes b {
+    display: block; font-family: var(--din);
+    font-size: 15px; letter-spacing: .16em; text-transform: uppercase;
+    color: #cfc9bd; font-weight: normal;
+  }
+  code { font-family: Consolas, monospace; font-size: 12px; color: #b79a52; }
+
+  table.verg { border-collapse: collapse; width: 100%; margin-top: 26px; font-size: 13px; }
+  table.verg th, table.verg td {
+    text-align: left; padding: 11px 14px 11px 0;
+    border-bottom: 1px solid var(--rule); vertical-align: top; color: var(--dim);
+  }
+  table.verg th {
+    font-family: var(--din); font-size: 13px; letter-spacing: .2em;
+    text-transform: uppercase; color: #b79a52; font-weight: normal; white-space: nowrap;
+  }
+  table.verg td:first-child { color: #cfc9bd; white-space: nowrap; }
+
+  /* ================================================================
+     De kaart
+     --------------------------------------------------------------
+     Alles wordt op 500x700 getekend en met `transform: scale()`
+     verkleind. Eén set maten, elke context schaalt mee — hetzelfde
+     principe als de `cqw`-typografie in `card.css`.
+
+     De vorm komt van de referentie, opgemeten als percentages:
+       randstap  6,4% van de breedte (niet meer — een grotere stap
+                 maakt er een plusteken van)
+       kraag     4,4% - 10,5% hoog
+       vleugel  10,5% - 28%
+       lijf     28%  - 56%
+       paneel   56%  - 88%
+       voet     88%  - 95%, met dezelfde boog als de kraag, omgekeerd
+     ================================================================ */
+  .ic-wrap {
+    width: calc(500px * var(--s));
+    height: calc(700px * var(--s));
+    flex: none;
+    filter: drop-shadow(0 16px 30px rgba(0,0,0,.6)) drop-shadow(0 2px 3px rgba(0,0,0,.45));
+  }
+  .ic {
+    position: relative;
+    width: 500px; height: 700px;
+    transform: scale(var(--s));
+    transform-origin: 0 0;
+    clip-path: url(#icClip);
+    font-family: var(--din);
+    user-select: none;
+    overflow: hidden;
+    background: var(--stone);
+  }
+
+  /* --- steen ---------------------------------------------------- */
+  .ic__wolk {
+    position: absolute; inset: 0;
+    background: linear-gradient(150deg, #fff, #000);
+    -webkit-mask-image: var(--wolk); mask-image: var(--wolk);
+    -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+    mix-blend-mode: soft-light; opacity: .34;
+  }
+  .ic__aders {
+    position: absolute; inset: -8%;
+    background: var(--aderVerf);
+    -webkit-mask-image: var(--ader); mask-image: var(--ader);
+    -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+    mix-blend-mode: multiply;
+    opacity: var(--aderDekking, .55);
+  }
+  .ic__aders--fijn {
+    inset: -18%;
+    transform: rotate(-7deg) scale(1.2);
+    -webkit-mask-image: var(--ader2); mask-image: var(--ader2);
+    opacity: calc(var(--aderDekking, .55) * .5);
+  }
+
+  /* --- kunstwerk per voorstel -----------------------------------
+     Het kunstwerk wijkt voor het hoofd. De foto staat op `multiply`, dus
+     alles wat eronder ligt schijnt door haar gezicht heen — en een gouden
+     rib of een gegraveerde straal dwars over een neus is precies zo erg
+     als het klinkt. Deze radiale uitsparing haalt het lijnwerk daar weg;
+     de rest van de kaart houdt het volledig. */
+  .ic__art {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    -webkit-mask-image: radial-gradient(ellipse 24% 21% at 50% 28%, transparent 38%, #000 100%);
+    mask-image: radial-gradient(ellipse 24% 21% at 50% 28%, transparent 38%, #000 100%);
+  }
+
+  /* --- foto ------------------------------------------------------ */
+  /*
+   * `multiply` op de foto zelf, niet alleen op de tint erover.
+   *
+   * De referentie heeft een uitgeknipte speler die op het kunstwerk staat; wij
+   * hebben een rechthoekige pasfoto op een lichte achtergrond. Multiply doet
+   * precies wat een uitknip zou doen: wit wordt doorzichtig, de speler blijft
+   * staan, en de facetten lopen achter haar schouders door. Zonder dit dekt de
+   * foto het hele kunstwerk af en is er van het kristal niets te zien.
+   *
+   * Werkt op alle huidige portretten omdat die op een lichte achtergrond zijn
+   * geschoten. Bij een donkere achtergrond valt de speler weg — dan moet dit
+   * terug naar `normal` met alleen de tint.
+   */
+  .ic__foto {
+    position: absolute;
+    left: 38px; right: 38px; top: 44px; height: 384px;
+    mix-blend-mode: multiply;
+    isolation: isolate; overflow: hidden;
+    -webkit-mask-image:
+      linear-gradient(to top, transparent 3%, #000 32%),
+      linear-gradient(135deg, transparent 7%, #000 30%);
+    mask-image:
+      linear-gradient(to top, transparent 3%, #000 32%),
+      linear-gradient(135deg, transparent 7%, #000 30%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  .ic__foto img {
+    width: 100%; height: 100%;
+    object-fit: cover; object-position: center 20%; display: block;
+  }
+  /* De foto naar het metaal toe kleuren, zoals `.card__portrait::after`. */
+  .ic__foto::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: linear-gradient(160deg, var(--tintA) 0%, var(--tintB) 100%);
+    mix-blend-mode: multiply; opacity: .2; pointer-events: none;
+  }
+  .ic__initialen {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 140px; letter-spacing: .06em; color: rgba(0,0,0,.13);
+  }
+
+  /* --- onderpaneel ------------------------------------------------
+     Halfdoorzichtig, zodat de aders er dof doorheen blijven lopen. Een
+     dekkend paneel maakte er een los wit vlak van dat op de steen lag in
+     plaats van eruit gesneden te zijn. */
+  .ic__paneel {
+    position: absolute; left: 0; right: 0; top: 392px; bottom: 0;
+    background: var(--paneel);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 -16px 26px -16px rgba(0,0,0,.28);
+  }
+
+  /* --- lijnwerk --------------------------------------------------- */
+  .ic__ink { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* --- druk -------------------------------------------------------- */
+  .ic__ovr, .ic__naam, .ic__tag { position: absolute; color: var(--ink2); z-index: 6; }
+  .ic__ovr {
+    top: 104px; left: 44px;
+    font-size: 88px; font-weight: 600; line-height: .9; letter-spacing: .01em;
+    text-shadow: 0 1px 0 rgba(255,255,255,.55), 0 2px 3px rgba(0,0,0,.16);
+  }
+  .ic__naam {
+    left: 52px; right: 52px; top: 474px;
+    text-align: center; font-size: 60px; line-height: 1; letter-spacing: .035em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 1px 0 rgba(255,255,255,.65);
+  }
+  .ic__tag {
+    left: 0; right: 0; top: 566px;
+    text-align: center; font-size: 17px;
+    letter-spacing: .58em; text-indent: .58em; text-transform: uppercase;
+    color: var(--ink3);
+  }
+
+  @media (max-width: 900px) { .showcase { gap: 32px; } h1 { font-size: 38px; } }
+</style>
+</head>
+<body>
+
+<!-- =================================================================
+     Gedeelde vormen: het silhouet, de biesmaskers en de drie metalen.
+     ================================================================= -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <path id="icShape" d="
+      M 250 8
+      C 272 8 290 16 290 30
+      L 444 30
+      C 452 30 458 36 458 46
+      L 458 58
+      C 458 68 468 72 478 72
+      C 486 72 490 78 490 88
+      L 490 180
+      C 490 190 486 196 478 196
+      L 470 196
+      C 462 196 458 202 458 212
+      L 458 372
+      C 458 382 466 392 478 392
+      C 486 392 490 398 490 408
+      L 490 600
+      C 490 610 484 616 476 616
+      L 470 616
+      C 462 616 458 622 458 632
+      L 458 648
+      C 458 658 452 664 444 664
+      L 290 664
+      C 290 678 272 688 250 688
+      C 228 688 210 678 210 664
+      L 56 664
+      C 48 664 42 658 42 648
+      L 42 632
+      C 42 622 38 616 30 616
+      L 24 616
+      C 16 616 10 610 10 600
+      L 10 408
+      C 10 398 14 392 22 392
+      C 34 392 42 382 42 372
+      L 42 212
+      C 42 202 38 196 30 196
+      L 22 196
+      C 14 196 10 190 10 180
+      L 10 88
+      C 10 78 14 72 22 72
+      C 32 72 42 68 42 58
+      L 42 46
+      C 42 36 48 30 56 30
+      L 210 30
+      C 210 16 228 8 250 8
+      Z" />
+
+    <clipPath id="icClip"><use href="#icShape"/></clipPath>
+
+    <!-- Eén haarlijn. Twee streken: 15 wit, 12 zwart laat een ring van
+         1,5 px over op 6 px van de rand. De buitenste helft valt weg tegen
+         de clip, dus de lijn eindigt exact op de vorm.
+
+         Was een dubbele bies, zoals de referentie. Twee lijnen om een vorm
+         met acht knikken erin is precies het ornament dat hier weg moest:
+         de vorm is al de decoratie. -->
+    <mask id="icBies" maskUnits="userSpaceOnUse" x="0" y="0" width="500" height="700">
+      <use href="#icShape" fill="none" stroke="#fff" stroke-width="15"/>
+      <use href="#icShape" fill="none" stroke="#000" stroke-width="12"/>
+    </mask>
+
+    <linearGradient id="mGoud" x1="0" y1="0" x2=".55" y2="1">
+      <stop offset="0"   stop-color="#fff6cf"/>
+      <stop offset=".18" stop-color="#e8c96a"/>
+      <stop offset=".34" stop-color="#b8901f"/>
+      <stop offset=".5"  stop-color="#8c6b12"/>
+      <stop offset=".66" stop-color="#f5dc8e"/>
+      <stop offset=".84" stop-color="#c19a2c"/>
+      <stop offset="1"   stop-color="#ffeeae"/>
+    </linearGradient>
+    <linearGradient id="mZilver" x1="0" y1="0" x2=".55" y2="1">
+      <stop offset="0"   stop-color="#ffffff"/>
+      <stop offset=".18" stop-color="#c9d4de"/>
+      <stop offset=".34" stop-color="#8593a2"/>
+      <stop offset=".5"  stop-color="#5d6874"/>
+      <stop offset=".66" stop-color="#e3ebf1"/>
+      <stop offset=".84" stop-color="#8d99a6"/>
+      <stop offset="1"   stop-color="#f4f8fb"/>
+    </linearGradient>
+    <linearGradient id="mBrons" x1="0" y1="0" x2=".55" y2="1">
+      <stop offset="0"   stop-color="#ffe2ba"/>
+      <stop offset=".18" stop-color="#d99f5e"/>
+      <stop offset=".34" stop-color="#a15b28"/>
+      <stop offset=".5"  stop-color="#733c17"/>
+      <stop offset=".66" stop-color="#f0c48a"/>
+      <stop offset=".84" stop-color="#a9662e"/>
+      <stop offset="1"   stop-color="#ffdfb4"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+<header class="page">
+  <p class="kicker">Tafelvoetbal &middot; verzamelkaarten</p>
+  <h1>Icoon-kaarten</h1>
+  <p>Drie voorstellen voor de kaart van een <strong>icoon</strong> — de speler die niet
+     meer actief is, die in pakjes verschijnt zodra je de actieve set compleet hebt, en
+     die op zijn hoogste rating ooit staat gewaardeerd.</p>
+  <p>Alle drie delen het silhouet van de referentie, opgemeten in percentages, en verder
+     zo min mogelijk: <strong>één haarlijn langs de rand, sterren die de tier tellen, een
+     naam</strong>. Geen embleem, geen dubbele bies, geen ornament in het paneel. Wat de drie
+     onderscheidt is één gebaar per kaart — de steen zelf, één slijpvlak, of één ring.</p>
+  <p>Voorbeeldspeler is <strong>Nynke</strong>. Haar echte kaart is zilver 71; de brons&#8209;
+     en goudvarianten laten alleen zien wat het sjabloon met een andere waardering doet.</p>
+</header>
+
+<div id="voorstellen"></div>
+
+<section class="voorstel" style="border-bottom:none">
+  <h2>Vergelijking</h2>
+  <p class="lead">Waar de drie uit elkaar lopen, en waarom je de een boven de ander zou kiezen.</p>
+  <table class="verg">
+    <tr><th></th><th>A &middot; Steen</th><th>B &middot; Facet</th><th>C &middot; Boog</th></tr>
+    <tr>
+      <td>Het gebaar</td>
+      <td>Geen — alleen de aders</td>
+      <td>Eén slijpvlak, schuin over de kaart</td>
+      <td>Eén ring om het hoofd</td>
+    </tr>
+    <tr>
+      <td>Op 144&nbsp;px in het album</td>
+      <td>Houdt het volledig; er is niets dat kan dichtlopen</td>
+      <td>Houdt het — twee lijnen blijven twee lijnen</td>
+      <td>De ring wordt dun maar blijft leesbaar</td>
+    </tr>
+    <tr>
+      <td>Verschil brons/zilver/goud</td>
+      <td>Steen en metaal, verder niets</td>
+      <td>Ook het onderste vlak kleurt mee — het sterkst van de drie</td>
+      <td>Steen en metaal; de ring is bijna kleurloos</td>
+    </tr>
+    <tr>
+      <td>Risico</td>
+      <td>Kan te leeg zijn naast de vier bestaande metalen</td>
+      <td>De diagonaal is een derde richting op een kaart die er al twee heeft</td>
+      <td>Een cirkel op een schild kan als logo lezen</td>
+    </tr>
+  </table>
+</section>
+
+</div>
+
+<script>
+/* ------------------------------------------------------------------
+   Eén render-functie, drie configuraties. Verder puur CSS en SVG —
+   geen bibliotheek, in lijn met de rest van het project.
+   ------------------------------------------------------------------ */
+
+const NYNKE = 'https://rik-dev.anago.io/tafelvoetbal-server/api/player/3eddd710-ce41-4225-b722-4107f3450074/avatar';
+
+/* Ruis als data-URI, net als het hout van de tafelbladen: geen asset,
+   niets dat geladen wordt, en uitgerekt over het hele vlak zodat er geen
+   naad in kan zitten.
+
+   De tweede feColorMatrix zet alpha op 1 vóór `luminanceToAlpha`. Zonder
+   die stap is de uitvoer van feTurbulence half doorzichtige ruis, wordt
+   de luminantie overal ongeveer gelijk, en levert de tabel een egale
+   waas op in plaats van aders. Dat is precies wat er de eerste keer
+   misging. */
+const ruis = (bf, oct, seed, tabel) =>
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='500' height='700'%3E" +
+  "%3Cfilter id='f' x='0' y='0' width='100%25' height='100%25'%3E" +
+  "%3CfeTurbulence type='fractalNoise' baseFrequency='" + bf + "' numOctaves='" + oct + "' seed='" + seed + "'/%3E" +
+  "%3CfeColorMatrix type='matrix' values='1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 1'/%3E" +
+  "%3CfeColorMatrix type='luminanceToAlpha'/%3E" +
+  "%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='" + tabel + "'/%3E%3C/feComponentTransfer%3E" +
+  "%3C/filter%3E%3Crect width='500' height='700' filter='url(%23f)'/%3E%3C/svg%3E\")";
+
+const ADER  = ruis('0.004 0.014', 6, 11, '0 0 1 0 0 0.8 0 0 1 0 0');   /* brede aders   */
+const ADER2 = ruis('0.010 0.030', 5, 3,  '0 0 0.75 0 0 0.5 0 0');       /* haarscheuren  */
+const WOLK  = ruis('0.018 0.030', 4, 5,  '0.1 0.4 0.55 0.8');           /* steenwolking  */
+
+/* De drie ruis-URI's staan in een stijlblok en niet in een `style`-attribuut.
+   Een data-URI moet in `url("...")` staan omdat er spaties en enkele quotes in
+   zitten, en die dubbele quote breekt het attribuut precies op de eerste `url(`.
+   Dat was de reden dat het marmer de eerste keer volledig onzichtbaar bleef. */
+document.head.insertAdjacentHTML('beforeend',
+  `<style>:root{--ader:${ADER};--ader2:${ADER2};--wolk:${WOLK}}</style>`);
+
+const TIERS = {
+  brons: {
+    label: 'Brons', ovr: 62, sterren: 1, metal: 'url(#mBrons)',
+    vars: {
+      '--stone': 'linear-gradient(158deg,#fdf6ec 0%,#f3e6d5 34%,#e6d0b4 66%,#faeedd 100%)',
+      '--paneel': 'linear-gradient(180deg,rgba(255,250,243,.9) 0%,rgba(240,226,206,.78) 100%)',
+      '--aderVerf': 'linear-gradient(120deg,#8a4f20,#c98a4e 35%,#6d3a14 65%,#b8763c)',
+      '--aderDekking': '.3',
+      '--tintA': '#f2d3ae', '--tintB': '#b07a45',
+      '--ink2': '#3d2410', '--ink3': '#8a5c30',
+      '--facetA': 'rgba(255,246,234,.78)', '--facetB': 'rgba(161,91,40,.34)'
+    }
+  },
+  zilver: {
+    label: 'Zilver', ovr: 71, sterren: 2, metal: 'url(#mZilver)',
+    vars: {
+      '--stone': 'linear-gradient(158deg,#ffffff 0%,#f4f7fa 30%,#dde4eb 64%,#fafcfe 100%)',
+      '--paneel': 'linear-gradient(180deg,rgba(255,255,255,.92) 0%,rgba(232,238,244,.8) 100%)',
+      '--aderVerf': 'linear-gradient(120deg,#67727e,#9aa7b4 35%,#4c555f 65%,#818e9b)',
+      '--aderDekking': '.26',
+      '--tintA': '#dde7f0', '--tintB': '#8e9dae',
+      '--ink2': '#1d232b', '--ink3': '#5d6771',
+      '--facetA': 'rgba(255,255,255,.82)', '--facetB': 'rgba(93,110,128,.32)'
+    }
+  },
+  goud: {
+    label: 'Goud', ovr: 88, sterren: 3, metal: 'url(#mGoud)',
+    vars: {
+      '--stone': 'linear-gradient(158deg,#fffefa 0%,#f9f4e9 30%,#ece2cc 64%,#fdf9ef 100%)',
+      '--paneel': 'linear-gradient(180deg,rgba(255,253,247,.92) 0%,rgba(243,235,219,.8) 100%)',
+      '--aderVerf': 'linear-gradient(120deg,#a8811d,#e8c96a 35%,#7a5c0e 65%,#c9a03a)',
+      '--aderDekking': '.34',
+      '--tintA': '#fdeeb0', '--tintB': '#c9a03a',
+      '--ink2': '#33290a', '--ink3': '#8a7220',
+      '--facetA': 'rgba(255,252,238,.8)', '--facetB': 'rgba(184,144,31,.36)'
+    }
+  }
+};
+
+/* ---- de kroon: alleen de sterren --------------------------------
+   Er zat een embleem onder met stangen en een bal erin. Weg: het was op
+   albummaat een vlekje, en op de grote kaart het enige plekje waar iets
+   te bestuderen viel. De sterren blijven omdat ze iets betekenen —
+   ze tellen de tier. */
+function kroon(tier) {
+  const n = TIERS[tier].sterren;
+  const stap = 15;
+  const x0 = 250 - (n - 1) * stap / 2;
+  let sterren = '';
+  for (let i = 0; i < n; i++) {
+    sterren += `<path transform="translate(${x0 + i * stap} 22) scale(.55)" fill="var(--metal)"
+      d="M0 -11 L3.1 -3.6 11 -3.4 4.9 1.5 7 9.2 0 4.9 -7 9.2 -4.9 1.5 -11 -3.4 -3.1 -3.6 Z"/>`;
+  }
+  return sterren;
+}
+
+/* ---- A: alleen de steen ------------------------------------------
+   Geen kunstwerk. De aders zijn het enige dat er gebeurt, en dat is
+   genoeg — een blok marmer in de vorm van een schild. */
+const artMarmer = '';
+
+/* ---- B: één slijpvlak --------------------------------------------
+   Twee lijnen, drie vlakken, nauwelijks verschillende tinten. Dat is
+   alles wat er nodig is om te zeggen dat dit geslepen is; de twaalf
+   ribben die hier stonden zeiden hetzelfde twaalf keer. */
+const artFacet = `
+  <polygon points="0,0 500,0 500,214 0,320" fill="var(--facetA)"/>
+  <polygon points="0,320 500,214 500,700 0,700" fill="var(--facetB)"/>
+  <g stroke="var(--metal)" stroke-width="1" opacity=".5">
+    <line x1="0" y1="320" x2="500" y2="214"/>
+    <line x1="0" y1="188" x2="500" y2="88"/>
+  </g>`;
+
+/* ---- C: één boog --------------------------------------------------
+   Een enkele gegraveerde ring achter de speler, dubbel getekend —
+   donker op zijn plek, licht één pixel lager, want dat schaduwrandje
+   is het enige dat een lijn gesneden laat lijken. */
+const artBoog = `
+  <circle cx="250" cy="238" r="176" fill="none" stroke="rgba(0,0,0,.22)" stroke-width="1.4"/>
+  <circle cx="250" cy="239.4" r="176" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="1.4"/>
+  <circle cx="250" cy="238" r="196" fill="none" stroke="rgba(0,0,0,.12)" stroke-width=".8"/>
+  <circle cx="250" cy="239.2" r="196" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".8"/>`;
+
+const VOORSTELLEN = [
+  {
+    nr: 'A', naam: 'Steen', art: () => artMarmer,
+    lead: `Niets. Een blok marmer in de vorm van een schild, een haarlijn langs de rand,
+           een naam. <em>De aders zijn het enige dat er gebeurt</em> — en die zijn echte
+           ruis, dus geen twee kaarten zijn hetzelfde.`,
+    notes: [
+      ['Geen kunstwerk',
+       'Geen facet, geen gravure, geen embleem. Wat overblijft is de vorm, de steen en de foto — en dat is precies genoeg om als icoon te lezen.'],
+      ['Steen én metaal wisselen per tier',
+       'Brons is travertijn met koperen aders, zilver koel carrara, goud albast. Verder is er niets waar de tier zich in kan uiten, en dat maakt het verschil juist duidelijker.']
+    ]
+  },
+  {
+    nr: 'B', naam: 'Facet', art: () => artFacet,
+    lead: `Twee lijnen, drie vlakken, nauwelijks verschillende tinten. <em>Eén slijpvlak dat
+           schuin over de kaart loopt</em> — genoeg om te zeggen dat dit geslepen is, zonder
+           dat er iets te tellen valt.`,
+    notes: [
+      ['Twee lijnen doen wat er twaalf deden',
+       'Een eerdere versie had twaalf ribben vanuit één slijppunt. Die zeiden twaalf keer hetzelfde, en liepen op albummaat dicht.'],
+      ['De vlakken dragen de tier',
+       'Het enige gekleurde element op de kaart is het onderste vlak. Bij brons is dat koper, bij zilver staal.']
+    ]
+  },
+  {
+    nr: 'C', naam: 'Boog', art: () => artBoog,
+    lead: `Eén gegraveerde ring achter de speler, en verder niets. <em>Dubbel getekend</em> —
+           donker op zijn plek, licht één pixel lager — want dat schaduwrandje is het enige
+           dat een lijn gesneden laat lijken in plaats van gedrukt.`,
+    notes: [
+      ['Eén ring, geen stralenkrans',
+       'Hier stonden negen bogen, dertien stralen en twee lauwertakken. De ring alleen doet hetzelfde en laat de steen zichtbaar.'],
+      ['De ring ligt om het hoofd, niet erover',
+       'Straal en middelpunt zijn zo gekozen dat hij nergens de foto raakt. Nodig, want de foto staat op <code>multiply</code> en alles eronder schijnt er anders doorheen.']
+    ]
+  }
+];
+
+function kaart(v, tier, schaal) {
+  const t = TIERS[tier];
+  const stijl = Object.entries(t.vars).map(([k, val]) => k + ':' + val).join(';');
+  return `
+  <div class="ic-wrap" style="--s:${schaal}">
+    <div class="ic" style="${stijl};--metal:${t.metal}">
+      <div class="ic__wolk"></div>
+      <div class="ic__aders"></div>
+      <div class="ic__aders ic__aders--fijn"></div>
+      <svg class="ic__art" viewBox="0 0 500 700">${v.art()}</svg>
+      <div class="ic__foto">
+        <img src="${NYNKE}" alt="Nynke"
+             onerror="this.parentNode.innerHTML='<div class=&quot;ic__initialen&quot;>NK</div>'">
+      </div>
+      <div class="ic__paneel"></div>
+      <svg class="ic__ink" viewBox="0 0 500 700">
+        <rect width="500" height="700" fill="var(--metal)" mask="url(#icBies)"/>
+        ${kroon(tier)}
+      </svg>
+      <div class="ic__ovr">${t.ovr}</div>
+      <div class="ic__naam">Nynke</div>
+      <div class="ic__tag">Icoon</div>
+    </div>
+  </div>`;
+}
+
+document.getElementById('voorstellen').innerHTML = VOORSTELLEN.map(v => `
+  <section class="voorstel">
+    <h2><span class="nr">${v.nr}</span>${v.naam}</h2>
+    <p class="lead">${v.lead}</p>
+    <div class="showcase">
+      <figure class="big">
+        ${kaart(v, 'goud', 1)}
+        <figcaption><b>Groot &middot; goud</b>500 &times; 700</figcaption>
+      </figure>
+      <div class="trio">
+        ${['brons','zilver','goud'].map(t => `
+          <figure>
+            ${kaart(v, t, .46)}
+            <figcaption><b>${TIERS[t].label}</b>${TIERS[t].sterren} ster${TIERS[t].sterren > 1 ? 'ren' : ''}</figcaption>
+          </figure>`).join('')}
+      </div>
+    </div>
+    <ul class="notes">
+      ${v.notes.map(n => `<li><b>${n[0]}</b>${n[1]}</li>`).join('')}
+    </ul>
+  </section>`).join('');
+</script>
+
+</body>
+</html>

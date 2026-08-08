@@ -11,12 +11,25 @@
  */
 
 /*
- * The stage's side padding, on :root rather than inline in `.game-stage`, because
- * `.album-layout` has to subtract it from the viewport to work out how much table
- * is left beside the book. If the two drift apart the pack shelf starts overlapping
- * the book, so they read from one value.
+ * The stage's outer width and its side padding, on :root rather than inline in
+ * `.game-stage`, because `.album-layout` has to subtract both to work out how much
+ * table is left beside the book. If they drift apart the pack shelf starts
+ * overlapping the book, so they read from one value.
+ *
+ * **`--stage-w` is here because they did drift apart.** The screen stages (A–E) are
+ * full bleed, so the width was written as a bare `100vw` inside `--shelf-room` and
+ * the padding was the only token that needed to exist. The tabletop stages (F–J)
+ * then made the stage a table-sized *object* — `min(1520px, 97vw)`, centred, with
+ * tighter padding of its own — and `--shelf-room` went on measuring the viewport.
+ * At 1920 the table is 1520 wide and leaves the book 44px a side, while the formula
+ * still believed it had 196: the shelf was sized for a margin four times the one it
+ * was lying in, so it ran onto the page.
+ *
+ * Anything that changes the stage's box must change these, not `.game-stage`'s own
+ * `width`/`padding` — which now read from here, so the two cannot disagree again.
  */
 :root {
+  --stage-w: 100vw;
   --stage-pad: clamp(8px, 3vw, 40px);
 }
 
@@ -56,6 +69,9 @@
 
   position: relative;
   min-height: 78vh;
+  /* No `width` here on purpose: a block already fills its parent, and `100vw` would
+     count the scrollbar and overflow. `--stage-w` describes that width for the shelf
+     formula; only a stage that genuinely constrains the box sets both (tabletop.css). */
   padding: 18px var(--stage-pad) 28px;
   box-sizing: border-box;
   font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
@@ -321,15 +337,21 @@
 
   /*
    * How much table is left beside the book, per side. Every term is
-   * viewport-relative (`--book-w` is `--page-w × 2`, and `--page-w` is vw/vh), so
-   * this can be resolved in CSS without measuring anything — which is what lets
-   * the shelf size itself to the room it actually has.
+   * viewport-relative (`--book-w` is `--page-w × 2`, `--page-w` is vw/vh, and
+   * `--stage-w` is either `100vw` or a cap on it), so this can be resolved in CSS
+   * without measuring anything — which is what lets the shelf size itself to the
+   * room it actually has.
    *
-   * `100vw` counts the scrollbar and `.album-layout` does not, hence the 16px:
-   * it keeps the shelf off the book on a scrolled page rather than under it.
+   * `--stage-w` and `--stage-pad` rather than `100vw` and a literal, so that the
+   * tabletop stages — where the stage is a 1520px slab rather than the window — get
+   * the margin they actually have. See the :root block at the top of this file.
+   *
+   * `--stage-w` counts the scrollbar where it is viewport-derived and
+   * `.album-layout` does not, hence the 16px: it keeps the shelf off the book on a
+   * scrolled page rather than under it.
    */
   --shelf-room: calc(
-    (100vw - 2 * var(--stage-pad) - var(--book-w)) / 2 - var(--shelf-gap) - 16px
+    (var(--stage-w) - 2 * var(--stage-pad) - var(--book-w)) / 2 - var(--shelf-gap) - 16px
   );
 
   /* Containing block for the aside. */
@@ -365,6 +387,39 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+
+  /*
+   * Coming back out of a reveal — see `--set-aside` below for the other direction.
+   *
+   * It waits for the results to land before it lights, because the pile brightening
+   * *is* the invitation to open the next one and it should not compete with the
+   * cards you just got. That delay is the whole reason the two directions are
+   * written separately rather than as one transition.
+   */
+  transition: opacity 420ms ease 320ms;
+}
+
+/*
+ * The shelf while a packet is being torn: still there, plainly out of play.
+ *
+ * The opener runs beside the pile rather than replacing it, so the pile has to say
+ * which of the two you are looking at. Dimmed rather than hidden — how many you have
+ * left is worth knowing through the reveal, and a shelf that vanished and came back
+ * would be a layout event at the worst possible moment. `pointer-events: none` is the
+ * functional half: you cannot pick up a second packet with your hands full, and
+ * without it a stray click mid-ceremony would tear down a reveal in progress.
+ *
+ * Faster out than in, and no delay: the pile stands down the instant you commit to
+ * one, which is the same asymmetry the album's turn strips use (160 in, 90 out).
+ *
+ * The gold build's vignette (`.opener__dim`) is `position: fixed` and covers this
+ * anyway — but only for the ~28% of cards that get a ceremony, and only once the
+ * build has ramped. This has to hold for the other 72%.
+ */
+.album-side--set-aside {
+  opacity: 0.34;
+  pointer-events: none;
+  transition: opacity 200ms ease;
 }
 
 /*
@@ -428,6 +483,27 @@
     --pack-w: var(--album-card-w, 96px);
 
     max-height: 56vh;
+  }
+
+  /*
+   * The shelf does not survive into the opener down here, and that is deliberate.
+   *
+   * Keeping it up is worth doing when it lies in the margin beside the book, because
+   * it costs the reveal nothing and the next packet stays under your hand. Stacked,
+   * it is *above* the opener in flow instead: it would push the reveal down by a row
+   * of packets, and the ceremony's vignette is a fixed layer clearing a hole at 45%
+   * of the viewport — so the card would drift out of its own spotlight on exactly the
+   * pulls that spotlight exists for.
+   *
+   * Below it is no better: the opener is `min-height: 62vh` and centred, so packets
+   * underneath start off screen and only the scrollbar says they are there.
+   *
+   * No layout jump is introduced by this — the book is being replaced by the opener
+   * in the same commit, so the whole middle of the screen changes anyway. "terug naar
+   * het album" is the way back, as it was before the shelf started staying up.
+   */
+  .album-layout--opening .album-side {
+    display: none;
   }
 }
 

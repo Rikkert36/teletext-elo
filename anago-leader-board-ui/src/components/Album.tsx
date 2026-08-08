@@ -134,7 +134,7 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
      * with the actives — a spread reading "Actieve spelers" on the left and
      * "Legendes" on the right looks like a mistake. Whether that happens by
      * itself depends on the pool size dividing by SLOTS_PER_PAGE, which moves as
-     * players cross ten games.
+     * players cross MIN_GAMES.
      *
      * Leaf i holds [page 2i, page 2i+1], and at `flipped = f` the spread shows
      * page 2f-1 on the left and 2f on the right — so a section must begin on an
@@ -410,6 +410,42 @@ const Album: React.FC<AlbumProps> = ({
     },
     [isMobile, maxFlipped, pages.length],
   );
+
+  /*
+   * Left and right turn the page — the keyboard equivalent of the turn strips,
+   * clamped at both ends exactly as they are.
+   *
+   * On the window rather than on the book, and for the same reason the card viewer
+   * does it: the strips are the only focusable thing on the book, they go dead at
+   * either end, and nothing hands the book focus when the page loads — so a
+   * listener on the element would only respond after a click somewhere on it.
+   *
+   * The two listeners must not both be live, or an arrow turns a page *and* steps
+   * the viewer. A `focusPlayerId` means a card is open, which is when the viewer's
+   * arrows own the book, so the album's stand down for as long as one is showing.
+   */
+  useEffect(() => {
+    if (focusPlayerId) return;
+
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      /* Browser and OS shortcuts (back, word-wise motion, selection) stay theirs. */
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+
+      /* The name type-ahead needs its own arrows — and a caret needs to move. */
+      const target = event.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (target?.isContentEditable || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') {
+        return;
+      }
+
+      event.preventDefault();
+      turn(event.key === 'ArrowLeft' ? -1 : 1);
+    };
+
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [focusPlayerId, turn]);
 
   /**
    * Unflipped leaves stack lowest-index-on-top so leaf `flipped` shows on the

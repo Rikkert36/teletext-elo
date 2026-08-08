@@ -11,7 +11,17 @@ Done and signed off: the mock data module, the `cardsClient` seam, the Panini ca
 face, the album's stiff 3D flip, the pack opener's five beats, the FLIP travel,
 the new-card marking, the four-level ceremony, and the D-minor payoff ladder.
 
-Newest: the **card viewer** — click any slot, including an empty one, and the card
+Newest: the **games gate dropped from 10 to 5**, for the card pool, the access
+gate and the legends pool alike. Four players join (Yannick, Sevda, Dmitry,
+Sandra), the set is 38 cards, and everyone's per-pack rate falls ~15%. `DHigh`
+stays at 2.5 — the slower completion is accepted, not compensated. See
+"Why ≥5 games".
+
+Before that: the **icoon card** — legends no longer wear a black `legende` pill, they
+get their own colourway: monochrome photo, pale ground, shards, and deliberately no
+frame. Tier moves the metal, rarity is untouched. See "The icoon card".
+
+Before that: the **card viewer** — click any slot, including an empty one, and the card
 fills the screen with its full name, nickname, tier and duplicate count, browsable
 left and right through the whole book. The count also reaches the album's tooltip.
 The page-turn strips narrowed to the page margin to make room for the click.
@@ -62,7 +72,7 @@ sized by how well they did, and collections build toward a legends unlock.
 | --- | --- |
 | Storage | Server-side (SQLite/EF Core). Sole source of truth. |
 | Identity | `PlayerId`, entered via type-ahead (not a dropdown). Browser remembers the last pick. |
-| Access gate | Collection page unlocks once that player has **≥10 games** — symmetric with the card pool. |
+| Access gate | Collection page unlocks once that player has **≥5 games** — symmetric with the card pool. |
 | Pack recipients | **All four participants** of a game. |
 | Pack size | 1 for playing, **+2** for winning, **+2** for beating expected margin by ≥3. So 1, 3 or 5. |
 | Opponent bonus | Winning *or* beating expected margin by ≥3 doubles both opponents' tickets in that pack. Flat 2×, does not stack to 4×. Flavour, not balance. |
@@ -74,13 +84,14 @@ sized by how well they did, and collections build toward a legends unlock.
 | Card rating | **Live**, computed on read from `visibleRating`. No stat columns on the card. |
 | Card sub-stats | **Dropped.** Not worth it for ~15 active players. |
 | Rarity axis | Rating alone — no foils, no serials, one card per player. |
-| Card pool | **Active** players with ≥10 games. |
-| Legends | Completing the active set permanently unlocks inactive (≥10 games) players in packs, alongside actives. Rated on all-time-high. |
+| Card pool | **Active** players with ≥5 games. |
+| Legends | Completing the active set permanently unlocks inactive (≥5 games) players in packs, alongside actives. Rated on all-time-high. |
 | Cards ↔ games | `CardInstance.GameId` FK with cascade delete. |
 | Cards ↔ players | `SubjectPlayerId` FK, **also cascade**. Player deletion only ever happens for accidentally-created players, so losing their cards is correct. |
 | Presentation | 2002 **PC-game** screen, no OS chrome. Token-driven; **ten directions still being chosen between**, in two families — five screens (A–E) and five wooden tabletops (F–J). |
 | Album | Hand-rolled stiff CSS 3D page flip. No new dependency. |
 | Card face | **Panini**: photo near-full-bleed and masked into the metal, no plates, first name only, DIN type, no stats. |
+| Icoon | The **legend** colourway, not a fifth tier: monochrome photo, pale ground, shards, **no frame**. Replaces the `legende` pill. Tier moves the metal. No effect on rarity. |
 | Sound | Fully **synthesised** (WebAudio, no assets). Default on, persisted mute. |
 | Pacing | Two knobs — `DEFAULT_SCALE` (2) and `DEFAULT_CEREMONY_MS` (2000). Both settled by ear on the sliders and baked in. |
 | Reveal ceremony | Graduated over four levels at 75/80/85/90 overall. Identical at any timestamp `t`; only the *length* differs. |
@@ -97,10 +108,16 @@ inactive players already, so the legends pool has content on day one. (The
 which filters on `Active` via `GetCurrentLeaderBoard()`, so it is the active
 roster only.)
 
-Legends are inactive players with ≥10 games, rated on their **all-time-high**
+Legends are inactive players with ≥5 games, rated on their **all-time-high**
 `visibleRating`. Unlock is a permanent latch: once you have completed the active
-set you keep legends forever, so new joiners and players crossing 10 games do
+set you keep legends forever, so new joiners and players crossing 5 games do
 not un-complete it.
+
+The legend gate is held symmetric with the card pool deliberately, but it is the
+one place where 5 is arguable: it means somebody who played five games and left
+is an icoon forever. No inactive player currently sits in the 5–9 band, so this
+costs nothing today — but it is the gate to reconsider first if the legends
+pages start filling with people nobody remembers.
 
 ## The rating scale (FIFA-style 40–99)
 
@@ -158,7 +175,7 @@ straight line:
 | 98 | 3800 | 2800 | 200 | 133 |
 | 99 | 4000 | **3000** | — | — |
 
-**No player's overall changed** — 0 of 34 actives and 0 of the legend
+**No player's overall changed** — 0 of 38 actives and 0 of the legend
 placeholders — so the odds table, the completion estimates and `DHigh` all stand
 untouched. That is the whole reason this change was safe to make on its own.
 
@@ -184,18 +201,63 @@ need retuning.
 | Zilver | 65–74 | 12 |
 | Brons | <65 | 4 |
 
-**There is no Icoon tier** — gold is the top, so the 90s are simply gold. The
-reveal ceremony is driven by the **overall**, not by tier, and steps at 75 / 80 /
-85 / 90 — so a 90+ pull still escalates well past an 85 even though the card
-itself shows no distinction above 85. See "The rare ceremony" below.
+**There is still no Icoon tier** — gold is the top of this axis, so the 90s are
+simply gold. The reveal ceremony is driven by the **overall**, not by tier, and
+steps at 75 / 80 / 85 / 90 — so a 90+ pull still escalates well past an 85 even
+though the card itself shows no distinction above 85. See "The rare ceremony"
+below.
 
-### Why ≥10 games
+Icoon exists, but on a **different axis**: it is what a legend's card looks like,
+not a rung above gold. A legend has a tier like everyone else, and it moves the
+icoon's metal. See "The icoon card" under the presentation layer.
+
+Also considered and rejected: collapsing 85+ into 75–84, or moving that
+distinction off tone onto a structural signal. The argument for it is that two
+shades of gold are indistinguishable in an album where the 6 rare golds are
+scattered among 38 slots — which is true and does not matter. The rarity signal
+was never the metal: it is the overall printed in the corner and the length of
+the ceremony. FUT makes gold-rare and gold-common just as quietly different, on
+purpose. Leave both golds alone.
+
+### Why ≥5 games
 
 `visibleRating = rating − 1000·e^(−0.2303·games)`, so the deduction is ~794 at
 one game and ~100 at ten. Without a floor the scale reports attendance, not
 skill: Ninette's real rating is 1003 but she scores 47; Thomas, Nino and Angela
-all sit at exactly 40 and are indistinguishable. Crossing 10 games becomes a
+all sit at exactly 40 and are indistinguishable. Crossing the gate becomes a
 small event — you become both collectable and able to collect.
+
+**The gate was 10 and is now 5.** The deduction is continuous, not a switch, and
+that is what makes the lower gate safe:
+
+| games | 5 | 6 | 7 | 9 | 10 | 15 | 20 | 30 |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|
+| deduction | −316 | −251 | −199 | −126 | −100 | −32 | −10 | −1 |
+
+At five games you are still docked ~316, so a short hot streak cannot buy a
+top-of-scale card: the four players the drop admits arrive at overall 73, 68, 63
+and 59 despite raw ratings of 993, 887, 878 and 737. They land mid-table, which
+is the whole argument. (It is also worth reading the table in the other
+direction: the deduction is ~1 by 30 games, so anyone past that is on their real
+rating and the floor is doing nothing at all.)
+
+The cost is that four extra cards dilute the pool. It is paid **almost perfectly
+uniformly** — every existing player's per-pack rate falls 14.4–15.5%, Petar
+losing the most at 15.5% and Daria the least at 14.4% — so the rarity
+*structure* survives intact: top-to-bottom spread goes 28.6× to 28.5×. The
+scarce cards do not become disproportionately scarce; everything stretches by
+about 1.18× and the set gets four cards longer.
+
+`DHigh` was deliberately **left at 2.5**. It could be raised to ~2.7 to hold
+Petar at his old ~187 packs, but the honest read is that a lower gate should
+cost something, and 3.5 months median is still inside the window the 2.5-vs-1.9
+argument above was defending. Revisit it only if completion actually stalls in
+practice.
+
+Cards are live, so these four re-rate fast: Yannick is raw 993 on nine games and
+would be an overall 80 if that holds to thirty. A ≥5 gate means the mid-table
+churns visibly week to week. That is arguably the feature — your own card gets
+rarer as you play — but it is new behaviour that ≥10 largely suppressed.
 
 ## The draw: weighted raffle with an accelerating rate
 
@@ -246,7 +308,7 @@ Each player can appear at most once in a pack, so a pack is a draw **without
 replacement** (successive sampling: redraw proportional to remaining tickets).
 This lifts everyone's per-pack inclusion odds slightly — ~4% for a 3-card pack,
 ~9% for a 5-card pack — and is folded into every number below. Guard for a pool
-smaller than the pack size, though 34 vs 5 makes it theoretical.
+smaller than the pack size, though 38 vs 5 makes it theoretical.
 
 ### Opponent bonus
 
@@ -255,7 +317,7 @@ tickets doubled** for that pack's draw. Flat 2× even if both conditions are met
 a dominant win already pays 5 cards, and compounding to 4× would let blowouts
 dominate collections.
 
-**This is flavour, not balance, and should be treated as such.** Doubling 2 of 34
+**This is flavour, not balance, and should be treated as such.** Doubling 2 of 38
 players shifts only ~6% of the ticket mass, lifting Petar's season rate ~8%. The
 intent is that it circulates as an urban legend — *you can pack someone more
 easily if you beat them* — which happens to be true, and happens to mean that
@@ -267,40 +329,49 @@ tune it as an economy lever.
 Mix assumption for the last column: 42.5% × 1-card, 35% × 3-card, 22.5% × 5-card,
 from P(win) = 0.5 and P(bonus) ≈ 0.30.
 
+Bracketed values are what the same player was under the old ≥10 gate, kept so the
+cost of the drop stays legible.
+
 | Player | rating | ovr | 1-pack | 3-pack | 5-pack | avg packs to first |
 |---|--:|--:|--:|--:|--:|--:|
-| Petar | 1851 | 90 | 0.20% | 0.61% | 1.1% | 187 |
-| Ton | 1578 | 88 | 0.34% | 1.1% | 1.8% | 108 |
-| Mark, Rik | 1551, 1463 | 87 | 0.45% | 1.4% | 2.4% | 82 |
-| Luuk, Casper | 1362, 1327 | 85 | 0.78% | 2.4% | 4.2% | 47 |
-| Gijs, Anneloes | 1201, 1179 | 83 | 1.4% | 4.2% | 7.2% | 27 |
-| Nadia, Ridho, Jeroen Mens | 1144–1098 | 82 | 1.8% | 5.5% | 9.4% | 21 |
-| Daan vd Beek, Daan Verkade, Laura, Mathijs | 1066–1035 | 81 | 2.4% | 7.2% | 12% | 16 |
-| Max | 981 | 79 | 3.2% | 9.7% | 16% | 11.9 |
-| Niek | 952 | 78 | 3.3% | 9.9% | 17% | 11.7 |
-| Tanny | 919 | 76 | 3.4% | 10% | 17% | 11.2 |
-| Marie | 864 | 73 | 3.7% | 11% | 18% | 10.4 |
-| Bo, Simon, Nynke | 829–811 | 71 | 3.9% | 12% | 19% | 10.0 |
-| Ewan, Rianne | 782, 767 | 69 | 4.0% | 12% | 20% | 9.6 |
-| Jeroen van Geel, Esther | 764, 759 | 68 | 4.1% | 12% | 20% | 9.4 |
-| Karin, Tim | 740, 732 | 67 | 4.2% | 13% | 21% | 9.2 |
-| Ida | 716 | 66 | 4.3% | 13% | 21% | 9.0 |
-| Lotte | 688 | 65 | 4.4% | 13% | 22% | 8.8 |
-| Fraser | 616 | 62 | 4.7% | 14% | 23% | 8.2 |
-| Jasper | 582 | 61 | 4.9% | 14% | 24% | 8.0 |
-| Evie | 519 | 58 | 5.2% | 15% | 25% | 7.5 |
-| Daria | 342 | 52 | 6.0% | 18% | 29% | 6.6 |
+| Petar | 1851 | 90 | 0.17% | 0.52% | 0.90% | 222 (187) |
+| Ton | 1578 | 88 | 0.29% | 0.90% | 1.5% | 128 (108) |
+| Mark, Rik | 1551, 1463 | 87 | 0.38% | 1.2% | 2.0% | 97 (82) |
+| Luuk, Casper | 1362, 1327 | 85 | 0.67% | 2.1% | 3.5% | 56 (47) |
+| Gijs, Anneloes | 1201, 1179 | 83 | 1.2% | 3.6% | 6.1% | 32 (27) |
+| Nadia, Ridho, Jeroen Mens | 1144–1098 | 82 | 1.5% | 4.7% | 7.9% | 25 (21) |
+| Daan vd Beek, Daan Verkade, Laura, Mathijs | 1066–1035 | 81 | 2.0% | 6.1% | 10% | 19 (16) |
+| Max | 981 | 79 | 2.7% | 8.2% | 14% | 14.0 (11.9) |
+| Niek | 952 | 78 | 2.8% | 8.4% | 14% | 13.7 (11.7) |
+| Tanny | 919 | 76 | 2.9% | 8.8% | 15% | 13.1 (11.2) |
+| **Yannick**, Marie | 867, 864 | 73 | 3.1% | 9.4% | 16% | 12.3 (—, 10.4) |
+| Bo, Simon, Nynke | 829–811 | 71 | 3.3% | 9.8% | 16% | 11.7 (10.0) |
+| Ewan, Rianne | 782, 767 | 69 | 3.4% | 10% | 17% | 11.2 (9.6) |
+| Jeroen van Geel, **Sevda**, Esther | 764–759 | 68 | 3.5% | 11% | 18% | 11.0 (9.4) |
+| Karin, Tim | 740, 732 | 67 | 3.6% | 11% | 18% | 10.7 (9.2) |
+| Ida | 716 | 66 | 3.7% | 11% | 18% | 10.5 (9.0) |
+| Lotte | 688 | 65 | 3.8% | 11% | 19% | 10.3 (8.8) |
+| **Dmitry** | 627 | 63 | 3.9% | 12% | 19% | 9.8 (—) |
+| Fraser | 616 | 62 | 4.0% | 12% | 20% | 9.6 (8.2) |
+| Jasper | 582 | 61 | 4.1% | 12% | 20% | 9.4 (8.1) |
+| **Sandra** | 538 | 59 | 4.3% | 13% | 21% | 9.0 (—) |
+| Evie | 519 | 58 | 4.4% | 13% | 22% | 8.8 (7.5) |
+| Daria | 342 | 52 | 5.1% | 15% | 24% | 7.8 (6.6) |
 
-The scarcity spread is deliberately not Petar-only: Ton at 108 packs, the 87s at
-82 and the 85s at 47 are all genuinely hard, while the bottom two-thirds sits in
-a tight 6.6–12 band. Top-to-bottom range is 28×.
+The scarcity spread is deliberately not Petar-only: Ton at 128 packs, the 87s at
+97 and the 85s at 56 are all genuinely hard, while the bottom two-thirds sits in
+a tight 7.8–14 band. Top-to-bottom range is 28×, unchanged by the gate drop.
 
 Sanity check for the implementation: these inclusion probabilities must sum to
-**2.600** across all 34 players — exactly the average pack size, as required when
-no player can repeat within a pack. Worth asserting in a unit test.
+**2.600** across all 38 players — exactly the average pack size, as required when
+no player can repeat within a pack. Worth asserting in a unit test. (The 1-, 3-
+and 5-pack columns must likewise sum to 1, 3 and 5. That is the check that
+catches a wrong without-replacement implementation, and it is easy to get subtly
+wrong: successive sampling is not the same as "draw k independently and dedupe".)
 
-Excluded from the pool (under 10 games): Yannick, Sevda, Dmitry, Sandra, Inge,
-Ancella, Molly, Ninette, Sylvia, Lianne, Thomas, Nino, Angela.
+Still excluded from the pool (under 5 games): Inge, Ancella, Molly, Ninette,
+Sylvia, Lianne, Thomas, Nino, Angela — all on two games or fewer, which is where
+the deduction is still ≥501 and the scale genuinely cannot say anything.
 
 Legends join the same pool with no special rarity. Their all-time-high overalls
 are high, so the curve makes them rare automatically.
@@ -323,23 +394,30 @@ Per person, at **3 games/day, 5 days/week** (roughly the heaviest current rate �
 | Free packs | 1 | 5 |
 | Cards | 8.8 | 44 |
 
-Completing the 34-card active set at `DHigh = 2.5`, with no-duplicates-per-pack
-and the opponent bonus both folded in:
+Completing the 38-card active set at `DHigh = 2.5`, with no-duplicates-per-pack
+and the opponent bonus both folded in. Bracketed figures are the 34-card set
+under the old ≥10 gate:
 
 | | 3-game days | weeks | months | games | packs | cards |
 |---|---:|---:|---:|---:|---:|---:|
-| Median | ~64 | ~13 | ~3 | ~192 | ~256 | ~563 |
-| 90% confidence | ~140 | ~28 | ~6.5 | ~420 | ~560 | ~1,232 |
+| Median | ~75 (64) | ~15 (13) | ~3.5 (3) | ~225 (192) | ~300 (256) | ~662 (563) |
+| 90% confidence | ~164 (140) | ~33 (28) | ~7.5 (6.5) | ~492 (420) | ~656 (560) | ~1,442 (1,232) |
 
 Completion is essentially *"when do you first pull Petar"* — every other card
 arrives long before, which is why the median and the 90th percentile are more
 than 2× apart. Half of collectors finish inside a quarter; the unlucky tail is
-still hunting at six or seven months.
+still hunting at seven or eight months.
+
+Note what the four extra cards did *not* do: they added ~17% to the median but
+they did not change the shape. Completion is still one long coin-flip on the top
+player, and the ratio between the median and the tail is the same. Four more
+commons cost almost nothing on their own — the whole delay is Petar getting
+15.5% rarer.
 
 Because duplicates are shown but never converted, a collector at median
-completion holds roughly **34 Darias, 29 Evies, 27 Jaspers** — and double that by
-the 90th percentile. The collection grid must handle three-digit counts
-gracefully.
+completion holds roughly **33 Darias, 29 Evies, 28 Sandras, 27 Jaspers** — and
+double that by the 90th percentile. The collection grid must handle three-digit
+counts gracefully.
 
 ## Architecture
 
@@ -428,7 +506,7 @@ new tables should use real FKs.
   card, cascade delete), `PackGrantId`, `GameId` (cascade delete), `IsLegend`,
   `MintedAt`.
 - **`PlayerCollectionState`** — `PlayerId`, `LegendsUnlockedAt` (nullable). A
-  permanent latch, so new joiners and players crossing 10 games don't
+  permanent latch, so new joiners and players crossing 5 games don't
   un-complete an existing unlock.
 
 Cascade on `GameId` for **both** `CardInstance` and `PackGrant`, so deleting a
@@ -574,8 +652,10 @@ width and its light. Eight layers in a fixed order, so an unused one is spelt
 "3 kaarten". A button that *describes* a packet is a worse object than the packet,
 especially two seconds before you see the real one full size — so the shelf
 renders the same `.pack` element the opener tears apart (`.pack--mini`), at the size
-of a card in the book. Tilts and sheen offsets come from the index, never random, so
-a re-render does not reshuffle the pile. This is not tabletop-only; it is better
+of a card in the book. Tilts and sheen offsets come from the pack's **id**, never
+random and no longer from its index, so a re-render does not reshuffle the pile —
+and neither does a packet leaving the middle of it, which now happens in front of
+you (see "The shelf stays up"). This is not tabletop-only; it is better
 under all ten stages. What makes it work is that the packet is shaped like a packet
 and scaled like the album — see the wrapper bullets under
 [Pack opening](#pack-opening).
@@ -645,6 +725,15 @@ carrying.
     justified by a thumb having no hover to hint with) is gone too — the fallback is
     the thing that gives way.
 
+**Left and right arrow keys turn the page too**, clamped at both ends like the
+strips. On the window rather than on the book: the strips are the only focusable
+thing on it, they go dead at either end, and nothing hands the book focus on load,
+so a listener on the element would only answer after a click. Modifier
+combinations and anything typed into a field (the name type-ahead) are left alone.
+The card viewer has a window listener on the same two keys, so the album's stands
+down while `focusPlayerId` is set — otherwise one press would both turn a page and
+step the viewer.
+
 Previously two `.game-button` arrows flanked the book. They worked, but they were
 the one thing on the page that was not part of the book, and they cost horizontal
 space on every screen for a control used at most twice per spread.
@@ -681,20 +770,135 @@ The photo fills almost the whole card. Everything else is overlaid on it.
   differed in every context it rendered — 0.13 on the reveal hero against 0.23 on
   an album page. Ratios are taken from the results row. This deleted fifteen
   per-context font overrides.
-  - `.card__legend` was the last px holdout and has been converted at the ratios it
-    had on the default 150px card. It only became visible as a bug once the viewer
-    rendered a card at 380px, where the badge was a speck; it grows on the reveal
-    hero as a result, which is the correction rather than a regression.
+  - `.card__legend` was the last px holdout and was converted at the ratios it had
+    on the default 150px card. It has since been deleted entirely — see "The icoon
+    card" — but the lesson stands for anything added to the face later.
 - No statistics anywhere, no duplicate count, no tier text **on the card**. Tier
   reads from the frame and the name plate colour. The count and the tier name live
   in the viewer — see below.
+
+### The icoon card
+
+**Icoon is not a fifth tier, it is the legend.** The same axis FIFA's Icons sit on:
+not *better than gold* but *a different kind of card* — who someone is rather than
+how good they are now. That axis already existed here as `isLegend`, so this is
+that flag finally doing something on the face rather than a new concept.
+
+It **replaces the black `legende` pill**, which was the only element on the card
+that was a *label* rather than material — the same objection that removed every
+plated version of the number and the name; it simply never got put through it. For
+the same reason nothing on the card prints the word "icoon" either. The word still
+appears in the viewer (`viewer__flag`), which is an off-face surface.
+
+Rarity is **completely untouched**: no separate draw, no extra tickets, no new
+threshold. `tierFor()`, `ticketsFor()`, `DHigh`, `drawPack()` and the ceremony are
+all unchanged.
+
+Four parts and no more:
+
+1. **The photo is graded to monochrome and warmed back up** (`grayscale(1)
+   sepia(.34) contrast(1.06) brightness(1.03)`), instead of being tinted toward a
+   tier colour. This is the whole idea; the other two exist to support it. The
+   tier tint becomes the *wash* that puts the grey photo back onto the card's own
+   material, at 0.5 rather than the coloured tiers' 0.42 — a grey image takes far
+   more multiply before anything breaks.
+2. **A pale ground**, so an icoon reads from the far side of a spread.
+3. **Shards of light** from a point below the card, one `conic-gradient` in a
+   single div. They fill the two areas the portrait mask clears — the bottom strip
+   and the top-left corner — which on the coloured tiers are filled by the metal
+   and on a pale ground would otherwise be blank stock with the name hanging in
+   it. Not decoration: they are what gives the cleared area something to be.
+4. **The type is a dark olive-bronze**, `#594D2C`, where the tiers use a
+   near-black. The reference sets its number, name and rules in metal, and that
+   is most of why those cards read as pressed rather than printed.
+
+Two things about the ink that are easy to undo by accident:
+
+- **The name divider goes metal with the type, and the engraved highlight warms
+  up with it.** A bronze number over a black hairline is just a card with a
+  bronze number on it, and a white highlight under a bronze rule reads as a line
+  lying on white paper rather than one cut into a warm card. The rule is the ink
+  at 62% rather than a separately chosen brown, so the two cannot drift.
+- **It is one colour for all three colourways**, declared on `.card--icoon`. A
+  bronze per tier was tried: it made the ink a second thing the tier moves, when
+  the colourway rule is that the tier moves the metal and *nothing else* — and
+  three inks that are all nearly the same brown is a distinction nobody can make
+  while being three values to keep in step. The colourway blocks outrank
+  `.card--icoon` on specificity, so re-adding `--tier-ink` to one of them is
+  exactly how this would get quietly reversed.
+
+Also not a saturated gold, which was the first attempt. Gold type competes with
+the metal it is printed on and loses, because the ground is already the gold; it
+has to read as ink that happens to be metallic, not as more metal. The darker
+brown also recovers the contrast a gold ink cost the overall — which is the one
+hard fact on the face, so it is the last thing that may go quiet.
+
+**The tier moves the metal and nothing else.** Not one gold for every legend,
+because legends are rated on their all-time high and that spreads — an inactive
+player who managed ten games and peaked at 780 is an icoon at overall 69, and a
+gold card would lie about him. That is the mistake `.card--zilver` once made with
+its white tint. The icoon reading is carried by the *structure*, which stays
+constant, so a silver icoon is still obviously an icoon. Both gold tiers share one
+colourway; 85+ already differs from 75–84 exactly as much as it does on the
+ordinary cards, and restating it is not this card's job.
+
+Silver and bronze cool the **metal** only. The wash over the photo stays warm: a
+cool wash cancels the sepia and leaves a grey silver card.
+
+#### There is no frame, and that took five passes to establish
+
+The reference card carries gold piping round its edge, and reproducing it went
+`3.4% → 2.6 → 1.7 → 0.85 → 0` inset before being cut entirely. Worth recording,
+because every step was wrong for a reason that is not obvious:
+
+- **Any card stock left outside the gold reads as a margin *around* a frame**
+  rather than as the card being framed, and the eye finds it however narrow it is.
+  There is no width at which a margin stops looking like a margin.
+- **A thick band is a mat, not a frame.** Two attempts widened the rule instead of
+  removing the margin inside it.
+- **Reserving space for it is worse still.** One pass stopped the photo at the
+  frame and left the band empty; that is a mount holding a picture, which the
+  reference is not.
+- **Gold vanishing at a corner is tone, not width.** A metal gradient that runs up
+  into near-white is invisible on ivory stock. No stop may be lighter than the
+  ground it sits on, and the ring needs a contact shadow — `drop-shadow`, not
+  `box-shadow`, since a mask clips box-shadows away entirely (same reason the pack
+  wrapper's shadow is a filter).
+
+And then the whole thing came off anyway, because the reference needs it and we do
+not: **its card is a shaped shield with a crown and shoulders, and the piping is
+what draws that shape.** Ours is a 5:7 rounded rectangle, so the piping had nothing
+to draw, became the loudest thing on the face, and — being identical on every
+variant — flattened the differences between them. With it gone the shards read;
+they were never weak, they were being shouted over.
+
+Do not add a frame back without also changing the card's outline. That is a
+separate decision: it touches the album grid, the pack opener's FLIP and every drop
+shadow in the feature.
+
+Also rejected along the way: a sepia version of the existing gold (a gold card with
+a grey photo is a gold card, and icoons lie among rare golds in the album); a
+near-black obsidian card matching the wrapper and card back (the strongest runner-up
+— the only one equally good on teletext black and on the wooden tabletops — but it
+will not bend to the tiers, since black-with-silver is the same object with a
+different accent); and a banknote engraving with guilloche (the only candidate
+carrying a *pattern*, which is exactly the argument that killed the striped and
+checkerboard card backs).
+
+Empty slots are deliberately **not** marked as icoons. A silhouette's job is to be
+identically blank, and legends have their own pages in the album.
+
+The full comparison — five candidates, four real faces, both frame readings, and
+the live photo-grade sliders — is in
+[icoon-designs.html](icoon-designs.html), kept as the record of what was
+eliminated.
 
 ### The card viewer
 
 A card in the book is ~144px wide on a 1920 screen and the photo is what
 disambiguates two Daans, so the album could be browsed cover to cover without ever
 really *seeing* a card. Clicking a slot lifts it out over a scrim, with
-`‹ 12 / 34 ›` beneath it, arrow keys and swipe.
+`‹ 12 / 38 ›` beneath it, arrow keys and swipe.
 
 It exists to carry the two facts the face has no room for — the full name with its
 nickname, and how deep the duplicate pile is. **Both are off-face, which is why
@@ -726,7 +930,7 @@ and nickname for exactly that reason; the count simply joins them.
     equivalent — the card is by far the tallest thing in the panel, so a two-line
     caption changes nothing. Same reason `.viewer__count` has a `min-width`: without
     it the chevrons shuffle as the number gains a digit.
-- **The position readout *is* the control.** `‹ 12 / 34 ›` — the counter is
+- **The position readout *is* the control.** `‹ 12 / 38 ›` — the counter is
   information the album genuinely cannot give you, and that is what earns the two
   chevrons attached to it their place on a page whose own navigation is an unlit
   page edge. The album's trick does not transfer: over a dark scrim there is no page
@@ -742,7 +946,7 @@ and nickname for exactly that reason; the count simply joins them.
 - **Focus goes back to the card you were last looking at, not the one you clicked**
   (via `data-slot-player`), since the book has moved underneath. And a face rotated
   away is still focusable, so `PageFace` takes a `visible` flag and puts every other
-  page's slots at `tabIndex={-1}` — without it, tabbing walks all 34 cards, most of
+  page's slots at `tabIndex={-1}` — without it, tabbing walks all 38 cards, most of
   them invisible.
 - **No sound.** Browsing is not an event, and `playSlot` / `playPageTurn` /
   `playFlip` each already mean something specific elsewhere.
@@ -785,7 +989,7 @@ Five beats: wrapper → tear → the card arrives → reveal → hand-off to the
     surviving `box-shadow` is the *inset* edge line, and only because its top and
     bottom runs are hidden behind the chrome; it lives with the shared paint so each
     torn half keeps its own, and `.pack--tearing` must null it or the wrapper keeps
-    a coloured ring while its halves fly off.
+    a ring while its halves fly off.
 - **The coloured panel is exactly one card**, and everything that is not the pouch is
   outside it: `--pack-h` is the card height plus one `--crimp` at each end, and the
   saw teeth are cut *through* those seals rather than added beyond them, which is what
@@ -826,16 +1030,19 @@ truer reading of "objects lying next to the book".
 
 - The cost is that the shelf now gets the room the book leaves rather than asking
   for 352px. `--shelf-room` on `.album-layout` computes it —
-  `(100vw - 2·--stage-pad - --book-w) / 2 - gap - 16px` — which is resolvable in CSS
-  because every term is viewport-relative. Hence `--book-w` moving from `.album` to
-  `:root` (same reason as `--album-card-w`) and the stage's side padding becoming
-  `--stage-pad`: if the padding in `.game-stage` and the padding in that formula
-  drift apart, the shelf starts overlapping the book.
+  `(--stage-w - 2·--stage-pad - --book-w) / 2 - gap - 16px` — which is resolvable in
+  CSS because every term is viewport-relative. Hence `--book-w` moving from `.album`
+  to `:root` (same reason as `--album-card-w`), and the stage's width and side padding
+  becoming `--stage-w` / `--stage-pad`: if the stage's own box and the box in that
+  formula drift apart, the shelf overlaps the book. Which is exactly what happened —
+  see "The shelf was overlapping the book".
 - The packets shrink to keep the pile **two columns** where they can, down to a 96px
   floor, below which the shelf becomes one centred column at whatever size fits. Two
   columns is what makes it read as a pile; a few percent off card parity is a
   cheaper price than a list. Card-sized survives from ~1600px wide; 1440×900 gets
   96px packets in two columns; tall windows (a big book, a thin margin) get one.
+  Those figures are for a full-bleed stage. On the tabletop stages the slab, not the
+  window, is what the margin comes out of — see "The table is 1660, not 1520".
 - Below the width where even one packet fits, the shelf goes back above the book in
   flow. Two triggers, because the book grows with viewport *height* as well:
   `max-width: 1150px`, or `max-width: 1400px and min-height: 1000px` — a 1300×1400
@@ -916,8 +1123,14 @@ truer reading of "objects lying next to the book".
   - An earlier version hashed `pack.id`, giving every individual packet its own hue
     out of 21. It made the pile look varied and told you nothing, and no two packets
     were ever the same product twice.
-  - One hue drives the foil, the rim, the edge line and the numeral together, so a
-    type is one colour rather than a colour plus an accent.
+  - One hue drives the foil, the glow and the numeral together, so a type is one
+    colour rather than a colour plus an accent.
+  - **The edge line is the exception: it is neutral white, not the hue.** Tinting it
+    was the obvious extension of the rule above and it looked wrong, because the
+    chrome seals cover the line's top and bottom runs — all you ever saw of it was two
+    full-height coloured stripes down the sides, reading as a red/green/blue outline
+    stuck onto the packet rather than as a printed rim. It is a highlight on a curved
+    surface, so it has to be light.
 - **One stage for all five beats.** The sealed wrapper is rendered *inside*
   `.opener__stage`, the stage's height is fixed at `--pack-h` (its tallest
   occupant, the packet), and the empty revealed row is rendered during the sealed
@@ -988,6 +1201,116 @@ truer reading of "objects lying next to the book".
 - **A 200ms hand-off gap** separates the outgoing card from the incoming one.
   Without it both occupy the centre at once and a face-up player appears to turn
   back into a card back.
+
+### The shelf stays up
+
+*On trial — built, not yet signed off.*
+
+Four packets is a normal day (three games plus the freebie), and opening the second
+one used to cost a round trip: back to the album, find the pile again, click. The
+opener replaced the whole album, so the pile it came from ceased to exist for the
+duration.
+
+It does not any more. `.album-layout` is now **one layout for both states** — the
+opener takes the book's place inside `.album-main` and the shelf never unmounts.
+Nothing moves when it happens, and that is the entire reason this works rather than
+being an idea about it: `--shelf-room` is computed from the viewport, not measured
+off whatever is currently in the middle, so the packets are in the same place after
+the swap as before it. **The next packet is a click where you just clicked.**
+
+Four things had to follow from it:
+
+- **The packet you are opening leaves the pile on the click**, not on the refresh at
+  the end of the reveal. It is in your hands; the shelf shrinks at the moment you
+  pick one up.
+- **Tilt and sheen come off the pack id, not the array index.** Index was stable only
+  while the shelf outlived nothing. Now a packet leaves the *middle* of a list that
+  stays on screen, and every packet below it would inherit its neighbour's angle and
+  visibly resettle — the pile rearranging itself because one was picked up. Lying
+  still is a property of the packet, so it keys off the packet.
+- **The pile goes inert from the tear to the last card** (`.album-side--set-aside`,
+  driven by `PackOpener`'s new `onStart` against the existing `onFinished`). Dimmed
+  to 0.34 rather than hidden — how many you have left is worth knowing through the
+  reveal, and a shelf that vanished and came back would be a layout event at the
+  worst possible moment — and `pointer-events: none`, so a stray click mid-ceremony
+  cannot tear down a reveal in progress. **Not** for as long as the opener is
+  mounted: a sealed packet lying on the stage is a decision you have not taken yet,
+  so the pile stays live and you can still change your mind.
+  - It stands down in 200ms with no delay and comes back over 420ms after a 320ms
+    wait — the same asymmetry as the album's turn strips, for the same reason, plus a
+    beat so the pile lighting does not compete with the results you just got. The
+    pile brightening *is* the invitation to open the next one.
+  - The gold build's vignette is `position: fixed` and covers the shelf for free, but
+    only on the ~28% of cards that get a ceremony and only once it has ramped. The
+    dim has to hold for the other 72%.
+- **Results do not accumulate.** Each packet gets its own reveal and its own grid,
+  and `key={openingPack.id}` remounts the opener, which is what already guaranteed
+  it. A running total across packets would turn a pile into a session and blur which
+  cards came out of which packet.
+
+**Not below 1150px**, where the shelf is above the book in flow rather than beside
+it. Up there it would push the reveal down by a row of packets, and the ceremony's
+vignette clears its hole at 45% of the *viewport* — so the card would drift out of
+its own spotlight on exactly the pulls the spotlight is for. Underneath is no better:
+the opener is 62vh and centred, so packets below it start off screen. The stacked
+layout keeps the old round trip, and loses nothing it had.
+
+### The shelf was overlapping the book
+
+Separately, and there all along on the tabletop stages: **`--shelf-room` was measuring
+the viewport while the stage had stopped being the viewport.**
+
+The formula is `(100vw − 2·--stage-pad − --book-w) / 2`, and `--stage-pad` was hoisted
+to `:root` precisely so it could not drift from `.game-stage`'s own padding — with a
+comment saying that if it ever did, the shelf would start overlapping the book. The
+width was the term nobody thought could drift, because the screen stages (A–E) are
+full bleed, so it was written as a bare `100vw`.
+
+Then the tabletop family made the stage a table-sized **object** — `min(1520px, 97vw)`,
+centred, with tighter side padding of its own — and neither half reached the formula.
+At 1920×1080 the slab is 1520 wide and leaves the book 229px a side; the formula still
+believed it had 381 and handed the shelf its full 352px cap. The shelf was sized for a
+margin four times the one it was lying in.
+
+So `--stage-w` joins `--stage-pad` on `:root`, `.game-stage` and the tabletop override
+both read their `width` and `padding` from the tokens, and `--shelf-room` subtracts the
+tokens rather than a literal. The rule the original comment was reaching for, stated
+properly: **anything that changes the stage's box changes the tokens, not the box.**
+
+#### The table is 1660, not 1520
+
+Fixing the overlap exposed the second half of the same staleness: at 1920×1080 the
+corrected shelf came out at 187px, and two packets need **226** — `2 × 96` at the floor,
+plus the 12px gap and 22px of padding. So the pile was correct and single-column, which
+is the outcome the shelf's whole sizing ladder exists to avoid.
+
+1520 was set when the packets were quarter-size tiles. Card-sized, the table has to
+clear the book plus a shelf-sized margin on *both* sides — the book is centred, so the
+margin it leaves is symmetric whether or not both hold packets:
+
+```
+--stage-w  ≥  --book-w + 2 × (--shelf-gap + 226px + 16px) + 2 × --stage-pad
+```
+
+1598 at 1920×1080, and 1644 at the same width on a taller window, where the book caps
+at 1040. **1660** covers any 1920-wide window; the shelf gets 257px and holds two
+columns of 111px packets.
+
+Full card parity would want ~1781 — 93vw at 1920 — and that is the line this stays
+behind deliberately. The slab exists to read as a table in a dark room rather than a
+wooden wall, and two columns at 79% of a card is the cheaper price than one column at
+100%, which is the same trade the packets already make against `--album-card-w`.
+Re-derive from the formula if the packets or the tilts change; do not nudge the number.
+
+One thing found while chasing this and deliberately *not* changed: a packet leans, and
+flex lays out the box it would have occupied if it did not. `.pack--mini` rotates up to
+4.1° and a packet is ~1.7× as tall as it is wide, so the rotated silhouette overhangs
+its own box by `(w/2)(cosθ−1) + (h/2)sinθ` ≈ 6% of the width per side — 8.9px at the
+largest a packet gets, and ~11.2px under the hover `scale(1.04)`. The shelf's 11px of
+side padding absorbs almost exactly that and always did, which is why this was not the
+bug. It is worth knowing that the figure is not slack but a fit: widening it is
+subtracted twice in `--pack-w`, and past ~11px two packets no longer clear the shelf's
+352px cap and the pile drops to a single column.
 
 ### New, not duplicate
 
@@ -1337,7 +1660,9 @@ red/green/yellow/cyan).
   `getPlayers(true)` fetch pattern from
   [GamesPage.tsx:871-982](anago-leader-board-ui/src/pages/GamesPage.tsx#L871-L982)
   but not its `Select` — see the impersonation note above.
-- Gate on ≥10 games for the picked player.
+- Gate on ≥5 games for the picked player (`MIN_GAMES` in `mock/cardMock.ts`;
+  `MinGamesForCards` in `appsettings.json` once the backend exists — it belongs
+  next to `DHigh`, since the two are tuned against each other).
 - Unrevealed packs, the pack opener, the album, legends progress — see the
   Presentation layer above.
 - Reuse `hooks/useIsMobile.ts` for the single-page mobile album.
@@ -1358,7 +1683,7 @@ and no API called for cards.**
 
 `src/mock/cardMock.ts` holds everything the UI needs:
 
-- The 34 pool players with real names and ratings, pasted from
+- The 38 pool players with real names and ratings, pasted from
   `GET /api/leaderboard`.
 - The piecewise rating scale and the ticket weighting, ported to TypeScript
   (~30 lines).
@@ -1418,7 +1743,7 @@ Order within phase 1: `XpWindow` → `PlayerCard` → `Album` with the flip →
    governing rule, and eyeballing it is not enough.
 6. Force a 74-rated pull — no shimmer, no radiation, nothing at all.
 7. Force a 75-rated pull — shimmer only, and **no gold edge**.
-8. Hit `/api/player/{id}/avatar` for all 34 pool players against the deployed API
+8. Hit `/api/player/{id}/avatar` for all 38 pool players against the deployed API
    and count the misses. This decides whether the photo-centric card face is
    viable, and it is checkable now because avatars are the one thing not mocked.
    **Not yet done.** Note `PlayerService.SaveAvatar` writes to a `C:\` path while
@@ -1452,14 +1777,14 @@ Order within phase 1: `XpWindow` → `PlayerCard` → `Album` with the flip →
    reveal → cards persist across a hard reload.
 8. Confirm cards are live: push a held player over 1000 rating and verify an
    already-owned card moves from Zilver to Goud.
-9. Confirm a player under 10 games never appears in a pack and cannot open the
-   collection page.
+9. Confirm a player under 5 games never appears in a pack and cannot open the
+   collection page — and that one *on* 5 does both.
 10. Delete a game via `DELETE /api/game/{id}` and confirm both its cards and its
     unrevealed packs vanish.
 11. Roll the clock past midnight and confirm unrevealed packs are gone.
-12. Confirm inactive ≥10-game players appear only for collectors who have
+12. Confirm inactive ≥5-game players appear only for collectors who have
     unlocked legends, rated on their all-time-high.
 13. Complete an active set on a test collector and confirm the legends latch
-    survives a new player later crossing 10 games.
+    survives a new player later crossing 5 games.
 14. After swapping the mock client for the HTTP one, re-run the phase-1 visual
     checks — no component should have needed changing.

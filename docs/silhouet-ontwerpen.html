@@ -1,0 +1,1128 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silhouetkaarten — kan het?</title>
+<style>
+  /* ================================================================
+     Presentatiepagina — zelfde huisstijl als icoon-ontwerpen.html
+     ================================================================ */
+  :root {
+    --din: "Bahnschrift SemiCondensed", Bahnschrift, "DIN Condensed",
+           "DIN Alternate", "Agency FB", "Franklin Gothic Medium", "Segoe UI", Tahoma, sans-serif;
+    --ui: Tahoma, Verdana, sans-serif;
+    --bg: #0a0b0d;
+    --ink: #d8d4cb;
+    --dim: #8a877f;
+    --rule: rgba(255,255,255,.11);
+    --goud: #b79a52;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0 0 96px;
+    background:
+      radial-gradient(ellipse 120% 70% at 50% -10%, #16181d 0%, rgba(0,0,0,0) 70%),
+      var(--bg);
+    color: var(--ink);
+    font-family: var(--ui);
+    font-size: 14px;
+    line-height: 1.65;
+  }
+  .wrap { max-width: 1500px; margin: 0 auto; padding: 0 28px; }
+
+  header.page { padding: 72px 0 40px; border-bottom: 1px solid var(--rule); }
+  h1 {
+    font-family: var(--din);
+    font-size: 54px; font-weight: 600; letter-spacing: .01em;
+    margin: 0 0 6px; color: #f2ede2;
+  }
+  .kicker {
+    font-family: var(--din);
+    font-size: 14px; letter-spacing: .34em; text-transform: uppercase;
+    color: var(--goud); margin: 0 0 18px;
+  }
+  header.page p { max-width: 76ch; color: var(--dim); margin: 0 0 10px; }
+  header.page strong { color: #cfc9bd; font-weight: normal; }
+
+  section.blok { padding: 62px 0 10px; border-bottom: 1px solid var(--rule); }
+  section.blok > h2 {
+    font-family: var(--din);
+    font-size: 34px; font-weight: 600; margin: 0 0 2px; color: #f2ede2;
+  }
+  section.blok > h2 .nr { display: inline-block; min-width: 1.9em; color: var(--goud); }
+  .lead { max-width: 80ch; color: var(--dim); margin: 0 0 34px; }
+  .lead em { color: #cfc9bd; font-style: normal; }
+  .lead code { color: #cfc9bd; font-family: Consolas, monospace; font-size: 12.5px; }
+  h3.sub {
+    font-family: var(--din);
+    font-size: 19px; font-weight: 600; letter-spacing: .02em;
+    color: #cfc9bd; margin: 46px 0 10px;
+  }
+
+  /* De volle pool, gerangschikt op score. */
+  .bak { display: flex; flex-wrap: wrap; gap: 14px 12px; margin: 4px 0 8px; }
+  .bak figure { width: 122px; }
+  .bak .kaart { width: 122px; }
+  .bak figcaption {
+    text-align: left; padding-top: 7px; letter-spacing: .06em;
+    font-family: var(--ui); font-size: 11px; text-transform: none; line-height: 1.45;
+  }
+  .bak figcaption b { letter-spacing: 0; }
+  .bak .cijfer { font-family: Consolas, monospace; color: var(--goud); }
+  .bak .laag .cijfer { color: #c0705f; }
+  .band {
+    font-family: var(--din); font-size: 13px; letter-spacing: .24em; text-transform: uppercase;
+    color: var(--goud); margin: 30px 0 12px; border-bottom: 1px solid var(--rule); padding-bottom: 5px;
+  }
+  .band span { color: #6d6960; letter-spacing: .1em; text-transform: none; margin-left: 12px; }
+
+  figure { margin: 0; }
+  figcaption {
+    font-family: var(--din);
+    font-size: 12px; letter-spacing: .22em; text-transform: uppercase;
+    color: #79746b; text-align: center; padding-top: 12px;
+  }
+  figcaption b { display: block; color: #cfc9bd; font-weight: normal; letter-spacing: .22em; }
+
+  /* ---- de matrix ------------------------------------------------ */
+  .matrix { display: grid; gap: 34px 26px; align-items: start; }
+  .matrix .kop {
+    font-family: var(--din);
+    font-size: 12px; letter-spacing: .22em; text-transform: uppercase;
+    color: var(--goud); padding-bottom: 4px; border-bottom: 1px solid var(--rule);
+    align-self: end;
+  }
+  .matrix .kop span { display: block; color: #6d6960; letter-spacing: .1em; text-transform: none; font-size: 11.5px; }
+  .rijkop {
+    font-family: var(--din);
+    font-size: 17px; letter-spacing: .1em; color: #cfc9bd; padding-top: 4px;
+  }
+  .rijkop .achtergrond { display: block; font-family: var(--ui); font-size: 11.5px; letter-spacing: 0; color: #79746b; line-height: 1.5; }
+  .rijkop .regelaar { margin-top: 14px; }
+  .rijkop label {
+    display: block; font-family: var(--ui); font-size: 11px; letter-spacing: 0;
+    color: #79746b; margin-bottom: 2px;
+  }
+  .rijkop output { color: var(--goud); font-family: Consolas, monospace; }
+  .rijkop input[type=range] { width: 100%; accent-color: var(--goud); }
+  .rijkop .om { margin-top: 8px; font-size: 11px; color: #79746b; display: flex; align-items: center; gap: 7px; }
+
+  /* ---- kaart ---------------------------------------------------- */
+  .kaart {
+    --tier-a: #dde7f0;
+    --tier-b: #8e9dae;
+    --tier-ink: #2e240e;
+    --facets:
+      linear-gradient(112deg, rgba(255,255,255,.16) 0 16%, transparent 16% 33%,
+                              rgba(255,255,255,.09) 33% 45%, transparent 45%),
+      linear-gradient(58deg,  rgba(255,255,255,.11) 0 20%, transparent 20% 54%,
+                              rgba(255,255,255,.06) 54% 66%, transparent 66%);
+    position: relative;
+    width: 158px;
+    aspect-ratio: 5 / 7;
+    border-radius: 6px;
+    overflow: hidden;
+    container-type: inline-size;
+    font-family: var(--ui);
+    box-shadow: 0 3px 9px rgba(0,0,0,.55);
+    background-image: var(--facets),
+      linear-gradient(160deg, #f6f8fa 0%, #bcc5ce 32%, #8b95a1 58%, #e6ecf1 100%);
+  }
+  /* De lege kaart zoals hij nu in de app staat: donkere ruit-stof. */
+  .kaart.leeg {
+    --tier-a: #55503f; --tier-b: #2a2721; --tier-ink: #8d8778;
+    background-image: repeating-linear-gradient(45deg,
+      rgba(255,255,255,.07) 0 6px, rgba(255,255,255,.03) 6px 12px);
+    background-color: #23211c;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.4), 0 3px 9px rgba(0,0,0,.55);
+  }
+
+  .portret {
+    position: absolute; inset: 0; overflow: hidden; isolation: isolate;
+    -webkit-mask-image:
+      linear-gradient(to top, transparent 20%, #000 40%),
+      linear-gradient(135deg, transparent 10%, #000 32%);
+    mask-image:
+      linear-gradient(to top, transparent 20%, #000 40%),
+      linear-gradient(135deg, transparent 10%, #000 32%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  .portret img {
+    width: 100%; height: 100%; object-fit: cover; object-position: center 22%;
+    display: block;
+  }
+  /* De tint over de foto, alleen op de gewone kaart. */
+  .kaart:not(.leeg) .portret::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(160deg, var(--tier-a) 0%, var(--tier-b) 100%);
+    mix-blend-mode: multiply; opacity: .42;
+  }
+  .kop-vak { position: absolute; top: 0; left: 0; padding: 4.5cqw 0 0 5.5cqw; z-index: 3; }
+  .overall {
+    font-family: var(--din); font-size: 15cqw; font-weight: 600; line-height: 1;
+    color: var(--tier-ink);
+  }
+  .naam {
+    position: absolute; left: 0; right: 0; bottom: 0; z-index: 3;
+    font-family: var(--din); font-size: 11cqw; letter-spacing: .04em;
+    text-align: center; padding: 2cqw 0 3.4cqw; color: var(--tier-ink);
+    border-top: 1px solid rgba(0,0,0,.45);
+  }
+
+  /* ---- de behandelingen ----------------------------------------- */
+  /* 0 — zoals het nu is */
+  .b-nu img { filter: grayscale(1) brightness(0) opacity(.45); }
+  .b-nu .portret { background: #1a1a1a; }
+
+  /* 1 — zachte sleutel: alfa = 1 − luminantie, geen drempel */
+  .b-zacht img { filter: url(#f-zacht); }
+  /* 2 — harde sleutel, lichte inkt op de lege kaart */
+  .b-licht img { filter: url(#f-licht); }
+  /* 3 — sleutel, uitgesneden zodat het kaartmetaal er doorheen komt.
+         De tint hoort er dan af: die zou over de weggesneden helft alsnog
+         een grijssluier leggen en het metaal dooddrukken. */
+  .b-metaal img { filter: url(#f-hard); }
+  .b-metaal .portret::after { display: none; }
+  /* 4 — polariteitsvrij stencil: twee tinten, achtergrond blijft */
+  .b-stencil img { filter: url(#f-stencil); }
+  /* 5 — alleen de contour */
+  .b-contour img { filter: url(#f-contour); }
+
+  /* 6/7/8 — verduisteren. Geen sleutel, dus geen polariteit en geen drempel. */
+  .b-zwart1 img { filter: url(#f-zwart1); }
+  .b-zwart2 img { filter: url(#f-zwart2); }
+  .b-zwart3 img { filter: url(#f-zwart3); }
+  /*
+   * Het ovaal komt bovenop de twee maskers die de kaart zelf al draagt (de
+   * onderrand en de linkerbovenhoek), en `intersect` betekent dat alle drie
+   * moeten toestemmen. Vandaar dat de naambalk hier net zo schoon blijft als
+   * op elke andere kaart.
+   */
+  .b-zwart3 .portret {
+    -webkit-mask-image:
+      linear-gradient(to top, transparent 20%, #000 40%),
+      linear-gradient(135deg, transparent 10%, #000 32%),
+      radial-gradient(ellipse 58% 46% at 50% 33%, #000 38%, transparent 82%);
+    mask-image:
+      linear-gradient(to top, transparent 20%, #000 40%),
+      linear-gradient(135deg, transparent 10%, #000 32%),
+      radial-gradient(ellipse 58% 46% at 50% 33%, #000 38%, transparent 82%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+
+  /* omgekeerde polariteit voor donkere achtergronden */
+  .kaart.omgekeerd.b-zacht img { filter: url(#f-zacht-om); }
+  .kaart.omgekeerd.b-licht img { filter: url(#f-licht-om); }
+  .kaart.omgekeerd.b-metaal img { filter: url(#f-hard-om); }
+  .kaart.omgekeerd.b-stencil img { filter: url(#f-stencil-om); }
+  .kaart.omgekeerd.b-contour img { filter: url(#f-contour-om); }
+
+  svg.filters { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+  /* ---- notities -------------------------------------------------- */
+  ul.notes {
+    list-style: none; padding: 0; margin: 44px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 40px;
+  }
+  ul.notes li { padding: 0 0 18px; color: var(--dim); max-width: 62ch; }
+  ul.notes b {
+    display: block; font-family: var(--din); font-size: 13px; letter-spacing: .2em;
+    text-transform: uppercase; color: #cfc9bd; font-weight: normal; margin-bottom: 3px;
+  }
+  .oordeel { border-left: 2px solid var(--goud); padding-left: 20px; margin: 30px 0 0; max-width: 80ch; }
+  .oordeel b { color: var(--goud); font-weight: normal; }
+  .oordeel.af { border-left-color: #7a4a40; }
+  .oordeel.af b { color: #c0705f; }
+
+  .stempel {
+    display: inline-block; vertical-align: middle; margin-left: 16px;
+    font-family: var(--din); font-size: 12px; letter-spacing: .26em; text-transform: uppercase;
+    color: #c0705f; border: 1px solid #7a4a40; border-radius: 3px; padding: 3px 11px 2px;
+  }
+  section.af > h2, section.af .lead, section.af ul.notes { opacity: .62; }
+
+  table.uitslag { border-collapse: collapse; margin-top: 26px; font-size: 13px; }
+  table.uitslag th, table.uitslag td {
+    text-align: left; padding: 7px 22px 7px 0; border-bottom: 1px solid var(--rule); vertical-align: top;
+  }
+  table.uitslag th {
+    font-family: var(--din); font-size: 12px; letter-spacing: .2em; text-transform: uppercase;
+    color: var(--goud); font-weight: normal;
+  }
+  td.ja { color: #8fbf7a; } td.nee { color: #c0705f; } td.half { color: #c2a45c; }
+</style>
+</head>
+<body>
+
+<!-- ==================================================================
+     De filters.
+
+     Alles hieronder is declaratief SVG dat via `filter: url(#…)` op een
+     gewone <img> hangt. Geen canvas, geen pixel-uitlezing, dus ook geen
+     CORS-eis en geen extra dependency — precies de soort oplossing die
+     dit project toelaat.
+
+     De kern is `feColorMatrix type="luminanceToAlpha"`: dat zet RGB op nul
+     en de alfa op de luminantie. Eén tabel-omkering later is alfa = 1 −
+     luminantie, en dan is een lichte achtergrond dus transparant en het
+     donkere onderwerp ondoorzichtig. Dat is de hele truc.
+     =================================================================== -->
+<svg class="filters" aria-hidden="true">
+<defs>
+  <!-- 1. Zachte sleutel — geen drempel, dus grijstonen blijven bestaan. -->
+  <filter id="f-zacht" color-interpolation-filters="sRGB">
+    <feColorMatrix type="luminanceToAlpha"/>
+    <feComponentTransfer><feFuncA type="table" tableValues="1 0"/></feComponentTransfer>
+    <feComponentTransfer><feFuncA class="drempel" type="linear" slope="2.2" intercept="-0.85"/></feComponentTransfer>
+  </filter>
+  <filter id="f-zacht-om" color-interpolation-filters="sRGB">
+    <feColorMatrix type="luminanceToAlpha"/>
+    <feComponentTransfer><feFuncA class="drempel-om" type="linear" slope="2.2" intercept="-0.35"/></feComponentTransfer>
+  </filter>
+
+  <!-- 2/3. Harde sleutel — steile drempel, daarna vlak volgegoten met inkt.
+       De lichte vervaging vooraf haalt de JPEG-ruis uit de rand, anders
+       rafelt de drempel de omtrek uit elkaar. -->
+  <filter id="f-hard" color-interpolation-filters="sRGB">
+    <feGaussianBlur stdDeviation="1.4"/>
+    <feColorMatrix type="luminanceToAlpha"/>
+    <feComponentTransfer><feFuncA type="table" tableValues="1 0"/></feComponentTransfer>
+    <feComponentTransfer result="matte"><feFuncA type="linear" slope="14" intercept="-6.3"/></feComponentTransfer>
+    <feFlood flood-color="#0c0d10" result="inkt"/>
+    <feComposite in="inkt" in2="matte" operator="in"/>
+  </filter>
+  <filter id="f-hard-om" color-interpolation-filters="sRGB">
+    <feGaussianBlur stdDeviation="1.4"/>
+    <feColorMatrix type="luminanceToAlpha"/>
+    <feComponentTransfer result="matte"><feFuncA type="linear" slope="14" intercept="-6.3"/></feComponentTransfer>
+    <feFlood flood-color="#0c0d10" result="inkt"/>
+    <feComposite in="inkt" in2="matte" operator="in"/>
+  </filter>
+
+  <!-- 3b. Dezelfde sleutel, maar volgegoten met een lichte inkt.
+
+       Dit is de enige variant die op de lége kaart werkt. Die kaart is
+       donkere ruit-stof, dus een zwart silhouet erop is geen silhouet maar
+       een zwart vlak: je ziet niets. Wat je mist moet lichter zijn dan de
+       grond waar het op ligt. -->
+  <filter id="f-licht" color-interpolation-filters="sRGB">
+    <feGaussianBlur stdDeviation="1.4"/>
+    <feColorMatrix type="luminanceToAlpha"/>
+    <feComponentTransfer><feFuncA type="table" tableValues="1 0"/></feComponentTransfer>
+    <feComponentTransfer result="matte"><feFuncA type="linear" slope="14" intercept="-6.3"/></feComponentTransfer>
+    <feFlood flood-color="#a8a294" result="inkt"/>
+    <feComposite in="inkt" in2="matte" operator="in"/>
+  </filter>
+  <filter id="f-licht-om" color-interpolation-filters="sRGB">
+    <feGaussianBlur stdDeviation="1.4"/>
+    <feColorMatrix type="luminanceToAlpha"/>
+    <feComponentTransfer result="matte"><feFuncA type="linear" slope="14" intercept="-6.3"/></feComponentTransfer>
+    <feFlood flood-color="#a8a294" result="inkt"/>
+    <feComposite in="inkt" in2="matte" operator="in"/>
+  </filter>
+
+  <!-- 4. Stencil — geen sleutel maar een posterisatie naar twee tinten.
+       De achtergrond blijft staan, maar het werkt ongeacht of die licht
+       of donker is: er komt altijd een leesbaar plaatje uit. -->
+  <filter id="f-stencil" color-interpolation-filters="sRGB">
+    <feGaussianBlur stdDeviation="1.1"/>
+    <feColorMatrix type="saturate" values="0"/>
+    <feComponentTransfer>
+      <feFuncR class="schuif" type="linear" slope="1" intercept="0"/>
+      <feFuncG class="schuif" type="linear" slope="1" intercept="0"/>
+      <feFuncB class="schuif" type="linear" slope="1" intercept="0"/>
+    </feComponentTransfer>
+    <feComponentTransfer>
+      <feFuncR type="discrete" tableValues="0.05 0.86"/>
+      <feFuncG type="discrete" tableValues="0.06 0.88"/>
+      <feFuncB type="discrete" tableValues="0.08 0.92"/>
+    </feComponentTransfer>
+  </filter>
+  <filter id="f-stencil-om" color-interpolation-filters="sRGB">
+    <feGaussianBlur stdDeviation="1.1"/>
+    <feColorMatrix type="saturate" values="0"/>
+    <feComponentTransfer>
+      <feFuncR class="schuif-om" type="linear" slope="-1" intercept="1"/>
+      <feFuncG class="schuif-om" type="linear" slope="-1" intercept="1"/>
+      <feFuncB class="schuif-om" type="linear" slope="-1" intercept="1"/>
+    </feComponentTransfer>
+    <feComponentTransfer>
+      <feFuncR type="discrete" tableValues="0.05 0.86"/>
+      <feFuncG type="discrete" tableValues="0.06 0.88"/>
+      <feFuncB type="discrete" tableValues="0.08 0.92"/>
+    </feComponentTransfer>
+  </filter>
+
+  <!-- 5. Contour — dezelfde sleutel, uitgedijd, min zichzelf. Wat overblijft
+       is de omtrek. -->
+  <filter id="f-contour" color-interpolation-filters="sRGB">
+    <feGaussianBlur stdDeviation="1.4"/>
+    <feColorMatrix type="luminanceToAlpha"/>
+    <feComponentTransfer><feFuncA type="table" tableValues="1 0"/></feComponentTransfer>
+    <feComponentTransfer result="matte"><feFuncA class="drempel" type="linear" slope="14" intercept="-6.3"/></feComponentTransfer>
+    <feMorphology in="matte" operator="dilate" radius="2" result="dik"/>
+    <feComposite in="dik" in2="matte" operator="out" result="rand"/>
+    <feFlood flood-color="#cfc9bd" result="krijt"/>
+    <feComposite in="krijt" in2="rand" operator="in"/>
+  </filter>
+  <filter id="f-contour-om" color-interpolation-filters="sRGB">
+    <feGaussianBlur stdDeviation="1.4"/>
+    <feColorMatrix type="luminanceToAlpha"/>
+    <feComponentTransfer result="matte"><feFuncA class="drempel-om" type="linear" slope="14" intercept="-6.3"/></feComponentTransfer>
+    <feMorphology in="matte" operator="dilate" radius="2" result="dik"/>
+    <feComposite in="dik" in2="matte" operator="out" result="rand"/>
+    <feFlood flood-color="#cfc9bd" result="krijt"/>
+    <feComposite in="krijt" in2="rand" operator="in"/>
+  </filter>
+
+  <!-- ================================================================
+       6/7/8. Verduisteren.
+
+       Een andere aanpak dan alles hierboven: niet uitsnijden maar indimmen.
+       Er wordt niets weggehaald en niets gedrempeld, dus er is ook niets
+       dat verkeerd kan worden weggehaald — precies het probleem waar Rik en
+       Daan op stukliepen. De foto blijft heel; hij zakt alleen weg.
+
+       `feFuncR/G/B type="gamma"` rekent C' = C^exponent. Bij exponent 1 is
+       er niets aan de hand, bij 2,4 zakt een middentoon van 0,50 naar 0,16,
+       en bij 4,5 naar 0,04. Alleen de allerhelderste plekken houden stand,
+       en dat is wat de vorm overeind houdt.
+       ================================================================ -->
+  <filter id="f-zwart1" color-interpolation-filters="sRGB">
+    <feColorMatrix type="saturate" values="0"/>
+    <feComponentTransfer>
+      <feFuncR class="gamma" type="gamma" exponent="2.4"/>
+      <feFuncG class="gamma" type="gamma" exponent="2.4"/>
+      <feFuncB class="gamma" type="gamma" exponent="2.4"/>
+    </feComponentTransfer>
+  </filter>
+  <filter id="f-zwart2" color-interpolation-filters="sRGB">
+    <feColorMatrix type="saturate" values="0"/>
+    <feComponentTransfer>
+      <feFuncR class="gamma" type="gamma" exponent="4.5"/>
+      <feFuncG class="gamma" type="gamma" exponent="4.5"/>
+      <feFuncB class="gamma" type="gamma" exponent="4.5"/>
+    </feComponentTransfer>
+  </filter>
+  <!-- Nummer 3 is nummer 2 plus een ovaal masker in de CSS. Dat masker is
+       het enige stuk gereedschap op deze pagina dat niet naar licht kijkt
+       maar naar plaats: het snijdt op geometrie. Daarom haalt het de tweede
+       persoon links naast Daan wél weg, terwijl geen enkele drempel dat kon. -->
+  <filter id="f-zwart3" color-interpolation-filters="sRGB">
+    <feColorMatrix type="saturate" values="0"/>
+    <feComponentTransfer>
+      <feFuncR class="gamma" type="gamma" exponent="4.5"/>
+      <feFuncG class="gamma" type="gamma" exponent="4.5"/>
+      <feFuncB class="gamma" type="gamma" exponent="4.5"/>
+    </feComponentTransfer>
+  </filter>
+</defs>
+</svg>
+
+<div class="wrap">
+
+<header class="page">
+  <p class="kicker">Kaarten die je nog niet hebt</p>
+  <h1>Silhouetkaarten</h1>
+  <p><strong>De vraag:</strong> kan een lege plek in het album het silhouet van de speler
+     tonen in plaats van een egale donkere plaat? Panini deed dat en het werkt: je ziet
+     de vorm van wat je mist.</p>
+  <p><strong>Het antwoord is: ja, maar niet voor iedereen.</strong> Het kan volledig
+     in CSS/SVG, zonder bibliotheek, zonder canvas, zonder asset — <em>mits</em> de foto
+     een lichte achtergrond heeft. En dat is bij lang niet elke speler het geval.
+     Vandaar deze vier: twee bedrijfsportretten, één AI-collage op een donkere lucht,
+     en één kroegfoto met een tweede persoon in beeld. Het slechtste geval zit erbij.</p>
+  <p>Elke rij heeft een eigen drempelschuif. Dat is de proef op de som: als één getal
+     per speler volstaat, is dit een kolom in de database en verder niets.</p>
+  <p><strong>Er komt nergens een model aan te pas.</strong> Alles op deze pagina is een
+     stapeling van SVG-filterprimitieven op een gewone <code>&lt;img&gt;</code> —
+     luminantie meten, drempelen, volgieten, gamma indrukken, maskeren. Deterministisch,
+     elke keer hetzelfde resultaat, geen genereerstap, geen asset, geen dependency, geen
+     netwerkverkeer. Wat je ziet is de echte foto van de server met rekenwerk erop. Het
+     draait mechanisch over de hele pool — en dát is precies waarom het bij Rik en Daan
+     misgaat: het weet niet wat een mens is, alleen wat licht is.</p>
+</header>
+
+<!-- ============================================================ -->
+<section class="blok">
+  <h2><span class="nr">1</span>De bronfoto's</h2>
+  <p class="lead">Waar het op stukloopt is niet de techniek maar het materiaal. De
+    avatars zijn geen studiofoto's op één afgesproken doek — het is wat er toevallig
+    van iemand rondslingerde.</p>
+
+  <div class="matrix bron"></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="blok">
+  <h2><span class="nr">2</span>Vijf behandelingen</h2>
+  <p class="lead">Alles hieronder is één <code>&lt;img&gt;</code> met een
+    <code>filter: url(#…)</code> erop. <em>Sleutel</em> maakt de achtergrond
+    doorzichtig zodat het kaartmetaal er doorheen komt; <em>stencil</em> laat de
+    achtergrond staan maar reduceert alles tot twee tinten. Zet
+    <em>polariteit omkeren</em> aan voor een foto met een donkere achtergrond.</p>
+
+  <div class="matrix proef"></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="blok af" id="verduisteren">
+  <h2><span class="nr">3</span>De andere kant op: verduisteren<span class="stempel">verworpen</span></h2>
+  <p class="lead">Alles in blok 2 probeert iets <em>weg te snijden</em>, en bij Rik en Daan
+    snijdt het het verkeerde weg. Dus de omgekeerde vraag: wat als we niets weghalen en de
+    foto alleen heel ver indimmen? Er valt dan niets fout te doen — er is geen drempel, geen
+    polariteit, geen aanname over wat achtergrond is. De foto zakt gewoon weg tot alleen de
+    vorm nog boven water staat. Drie keer, steeds een stap verder.</p>
+
+  <div class="matrix zwart"></div>
+
+  <ul class="notes">
+    <li><b>1 — zwartsel, gamma 2,4</b>
+      Nog gewoon een foto, alleen donkerder: een middentoon van 0,50 zakt naar 0,16. Alle
+      vier zijn onmiddellijk herkenbaar. Als lege plek werkt dit niet — het leest als een
+      verkeerd belichte kaart, niet als iets wat je mist.</li>
+    <li><b>2 — zwartsel zwaar, gamma 6</b>
+      Nu zakt het echt weg (0,50 wordt 0,016). Een gamma drukt alles evenredig in, dus wat
+      al donker was verdwijnt het eerst — en dat pakt per foto anders uit. Bij Jasper en Bo
+      dooft de <em>persoon</em> eerder uit dan het lichte kantoor achter hen. Bij Daan is
+      het precies omgekeerd: de rode muur zakt weg en zijn gezicht blijft als enige staan.
+      Alle vier zijn nog herkenbaar, en de tweede persoon naast Daan ook.</li>
+    <li><b>3 — zwartsel zwaar + ovaal</b>
+      Hetzelfde, plus een ovaal masker over het hoofd. Dat masker kijkt niet naar licht maar
+      naar <em>plaats</em>, en daar zit de winst: de tweede persoon naast Daan valt buiten
+      het ovaal en is weg, ongeacht hoe helder hij is. Geen drempel kreeg dat voor elkaar.
+      Bij Bo levert dit op gamma 8 bijna een echt silhouet op — bereikt door indimmen in
+      plaats van door uitsnijden.</li>
+  </ul>
+
+  <div class="oordeel af">
+    <p><b>Verworpen.</b> Een schaduwportret is geen silhouet, en dat is precies het bezwaar:
+      het lost het probleem op door de vraag te veranderen. Blijft staan als vastlegging van
+      wat er geprobeerd is; blok 4 gaat verder op de sleutel. De rest van dit blok is de
+      oorspronkelijke beoordeling.</p>
+    <p><b>Wat dit oplevert.</b> Geen silhouetten; het blijft een foto, alleen zwak. Maar
+      variant 3 is het enige op deze pagina dat op <em>drie</em> van de vier iets bruikbaars
+      geeft in plaats van op twee ervan iets fouts. Het ovaal doet het meeste werk, de
+      verduistering zorgt dat wat overblijft niet meer als portret leest, en er is geen
+      drempel die per foto goed of fout kan staan — dus geen kolom in de database en geen
+      handmatige ronde langs 46 spelers.</p>
+    <p>Prijs: elke lege plek verklapt nu vaag wie erin hoort. Bij variant 1 is dat te veel,
+      bij 3 net niet — en dat is een smaakoordeel, geen meting.</p>
+    <p><b>Rik blijft over.</b> Hij faalt op élke route op deze pagina, en dat is geen
+      instelling die nog gevonden moet worden: zijn foto heeft een lichte zee precies achter
+      hem, dus het helderste in het beeld is niet zijn gezicht maar de achtergrond, en het
+      staat op dezelfde plek. Sleutelen kan het niet scheiden, verduisteren kan het niet
+      scheiden en het ovaal zit er middenin. Voor hem zijn er twee antwoorden: echte
+      segmentatie, of <em>een andere foto</em>. Dat tweede is gratis.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="blok">
+  <h2><span class="nr">4</span>De drempel automatisch vinden</h2>
+  <p class="lead">Als er per foto een drempel bestaat die werkt, kan die dan gevonden worden
+    zonder hem met de hand te zoeken? <em>Ja</em> — maar niet met een formule over de
+    achtergrond, en het antwoord komt met een gratis toegift die belangrijker is dan de
+    drempel zelf.</p>
+
+  <h3 class="sub">Eerst: waarom een formule niet kan</h3>
+  <p class="lead">De voor de hand liggende gedachte is "meet de achtergrond en ga er net
+    onder zitten". Dat is gemeten, op de randzone van precies de uitsnede die de kaart laat
+    zien, over alle 46 avatars. Twee ervan maken het idee onmiddellijk kapot:</p>
+
+  <table class="uitslag">
+    <thead><tr><th></th><th>rand p10</th><th>p25</th><th>p50</th><th>p75</th><th>drempel die werkt</th></tr></thead>
+    <tbody>
+      <tr><td>Jasper</td><td>0,730</td><td>0,758</td><td>0,783</td><td>0,817</td><td>0,72–0,77</td></tr>
+      <tr><td>Bo</td><td>0,730</td><td>0,756</td><td>0,782</td><td>0,817</td><td>0,61–0,68</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oordeel">
+    <p>Hun achtergrondstatistiek verschilt <b>0,001</b>. De drempel die ze nodig hebben
+      verschilt <b>0,10</b> — honderd keer zoveel. Ze zijn op dezelfde dag voor hetzelfde
+      doek gefotografeerd, dus dat kán ook niet anders. Het verschil zit niet in de
+      achtergrond maar in het <em>onderwerp</em>: Bo's blonde haar loopt qua helderheid tegen
+      het doek aan en Jaspers donkere haar niet, dus zij moet lager blijven of haar haarlijn
+      lekt weg in de achtergrond.</p>
+    <p>Daarmee is elke functie van de achtergrond uitgesloten — Otsu, randpercentielen,
+      histogramdalen, wat dan ook. Twee foto's met dezelfde invoer en een andere gewenste
+      uitvoer: geen enkele functie kan dat.</p>
+  </div>
+
+  <h3 class="sub">Dus: niet schatten maar zoeken</h3>
+  <p class="lead">De informatie zit niet in het histogram maar in <em>het masker dat eruit
+    komt</em>. Dus draai alle drempels af — 0,05 tot 0,95 in stappen van 0,01, in beide
+    polariteiten — en beoordeel elk resultaat op vier dingen die een silhouet wél heeft en
+    ruis niet:</p>
+
+  <ul class="notes">
+    <li><b>oppervlak</b> Tussen 10% en 75% van het vlak. Daarbuiten is het geen portret maar
+      een leeg of een dichtgelopen kaartje.</li>
+    <li><b>samenhang</b> Hoeveel van het masker in één stuk zit. Een silhouet is één vlek;
+      spikkels zijn er honderd.</li>
+    <li><b>gladheid</b> 4πA/P². Een gladde vlek zit rond 0,5–0,8, uitgerafelde ruis rond
+      0,05. Dit is het scherpste van de vier.</li>
+    <li><b>bovenrand</b> Hoeveel van de bovenrand het masker pakt. Een hoofd raakt de
+      onderrand en de schouders raken de zijkanten, maar de lucht erboven hoort leeg.</li>
+  </ul>
+
+  <p class="lead">Vermenigvuldigd geeft dat één score per drempel. Niet de piek pakken maar
+    een stuk boven de piek: de score beloont gladheid en kleiner is altijd gladder, dus de
+    piek levert stelselmatig een afgeknepen silhouet. Kosten: één canvas-uitlezing op 64×112
+    en 91 maskerbeoordelingen per foto — eenmalig bij het uploaden, of eenmalig en dan
+    onthouden. Geen model, geen training, geen dependency.</p>
+
+  <h3 class="sub">De vier handmatige waarden als ijkpunt</h3>
+  <p class="lead">De eerste versie van deze zoektocht koos vrij tussen beide polariteiten en
+    pakte de bovenkant van een strak plateau. Die versie week af van de vier met de hand
+    gevonden bereiken, en dat is de nuttigste fout op deze pagina geweest — vier bereiken
+    zijn te weinig om een voorspeller op te trainen, maar ruim genoeg om een doelfunctie mee
+    te <em>ijken</em>. Wat eruit kwam:</p>
+
+  <table class="uitslag">
+    <thead><tr><th></th><th>met de hand</th><th>eerste versie</th><th>na ijking</th></tr></thead>
+    <tbody>
+      <tr><td>Jasper</td><td>0,72–0,77</td><td class="nee">0,71</td><td class="half">0,71</td></tr>
+      <tr><td>Bo</td><td>0,61–0,68</td><td class="nee">0,72</td><td class="ja">0,68</td></tr>
+      <tr><td>Rik</td><td>0,12–0,20</td><td class="nee">0,69 omgekeerd</td><td class="half">0,11</td></tr>
+      <tr><td>Daan V.</td><td>0,12–0,18</td><td class="nee">0,24 omgekeerd</td><td class="ja">0,18</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oordeel">
+    <p><b>Drie wijzigingen, waarvan één die er echt toe doet.</b> De polariteit vastzetten op
+      normaal — altijd de donkere kant sleutelen. De eerste versie mocht kiezen, en koos voor
+      Rik en Daan een omgekeerd masker dat hóger scoorde op "één gladde vlek" maar er slechter
+      uitzag. De vier bereiken zeggen eensluidend: nooit omkeren. Verder is de randstraf
+      verzacht (macht 1,5 in plaats van 2) en het plateau ruimer genomen. Dat is het.</p>
+    <p>Resultaat: <b>0,68 en 0,18 vallen precies in jouw bereik, 0,71 en 0,11 liggen er één
+      stap van 0,01 naast.</b> Op een schaal die met de hand is beoordeeld is dat geen
+      afwijking meer. En de bandindeling van alle 46 is er niet door veranderd — dezelfde
+      15 / 7 / 24 — dus het ijken heeft de goede gevallen niet beschadigd.</p>
+    <p><b>Wat ik hiervoor beweerde klopte niet.</b> "Voor Rik bestaat geen goede drempel" was
+      mijn oordeel over zijn masker, niet een meting. Op 0,11 doet hij precies wat jij zag:
+      geen gesloten silhouet, maar een gescheurde vorm die wel degelijk naar hem verwijst.
+      Dat de score hem laag zet is nu een <em>beschrijving</em> van dat verschil, niet een
+      afkeuring — zie hieronder.</p>
+  </div>
+
+  <h3 class="sub">Het resultaat, alle 46</h3>
+  <p class="lead">Hieronder wat de zoektocht vindt, gerangschikt op zijn eigen score. De
+    drempels zijn door het algoritme bepaald en hier als data ingeplakt; de kaarten eronder
+    zijn echt en worden live door het filter gehaald.</p>
+
+  <div id="alles"></div>
+
+  <div class="oordeel">
+    <p><b>De toegift is de score zelf.</b> Alles boven 0,60 is een gesloten silhouet —
+      vijftien stuks, zonder uitzondering. Alles onder 0,35 is gescheurd. De score meet dus
+      niet alleen wélke drempel de beste is, maar ook <em>wat voor soort beeld</em> de beste
+      oplevert, en dat is precies de keuring die eerder als losse
+      <code>silhouetOk</code>-vlag was bedacht. Die hoeft niet met de hand.</p>
+    <p><b>Maar laag betekent niet fout.</b> Rik staat op 0,03 en Daan op 0,08, en jij vindt
+      ze allebei bruikbaar. Dat is geen tegenspraak: de score meet "één gladde gesloten
+      vlek", en dat is wat die twee juist níet zijn. Rik heeft op 0,11 een gladheid van 0,07
+      waar Bo op 0,68 aan 1,5 zit — twintig keer zo versnipperd, gemeten. De score is
+      betrouwbaar; het is de <em>drempel</em> van 0,35 die een smaakoordeel is en geen
+      meting. Wie de gescheurde variant ook wil, zet die streep lager of laat hem vallen.</p>
+    <p><b>De opbrengst.</b> 15 van 46 gesloten, 7 twijfelachtig, 24 gescheurd. Als alleen
+      gesloten silhouetten tellen is dat een derde van het album, automatisch, zonder dat
+      iemand een getal instelt. Tellen de gescheurde mee, dan is het de hele pool en dient de
+      score alleen nog om te weten wat je krijgt.</p>
+    <p><b>Voor de bovenste band ligt de drempel bijna overal op 0,68–0,72.</b> Dat is geen
+      toeval: die avatars komen uit hetzelfde bedrijfsshoot voor hetzelfde doek. Daar is de
+      zoektocht vooral aan het uitzoeken <em>of</em> een foto meedoet. Onderin loopt hij van
+      0,07 tot 0,95 en doet hij wél echt werk — dat zijn de losse foto's, en dat is precies
+      waar met de hand instellen ondoenlijk zou worden.</p>
+  </div>
+
+  <h3 class="sub">En machine learning dan?</h3>
+  <div class="oordeel">
+    <p><b>Niet om de drempel te voorspellen.</b> Vier waarden zijn te weinig om een functie
+      op te trainen die uit een foto een getal geeft; dat is ruis passen. Maar dat is ook
+      niet nodig, want de zoektocht <em>vindt</em> de drempel al — er valt niets te
+      voorspellen wat niet in twee milliseconden na te rekenen is.</p>
+    <p><b>Wel als ijking, en dat is precies wat er hierboven gebeurd is.</b> Vier bereiken
+      tegen drie knoppen in de doelfunctie is een eerlijke verhouding, en het leverde één
+      inzicht op dat ik zelf niet had bedacht: nooit omkeren. Wil je dat uitbreiden, dan is
+      de goedkoopste stap niet een model maar méér labels — twintig foto's met de hand
+      afgesteld maakt van deze ijking een echte validatie, en de zoektocht blijft hetzelfde.</p>
+    <p><b>Wel voor de vraag eronder.</b> Het echte gebrek is dat het filter niet weet wat een
+      mens is. Dát is een leerprobleem — maar het is al opgelost en het model is er al. Een
+      kant-en-klare segmentatie (u2net/rembg, of MediaPipe) heeft geen enkel trainingsvoorbeeld
+      van ons nodig en werkt op alle 46, inclusief Rik. Wij zouden dus geen model moeten
+      trainen; we zouden er één moeten <em>gebruiken</em>, eenmalig, bij het uploaden.</p>
+    <p>Beide sporen bijten elkaar niet. Het zoeken kost niets en levert vandaag een derde van
+      het album op. De segmentatie levert de rest, als fase 2 dat waard vindt.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="blok">
+  <h2><span class="nr">5</span>Waar het op neerkomt</h2>
+
+  <table class="uitslag">
+    <thead>
+      <tr><th>Foto</th><th>Sleutel</th><th>Stencil</th><th>Zwartsel + ovaal</th><th>Waarom</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Jasper — licht kantoor</td><td class="ja">werkt</td><td class="ja">werkt</td><td class="half">bruikbaar</td>
+          <td>Onderwerp donkerder dan de achtergrond over de hele omtrek. Het ideale geval,
+              en de sleutel is hier duidelijk de mooiste van de drie.</td></tr>
+      <tr><td>Bo — licht kantoor</td><td class="half">bijna</td><td class="ja">werkt</td><td class="ja">werkt</td>
+          <td>Blond haar tegen een licht doek: de haarlijn valt gedeeltelijk weg, want daar
+              is het contrast dat de sleutel nodig heeft er simpelweg niet. Het zwartsel
+              haalt op gamma 8 juist wél een sluitende vorm.</td></tr>
+      <tr><td>Rik — lichte zee</td><td class="half">gescheurd</td><td class="nee">nee</td><td class="nee">nee</td>
+          <td>Het helderste in het beeld is de zee, en die zit pal achter hem, dus een
+              gesloten omtrek zit er niet in. Op 0,11 komt er wel een gescheurde vorm uit die
+              naar hem verwijst — geen silhouet, maar niet niets. Zie blok 4.</td></tr>
+      <tr><td>Daan V. — rode muur</td><td class="nee">nee</td><td class="half">bijna</td><td class="ja">werkt</td>
+          <td>De muur zit qua luminantie middenin en er staat een tweede persoon in beeld,
+              dus geen drempel lost het op. Het ovaal wel: die man staat aan de rand en
+              wordt op plaats weggesneden.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="oordeel">
+    <p><b>Conclusie.</b> Een luminantiesleutel is geen achtergrondverwijdering, het is
+      een contrasttruc. Hij is gratis en ziet er op een bedrijfsportret ronduit goed uit,
+      maar hij kent geen mensen — hij kent alleen licht en donker. Op de helft van de
+      pool geeft dat een silhouet van de verkeerde dingen, en dat is erger dan de egale
+      plaat die er nu staat: fout is opvallender dan leeg.</p>
+    <p><b>Wat er wél mechanisch werkt, werkt zonder afstelling.</b> Het zwartsel met ovaal
+      uit blok 3 heeft geen drempel en dus ook geen mogelijkheid om per foto verkeerd te
+      staan. Het geeft geen silhouet maar een schaduwportret, en het haalt drie van de vier.
+      Als dit er zonder backend-werk moet komen, is dat de route: één vaste behandeling voor
+      iedereen, geen kolommen, geen handmatige ronde. En dan de sleutel eventueel als
+      opwaardering voor de portretten waar hij mooier is.</p>
+    <p>Uitwegen, in volgorde van hoeveel ze kosten:</p>
+  </div>
+
+  <ul class="notes">
+    <li><b>a — sleutel met een vangnet</b>
+      Per speler één drempel plus een omkeervlag in de database, en een
+      <code>silhouetOk</code>-vlag die zegt of het resultaat door de keuring komt.
+      Valt hij niet door de keuring, dan de huidige egale plaat. Kost: twee kolommen,
+      geen dependency, en één keer handmatig langs 46 spelers. Levert: silhouetten voor
+      misschien de helft.</li>
+    <li><b>b — echte segmentatie, eenmalig aan de serverkant</b>
+      Bij het uploaden van een avatar er één keer een model overheen (u2net/rembg,
+      of MediaPipe) en het resultaat opslaan als een 1-bits masker-PNG van een paar kB
+      naast de foto. De front-end vult dat masker met inkt en klaar — dat is
+      <em>eenvoudiger</em> front-endwerk dan (a), en het werkt op iedereen, ook op
+      Poseidon. Kost: een verwerkingsstap in fase 2. Dit is het juiste antwoord als
+      silhouetten er echt moeten komen.</li>
+    <li><b>c — segmentatie in de browser</b>
+      Kan (MediaPipe via WASM), maar het album rendert de hele pool in één keer, dus
+      dan draait er een model over 46 foto's bij het openen van de pagina. Het model
+      alleen al is groter dan de rest van de app. Afgeraden.</li>
+    <li><b>d — een andere foto</b>
+      Rik faalt niet omdat de techniek tekortschiet maar omdat zijn avatar een collage is
+      met een lichte zee pal achter hem. Eén bedrijfsportret zoals Jasper en Bo dat hebben
+      en hij valt in het makkelijke geval. Voor de handvol foto's die op geen enkele route
+      werken is dit het goedkoopste antwoord dat er is, en het kost geen regel code.</li>
+    <li><b>e — het stencil als tussenweg</b>
+      Als het doel "de lege plek moet naar de speler wijzen" is en niet "het moet een
+      silhouet zijn": het stencil werkt op alle vier, want het hoeft niets weg te
+      snijden. Het is alleen geen silhouet meer — de achtergrond komt mee, en daarmee
+      verschilt de ene lege plek visueel sterk van de andere.</li>
+    <li><b>f — de vraag onder de vraag</b>
+      In <code>docs/trading-cards.md</code> staat nu dat een silhouet "identiek blanco"
+      hoort te zijn. Een silhouet per speler is daar een bewuste omkering van: de lege
+      plek gaat de speler verklappen. Dat is waarschijnlijk juist de charme, maar het is
+      wel een besluit dat teruggedraaid wordt en dat hoort in dat document te landen.</li>
+  </ul>
+</section>
+
+</div>
+
+<script>
+/* ------------------------------------------------------------------
+   De vier proefkonijnen.
+
+   Rechtstreeks van de server; de avatar-route is publiek. `crossorigin`
+   staat er bewust *niet* op — we lezen nooit pixels uit, we hangen alleen
+   een filter aan het element, en met `crossorigin` zou een ontbrekende
+   CORS-header de foto juist laten mislukken.
+   ------------------------------------------------------------------ */
+var SERVER = "https://rik-dev.anago.io/tafelvoetbal-server";
+
+/*
+ * De drempels hieronder zijn niet gegokt: ze komen uit een reeks van 0,50 tot
+ * 0,90 in stappen van 0,06, per foto en in beide polariteiten afgedraaid. Voor
+ * Jasper en Bo is er een duidelijk raam waarin het klopt. Voor Rik en Daan is
+ * er geen enkele waarde die werkt — die twee staan er als tegenbewijs, niet
+ * als instelling die nog fijngeslepen moet worden.
+ */
+var SPELERS = [
+  { naam: "Jasper",      id: "e01b2a10-e1cf-40ce-9b37-946cb91436fe", nr: 71,
+    achtergrond: "Bedrijfsportret, licht kantoor onscherp",  drempel: 0.72, om: false },
+  { naam: "Bo",          id: "32ff155d-cf56-44b1-88f3-10f234aaf2ec", nr: 68,
+    achtergrond: "Bedrijfsportret, licht kantoor onscherp",  drempel: 0.66, om: false },
+  { naam: "Rik",         id: "2fbf1b87-6fcd-460d-8a2a-c3a34318e95c", nr: 78,
+    achtergrond: "AI-collage, donkere lucht en zee",         drempel: 0.72, om: true  },
+  { naam: "Daan",        id: "808d23eb-10e5-4d07-851c-3902aaba1cda", nr: 64,
+    achtergrond: "Kroegfoto, rode muur, tweede persoon",     drempel: 0.58, om: false }
+];
+
+var BEHANDELINGEN = [
+  { klasse: "b-nu",      titel: "Nu",       onder: "egale plaat",      leeg: true  },
+  { klasse: "b-zacht",   titel: "Sleutel",  onder: "zacht, spookbeeld", leeg: true  },
+  { klasse: "b-licht",   titel: "Silhouet", onder: "licht, op de stof", leeg: true  },
+  { klasse: "b-metaal",  titel: "Silhouet", onder: "donker, op metaal", leeg: false },
+  { klasse: "b-stencil", titel: "Stencil",  onder: "twee tinten",      leeg: true  },
+  { klasse: "b-contour", titel: "Contour",  onder: "alleen omtrek",    leeg: true  }
+];
+
+function el(tag, klasse, tekst) {
+  var n = document.createElement(tag);
+  if (klasse) n.className = klasse;
+  if (tekst !== undefined) n.textContent = tekst;
+  return n;
+}
+
+/** Eén kaart: metaal of lege stof, met portret, rugnummer en naambalk. */
+function kaart(speler, behandeling) {
+  var k = el("div", "kaart " + (behandeling.leeg ? "leeg " : "") + behandeling.klasse);
+  var p = el("div", "portret");
+  var img = new Image();
+  img.src = SERVER + "/api/player/" + speler.id + "/avatar";
+  img.alt = "";
+  p.appendChild(img);
+  k.appendChild(p);
+  var kop = el("div", "kop-vak");
+  kop.appendChild(el("div", "overall", behandeling.leeg ? "??" : String(speler.nr)));
+  k.appendChild(kop);
+  k.appendChild(el("div", "naam", behandeling.leeg ? "??" : speler.naam));
+  return k;
+}
+
+/* ---- blok 1: de bronfoto's ------------------------------------- */
+(function bron() {
+  var raster = document.querySelector(".matrix.bron");
+  raster.style.gridTemplateColumns = "repeat(4, max-content)";
+  SPELERS.forEach(function (s) {
+    var f = el("figure");
+    var k = kaart(s, { klasse: "", leeg: false });
+    f.appendChild(k);
+    var cap = el("figcaption");
+    cap.appendChild(el("b", null, s.naam));
+    cap.appendChild(document.createTextNode(s.achtergrond));
+    f.appendChild(cap);
+    raster.appendChild(f);
+  });
+})();
+
+/* ---- blok 2: de matrix ----------------------------------------- */
+(function proef() {
+  var raster = document.querySelector(".matrix.proef");
+  raster.style.gridTemplateColumns = "210px repeat(" + BEHANDELINGEN.length + ", max-content)";
+
+  raster.appendChild(el("div", "kop", ""));
+  BEHANDELINGEN.forEach(function (b) {
+    var h = el("div", "kop", b.titel);
+    h.appendChild(el("span", null, b.onder));
+    raster.appendChild(h);
+  });
+
+  SPELERS.forEach(function (s, i) {
+    var rij = el("div", "rijkop", s.naam);
+    rij.appendChild(el("span", "achtergrond", s.achtergrond));
+
+    var regel = el("div", "regelaar");
+    var lab = el("label", null, "drempel ");
+    var uit = el("output", null, s.drempel.toFixed(2));
+    lab.appendChild(uit);
+    var schuif = document.createElement("input");
+    schuif.type = "range";
+    schuif.min = "0.05"; schuif.max = "0.95"; schuif.step = "0.01";
+    schuif.value = String(s.drempel);
+    regel.appendChild(lab);
+    regel.appendChild(schuif);
+    rij.appendChild(regel);
+
+    var omDoos = el("div", "om");
+    var vink = document.createElement("input");
+    vink.type = "checkbox"; vink.checked = s.om; vink.id = "om" + i;
+    var omLab = el("label", null, "polariteit omkeren");
+    omLab.htmlFor = "om" + i; omLab.style.margin = "0";
+    omDoos.appendChild(vink); omDoos.appendChild(omLab);
+    rij.appendChild(omDoos);
+    raster.appendChild(rij);
+
+    /*
+     * Elke rij krijgt een eigen kopie van de filters, want een SVG-filter
+     * heeft geen parameters — de drempel zit als getal in het filter zelf.
+     * Vier rijen is vier setjes; dat is precies waarom een instelbare
+     * drempel in productie een gegenereerde <filter> per speler zou zijn,
+     * of anders een gedeeld filter en een vaste drempel voor iedereen.
+     */
+    var cellen = [];
+    BEHANDELINGEN.forEach(function (b) {
+      var k = kaart(s, b);
+      k.dataset.rij = String(i);
+      raster.appendChild(k);
+      cellen.push(k);
+    });
+
+    var eigen = maakFilters(
+      ["f-zacht", "f-licht", "f-hard", "f-stencil", "f-contour",
+       "f-zacht-om", "f-licht-om", "f-hard-om", "f-stencil-om", "f-contour-om"],
+      i, ".matrix.proef");
+
+    function toepassen() {
+      var t = parseFloat(schuif.value);
+      uit.textContent = t.toFixed(2);
+      stelDrempelIn(eigen, t, vink.checked);
+      cellen.forEach(function (k) { k.classList.toggle("omgekeerd", vink.checked); });
+    }
+    schuif.addEventListener("input", toepassen);
+    vink.addEventListener("change", toepassen);
+    toepassen();
+  });
+})();
+
+/* ---- blok 3: verduisteren -------------------------------------- */
+(function zwart() {
+  var raster = document.querySelector(".matrix.zwart");
+  var KOLOMMEN = [
+    { klasse: "b-zwart1", titel: "Zwartsel",  onder: "gamma 2,4"     },
+    { klasse: "b-zwart2", titel: "Zwartsel",  onder: "zwaar"         },
+    { klasse: "b-zwart3", titel: "Zwartsel",  onder: "zwaar + ovaal" }
+  ];
+  raster.style.gridTemplateColumns = "210px repeat(" + KOLOMMEN.length + ", max-content)";
+
+  raster.appendChild(el("div", "kop", ""));
+  KOLOMMEN.forEach(function (k) {
+    var h = el("div", "kop", k.titel);
+    h.appendChild(el("span", null, k.onder));
+    raster.appendChild(h);
+  });
+
+  SPELERS.forEach(function (s, i) {
+    var rij = el("div", "rijkop", s.naam);
+    rij.appendChild(el("span", "achtergrond", s.achtergrond));
+
+    var regel = el("div", "regelaar");
+    /* De schuif stuurt alleen 2 en 3. Kolom 1 staat vast op 2,4 zodat er
+       altijd een ijkpunt naast staat om tegen af te lezen. */
+    var lab = el("label", null, "gamma (2 en 3) ");
+    var uit = el("output", null, "6.0");
+    lab.appendChild(uit);
+    var schuif = document.createElement("input");
+    schuif.type = "range";
+    schuif.min = "1.2"; schuif.max = "9"; schuif.step = "0.1"; schuif.value = "6";
+    regel.appendChild(lab);
+    regel.appendChild(schuif);
+    rij.appendChild(regel);
+    raster.appendChild(rij);
+
+    KOLOMMEN.forEach(function (k) {
+      var kaartje = kaart(s, { klasse: k.klasse, leeg: true });
+      kaartje.dataset.rij = String(i);
+      raster.appendChild(kaartje);
+    });
+
+    var eigen = maakFilters(["f-zwart1", "f-zwart2", "f-zwart3"], i, ".matrix.zwart");
+
+    function toepassen() {
+      var g = parseFloat(schuif.value);
+      uit.textContent = g.toFixed(1);
+      eigen.forEach(function (f) {
+        if (f.id.indexOf("f-zwart1") === 0) return;
+        f.querySelectorAll("feFuncR, feFuncG, feFuncB").forEach(function (fn) {
+          fn.setAttribute("exponent", String(g));
+        });
+      });
+    }
+    schuif.addEventListener("input", toepassen);
+    toepassen();
+  });
+})();
+
+/* ------------------------------------------------------------------
+   Blok 4 — wat de zoektocht vond, over de hele pool.
+
+   Per speler: id, naam, gevonden drempel en de score van het masker dat
+   eruit kwam. Geen polariteitsveld meer — die staat vast op normaal, en
+   dat vastzetten is de belangrijkste correctie die de vier handmatige
+   waarden hebben afgedwongen.
+
+   Deze getallen zijn niet met de hand gekozen: ze komen uit de zoektocht
+   die in dit blok beschreven staat, gedraaid over alle 46 avatars, en
+   staan hier als data ingeplakt zodat de pagina zelf geen canvas hoeft
+   aan te raken. De kaarten eronder zijn echt en gaan live door het filter.
+   ------------------------------------------------------------------ */
+var GEVONDEN = [
+  ["44c8a599-1faa-486e-939e-e3afcd90d334", "Tanny", 0.72, 1.00],
+  ["32ff155d-cf56-44b1-88f3-10f234aaf2ec", "Bo", 0.68, 1.00],
+  ["966faa86-037d-4666-832f-5d0b15c28d0e", "Simon", 0.7, 1.00],
+  ["f9e220a1-2290-46ad-9bac-fd3c65e5738f", "Rianne Meiberg", 0.7, 1.00],
+  ["f4007378-c534-48c0-a5c3-a85abd907a1c", "Sevda", 0.72, 1.00],
+  ["ab29240b-32d7-423f-b5ac-bb9f4ecbc682", "Tim Houthuijs", 0.69, 1.00],
+  ["5eb57dc9-4aac-42d8-818c-a670543ea5c4", "Lotte Wesselman", 0.7, 1.00],
+  ["068ae7c1-9818-47ee-ac41-07a7ca9430b2", "Daria", 0.7, 1.00],
+  ["eb23dc73-1c1f-4657-8f3e-b4f6ba847355", "Ancella", 0.95, 1.00],
+  ["890a67ed-902f-4b78-910f-0fa0a685600e", "Nino", 0.72, 1.00],
+  ["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f", "Sandra", 0.94, 0.94],
+  ["e01b2a10-e1cf-40ce-9b37-946cb91436fe", "Jasper van Buul", 0.71, 0.89],
+  ["d4a789f5-b1de-4756-89c3-ad91f0bb7a14", "Thomas de Nooij", 0.72, 0.79],
+  ["b1d1b114-0174-4daa-b518-c3f902afe6be", "Dmitry", 0.71, 0.75],
+  ["432d8107-ac5d-4147-b690-150de744601b", "Yannick", 0.74, 0.66],
+  ["f20b169b-aec5-4462-822f-e378326dbb79", "Nadia Cissen", 0.89, 0.58],
+  ["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b", "Casper Keijsers", 0.95, 0.54],
+  ["91aa9d7c-8186-4242-b957-52924df4e4f9", "Gijs Janssen", 0.72, 0.48],
+  ["d77771b6-b714-4bb5-98d6-61511e50c123", "Jeroen van Geel", 0.71, 0.40],
+  ["f2cf0132-0bd9-4113-bb91-971cc65d3482", "Ridho Hidayat", 0.71, 0.39],
+  ["3db685db-ae5f-4b79-b0a6-455c1d8634c4", "Evie Wijnhoven", 0.73, 0.36],
+  ["fed9a05c-4990-46dc-84e5-eb09bdf68948", "Ninette van der Velden", 0.71, 0.36],
+  ["27d01eda-dc90-4a81-891a-6d00f91ef79d", "Petar Drandarov", 0.33, 0.35],
+  ["a70cf550-1ed4-4551-8106-78556e5dee6a", "Ewan Deeley", 0.73, 0.34],
+  ["fae1d713-8f8c-44e2-a316-1a2c4c7e4421", "Molly", 0.76, 0.27],
+  ["9a159b0b-bae4-4b74-ad24-54dbee09b618", "Laura Ackermans", 0.75, 0.27],
+  ["2724f764-4837-4623-a48f-b204014b8769", "Ton Pastoor", 0.94, 0.26],
+  ["0f2376d6-2c45-4f64-bea6-bcb27352850e", "Mathijs", 0.69, 0.25],
+  ["527c421f-d0ee-49c8-b87c-7340b71b0e96", "Marie Versteeg", 0.73, 0.25],
+  ["cfb66496-4e21-446b-8ff4-c44fdd7d0234", "Niek", 0.72, 0.23],
+  ["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3", "Angela", 0.71, 0.23],
+  ["1b6d918c-d0c6-4419-a286-ad6f94d49e89", "Karin", 0.72, 0.22],
+  ["6f10c388-13f3-4748-bdac-be7db30ed7db", "Sylvia", 0.71, 0.19],
+  ["86e7fbb5-2d7c-4b58-a227-bdc732accc5d", "Anneloes Ernest", 0.63, 0.19],
+  ["8094ad42-794b-4d98-8228-a0894b59e762", "Esther", 0.67, 0.18],
+  ["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb", "Jeroen Mens", 0.71, 0.17],
+  ["0b242a31-3aa5-4595-907b-965ba6369c2c", "Fraser", 0.72, 0.16],
+  ["50437f33-9d31-45d5-8f42-00c9c25a5f88", "Inge van Amelsvoort", 0.68, 0.12],
+  ["ea69c1f5-8a97-4858-82f0-6950199e502f", "Lianne", 0.56, 0.12],
+  ["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c", "Daan van der Beek", 0.61, 0.11],
+  ["1e55c518-674f-4f55-8107-c9a6a96bbc31", "Max Smedts", 0.66, 0.11],
+  ["808d23eb-10e5-4d07-851c-3902aaba1cda", "Daan Verkade", 0.18, 0.08],
+  ["0a9a2736-30f5-477f-899c-368901dd0a63", "Ida", 0.26, 0.05],
+  ["08548a49-477a-405c-b742-40e6de5bb7af", "Mark tarwebrood Razenberg", 0.29, 0.04],
+  ["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c", "Rik Maas", 0.11, 0.03],
+  ["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad", "Luuk Heijmans", 0.07, 0.03]
+];
+
+(function pool() {
+  var bak = document.getElementById("alles");
+  var BANDEN = [
+    { van: 0.60, naam: "Schoon", bij: "score ≥ 0,60 — 15 stuks, zonder uitzondering bruikbaar" },
+    { van: 0.35, naam: "Twijfel", bij: "score 0,35–0,60 — 7 stuks, gaten in het gezicht of de haarlijn" },
+    { van: 0.00, naam: "Stuk",    bij: "score < 0,35 — 24 stuks, hier moet de egale plaat blijven staan" }
+  ];
+
+  BANDEN.forEach(function (band, bi) {
+    var tot = bi === 0 ? 2 : BANDEN[bi - 1].van;
+    var leden = GEVONDEN.filter(function (r) { return r[3] >= band.van && r[3] < tot; });
+
+    var kop = el("div", "band", band.naam);
+    kop.appendChild(el("span", null, band.bij));
+    bak.appendChild(kop);
+
+    var raster = el("div", "bak");
+    leden.forEach(function (r, i) {
+      var id = "f-pool-" + bi + "-" + i;
+      /* Altijd normale polariteit — zie de noot over het vastzetten daarvan. */
+      maakPoolFilter(id, r[2], false);
+
+      var fig = el("figure");
+      if (r[3] < 0.35) fig.className = "laag";
+      var k = kaart({ naam: r[1], id: r[0], nr: 0 }, { klasse: "b-pool-" + bi + "-" + i, leeg: true });
+      var s = document.createElement("style");
+      s.textContent = ".b-pool-" + bi + "-" + i + " img { filter: url(#" + id + "); }";
+      document.head.appendChild(s);
+      fig.appendChild(k);
+
+      var cap = el("figcaption");
+      cap.appendChild(el("b", null, r[1]));
+      cap.appendChild(el("span", "cijfer", r[3].toFixed(2) + " · t=" + r[2].toFixed(2)));
+      fig.appendChild(cap);
+      raster.appendChild(fig);
+    });
+    bak.appendChild(raster);
+  });
+})();
+
+/** Eén los sleutelfilter met een vaste drempel, voor de pool hierboven. */
+function maakPoolFilter(id, t, om) {
+  var basis = document.getElementById(om ? "f-licht-om" : "f-licht").cloneNode(true);
+  basis.id = id;
+  var slope = 14, kern = om ? t : 1 - t;
+  basis.querySelectorAll("feFuncA").forEach(function (fn) {
+    if (fn.getAttribute("type") !== "linear") return;
+    fn.setAttribute("intercept", String(0.5 - slope * kern));
+  });
+  document.querySelector("svg.filters defs").appendChild(basis);
+}
+
+/* ------------------------------------------------------------------
+   Per rij een eigen setje filters, want de drempel is een constante
+   binnen het filter en niet iets wat je van buitenaf meegeeft.
+   ------------------------------------------------------------------ */
+function maakFilters(namen, i, scope) {
+  var defs = document.querySelector("svg.filters defs");
+  var stijl = [];
+  var kopieen = [];
+  namen.forEach(function (n) {
+    var origineel = document.getElementById(n);
+    var kopie = origineel.cloneNode(true);
+    kopie.id = n + "-r" + i;
+    defs.appendChild(kopie);
+    kopieen.push(kopie);
+    /* De CSS koppelt op klasse; per rij verwijzen we door naar de kopie. */
+    var klasse = n.replace(/^f-/, "b-").replace(/-om$/, "");
+    var sel = n.endsWith("-om")
+      ? scope + ' .kaart.omgekeerd[data-rij="' + i + '"].' + klasse + ' img'
+      : scope + ' .kaart:not(.omgekeerd)[data-rij="' + i + '"].' + klasse + ' img';
+    /* `f-hard` heeft geen eigen kolom meer; het is het filter achter de
+       kolom "silhouet donker, op metaal". */
+    stijl.push(sel.replace(".b-hard", ".b-metaal") + " { filter: url(#" + kopie.id + "); }");
+  });
+  var s = document.createElement("style");
+  s.textContent = stijl.join("\n");
+  document.head.appendChild(s);
+  return kopieen;
+}
+
+/**
+ * Zet de drempel in een setje filters.
+ *
+ * Een `feFunc*` van type `linear` rekent `slope * x + intercept` en klemt
+ * op 0..1. Om bij waarde `t` door het midden te gaan is de intercept dus
+ * `0.5 - slope * t` — steile slope betekent een harde rand, lage slope een
+ * zachte overgang.
+ */
+function stelDrempelIn(filters, t, om) {
+  filters.forEach(function (f) {
+    var omgekeerd = f.id.indexOf("-om-") !== -1;
+    if (omgekeerd !== om) return;
+
+    /* Sleutel-achtigen: de alfa is 1 − luminantie (of luminantie zelf bij
+       omgekeerde polariteit), dus de drempel zit op de alfa-functie. */
+    f.querySelectorAll("feFuncA").forEach(function (fn) {
+      if (fn.getAttribute("type") !== "linear") return;
+      var slope = parseFloat(fn.getAttribute("slope"));
+      var kern = omgekeerd ? t : 1 - t;
+      fn.setAttribute("intercept", String(0.5 - slope * kern));
+    });
+
+    /* Het stencil drempelt op de kleurkanalen: eerst verschuiven zodat de
+       gewenste drempel op 0.5 valt, want `discrete` splitst daar. */
+    ["feFuncR", "feFuncG", "feFuncB"].forEach(function (tag) {
+      f.querySelectorAll(tag).forEach(function (fn) {
+        if (fn.getAttribute("type") !== "linear") return;
+        var slope = omgekeerd ? -1 : 1;
+        fn.setAttribute("slope", String(slope));
+        fn.setAttribute("intercept", String(0.5 - slope * t));
+      });
+    });
+  });
+}
+</script>
+</body>
+</html>

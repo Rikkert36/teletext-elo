@@ -49,9 +49,12 @@ const CardViewer: React.FC<CardViewerProps> = ({ slots, index, onIndex, onClose 
   );
 
   /*
-   * The first window-level key listener in the app — everything else handles keys on
-   * the element that has focus. An overlay cannot: the arrows have to work wherever
-   * focus happens to be inside it, including on a disabled chevron at either end.
+   * A window-level key listener, not one on the overlay — the arrows have to work
+   * wherever focus happens to be inside it, including on a disabled chevron at
+   * either end.
+   *
+   * The album has one too, on the same two keys, and it stands itself down while a
+   * card is open so only one of them acts on a press. See `Album`.
    */
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {

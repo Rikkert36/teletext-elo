@@ -64,8 +64,6 @@ export const packFoil = (pack: Pack): CSSProperties => {
     '--foil-lo': `hsl(${hue}, 45%, 6%)`,
     /* The neon bleeding off the edges, and the halo under the numeral. */
     '--glow': `hsla(${hue}, 90%, 52%, 0.5)`,
-    /* A printed edge line down both sides. */
-    '--edge': `hsla(${hue}, 85%, 60%, 0.45)`,
     /* The numeral, at LED brightness. */
     '--ink': `hsl(${hue}, 95%, 72%)`,
     '--pack-mark': `url(${rikDevMark})`,

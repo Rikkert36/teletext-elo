@@ -1,0 +1,1428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Icoon cards — design proposals</title>
+<style>
+/* ================================================================
+   Scaffolding — this page only, nothing here goes into the app.
+   ================================================================ */
+:root {
+  --ink: #e8e4da;
+  --dim: #8f897c;
+  --bg: #101012;
+  --panel: #17171a;
+  --rule: #2a2a2f;
+  --accent: #d8b35e;
+
+  /* Live photo-treatment knobs, driven by the sliders at the top. A, B, C
+     and E all read these so the four can be compared under identical
+     grading. D bakes its own — see its note. */
+  --icoon-gray: 1;
+  --icoon-sepia: 0.34;
+  --icoon-contrast: 1.06;
+  --icoon-bright: 1.03;
+  --icoon-tint: 0.5;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0 0 120px;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.62 -apple-system, "Segoe UI", Tahoma, sans-serif;
+}
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 32px; }
+
+header.page {
+  padding: 56px 0 34px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 40px;
+}
+
+h1 { font-size: 30px; margin: 0 0 12px; font-weight: 600; letter-spacing: -0.01em; }
+h2 {
+  font-size: 13px; text-transform: uppercase; letter-spacing: 0.16em;
+  color: var(--dim); margin: 64px 0 20px; font-weight: 600;
+}
+h3 { font-size: 19px; margin: 0 0 6px; font-weight: 600; }
+p { margin: 0 0 14px; max-width: 76ch; color: #cbc5b9; }
+p.lead { font-size: 17px; color: var(--ink); }
+strong { color: #fff; font-weight: 600; }
+em { color: var(--accent); font-style: normal; }
+code {
+  font: 12.5px/1 ui-monospace, Consolas, monospace;
+  background: #1e1e22; padding: 2px 5px; border-radius: 3px; color: #d9cfae;
+}
+ul { max-width: 76ch; color: #cbc5b9; padding-left: 20px; }
+li { margin-bottom: 7px; }
+
+.verdict {
+  border-left: 2px solid var(--accent);
+  padding: 2px 0 2px 16px;
+  margin: 16px 0 0;
+  color: #ded7c6;
+}
+.verdict b { color: var(--accent); font-weight: 600; }
+
+/* --- proposal layout ------------------------------------------- */
+
+.proposal { padding: 40px 0; border-top: 1px solid var(--rule); }
+.proposal:first-of-type { border-top: none; padding-top: 8px; }
+
+.lineup {
+  display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start;
+  margin-top: 22px; padding: 24px; border-radius: 8px;
+  background: var(--panel); border: 1px solid var(--rule);
+}
+/* The proposal is separated from the three reference cards by a rule, not by
+   a gap — a gap alone reads as "four options", which is the wrong question. */
+.lineup .divider {
+  width: 1px; align-self: stretch; background: var(--rule); margin: 0 8px;
+}
+
+.spec { text-align: center; }
+.spec > .caption {
+  margin-top: 10px; font-size: 12px; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--dim);
+}
+.spec > .caption b { display: block; color: var(--accent); font-weight: 600; }
+
+/* --- controls --------------------------------------------------- */
+
+.controls {
+  position: sticky; top: 0; z-index: 50;
+  background: rgba(16,16,18,0.94);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--rule);
+  padding: 12px 32px;
+  display: flex; gap: 26px; flex-wrap: wrap; align-items: center;
+  font-size: 12px; color: var(--dim);
+}
+.controls label { display: flex; gap: 9px; align-items: center; white-space: nowrap; }
+.controls input[type=range] { width: 104px; accent-color: var(--accent); }
+.controls output { width: 34px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.controls button {
+  background: #23232a; color: var(--ink); border: 1px solid var(--rule);
+  border-radius: 4px; padding: 5px 11px; font-size: 12px; cursor: pointer;
+}
+.controls button:hover { border-color: var(--accent); }
+
+/* ================================================================
+   THE CARD — copied verbatim from src/styles/card.css so the proposals
+   sit on the real geometry. Only the .card--icoon* blocks are new.
+   ================================================================ */
+
+.card {
+  --card-width: 178px;
+  --card-display: "Bahnschrift SemiCondensed", Bahnschrift, "DIN Condensed",
+    "DIN Alternate", "Agency FB", "Franklin Gothic Medium", "Segoe UI", Tahoma, sans-serif;
+
+  --facets:
+    linear-gradient(112deg,
+      rgba(255,255,255,0.16) 0 16%, transparent 16% 33%,
+      rgba(255,255,255,0.09) 33% 45%, transparent 45%),
+    linear-gradient(58deg,
+      rgba(255,255,255,0.11) 0 20%, transparent 20% 54%,
+      rgba(255,255,255,0.06) 54% 66%, transparent 66%);
+
+  position: relative;
+  width: var(--card-width);
+  aspect-ratio: 5 / 7;
+  border-radius: 6px;
+  overflow: hidden;
+  container-type: inline-size;
+  font-family: Tahoma, Verdana, sans-serif;
+  user-select: none;
+  flex: none;
+  box-shadow: 0 3px 9px rgba(0,0,0,0.55);
+}
+.card__inner { position: absolute; inset: 0; }
+
+.card::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(115deg,
+    transparent 32%, rgba(255,255,255,0.17) 46%,
+    rgba(255,255,255,0.04) 53%, transparent 66%);
+  pointer-events: none; z-index: 3;
+}
+
+.card__portrait {
+  position: absolute; inset: 0; overflow: hidden; isolation: isolate;
+  -webkit-mask-image:
+    linear-gradient(to top, transparent 20%, #000 40%),
+    linear-gradient(135deg, transparent 10%, #000 32%);
+  mask-image:
+    linear-gradient(to top, transparent 20%, #000 40%),
+    linear-gradient(135deg, transparent 10%, #000 32%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+}
+.card__portrait img {
+  width: 100%; height: 100%; object-fit: cover;
+  object-position: center 22%; display: block;
+}
+.card__portrait::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(160deg, var(--tier-a) 0%, var(--tier-b) 100%);
+  mix-blend-mode: multiply; opacity: 0.42;
+}
+
+.card__header { position: absolute; top: 4%; left: 7.5%; z-index: 2; color: var(--tier-ink); }
+.card__overall {
+  font-family: var(--card-display); font-size: 20.5cqw; font-weight: 600;
+  line-height: 1; letter-spacing: 0.015em; text-shadow: 0 1px 1px rgba(0,0,0,0.14);
+}
+.card__name {
+  position: absolute; left: 9%; right: 9%; bottom: 7%; z-index: 2;
+  text-align: center; font-family: var(--card-display);
+  font-size: 8.5cqw; font-weight: normal; letter-spacing: 0.045em;
+  line-height: 1.2; padding-top: 0.28em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--tier-ink);
+  border-top: 1px solid rgba(0,0,0,0.24);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.32);
+  text-shadow: 0 1px 0 rgba(255,255,255,0.28);
+}
+/* The pill this whole exercise removes. Rendered once, in the reference row. */
+.card__legend {
+  position: absolute; top: 4%; right: 4%; z-index: 2;
+  font-family: Tahoma, Verdana, sans-serif;
+  font-size: 4.33cqw; letter-spacing: 0.67cqw; text-transform: uppercase;
+  color: #f0e4c4; background: rgba(0,0,0,0.78);
+  padding: 1.33cqw 2.67cqw; border-radius: 1.33cqw;
+}
+
+/* --- the existing four tiers ------------------------------------ *
+ *
+ * One change from where they started: all four now share `#2E240E` as their
+ * ink. They used to carry three near-blacks, each leaning toward its own metal
+ * — which reads as a considered detail and is not one, since at these sizes
+ * they are indistinguishable side by side, and the cool silver ink was the one
+ * thing on the face pulling out of the warm register everything else sits in.
+ * ---------------------------------------------------------------- */
+
+.card--brons {
+  --tier-a: #f2d3ae; --tier-b: #b07a45; --tier-ink: #2e240e;
+  background-image: var(--facets),
+    linear-gradient(160deg, #e0b184 0%, #a3653a 32%, #7a4522 58%, #cf9868 100%);
+}
+.card--zilver {
+  --tier-a: #dde7f0; --tier-b: #8e9dae; --tier-ink: #2e240e;
+  background-image: var(--facets),
+    linear-gradient(160deg, #f6f8fa 0%, #bcc5ce 32%, #8b95a1 58%, #e6ecf1 100%);
+}
+.card--goud {
+  --tier-a: #fdeeb0; --tier-b: #c9a03a; --tier-ink: #2e240e;
+  background-image: var(--facets),
+    linear-gradient(160deg, #fbe9a3 0%, #dcb64a 32%, #b8901f 58%, #f7e293 100%);
+}
+.card--goudZeldzaam {
+  --tier-a: #fff6c6; --tier-b: #b8901f; --tier-ink: #2e240e;
+  background-image: var(--facets),
+    linear-gradient(160deg, #fff6cf 0%, #f5d772 26%, #8c6b12 56%, #ffeeae 100%);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.6), 0 0 0 1px #6d520c;
+}
+
+/* ================================================================
+   NEW — the icoon treatment.
+
+   Two mechanics, shared by all five proposals and by nothing else on
+   the card:
+
+   1. The portrait is graded to monochrome and warmed back up, instead
+      of being tinted toward a tier colour.
+   2. The reference's gold edge: two thin gold lines close together, a
+      sliver in from the border, drawn straight onto the artwork. Built
+      in both readings — one beaded moulding, or two separate rules —
+      switchable from the bar at the top of the page.
+
+   There is no wordmark. "icoon" printed on the card would be the same
+   mistake as the black `legende` pill it replaces: a label doing work
+   the material should be doing. Everything else on this card — the
+   number, the name, the tier — is unlabelled, and this is no different.
+   ================================================================ */
+
+.card--icoon .card__portrait img {
+  filter:
+    grayscale(var(--icoon-gray))
+    sepia(var(--icoon-sepia))
+    contrast(var(--icoon-contrast))
+    brightness(var(--icoon-bright));
+}
+/* The tier tint stops being a tint and becomes the warm wash that puts the
+   monochrome photo back onto the same material as the card. Hence a much
+   higher opacity than the 0.42 the coloured tiers use: multiplying a grey
+   image can go a long way before anything is destroyed. */
+.card--icoon .card__portrait::after { opacity: var(--icoon-tint); }
+
+/*
+ * The frame, two readings of the same reference.
+ *
+ * Settled first, because three passes were spent getting it wrong and each
+ * time for the same reason:
+ *
+ *   - The card's own stock runs edge to edge, uninterrupted. The pale margin
+ *     outside the gold is not a mount, not a band and not part of the frame —
+ *     it is simply the card, the same material as the middle.
+ *   - The gold sits *on* the artwork. Nothing is inset or cleared to make
+ *     room for it.
+ *   - The whole assembly is thin. What made the earlier versions read thick
+ *     was never the gold's own width, it was the empty margin they reserved
+ *     inside it.
+ *
+ * What is genuinely ambiguous in the reference is what the two visible gold
+ * lines *are*, so both readings are built and switchable:
+ *
+ *   BEADED  one piece of gold beading, catching light on both of its rounded
+ *           edges with a dark groove down the middle. Three contiguous rings,
+ *           no card stock anywhere inside the assembly.
+ *   TWIN    two independent hairline rules with clean card stock between
+ *           them. A wider gap, and the material in it is the card.
+ *
+ * They are a hair apart at album scale and clearly different in the viewer,
+ * which is exactly why it is worth choosing rather than guessing.
+ *
+ * Both are the padding-box mask trick — a `border` cannot carry a gradient
+ * and `border-image` cannot carry a radius — so each ring is one element
+ * painted with the metal gradient, masked so only the `padding` survives.
+ */
+.card--icoon {
+  /*
+   * Zero. The frame is the edge.
+   *
+   * This went 3.4% -> 2.6 -> 1.7 -> 0.85 -> 0 over five passes, and every
+   * intermediate value was wrong for the same reason: any stock left outside
+   * the gold reads as a pale margin *around* a frame rather than as the card
+   * being framed, and the eye finds it however narrow it is. There is no width
+   * at which a margin stops looking like a margin — there is only having one
+   * or not.
+   *
+   * With it at zero the ring's outer edge is the card's outer edge, so its
+   * radius is the card's own 6px and the two are the same curve rather than
+   * two concentric ones.
+   */
+  --rule-inset: 0cqw;
+
+  /*
+   * The rails are not the same width all the way round: thick along the top,
+   * ordinary down the sides, thin along the bottom. That is what a bevelled
+   * frame lit from above actually looks like — the top rail catches the light
+   * across its full face while the bottom one is turned away from it and
+   * nearly edge-on.
+   *
+   * Also the reason the widths are what they are: at the album's card size the
+   * top rail holds a comfortable pixel and a half where a uniform hairline
+   * landed on 0.75px and was anti-aliased into grey. A frame has to survive
+   * being small; this one gets to be crisp where it matters and lets the
+   * bottom rail go faint, which is what it should do anyway.
+   */
+  --rail-top: 1.05cqw;
+  --rail-side: 0.78cqw;
+  --rail-bot: 0.6cqw;
+}
+
+/*
+ * The contact shadow, and the reason the gold was disappearing at the top-left.
+ *
+ * That was never a width problem. The metal gradient started at a near-white
+ * cream and the ivory stock it is drawn on is also near-white, so at the end of
+ * the ring where the gradient is lightest there was no contrast to see a width
+ * *with*. The bottom-right had the mirror version of the same fault: the darkest
+ * end of the metal against the ground's own bright bottom stop, on the thinnest
+ * rail. Both corners were tone, not geometry.
+ *
+ * Two fixes. Every metal now stays a real gold rather than running up into
+ * white — no stop is lighter than the stock it sits on. And the ring casts a
+ * short shadow, so there is a dark edge holding the gold apart from the card
+ * even where the two agree in tone. `filter: drop-shadow` rather than
+ * `box-shadow` because a mask clips box-shadows away entirely, but a filter is
+ * computed from the masked silhouette — the same reason the pack wrapper's
+ * shadow is a filter.
+ */
+.card--fr-beaded .card__inner::before,
+.card--fr-twin .card__inner::before,
+.card--fr-twin .card__inner::after {
+  filter: drop-shadow(0 0.5px 0.6px var(--frame-shadow, rgba(44,32,8,0.5)));
+}
+
+/*
+ * Radius follows the card's own 6px, less however far in the ring sits, so the
+ * two curves stay concentric. They did not before — the card was at 6px and the
+ * ring at a flat 3px, so at the corners they diverged and the gold pulled
+ * inboard exactly where the eye checks whether a frame is on the edge.
+ */
+
+/* ---------- reading 1: one beaded moulding ---------------------- */
+
+.card--fr-beaded {
+  /*
+   * The groove — the dark channel between the two gold beads — is wider than
+   * either of them, at roughly one and a third of the top rail.
+   *
+   * It was 0.45cqw, thinner than every rail, and at that width it read as a
+   * seam where two lines meet rather than as a gap between two objects. Widening
+   * it is what turns the assembly from *a gold line with a dark line in it* into
+   * *two gold edges with a shadow between them*, which is the whole claim this
+   * reading makes about the reference.
+   *
+   * The two beads stay equal to each other. Making the inner one heavier was
+   * tried and it is the wrong axis: it thickens the frame without deepening it,
+   * and depth is the only thing the groove is for.
+   */
+  --groove: 1.4cqw;
+}
+
+/* The full width of the beading, in gold. The groove is painted over it. */
+.card--fr-beaded .card__inner::before {
+  content: "";
+  position: absolute; z-index: 2;
+  inset: var(--rule-inset);
+  border-radius: calc(6px - var(--rule-inset));
+  padding:
+    calc(var(--rail-top) * 2 + var(--groove))
+    calc(var(--rail-side) * 2 + var(--groove))
+    calc(var(--rail-bot) * 2 + var(--groove));
+  background: var(--frame-metal);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+/* The shadow in the groove. Not stock showing through — the two gold edges are
+   one object, and this is the dark between them. Positioned off the outer rail,
+   so widening `--groove` eats inward and the outer bead does not move. */
+.card--fr-beaded .card__inner::after {
+  content: "";
+  position: absolute; z-index: 2;
+  inset:
+    calc(var(--rule-inset) + var(--rail-top))
+    calc(var(--rule-inset) + var(--rail-side))
+    calc(var(--rule-inset) + var(--rail-bot));
+  border-radius: calc(6px - var(--rule-inset) - var(--rail-side));
+  padding: var(--groove);
+  background: var(--frame-line);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/*
+ * What makes the beads look round: dark on *both* sides of each of them.
+ *
+ * A bead is a cylinder. It reads as one when it is bright along its crown and
+ * falls off into shadow at each edge, and as a flat gold stripe when it does
+ * not. Round the assembly that means four dark edges, and three of them were
+ * already there:
+ *
+ *   outer bead, outer side  the contact shadow against the card's border
+ *   outer bead, inner side  the groove
+ *   inner bead, outer side  the groove, from the other side
+ *   inner bead, inner side  --> nothing at all, which is this element
+ *
+ * So the inner bead was lit on one side and open on the other, and no amount of
+ * widening or darkening the groove could fix that — it is on the wrong side of
+ * the bead. This is the gold rolling over and casting onto the card.
+ *
+ * An inset `box-shadow` on a plain element rather than a fourth ring: a shadow
+ * that has to fade *inward* from an edge is exactly what `inset` draws, and it
+ * needs no mask. Two of them — an even falloff all round, plus a stronger one
+ * from the top, since the light is above and the top rail overhangs furthest.
+ *
+ * Beaded only. The twin reading has card stock between its rules, so its inner
+ * rule is a line printed on the card and has nothing to roll over.
+ */
+.card--fr-beaded .card__bevel {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  inset:
+    calc(var(--rule-inset) + var(--rail-top) * 2 + var(--groove))
+    calc(var(--rule-inset) + var(--rail-side) * 2 + var(--groove))
+    calc(var(--rule-inset) + var(--rail-bot) * 2 + var(--groove));
+  border-radius: 2px;
+  /* Brown rather than black, like the groove: a shadow cast by gold onto warm
+     ivory picks up both, and a neutral one reads as dirt on the card. */
+  box-shadow:
+    inset 0 0 1cqw rgba(96, 70, 32, 0.26),
+    inset 0 1.2cqw 1.2cqw -0.8cqw rgba(96, 70, 32, 0.30);
+}
+
+/* ---------- reading 2: two separate rules ----------------------- */
+
+.card--fr-twin { --gap: 0.95cqw; }
+
+.card--fr-twin .card__inner::before {
+  content: "";
+  position: absolute; z-index: 2;
+  inset: var(--rule-inset);
+  border-radius: calc(6px - var(--rule-inset));
+  padding: var(--rail-top) var(--rail-side) var(--rail-bot);
+  background: var(--frame-metal);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+/* The inner rule is dimmer: it is further from the light, and the reference's
+   two lines are not equally bright. Nothing fills the gap — the card does. */
+.card--fr-twin .card__inner::after {
+  content: "";
+  position: absolute; z-index: 2;
+  inset:
+    calc(var(--rule-inset) + var(--rail-top) + var(--gap))
+    calc(var(--rule-inset) + var(--rail-side) + var(--gap))
+    calc(var(--rule-inset) + var(--rail-bot) + var(--gap));
+  border-radius: calc(6px - var(--rule-inset) - var(--rail-side) - var(--gap));
+  padding: var(--rail-top) var(--rail-side) var(--rail-bot);
+  background: var(--frame-metal-inner, var(--frame-metal));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ---------- A. Ivory -------------------------------------------- */
+.card--icoon-a {
+  --tier-a: #f6ecd6; --tier-b: #b99f6e; --tier-ink: #34291a;
+  --frame-metal: linear-gradient(168deg, #f7e2a8 0%, #dcb865 26%, #b28f3c 62%, #79601f 100%);
+  --frame-metal-inner: linear-gradient(168deg, #dcbc78 0%, #b8933f 26%, #86691e 62%, #52400f 100%);
+  --frame-line: rgba(102,72,30,0.76);
+  background-image: var(--facets),
+    linear-gradient(160deg, #fdfaf3 0%, #ece2cd 30%, #c8b795 58%, #f9f4e8 100%);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.6);
+}
+
+/* ---------- B. Sepia -------------------------------------------- */
+.card--icoon-b {
+  --tier-a: #f0dfa8; --tier-b: #8a6c26; --tier-ink: #2a2004;
+  --frame-metal: linear-gradient(168deg, #eeda96 0%, #c9a648 26%, #97772a 62%, #5c4610 100%);
+  --frame-metal-inner: linear-gradient(168deg, #c8a752 0%, #9d7d2e 26%, #6d5619 62%, #3e2f08 100%);
+  --frame-line: rgba(92,64,22,0.78);
+  background-image: var(--facets),
+    linear-gradient(160deg, #e9d59a 0%, #b8973f 30%, #7b6018 58%, #e3d093 100%);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.6);
+}
+
+/* ---------- C. Obsidian ----------------------------------------- */
+.card--icoon-c {
+  --tier-a: #cbb680; --tier-b: #6b5a33; --tier-ink: #e6d5a4;
+  --frame-metal: linear-gradient(168deg, #f8e6b4 0%, #d9ba74 26%, #9d8038 62%, #554417 100%);
+  --frame-metal-inner: linear-gradient(168deg, #d2b268 0%, #a6862f 26%, #6b561e 62%, #32270a 100%);
+  --frame-line: rgba(58,40,14,0.88);
+  background-color: #0b0b0d;
+  background-image:
+    radial-gradient(ellipse 78% 58% at 50% 40%, rgba(196,158,74,0.20) 0%, rgba(0,0,0,0) 100%),
+    linear-gradient(112deg,
+      rgba(255,255,255,0.07) 0 16%, transparent 16% 33%,
+      rgba(255,255,255,0.035) 33% 45%, transparent 45%),
+    linear-gradient(160deg, #1a1712 0%, #0a0a0c 44%, #171310 74%, #0d0c0b 100%);
+  box-shadow: 0 3px 14px rgba(0,0,0,0.72);
+}
+/* Engraving on black has to be light, so the name band's two rules invert:
+   light above, dark below. */
+.card--icoon-c .card__name {
+  border-top: 1px solid rgba(214,178,92,0.55);
+  box-shadow: inset 0 1px 0 rgba(0,0,0,0.5);
+  text-shadow: 0 1px 0 rgba(0,0,0,0.6);
+}
+/* `multiply` against near-black would erase the photo, so here the wash is
+   warm light falling onto it rather than colour sinking through it. */
+.card--icoon-c .card__portrait::after {
+  background: linear-gradient(160deg, #e0bd6e 0%, #6d5623 100%);
+  mix-blend-mode: overlay;
+  opacity: calc(var(--icoon-tint) * 0.78);
+}
+
+/* ---------- D. Engraving ---------------------------------------- */
+.card--icoon-d {
+  --tier-a: #ece2cd; --tier-b: #9c8d6c; --tier-ink: #2b2519;
+  --frame-metal: linear-gradient(168deg, #e9dcbe 0%, #c4b287 26%, #97855c 62%, #62522f 100%);
+  --frame-metal-inner: linear-gradient(168deg, #c0ae85 0%, #9a8a60 26%, #6f5f3d 62%, #43371f 100%);
+  --frame-line: rgba(104,86,52,0.74);
+  background-color: #efe9dc;
+  background-image:
+    /* Guilloche: two counter-rotating fine ray fans, which is what a banknote
+       lathe actually draws. */
+    repeating-conic-gradient(from 0deg at 50% 62%,
+      rgba(120,98,52,0.085) 0deg 0.55deg, transparent 0.55deg 1.5deg),
+    repeating-conic-gradient(from 0deg at 22% 24%,
+      rgba(120,98,52,0.06) 0deg 0.8deg, transparent 0.8deg 2.2deg),
+    linear-gradient(160deg, #f7f2e7 0%, #e5dcc7 40%, #d3c8ae 72%, #f2ebdc 100%);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.55);
+}
+/* Posterised to line-art rather than graded to sepia — this proposal is about
+   the *photo* becoming an engraving, so it opts out of the sliders. */
+.card--icoon-d .card__portrait img {
+  filter: grayscale(1) contrast(1.9) brightness(1.12) sepia(0.5) saturate(0.8);
+}
+.card--icoon-d .card__portrait::after {
+  background: linear-gradient(160deg, #e8dcc0 0%, #8c7c56 100%);
+  opacity: 0.4;
+}
+
+/* ---------- E. Shard -------------------------------------------- */
+.card--icoon-e {
+  --tier-a: #f7edd8; --tier-b: #b49c69; --tier-ink: #2f2617;
+  --frame-metal: linear-gradient(168deg, #f7e2a8 0%, #dcb865 26%, #b28f3c 62%, #79601f 100%);
+  --frame-metal-inner: linear-gradient(168deg, #dcbc78 0%, #b8933f 26%, #86691e 62%, #52400f 100%);
+  --frame-line: rgba(102,72,30,0.76);
+  --shard-hi: rgba(255,255,255,0.72);
+  --shard-lo: rgba(198,160,74,0.5);
+  background-image: var(--facets),
+    linear-gradient(160deg, #fdfbf4 0%, #eae0ca 28%, #c3b18e 60%, #fbf7ec 100%);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.6);
+}
+
+/*
+ * Angular light shards. One conic gradient from a point below the card, so
+ * they radiate up past the shoulders exactly as the reference does.
+ *
+ * Scoped to E and F, not to `.card--icoon`. The element is rendered on every
+ * icoon card, but only those two paint it — which is what makes A differ from
+ * them by exactly one layer, and is the reason the colourways below can hand
+ * out `--shard-*` without turning A into E.
+ */
+.card__shards { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+
+.card--icoon-e .card__shards {
+  background:
+    conic-gradient(from 196deg at 50% 128%,
+      transparent 0 5deg,
+      var(--shard-hi) 5deg 7.4deg,
+      transparent 7.4deg 13deg,
+      var(--shard-lo) 13deg 17deg,
+      transparent 17deg 23deg,
+      var(--shard-hi) 23deg 24.6deg,
+      transparent 24.6deg 34deg,
+      var(--shard-lo) 34deg 39deg,
+      transparent 39deg 44deg,
+      var(--shard-hi) 44deg 46deg,
+      transparent 46deg);
+}
+
+/* ================================================================
+   Colourways: one structure, the tier moves the metal only.
+
+   Applied by overriding the same three --tier-* props the card already
+   uses, plus the frame metals and the two shard colours.
+
+   Scoped to `.card--icoon`, not to E — an icoon of any proposal needs a
+   silver and a bronze, and A and E have to be comparable on the same
+   player at his own tier. Handing `--shard-*` to A is harmless because
+   only E paints the shard layer at all (see above).
+   ================================================================ */
+
+.card--icoon.cw-goud {
+  --tier-a: #f7edd8; --tier-b: #b49c69; --tier-ink: #2f2617;
+  --frame-metal: linear-gradient(168deg, #f7e2a8 0%, #dcb865 26%, #b28f3c 62%, #79601f 100%);
+  --frame-metal-inner: linear-gradient(168deg, #dcbc78 0%, #b8933f 26%, #86691e 62%, #52400f 100%);
+  --frame-line: rgba(102,72,30,0.76);
+  --shard-hi: rgba(255,255,255,0.72);
+  --shard-lo: rgba(198,160,74,0.5);
+  background-image: var(--facets),
+    linear-gradient(160deg, #fdfbf4 0%, #eae0ca 28%, #c3b18e 60%, #fbf7ec 100%);
+}
+.card--icoon.cw-zilver {
+  --tier-a: #eef1f4; --tier-b: #9aa4ae; --tier-ink: #21272e;
+  --frame-metal: linear-gradient(168deg, #eef3f8 0%, #c3ced8 26%, #8e9aa6 62%, #56616c 100%);
+  --frame-metal-inner: linear-gradient(168deg, #c2ccd5 0%, #929da8 26%, #66717c 62%, #363f48 100%);
+  --frame-line: rgba(86,72,54,0.72);
+  --shard-hi: rgba(255,255,255,0.78);
+  --shard-lo: rgba(146,160,175,0.5);
+  background-image: var(--facets),
+    linear-gradient(160deg, #fdfdfe 0%, #e4e8ec 28%, #b3bcc5 60%, #f7f9fb 100%);
+}
+.card--icoon.cw-brons {
+  --tier-a: #f4e3d2; --tier-b: #ac8055; --tier-ink: #33200f;
+  --frame-metal: linear-gradient(168deg, #fbdec2 0%, #d6a878 26%, #9f7449 62%, #613a15 100%);
+  --frame-metal-inner: linear-gradient(168deg, #cf9d70 0%, #a17244 26%, #714a26 62%, #3f230d 100%);
+  --frame-line: rgba(100,62,26,0.78);
+  --shard-hi: rgba(255,255,255,0.66);
+  --shard-lo: rgba(178,124,70,0.52);
+  background-image: var(--facets),
+    linear-gradient(160deg, #fdf6ee 0%, #ecdcc8 28%, #c19b76 60%, #faf1e6 100%);
+}
+/* Silver and bronze cool the *metal* only. The wash over the photo stays warm:
+   a cool wash cancels the sepia and the card stops reading as an icoon at all. */
+.card--icoon.cw-zilver .card__portrait::after,
+.card--icoon.cw-brons .card__portrait::after {
+  background: linear-gradient(160deg, #f0e3c9 0%, var(--tier-b) 100%);
+}
+
+/* --- context strips ---------------------------------------------- */
+
+.strip {
+  display: flex; gap: 22px; flex-wrap: wrap;
+  padding: 26px; border-radius: 8px;
+  background: var(--panel); border: 1px solid var(--rule);
+}
+.strip--dark { background: #000; }
+.strip--wood {
+  background:
+    linear-gradient(100deg, rgba(0,0,0,0.16), rgba(255,255,255,0.06) 40%, rgba(0,0,0,0.2)),
+    #5a3d24;
+}
+.strip .card { --card-width: 150px; }
+
+/* Demo only: strips the photo so the shard layer can be seen on its own. */
+.demo-bare .card__portrait,
+.demo-bare .card__name,
+.demo-bare .card__header { display: none; }
+
+/*
+ * Demo only: frame off.
+ *
+ * Declared after the two frame blocks on purpose — it has the same specificity
+ * as `.card--fr-beaded .card__inner::before`, so order is what settles it.
+ */
+.demo-noframe .card__inner::before,
+.demo-noframe .card__inner::after { display: none; }
+
+/* ================================================================
+   Gold ink — the letters and the divider in metal, not in near-black.
+
+   The reference sets the number, the name and every rule in a warm
+   bronze-gold rather than a dark ink, which is most of why those cards
+   read as pressed rather than printed.
+
+   Two things have to move together or it does not work. The type goes
+   metal, and the name divider goes with it — a gold number over a black
+   hairline is just a card with a gold number on it. And the engraved
+   highlight under the rule has to warm up too: a white highlight under a
+   gold rule is a gold line lying on white paper, not a line cut into a
+   warm card.
+   ================================================================ */
+
+/*
+ * One brown across all three colourways, not a bronze per metal.
+ *
+ * The first pass gave gold, silver and bronze icoons their own ink — a true
+ * bronze-gold, a warm grey-brown and a redder brown. It was wrong twice over.
+ * It made the ink a *second* thing the tier moves, when the whole colourway
+ * rule is that the tier moves the metal and nothing else; and three inks that
+ * are all nearly the same brown is a distinction nobody can make while doing a
+ * lot of work to maintain.
+ *
+ * It is also a brown rather than a gold. A saturated gold competes with the
+ * metal it is printed on and loses — the ground is already the gold. What the
+ * reference actually sets its type in is closer to a dark bronze, which reads
+ * as ink that happens to be metallic rather than as more metal.
+ */
+.card--icoon.ink-gold { --tier-ink: #594d2c; }
+
+.card--icoon.ink-gold .card__name {
+  /* The divider is the ink at 62%, so the two cannot drift apart if the ink
+     is retuned again — it is the same line, just lighter for being a rule. */
+  border-top: 1px solid rgba(89, 77, 44, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 249, 232, 0.6);
+  text-shadow: 0 1px 0 rgba(255, 251, 240, 0.5);
+}
+.card--icoon.ink-gold .card__overall {
+  text-shadow: 0 1px 0 rgba(255, 251, 240, 0.45);
+}
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <strong style="color:var(--ink);font-size:12px">Photo grade</strong>
+  <label>grayscale <input type="range" id="s-gray" min="0" max="1" step="0.02" value="1"><output id="o-gray">1</output></label>
+  <label>sepia <input type="range" id="s-sepia" min="0" max="1" step="0.02" value="0.34"><output id="o-sepia">0.34</output></label>
+  <label>contrast <input type="range" id="s-contrast" min="0.6" max="2" step="0.02" value="1.06"><output id="o-contrast">1.06</output></label>
+  <label>brightness <input type="range" id="s-bright" min="0.6" max="1.6" step="0.02" value="1.03"><output id="o-bright">1.03</output></label>
+  <label>wash <input type="range" id="s-tint" min="0" max="1" step="0.02" value="0.5"><output id="o-tint">0.5</output></label>
+  <button id="reset">reset</button>
+  <span style="width:1px;align-self:stretch;background:var(--rule)"></span>
+  <strong style="color:var(--ink);font-size:12px">Edge</strong>
+  <button id="frame-toggle">no frame</button>
+  <strong style="color:var(--ink);font-size:12px">Ink</strong>
+  <button id="ink-toggle">gold</button>
+</div>
+
+<div class="wrap">
+
+<header class="page">
+  <h1>Icoon cards</h1>
+  <p class="lead">Five proposals on Nynke, each shown beside the bronze, silver and gold
+  cards exactly as they are today — plus the answer to the "should they all be gold"
+  question. Everything sits on the real card geometry from
+  <code>src/styles/card.css</code>: same masks, same type, same <code>cqw</code> ratios.
+  What you see here is what lands in the album.</p>
+</header>
+
+<h2>First: what an icoon <em>is</em> in this system</h2>
+
+<p><strong>Icoon is not a fifth tier. Icoon is the legend.</strong> That is not a way around
+<code>docs/trading-cards.md</code> saying "There is no Icoon tier" — it is what the reference
+does too. A FIFA Icon does not sit <em>above</em> gold on the same axis; it is a different
+axis: <em>who someone is</em> (a retired great) rather than <em>how good they are now</em>.
+That axis already exists here — legends are inactive players with ≥10 games, rated on their
+<em>all-time high</em>. So "icoon" is simply the better word for what the card already calls
+<code>isLegend</code>.</p>
+
+<p>What it replaces is the black <code>legende</code> pill, which is currently the only
+element on the whole card that is a <em>label</em> rather than material. That is exactly the
+reasoning that removed every plated version of the number and the name; the pill never got
+put through it.</p>
+
+<p><strong>For the same reason, none of these prints the word "icoon" on the card.</strong>
+Doing so would be the pill again in nicer type. Everything else on this face — the number,
+the name, the tier — is unlabelled, and the legend flag is no different: if the material does
+not say it, a caption will not rescue it.</p>
+
+<div class="verdict">
+  <b>Effect on rarity: none.</b> An icoon is not a separate draw, not extra tickets, not a
+  new threshold. It is the existing legend flag finally doing something on the face.
+  <code>ticketsFor()</code>, <code>DHigh</code>, <code>drawPack()</code> and the whole odds
+  table are untouched.
+</div>
+
+<h2>Gold ink</h2>
+
+<p>The reference sets the number, the name and every rule in a <strong>warm bronze-gold rather
+than a dark ink</strong>, and that is most of why those cards read as pressed rather than
+printed. The <em>Ink</em> button in the bar at the top switches every icoon on this page
+between the two.</p>
+
+<p>Two things have to move together or it does not work. The type goes metal <em>and the name
+divider goes with it</em> — a gold number over a black hairline is just a card with a gold
+number on it. And the engraved highlight under that rule has to warm up too: a white highlight
+under a gold rule reads as a gold line lying on white paper rather than as a line cut into a
+warm card.</p>
+
+<p><strong>One brown across all three colourways</strong>, not a bronze per metal. The first pass
+gave each colourway its own ink and it was wrong twice over: it made the ink a <em>second</em>
+thing the tier moves, when the whole colourway rule is that the tier moves the metal and nothing
+else — and three inks that are all nearly the same brown is a distinction nobody can make while
+being three things to keep in step.</p>
+
+<p>It is also a <strong>brown rather than a gold</strong> — <code>#594D2C</code>. A saturated
+gold competes with the metal it is printed on and loses, because the ground is already the gold.
+What the reference sets its type in is nearer a dark olive-bronze, which reads as ink that
+happens to be metallic rather than as more metal. The divider is that same colour at 62%, so the
+two cannot drift apart if the ink is retuned again.</p>
+
+<div class="strip" id="ink-compare"></div>
+<p class="stripnote">Left of each pair is the dark ink, right is gold. Watch the contrast at
+album size before deciding: the number is the only hard fact on the card, and gold on ivory has
+a good deal less of it than near-black on ivory.</p>
+
+<h2>The border, and where it sits <span style="color:var(--dim);font-weight:400;letter-spacing:0;text-transform:none">— dropped, kept as a record</span></h2>
+
+<p style="color:var(--accent)">This section is history. The frame was taken off in the end (see
+<em>Settled: E, frameless</em>), but it took five passes to arrive at a version worth rejecting,
+and the reasons are worth not repeating. Everything below still works from the
+<strong>Edge</strong> toggle in the bar at the top.</p>
+
+<p>Three passes were spent on this and all three failed the same way, so the settled part is
+worth stating flatly:</p>
+
+<ul>
+  <li><strong>The gold sits on the artwork.</strong> Nothing is inset or cleared to make room
+  for it. An earlier attempt stopped the photo at the frame and reserved an empty band, and that
+  is a mount holding a picture — not what the reference is.</li>
+  <li><strong>There is no stock outside the gold at all.</strong> The inset went
+  <code>3.4% → 2.6 → 1.7 → 0.85 → 0</code> over five passes, and every intermediate value was
+  wrong the same way: any stock left outside the gold reads as a pale margin <em>around</em> a
+  frame rather than as the card being framed, and the eye finds it however narrow it is. There
+  is no width at which a margin stops looking like a margin — there is only having one or not
+  having one.</li>
+  <li><strong>So the ring's outer edge is the card's outer edge</strong>, and it takes the
+  card's own <code>6px</code> radius. The two are now the same curve rather than two concentric
+  ones.</li>
+</ul>
+
+<p><strong>The rails are not the same width all the way round</strong> — thick along the top
+(<code>1.05cqw</code>), ordinary down the sides (<code>0.78cqw</code>), thin along the bottom
+(<code>0.6cqw</code>). That is what a bevelled frame lit from above looks like: the top rail
+catches light across its whole face, the bottom one is turned away and nearly edge-on. It also
+solves a rendering problem, because a uniform hairline landed on 0.75px at album size and was
+anti-aliased into grey.</p>
+
+<p>The metal gradient runs <strong>bright at the top to dull at the bottom, and only in that
+direction</strong>. It used to end on a bright stop, so it lit up again at the bottom corners
+and dimmed in the middle — light arriving from two places at once, which is the one thing that
+kills a frame.</p>
+
+<p><strong>The gold thinning out at the top-left and bottom-right was never width.</strong> It
+was tone. The metal started at a near-white cream and the ivory stock it is drawn on is also
+near-white, so at the lightest end of the ring there was no contrast to see a width
+<em>with</em>. Two fixes: no stop in any metal is now lighter than the stock it sits on, and the
+ring casts a short contact shadow. It is a <code>drop-shadow</code> rather than a
+<code>box-shadow</code> because a mask clips box-shadows away entirely while a filter is
+computed from the masked silhouette — the same reason the pack wrapper's shadow is a filter.</p>
+
+<h3 style="margin-top:30px">The two readings, side by side</h3>
+
+<p>What the reference shows for certain is <em>two gold lines close together, near the edge,
+drawn on the marble</em>. What it does not settle is whether that is one object or two:</p>
+
+<ul>
+  <li><strong>Beaded moulding</strong> — one piece of gold beading, catching light on both of
+  its rounded edges with a dark groove down the middle. Three contiguous rings; no card stock
+  anywhere inside the assembly. The dark line is a shadow.
+  <br>The <strong>groove is wider than either bead</strong> (<code>--groove</code> at
+  <code>1.4cqw</code> against a <code>1.05cqw</code> top rail). At its original
+  <code>0.45cqw</code> it read as a seam where two lines meet rather than as a gap between two
+  objects. The beads stay equal to each other: making the inner one heavier thickens the frame
+  without deepening it, which is the wrong axis.
+  <br>It is a <strong>warm brown, not a black</strong>. Taken to near-black it stopped being a
+  shadow in gold and became a slot cut through the card. A shadow is the absence of whatever
+  light is falling, and the light here is warm — so gold in shade is brown, not grey.
+  <br><strong>Each bead is dark on both sides</strong>, which is what makes them read as round
+  rather than as flat gold stripes. Three of the four edges already had it; the inner bead's
+  inner side had nothing, so it was lit on one side and open on the other. No amount of widening
+  the groove could fix that — it is on the wrong side of the bead. That edge now casts onto the
+  card, hardest from the top where the light is.</li>
+  <li><strong>Twin rules</strong> — two independent hairlines with clean card stock between
+  them. A wider gap, and what fills it is the card. The dark line does not exist.</li>
+</ul>
+
+<div class="strip" id="frame-readings"></div>
+<p class="stripnote">My read of the crop is <strong>beaded</strong>. The two below are pinned;
+everything else on the page follows the <em>Edge</em> toggle.</p>
+
+<h2>Today, for reference</h2>
+
+<div class="strip" id="baseline"></div>
+<p class="stripnote">Nynke sits at 811 → overall 71 → <em>silver</em>. The last card is the
+current legend treatment: the same gold card with a black pill stuck on it.</p>
+
+<h2>The proposals</h2>
+
+<div id="proposals"></div>
+
+<h2>A against E, on four faces</h2>
+
+<p><strong>A and E differ by exactly one layer and nothing else.</strong> Same ivory ground, same
+frame, same photo grade, same type. E adds a fan of light shards radiating from a point below
+the card — and that is the whole difference. If you cannot see it, that is not you missing
+something subtle; it is the finding.</p>
+
+<p>The reason it hides: the shards sit <em>behind</em> the photo, so they can only show through
+where the portrait mask has cleared it — the bottom strip and the top-left corner. The first
+card below is E with the photo stripped away, so you can see what the layer is before hunting
+for it on a finished card.</p>
+
+<div id="ae-compare"></div>
+
+<p class="stripnote">Four players at their real overalls and their real tiers. The second pair in
+each row is the same two cards <strong>with the frame off</strong> — the gold band is the
+loudest thing on the card and it is identical on A and E, so it drowns out the one layer that
+actually differs.</p>
+
+<h2>Settled: E, frameless</h2>
+
+<p><strong>The frame is out.</strong> Five passes went into getting it to sit right, and the
+version that finally did is the one that made the card worse — it was the loudest thing on the
+face, it was identical on every proposal, and it flattened the difference between them. The
+reference needs a frame because its card is a shaped silhouette with a crown and shoulders, and
+gold piping is what draws that shape. Ours is a 5:7 rounded rectangle, so the piping had no
+shape to draw and became jewellery.</p>
+
+<p>What is left is the thing that was carrying the idea the whole time: <strong>ivory ground,
+monochrome photo warmed back up, and the shards</strong>. And with the frame gone the shards
+finally read — they were never weak, they were being shouted over.</p>
+
+<p>Each player twice: their ordinary card as it stands today, and their icoon.</p>
+
+<div id="final-compare"></div>
+
+<div class="verdict" style="margin-top:24px">
+  <b>The tier still moves the metal.</b> Nynke and Jeroen are silver icoons, Daan and Laura gold
+  ones — same structure, different ground and shard colour. That decision is unaffected by
+  dropping the frame; if anything it matters more now, because the ground is doing all of the
+  work the band used to share.
+</div>
+
+<h2>Considered and rejected: touching the 84/85 line</h2>
+
+<p><strong>The two golds stay exactly as they are.</strong> Recorded here because the argument
+against them is superficially good and will otherwise be made again.</p>
+
+<p>It goes: the 75–84 and 85+ cards differ only in tone, tone is a comparison you can only make
+with both cards adjacent, and there are 6 rare golds scattered among 34 slots — so in the album
+the distinction is invisible. Therefore give rare gold something structural instead.</p>
+
+<p>It does not survive, for three reasons.</p>
+
+<ul>
+  <li><strong>The rarity signal was never the metal.</strong> Tiers are cosmetic labels; the
+  hard fact is the overall printed in the corner, and the thing that actually announces a big
+  pull is the ceremony, which steps at 75 / 80 / 85 / 90.</li>
+  <li><strong>The reference agrees.</strong> Gold rare and gold common in FUT are barely
+  distinguishable too, deliberately. A subtle difference is not a failed loud one.</li>
+  <li><strong>It is expensive in the wrong place.</strong> Spending a structural signal on rare
+  gold is the one thing that would blunt the icoon, which is the card this page is about.</li>
+</ul>
+
+<div class="strip" id="gold-today"></div>
+<p class="stripnote">75–84 and 85+ as they are, with an icoon at the end. The gap that has to
+be legible at album scale is the last one — and it is, without touching the two before it.</p>
+
+<p class="stripnote">Also not proposed: a fourth state at 90. The ceremony steps there, but
+that is one player today, and a visual state you see once is not a state.</p>
+
+<h2>Should every icoon be gold?</h2>
+
+<p><strong>No — but the tier may only move the metal, never the structure.</strong></p>
+
+<p>The reason is arithmetic rather than taste. Legends are rated on their all-time high, and
+that spreads. The placeholder pool in <code>cardMock.ts</code> runs from 1690 down to 845,
+which is overall 88 down to 72 — <em>rare gold through to silver</em>. A real inactive player
+who managed ten games and peaked at 780 is an icoon at 69. If every icoon is gold, that card
+lies about him, and the number in the top-left — the only hard fact on the face — stops
+agreeing with the material around it. That is precisely the mistake
+<code>.card--zilver</code> once made with its white tint.</p>
+
+<ul>
+  <li><strong>Structure constant</strong> — ground, photo grade, shards. Four cards, one
+  object.</li>
+  <li><strong>Metal per tier</strong> — exactly the three <code>--tier-*</code> properties the
+  card already uses, plus two shard colours. No new machinery and no new tier in
+  <code>tierFor()</code>: <code>card--icoon</code> is an extra class <em>alongside</em>
+  <code>card--zilver</code>, not instead of it.</li>
+  <li><strong>Bronze stays rare, and that is fine.</strong> An all-time high below 800 means a
+  short career. A colourway you almost never see is what a colourway is for.</li>
+</ul>
+
+<div class="strip" id="colourways"></div>
+<p class="stripnote">The same card, three metals. Silver and bronze cool the <em>metal</em> only;
+the wash over the photo stays warm, because a cool one cancels the sepia and leaves a grey
+silver card rather than an icoon.</p>
+
+<h2>In context</h2>
+
+<div class="strip strip--dark" id="ctx-dark"></div>
+<p class="stripnote">On teletext black. The ivory variants win hardest here: they are the only
+light object in the entire album.</p>
+
+<div class="strip strip--wood" id="ctx-wood" style="margin-top:22px"></div>
+<p class="stripnote">On wood. B falls over here — against a warm ground the difference from an
+ordinary gold card almost disappears — and C holds up best.</p>
+
+<h2>Recommendation</h2>
+
+<div class="verdict">
+  <b>E — Shard, frameless</b>, with the three colourways.
+  <br><br>
+  Three parts and no more: an ivory ground, the photo graded to monochrome and warmed back up,
+  and one fan of shards from a point below the card. One <code>conic-gradient</code>, so no
+  asset and one extra div in <code>PlayerCard</code>.
+  <br><br>
+  <b>Runner-up: C — Obsidian</b>, and not weakly. It is the only one equally strong on all
+  three grounds, and it rhymes with the wrapper and the card back. The objection is that it
+  will not bend to the tiers: black-with-silver and black-with-bronze are the same object with
+  a different accent, where E genuinely is three metals.
+  <br><br>
+  <b>Do not ship B.</b> A gold card with a sepia photo is a gold card, and in the album — where
+  icoons lie among rare golds — you cannot tell at a glance.
+  <br><br>
+  <b>Cut: F — Marble.</b> A literal reading of the reference's stone, built as three
+  <code>feTurbulence</code> layers. Two things killed it. The veining read as cloud rather than
+  crack at card size, and more fundamentally the stone can only appear where the portrait mask
+  has cleared the photo — so it framed the picture instead of sitting behind the figure, which
+  is the whole point of it in the reference. That needs cut-out portraits, which is not a CSS
+  problem.
+</div>
+
+<p style="margin-top:26px">The change is small and purely additive: an <code>isLegend</code>
+branch adding <code>card--icoon card--icoon-e cw-{tier}</code> in
+<a href="../anago-leader-board-ui/src/components/PlayerCard.tsx">PlayerCard.tsx</a>, one
+<code>&lt;div class="card__shards"&gt;</code> beside the portrait, the
+<code>.card__legend</code> pill deleted, and one block in
+<a href="../anago-leader-board-ui/src/styles/card.css">card.css</a>. No new tier, and nothing
+touched in <code>tierFor()</code>, <code>drawPack()</code> or the ceremony.</p>
+
+<p><strong>Still open:</strong> the shaped silhouette. The reference's card is not a rectangle,
+and that is where a lot of its character lives — but it is also why it needs the gold piping we
+just dropped. Changing the card's outline touches the album grid, the pack opener's FLIP and
+every drop shadow in the feature, so it is a separate decision.</p>
+
+</div>
+
+<script>
+/*
+ * Which reading of the edge the unpinned cards use. Default is `none` — the
+ * frame is dropped. `beaded` and `twin` are kept behind the toggle because the
+ * two readings were worth resolving and the record is worth keeping.
+ *
+ * `card--fr-none` matches no CSS at all, which is the entire implementation.
+ */
+let FRAME = 'none';
+
+/** Whether unpinned icoon cards carry the gold ink. Swapped by the Ink toggle. */
+let INK = 'gold';
+
+const NYNKE = '3eddd710-ce41-4225-b722-4107f3450074';
+const AVATAR = id => `https://rik-dev.anago.io/tafelvoetbal-server/api/player/${id}/avatar`;
+
+/*
+ * The four faces the icoon is judged on. Real ids, names and overalls out of
+ * cardMock.ts, each at its own tier — Nynke and Jeroen are silver, the two 81s
+ * are gold. `tier` is the class their ordinary card carries today; `extra` is
+ * the icoon colourway that corresponds to it.
+ */
+const FACES = [
+  { id: NYNKE, name: 'Nynke Koornstra', overall: 71, tier: 'card--zilver', extra: 'cw-zilver' },
+  { id: '808d23eb-10e5-4d07-851c-3902aaba1cda', name: 'Daan Verkade', overall: 81, tier: 'card--goud', extra: 'cw-goud' },
+  { id: '9a159b0b-bae4-4b74-ad24-54dbee09b618', name: 'Laura Ackermans', overall: 81, tier: 'card--goud', extra: 'cw-goud' },
+  { id: 'd77771b6-b714-4bb5-98d6-61511e50c123', name: 'Jeroen van Geel', overall: 68, tier: 'card--zilver', extra: 'cw-zilver' },
+];
+
+/**
+ * One card. `variant` is the tier or icoon class, `extra` any colourway class.
+ *
+ * `frame` and `ink` pin a card to one setting; leaving them null lets the
+ * toggles at the top swap it.
+ */
+function card(variant, {
+  overall = 71, name = 'Nynke Koornstra', id = NYNKE, extra = '',
+  icoon = false, pill = false, frame = null, ink = null,
+} = {}) {
+  const el = document.createElement('div');
+  if (icoon && frame) el.dataset.frameLock = '1';
+  if (icoon && ink) el.dataset.inkLock = '1';
+
+  const inkClass = (ink || INK) === 'gold' ? 'ink-gold' : '';
+
+  el.className = [
+    'card', variant, icoon ? 'card--icoon' : '',
+    icoon ? 'card--fr-' + (frame || FRAME) : '',
+    icoon ? inkClass : '', extra,
+  ].filter(Boolean).join(' ');
+
+  el.innerHTML = `
+    <div class="card__inner">
+      ${icoon ? '<div class="card__shards"></div>' : ''}
+      ${icoon ? '<span class="card__bevel"></span>' : ''}
+      ${pill ? '<span class="card__legend">legende</span>' : ''}
+      <div class="card__header"><span class="card__overall">${overall}</span></div>
+      <div class="card__portrait"><img src="${AVATAR(id)}" alt=""></div>
+      <div class="card__name">${name}</div>
+    </div>`;
+  return el;
+}
+
+function spec(node, caption, lead) {
+  const w = document.createElement('div');
+  w.className = 'spec';
+  w.appendChild(node);
+  const c = document.createElement('div');
+  c.className = 'caption';
+  c.innerHTML = lead ? `<b>${lead}</b>${caption}` : caption;
+  w.appendChild(c);
+  return w;
+}
+
+/** The three cards every proposal is judged against. */
+function referenceCards() {
+  return [
+    spec(card('card--brons', { overall: 62 }), 'bronze · today'),
+    spec(card('card--zilver', { overall: 71 }), 'silver · today'),
+    spec(card('card--goud', { overall: 79 }), 'gold · today'),
+  ];
+}
+
+/* --- gold ink, dark against gold on the four faces ---------------- */
+{
+  const host = document.getElementById('ink-compare');
+  for (const face of FACES) {
+    host.append(
+      spec(card('card--icoon-e', { ...face, icoon: true, frame: 'none', ink: 'dark' }),
+        face.name.split(' ')[0], 'dark'),
+      spec(card('card--icoon-e', { ...face, icoon: true, frame: 'none', ink: 'gold' }),
+        face.name.split(' ')[0], 'gold'),
+    );
+  }
+}
+
+/* --- the two edge readings, pinned and shown large ---------------- */
+{
+  const host = document.getElementById('frame-readings');
+  const big = (frame) => {
+    const el = card('card--icoon-e', { overall: 88, extra: 'cw-goud', icoon: true, frame });
+    el.style.setProperty('--card-width', '260px');
+    return el;
+  };
+  host.append(
+    spec(big('beaded'), 'gold + dark groove + gold', 'beaded moulding'),
+    spec(big('twin'), 'gold + card stock + gold', 'twin rules'),
+  );
+}
+
+/* --- baseline ----------------------------------------------------- */
+{
+  const host = document.getElementById('baseline');
+  host.append(
+    ...referenceCards(),
+    spec(card('card--goudZeldzaam', { overall: 88 }), 'rare gold · today'),
+    spec(card('card--goudZeldzaam', { overall: 88, pill: true }), 'legend · today'),
+  );
+}
+
+/* --- the five proposals ------------------------------------------- */
+
+const PROPOSALS = [
+  {
+    key: 'a',
+    title: 'A — Ivory',
+    lede: 'The faithful reading of the reference.',
+    body: `A pearl-white ground and nothing else saturated on the whole card. The photo is
+      monochrome under a warm wash that puts it back onto the same material as the card —
+      technically the same <code>multiply</code> the tiers use, just much stronger, because a
+      grey image can take far more before anything breaks.
+      <br><br>
+      The objection is the bottom fifth. The portrait mask wipes the photo there to clear room
+      for the name, and on the coloured tiers what you then see is <em>the metal</em> — a reason
+      to be there. On ivory it is empty field, and the name hangs in it.`,
+    verdict: 'The right base, but unfinished. See E.',
+  },
+  {
+    key: 'b',
+    title: 'B — Sepia',
+    lede: 'The existing gold, desaturated, with a black-and-white photo.',
+    body: `The smallest possible intervention: no new ground, no new geometry, just a darker
+      duller gold and the monochrome photo. One block of CSS, no risk.
+      <br><br>
+      Which is also the problem. In the album icoons lie among rare golds, and from two card
+      widths away a gold card with a sepia photo is a gold card. The reference does not make
+      its icon <em>lighter</em> than gold by accident — that difference exists so the card
+      still works on a page full of gold.`,
+    verdict: 'Here as a control, not as a candidate.',
+  },
+  {
+    key: 'c',
+    title: 'C — Obsidian',
+    lede: 'Near-black and gold — the wrapper and the card back.',
+    body: `The only variant that already rhymes with something: the same near-black foil, the
+      same chrome-gold, and the same pool of light as <code>.card--back</code> and the packet.
+      You tear open a black-and-chrome packet and a black-and-gold card comes out, which is
+      the exact reasoning that chose the card back in the first place.
+      <br><br>
+      Two things had to invert for it. The name band swaps its two rules — light above, dark
+      below — because engraving on black is light. And the wash cannot be a
+      <code>multiply</code>: multiplying against near-black erases the photo, so here it is an
+      <code>overlay</code>, warm light falling on it rather than colour sinking through it.
+      <br><br>
+      The objection: it will not bend to the tiers. Black-with-silver is the same card with a
+      different line colour, not a different metal.`,
+    verdict: 'Runner-up, and not weakly. Strongest on wood and on teletext black.',
+  },
+  {
+    key: 'd',
+    title: 'D — Engraving',
+    lede: 'Banknote: guilloche, and the photo as an etching.',
+    body: `The photo is posterised rather than graded — hard contrast, lifted highlights — so
+      it reads as line-work instead of as a photograph. Under it, two counter-rotating ray
+      fans, which is what a guilloche lathe physically draws.
+      <br><br>
+      This one does something the other four cannot: it says <em>old</em> without saying
+      <em>expensive</em>, which is an honester description of a retired office footballer than
+      a gold monument is. It deliberately ignores the sliders.
+      <br><br>
+      Why it probably does not win: it is the only variant carrying a <em>pattern</em>, and
+      that is precisely the argument that killed the striped and checkerboard card backs — a
+      texture has to be either meaningful or invisible, and a tiled one is neither.`,
+    verdict: 'The most interesting outlier. Keep it, do not pick it.',
+  },
+  {
+    key: 'e',
+    title: 'E — Shard',
+    lede: 'A, plus the thing A is missing.',
+    body: `Ivory ground, monochrome photo — and shards of light radiating up from a point
+      <em>below</em> the card, past the shoulders. They fill exactly the void A is left with:
+      the portrait mask clears the bottom 20% and the top-left corner, and those are precisely
+      the two places the shards come through. So they are not decoration, they are the material
+      the card needs where the photo has gone.
+      <br><br>
+      One <code>conic-gradient</code> from 50%/128% — no asset, no animation, one div in
+      <code>PlayerCard</code>. And because the shard colours are two variables beside the three
+      the card already has, a colourway costs about five lines.`,
+    verdict: 'The recommendation — see "Settled" below.',
+  },
+];
+
+{
+  const host = document.getElementById('proposals');
+  for (const p of PROPOSALS) {
+    const block = document.createElement('div');
+    block.className = 'proposal';
+
+    const divider = document.createElement('div');
+    divider.className = 'divider';
+
+    const lineup = document.createElement('div');
+    lineup.className = 'lineup';
+    lineup.append(
+      spec(card('card--icoon-' + p.key, { overall: 71, icoon: true }), 'proposal', p.title.split(' — ')[0]),
+      divider,
+      ...referenceCards(),
+    );
+
+    const text = document.createElement('div');
+    text.innerHTML = `
+      <h3>${p.title}</h3>
+      <p style="color:var(--accent);margin-bottom:12px">${p.lede}</p>
+      <p>${p.body}</p>
+      <div class="verdict">${p.verdict}</div>`;
+
+    block.append(text, lineup);
+    host.appendChild(block);
+  }
+}
+
+/* --- A against E, four faces -------------------------------------- */
+{
+  const host = document.getElementById('ae-compare');
+
+  /* What the layer even is, once, with the photo taken away. */
+  const bare = document.createElement('div');
+  bare.className = 'strip';
+  bare.append(
+    spec(card('card--icoon-e', { overall: 88, extra: 'cw-goud demo-bare', icoon: true }), 'the layer alone', 'shards'),
+    spec(card('card--icoon-a', { ...FACES[0], icoon: true }), 'ivory', 'A'),
+    spec(card('card--icoon-e', { ...FACES[0], icoon: true }), 'shard', 'E'),
+  );
+  host.append(bare);
+
+  for (const face of FACES) {
+    const label = document.createElement('p');
+    label.className = 'stripnote';
+    label.style.margin = '26px 0 8px';
+    label.innerHTML = `<strong>${face.name}</strong> · ${face.overall} · ${face.extra.replace('cw-', '')}`;
+
+    const strip = document.createElement('div');
+    strip.className = 'strip';
+    strip.append(
+      spec(card('card--icoon-a', { ...face, icoon: true }), 'ivory', 'A'),
+      spec(card('card--icoon-e', { ...face, icoon: true }), 'shard', 'E'),
+      spec(card('card--icoon-a', { ...face, extra: face.extra + ' demo-noframe', icoon: true }), 'no frame', 'A'),
+      spec(card('card--icoon-e', { ...face, extra: face.extra + ' demo-noframe', icoon: true }), 'no frame', 'E'),
+    );
+
+    host.append(label, strip);
+  }
+}
+
+/* --- settled: E frameless, against each player's current card ----- */
+{
+  const host = document.getElementById('final-compare');
+  for (const face of FACES) {
+    const label = document.createElement('p');
+    label.className = 'stripnote';
+    label.style.margin = '26px 0 8px';
+    label.innerHTML = `<strong>${face.name}</strong> · ${face.overall} · ${face.extra.replace('cw-', '')}`;
+
+    const strip = document.createElement('div');
+    strip.className = 'strip';
+    strip.append(
+      spec(card(face.tier, { id: face.id, name: face.name, overall: face.overall }), 'their card today'),
+      spec(card('card--icoon-e', { ...face, icoon: true, frame: 'none' }), 'E, frameless', 'icoon'),
+    );
+
+    host.append(label, strip);
+  }
+}
+
+/* --- the 84/85 note ----------------------------------------------- */
+document.getElementById('gold-today').append(
+  spec(card('card--goud', { overall: 79 }), 'goud · 79'),
+  spec(card('card--goud', { overall: 84 }), 'goud · 84'),
+  spec(card('card--goudZeldzaam', { overall: 85 }), 'goud zeldzaam · 85'),
+  spec(card('card--goudZeldzaam', { overall: 88 }), 'goud zeldzaam · 88'),
+  spec(card('card--icoon-e', { overall: 88, extra: 'cw-goud', icoon: true }), 'icoon · 88'),
+);
+
+/* --- colourways --------------------------------------------------- */
+{
+  const host = document.getElementById('colourways');
+  host.append(
+    spec(card('card--icoon-e', { overall: 88, extra: 'cw-goud', icoon: true }), 'gold · 85+'),
+    spec(card('card--icoon-e', { overall: 79, extra: 'cw-goud', icoon: true }), 'gold · 75–84'),
+    spec(card('card--icoon-e', { overall: 71, extra: 'cw-zilver', icoon: true }), 'silver · 65–74'),
+    spec(card('card--icoon-e', { overall: 62, extra: 'cw-brons', icoon: true }), 'bronze · <65'),
+  );
+}
+
+/* --- context strips ---------------------------------------------- */
+for (const id of ['ctx-dark', 'ctx-wood']) {
+  const host = document.getElementById(id);
+  host.append(
+    card('card--brons', { overall: 62 }),
+    card('card--zilver', { overall: 71 }),
+    card('card--goud', { overall: 79 }),
+    card('card--icoon-a', { overall: 71, icoon: true }),
+    card('card--icoon-b', { overall: 71, icoon: true }),
+    card('card--icoon-c', { overall: 71, icoon: true }),
+    card('card--icoon-d', { overall: 71, icoon: true }),
+    card('card--icoon-e', { overall: 71, icoon: true }),
+  );
+}
+
+/* --- sliders ------------------------------------------------------ */
+{
+  const KNOBS = [
+    ['gray', '--icoon-gray'],
+    ['sepia', '--icoon-sepia'],
+    ['contrast', '--icoon-contrast'],
+    ['bright', '--icoon-bright'],
+    ['tint', '--icoon-tint'],
+  ];
+  const DEFAULTS = { gray: 1, sepia: 0.34, contrast: 1.06, bright: 1.03, tint: 0.5 };
+
+  const apply = (key, prop, value) => {
+    document.documentElement.style.setProperty(prop, value);
+    document.getElementById('o-' + key).textContent = value;
+  };
+
+  for (const [key, prop] of KNOBS) {
+    const input = document.getElementById('s-' + key);
+    input.addEventListener('input', () => apply(key, prop, input.value));
+  }
+
+  /* The edge toggle. Rewrites the class on every icoon card that is not
+     pinned, so the whole page can be judged under one reading at a time. */
+  const ORDER = ['none', 'beaded', 'twin'];
+  const LABELS = { none: 'no frame', beaded: 'beaded moulding', twin: 'twin rules' };
+  document.getElementById('frame-toggle').addEventListener('click', (e) => {
+    FRAME = ORDER[(ORDER.indexOf(FRAME) + 1) % ORDER.length];
+    e.target.textContent = LABELS[FRAME];
+    document.querySelectorAll('.card--icoon:not([data-frame-lock])').forEach((el) => {
+      el.classList.remove('card--fr-none', 'card--fr-beaded', 'card--fr-twin');
+      el.classList.add('card--fr-' + FRAME);
+    });
+  });
+
+  /* The ink toggle, same shape as the edge one. Pinned cards (the gold-ink
+     comparison strip) carry `data-ink-lock` and are left alone. */
+  document.getElementById('ink-toggle').addEventListener('click', (e) => {
+    INK = INK === 'gold' ? 'dark' : 'gold';
+    e.target.textContent = INK;
+    document.querySelectorAll('.card--icoon:not([data-ink-lock])').forEach((el) => {
+      el.classList.toggle('ink-gold', INK === 'gold');
+    });
+  });
+
+  document.getElementById('reset').addEventListener('click', () => {
+    for (const [key, prop] of KNOBS) {
+      document.getElementById('s-' + key).value = DEFAULTS[key];
+      apply(key, prop, DEFAULTS[key]);
+    }
+  });
+}
+</script>
+
+</body>
+</html>

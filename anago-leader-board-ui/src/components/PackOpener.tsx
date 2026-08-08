@@ -242,6 +242,16 @@ interface PackOpenerProps {
   pack: Pack;
   /** Rolls the cards. Called once, when the wrapper is clicked. */
   onOpen: () => Promise<RevealedCard[]>;
+  /**
+   * Fired the moment the wrapper is clicked, before the roll is even awaited.
+   *
+   * The shelf stays on screen beside the opener, and it has to go inert for the
+   * duration — you cannot pick up a second packet with your hands full. Paired with
+   * `onFinished`, which is the other end of the same window. Not derivable from
+   * outside: the packet spends an unbounded time lying there sealed, and the pile is
+   * still live for all of it, so mounting the opener is not the start of anything.
+   */
+  onStart?: () => void;
   /** Fired after the last card has settled. */
   onFinished: (cards: RevealedCard[]) => void;
   fastMode: boolean;
@@ -250,7 +260,13 @@ interface PackOpenerProps {
 const prefersReducedMotion = (): boolean =>
   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
-const PackOpener: React.FC<PackOpenerProps> = ({ pack, onOpen, onFinished, fastMode }) => {
+const PackOpener: React.FC<PackOpenerProps> = ({
+  pack,
+  onOpen,
+  onStart,
+  onFinished,
+  fastMode,
+}) => {
   const [phase, setPhase] = useState<Phase>('sealed');
   const [cards, setCards] = useState<RevealedCard[]>([]);
   const [flagged, setFlagged] = useState(false);
@@ -625,6 +641,10 @@ const PackOpener: React.FC<PackOpenerProps> = ({ pack, onOpen, onFinished, fastM
 
   const start = async () => {
     if (phase !== 'sealed') return;
+
+    // Before the await, not after: the roll is a network call in phase 2, and the
+    // pile must not stay clickable across it.
+    onStart?.();
 
     const drawn = await onOpen();
     cardsRef.current = drawn;

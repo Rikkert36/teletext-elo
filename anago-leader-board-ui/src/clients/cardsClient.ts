@@ -14,6 +14,7 @@
 
 import {
   CardPlayer,
+  MIN_GAMES,
   MOCK_PACKS,
   OwnedCard,
   Pack,
@@ -47,7 +48,7 @@ export interface CardsClient {
    * one whether it filled an empty slot.
    */
   revealPack(playerId: string, packId: string): Promise<RevealedCard[]>;
-  /** Players eligible to own a collection (>= 10 games). */
+  /** Players eligible to own a collection (>= MIN_GAMES games). */
   getSelectablePlayers(): Promise<CardPlayer[]>;
 }
 
@@ -126,7 +127,7 @@ export const mockCardsClient: CardsClient = {
   },
 
   async getSelectablePlayers() {
-    return settle(activePool().filter((p) => p.numberOfGames >= 10));
+    return settle(activePool().filter((p) => p.numberOfGames >= MIN_GAMES));
   },
 };
 

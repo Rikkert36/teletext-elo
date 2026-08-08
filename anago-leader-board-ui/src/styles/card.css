@@ -80,10 +80,22 @@
  * plastic, the streaks read as brushed metal.
  * ---------------------------------------------------------------- */
 
+/*
+ * All four tiers share one ink, `#2E240E`.
+ *
+ * They used to carry three: `#2C1608` on bronze, `#1C222A` on silver and
+ * `#2B2205` on gold — each a near-black leaning toward its own metal. It reads
+ * as a considered detail and is not one: at these sizes the three are
+ * indistinguishable side by side, and the cool silver ink was the only thing on
+ * the whole face pulling away from the warm register everything else sits in.
+ *
+ * One warm near-black instead. The icoon keeps its own `#594D2C` — that one is
+ * a colour rather than an ink, and it is the point of the card.
+ */
 .card--brons {
   --tier-a: #f2d3ae;
   --tier-b: #b07a45;
-  --tier-ink: #2c1608;
+  --tier-ink: #2e240e;
 
   background-image: var(--facets),
     linear-gradient(160deg, #e0b184 0%, #a3653a 32%, #7a4522 58%, #cf9868 100%);
@@ -94,7 +106,7 @@
      which is why silver cards on studio backdrops read as blank paper. */
   --tier-a: #dde7f0;
   --tier-b: #8e9dae;
-  --tier-ink: #1c222a;
+  --tier-ink: #2e240e;
 
   background-image: var(--facets),
     linear-gradient(160deg, #f6f8fa 0%, #bcc5ce 32%, #8b95a1 58%, #e6ecf1 100%);
@@ -103,7 +115,7 @@
 .card--goud {
   --tier-a: #fdeeb0;
   --tier-b: #c9a03a;
-  --tier-ink: #2b2205;
+  --tier-ink: #2e240e;
 
   background-image: var(--facets),
     linear-gradient(160deg, #fbe9a3 0%, #dcb64a 32%, #b8901f 58%, #f7e293 100%);
@@ -113,11 +125,199 @@
 .card--goudZeldzaam {
   --tier-a: #fff6c6;
   --tier-b: #b8901f;
-  --tier-ink: #2b2205;
+  --tier-ink: #2e240e;
 
   background-image: var(--facets),
     linear-gradient(160deg, #fff6cf 0%, #f5d772 26%, #8c6b12 56%, #ffeeae 100%);
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6), 0 0 0 1px #6d520c;
+}
+
+/* ---------------------------------------------------------------- *
+ * Icoon — the legend colourway
+ *
+ * **Icoon is not a fifth tier, it is the legend.** Same axis FIFA uses for its
+ * Icons: not *better than gold* but *a different kind of card* — who someone
+ * is rather than how good they are now. We already have that axis, so this is
+ * the existing `isLegend` flag finally doing something on the face. Nothing in
+ * `tierFor()`, `drawPack()`, the ticket weighting or the ceremony changes.
+ *
+ * It replaces the black `legende` pill, which was the only element on the card
+ * that was a *label* rather than material — the same objection that removed
+ * every plated version of the number and the name. For the same reason nothing
+ * here prints the word "icoon" either.
+ *
+ * Three parts and no more:
+ *
+ * 1. **The photo is graded to monochrome and warmed back up**, instead of
+ *    being tinted toward a tier colour. This is the whole idea; everything
+ *    else exists to support it.
+ * 2. **A pale ground**, so an icoon reads from the far side of a spread. The
+ *    tier moves this ground and nothing else — see the colourways below.
+ * 3. **Shards of light** from a point below the card.
+ *
+ * **There is no frame**, and that took five passes to establish rather than
+ * assume. The reference card carries gold piping because its silhouette is a
+ * shaped shield with a crown and shoulders, and the piping is what draws that
+ * shape. Ours is a 5:7 rounded rectangle: the piping had no shape to draw, it
+ * became the loudest thing on the face, and being identical on every variant
+ * it flattened the differences between them. Do not add one back without also
+ * changing the card's outline — which touches the album grid, the opener's
+ * FLIP and every drop shadow in the feature, so it is its own decision.
+ *
+ * Empty slots are deliberately *not* marked: a silhouette's job is to be
+ * identically blank, and legends have their own pages in the album anyway.
+ * ---------------------------------------------------------------- */
+
+.card--icoon {
+  /*
+   * The tier tint stops being a tint and becomes the wash that puts the
+   * monochrome photo back onto the same material as the card. Much stronger
+   * than the 0.42 the coloured tiers use, because multiplying a grey image can
+   * go a long way before anything is destroyed.
+   */
+  --icoon-wash: 0.5;
+
+  /*
+   * The ink, and it is the same on all three colourways.
+   *
+   * A dark olive-bronze rather than the tiers' near-black: the reference sets
+   * its number, name and rules in metal, and that is most of why those cards
+   * read as pressed rather than printed.
+   *
+   * Deliberately **not** a saturated gold. Gold type competes with the metal it
+   * is printed on and loses, because the ground is already the gold — this has
+   * to read as ink that happens to be metallic, not as more metal.
+   *
+   * And deliberately **one** colour rather than a bronze per tier, which was
+   * tried. It made the ink a second thing the tier moves, when the whole
+   * colourway rule is that the tier moves the metal and nothing else — and
+   * three inks that are all nearly the same brown is a distinction nobody can
+   * make while being three values to keep in step.
+   */
+  --tier-ink: #594d2c;
+
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6);
+}
+
+.card--icoon .card__portrait img {
+  filter: grayscale(1) sepia(0.34) contrast(1.06) brightness(1.03);
+}
+
+.card--icoon .card__portrait::after {
+  opacity: var(--icoon-wash);
+}
+
+/*
+ * The name divider goes metal with the type, and the engraved highlight warms
+ * up with it. Both are load-bearing: a bronze number over a black hairline is
+ * just a card with a bronze number on it, and a white highlight under a bronze
+ * rule reads as a line lying on white paper rather than one cut into a warm
+ * card.
+ *
+ * The rule is the ink at 62% rather than an independently chosen brown, so the
+ * two cannot drift apart if the ink is ever retuned.
+ */
+.card--icoon .card__name {
+  border-top: 1px solid rgba(89, 77, 44, 0.62);
+  box-shadow: inset 0 1px 0 rgba(255, 249, 232, 0.6);
+  text-shadow: 0 1px 0 rgba(255, 251, 240, 0.5);
+}
+
+.card--icoon .card__overall {
+  text-shadow: 0 1px 0 rgba(255, 251, 240, 0.45);
+}
+
+/*
+ * The colourways. The tier may move the metal and nothing else.
+ *
+ * Not one gold for everybody, because legends are rated on their all-time high
+ * and that spreads: an inactive player who managed ten games and peaked at 780
+ * is an icoon at overall 69, and a gold card would lie about him — the same
+ * mistake `.card--zilver` once made with its white tint. The icoon reading is
+ * carried by the *structure* (pale ground, monochrome photo, shards), which
+ * stays constant, so a silver icoon is still obviously an icoon.
+ *
+ * Both gold tiers share one colourway: 85+ already differs from 75–84 exactly
+ * as much as it does on the ordinary cards, and that distinction is not this
+ * card's job to restate.
+ *
+ * None of them sets `--tier-ink`: that is one colour for every icoon, declared
+ * once above. These blocks outrank it on specificity, so re-adding it here is
+ * how the single-ink rule would get quietly undone.
+ */
+.card--icoon.card--goud,
+.card--icoon.card--goudZeldzaam {
+  --tier-a: #f7edd8;
+  --tier-b: #b49c69;
+  --shard-hi: rgba(255, 255, 255, 0.72);
+  --shard-lo: rgba(198, 160, 74, 0.5);
+
+  background-image: var(--facets),
+    linear-gradient(160deg, #fdfbf4 0%, #eae0ca 28%, #c3b18e 60%, #fbf7ec 100%);
+}
+
+.card--icoon.card--zilver {
+  --tier-a: #eef1f4;
+  --tier-b: #9aa4ae;
+  --shard-hi: rgba(255, 255, 255, 0.78);
+  --shard-lo: rgba(146, 160, 175, 0.5);
+
+  background-image: var(--facets),
+    linear-gradient(160deg, #fdfdfe 0%, #e4e8ec 28%, #b3bcc5 60%, #f7f9fb 100%);
+}
+
+.card--icoon.card--brons {
+  --tier-a: #f4e3d2;
+  --tier-b: #ac8055;
+  --shard-hi: rgba(255, 255, 255, 0.66);
+  --shard-lo: rgba(178, 124, 70, 0.52);
+
+  background-image: var(--facets),
+    linear-gradient(160deg, #fdf6ee 0%, #ecdcc8 28%, #c19b76 60%, #faf1e6 100%);
+}
+
+/*
+ * Silver and bronze cool the **metal** only — the wash over the photo stays
+ * warm. A cool wash cancels the sepia and the card stops reading as an icoon
+ * at all, leaving a grey silver card.
+ */
+.card--icoon.card--zilver .card__portrait::after,
+.card--icoon.card--brons .card__portrait::after {
+  background: linear-gradient(160deg, #f0e3c9 0%, var(--tier-b) 100%);
+}
+
+/*
+ * The shards.
+ *
+ * One conic gradient from a point below the card, so they radiate up past the
+ * shoulders. They fill the two areas the portrait mask clears — the bottom
+ * strip and the top-left corner — which on the coloured tiers are filled by
+ * the metal and on a pale ground would otherwise be blank stock with the name
+ * hanging in it. So they are not decoration; they are what gives the cleared
+ * area something to be.
+ *
+ * Below the portrait in the stack, so they only show where the mask has taken
+ * the photo away. No asset, no animation, one div.
+ */
+.card__shards {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: conic-gradient(
+    from 196deg at 50% 128%,
+    transparent 0 5deg,
+    var(--shard-hi) 5deg 7.4deg,
+    transparent 7.4deg 13deg,
+    var(--shard-lo) 13deg 17deg,
+    transparent 17deg 23deg,
+    var(--shard-hi) 23deg 24.6deg,
+    transparent 24.6deg 34deg,
+    var(--shard-lo) 34deg 39deg,
+    transparent 39deg 44deg,
+    var(--shard-hi) 44deg 46deg,
+    transparent 46deg
+  );
 }
 
 /* Foil sheen across the whole card. Static; only animates on a rare reveal. */
@@ -307,27 +507,15 @@
 }
 
 /*
- * The badge was the last thing on the card sized in px, and so the last thing whose
- * ratio to the card differed in every context it rendered — a speck at 380px in the
- * viewer, oversized at 100px in the revealed row. Converted at the ratios it had on
- * the default 150px card (6.5px -> 4.33cqw and so on), which is the rule the rest of
- * the face already follows. It grows on the pack-opener hero as a result; that is
- * the correction, not a regression.
+ * `.card__legend` — the black "legende" pill — lived here. It is gone, replaced
+ * by the icoon colourway above.
+ *
+ * It was the only element on the card that was a *label* rather than material,
+ * which is the same objection that removed every plated version of the number
+ * and the name; it simply never got put through it. The name and nickname still
+ * reach the tooltip and the viewer, which are off-face surfaces — `viewer__flag`
+ * in viewer.css still says "legende" in words, and that is the right place for it.
  */
-.card__legend {
-  position: absolute;
-  top: 4%;
-  right: 4%;
-  z-index: 2;
-  font-family: Tahoma, Verdana, sans-serif;
-  font-size: 4.33cqw;
-  letter-spacing: 0.67cqw;
-  text-transform: uppercase;
-  color: #f0e4c4;
-  background: rgba(0, 0, 0, 0.78);
-  padding: 1.33cqw 2.67cqw;
-  border-radius: 1.33cqw;
-}
 
 /* ---------------------------------------------------------------- *
  * Empty slot: the silhouette that drives completion

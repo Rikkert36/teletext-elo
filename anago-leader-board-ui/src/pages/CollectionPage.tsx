@@ -8,6 +8,7 @@ import PlayerPicker from '../components/PlayerPicker';
 import { CollectionState, mockCardsClient, mockDebug } from '../clients/cardsClient';
 import {
   CardPlayer,
+  MIN_GAMES,
   Pack,
   RevealedCard,
   activePool,
@@ -37,7 +38,6 @@ import '../styles/game.css';
 
 const PLAYER_KEY = 'tafelvoetbal.cards.playerId';
 const FAST_KEY = 'tafelvoetbal.cards.fastOpen';
-const MIN_GAMES = 10;
 const METER_CHUNKS = 24;
 
 /** Phase 1 only. Delete along with mock/cardMock.ts when the backend lands. */
@@ -66,6 +66,12 @@ const CollectionPage: React.FC = () => {
   const [player, setPlayer] = useState<CardPlayer | null>(null);
   const [collection, setCollection] = useState<CollectionState | null>(null);
   const [openingPack, setOpeningPack] = useState<Pack | null>(null);
+  /**
+   * True from the tear until the last card has settled — *not* for as long as the
+   * opener is mounted. A sealed packet lying on the stage is a decision you have not
+   * taken yet, so the pile beside it stays live and you can still change your mind.
+   */
+  const [revealing, setRevealing] = useState(false);
   /** Index into `slotOrder` of the card being looked at, or null for none. */
   const [viewing, setViewing] = useState<number | null>(null);
   const [fastMode, setFastMode] = useState(() => read(FAST_KEY) === 'true');
@@ -105,7 +111,24 @@ const CollectionPage: React.FC = () => {
     setPlayer(next);
     write(PLAYER_KEY, next.id);
     setOpeningPack(null);
+    setRevealing(false);
     setViewing(null);
+  };
+
+  /**
+   * Picking a packet off the shelf. Reachable from the album *and* from the results
+   * of the packet before it, which is the whole point of keeping the shelf up.
+   *
+   * `revealing` is reset here rather than relying on the opener remounting: the new
+   * opener starts sealed and its `onStart` has not fired yet, so without this the
+   * pile would stay inert until the second packet was torn.
+   */
+  const openPack = (next: Pack) => {
+    /* The shelf is behind the viewer's scrim and so unreachable while one is open,
+       but the opener would be layered under a viewer left mounted over it. */
+    setViewing(null);
+    setRevealing(false);
+    setOpeningPack(next);
   };
 
   const toggleFast = () => {
@@ -190,8 +213,19 @@ const CollectionPage: React.FC = () => {
   );
 
   const handleFinished = useCallback(() => {
+    setRevealing(false);
     if (player) void refresh(player.id);
   }, [player, refresh]);
+
+  /**
+   * The pile, less the packet currently on the stage — that one is in your hands, not
+   * lying on the table. It leaves the shelf on the click rather than on the refresh
+   * at the end of the reveal, so the pile shrinks at the moment you pick one up.
+   */
+  const shelfPacks = useMemo(
+    () => collection?.packs.filter((p) => p.id !== openingPack?.id) ?? [],
+    [collection, openingPack],
+  );
 
   const grant = (options: Parameters<typeof mockDebug.grantPack>[0]) => {
     mockDebug.grantPack(options);
@@ -251,23 +285,19 @@ const CollectionPage: React.FC = () => {
           <br />
           Vanaf {MIN_GAMES} wedstrijden gaat je album open.
         </div>
-      ) : openingPack ? (
-        <>
-          <PackOpener
-            key={openingPack.id}
-            pack={openingPack}
-            onOpen={() => handleOpen(openingPack)}
-            onFinished={handleFinished}
-            fastMode={fastMode}
-          />
-          <div className="game-row" style={{ justifyContent: 'center' }}>
-            <button type="button" className="game-button" onClick={() => setOpeningPack(null)}>
-              terug naar het album
-            </button>
-          </div>
-        </>
       ) : (
-        <div className="album-layout">
+        /*
+          One layout for both states. The opener takes the book's place inside
+          `.album-main`; the shelf never unmounts and never moves, because
+          `--shelf-room` is worked out from the viewport rather than measured off
+          whatever is currently in the middle. So the packet you open next is a click
+          in the place you just clicked, with no return trip through the album.
+
+          The book being replaced rather than dimmed is deliberate: this is the one
+          screen where it genuinely is not the subject, and leaving it under the
+          reveal would put a second lit object inside the vignette.
+        */
+        <div className={`album-layout${openingPack ? ' album-layout--opening' : ''}`}>
           {/*
             No plate, no "Jouw pakjes" label, and nothing at all when there are none.
             The packets are objects lying next to the book — a titled panel around them
@@ -279,39 +309,50 @@ const CollectionPage: React.FC = () => {
             out of flow now, and the book is centred on the stage whether the aside
             is there or not. See `.album-layout` in game.css.
           */}
-          {collection && collection.packs.length > 0 ? (
-            <aside className="album-side">
+          {shelfPacks.length > 0 ? (
+            <aside className={`album-side${revealing ? ' album-side--set-aside' : ''}`}>
               <div className="pack-shelf">
-                {collection.packs.map((pack, i) => (
-                  <PackTile
-                    key={pack.id}
-                    pack={pack}
-                    index={i}
-                    /* The shelf is behind the viewer's scrim and so unreachable while
-                       one is open, but the opener replaces the album wholesale and a
-                       viewer left mounted over it would be layered on the reveal. */
-                    onOpen={(next) => {
-                      setViewing(null);
-                      setOpeningPack(next);
-                    }}
-                  />
+                {shelfPacks.map((pack) => (
+                  <PackTile key={pack.id} pack={pack} onOpen={openPack} />
                 ))}
               </div>
             </aside>
           ) : null}
 
           <div className="album-main">
-            <Album
-              sections={sections}
-              owner={ownerName}
-              style={albumStyle}
-              onCardOpen={(id) => {
-                const found = slotOrder.findIndex((s) => s.card.player.id === id);
-                if (found >= 0) setViewing(found);
-              }}
-              /* Keeps the book on the spread of whatever the viewer is showing. */
-              focusPlayerId={viewingSlot?.card.player.id ?? null}
-            />
+            {openingPack ? (
+              <>
+                <PackOpener
+                  key={openingPack.id}
+                  pack={openingPack}
+                  onOpen={() => handleOpen(openingPack)}
+                  onStart={() => setRevealing(true)}
+                  onFinished={handleFinished}
+                  fastMode={fastMode}
+                />
+                <div className="game-row" style={{ justifyContent: 'center' }}>
+                  <button
+                    type="button"
+                    className="game-button"
+                    onClick={() => setOpeningPack(null)}
+                  >
+                    terug naar het album
+                  </button>
+                </div>
+              </>
+            ) : (
+              <Album
+                sections={sections}
+                owner={ownerName}
+                style={albumStyle}
+                onCardOpen={(id) => {
+                  const found = slotOrder.findIndex((s) => s.card.player.id === id);
+                  if (found >= 0) setViewing(found);
+                }}
+                /* Keeps the book on the spread of whatever the viewer is showing. */
+                focusPlayerId={viewingSlot?.card.player.id ?? null}
+              />
+            )}
           </div>
         </div>
       )}

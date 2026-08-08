@@ -224,15 +224,23 @@
   background-size: 250% 100%, auto, auto, auto;
   background-position: -60% 0, 0 0, 0 0, 0 0;
   /*
-   * A thin printed edge line in the packet's own colour. An *inset* shadow, which is
+   * A thin edge line where the foil turns away from you. An *inset* shadow, which is
    * only usable because its top and bottom runs are hidden behind the chrome seals —
    * the mask would otherwise chew them into the teeth. It belongs here with the paint
    * rather than on `.pack`, so that each torn half keeps its own edge and the intact
    * parent can drop it: an inset shadow is drawn whether or not there is a
-   * background, so `.pack--tearing` would otherwise leave a coloured ring around a
-   * wrapper that is supposed to have come apart.
+   * background, so `.pack--tearing` would otherwise leave a ring around a wrapper
+   * that is supposed to have come apart.
+   *
+   * **It is neutral, not the packet's hue.** It used to be tinted with the type
+   * colour on the theory that one hue should drive foil, glow, edge and numeral
+   * together. Because the seals cover its top and bottom runs, the only part you ever
+   * saw was two full-height coloured stripes down the sides — which read as a stray
+   * red/green/blue outline stuck to the packet, not as a printed rim. The line is a
+   * highlight on a curved surface, so it wants to be light, not coloured; the hue
+   * still carries on the foil, the glow and the numeral.
    */
-  box-shadow: inset 0 0 0 1px var(--edge, rgba(255, 255, 255, 0.16));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
 
 /**
@@ -413,13 +421,23 @@
   max-height: 56vh;
   overflow-y: auto;
   /*
-   * Room for a packet to lift.
+   * Room for a packet to lift, and to lean.
    *
    * A scroll container clips at its padding box, so at the old 4px the top row's hover
    * — 4px of lift, ~5px of growth from `scale(1.04)`, and a 7px glow — was cut off
    * against an edge with nothing visible at it. Padding is the fix rather than
    * `overflow: visible`, which would drop the scrolling this needs once there are more
    * than four packets.
+   *
+   * The 11px at the sides is also what absorbs the *lean*, and it is only just
+   * enough. `.pack--mini` rotates up to 4.1° and a packet is ~1.7× as tall as it is
+   * wide, so the rotated silhouette overhangs its own box by
+   * `(w/2)(cosθ−1) + (h/2)sinθ` ≈ 6% of the width per side — 8.9px at the largest a
+   * packet gets, and ~11.2px under the hover `scale(1.04)`. Anything that raises the
+   * tilts or the packet size has to raise this with it, and it cannot simply be made
+   * generous: it is subtracted twice in `--pack-w` (see `.album-side .pack-shelf` in
+   * game.css), and past ~11px two packets stop fitting the shelf's 352px cap and the
+   * pile drops to a single column.
    */
   padding: 16px 11px 18px;
 }
@@ -478,7 +496,7 @@
 .pack--tearing {
   background: none;
   /* An inset shadow is painted with or without a background, so without this the
-     wrapper keeps a coloured edge line while its two halves fly off it. */
+     wrapper keeps an edge line while its two halves fly off it. */
   box-shadow: none;
   animation: none;
   cursor: default;

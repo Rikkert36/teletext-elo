@@ -109,18 +109,45 @@
   /* ---- the slab ---- */
 
   /*
-   * Wide enough for the widest thing that has to sit on it — the two-page spread,
-   * its arrows and the packet shelf — and no wider, so that on a big screen you
-   * are looking at a table in a dark room rather than at a wooden wall. The album
-   * sizes itself from the viewport, not from this container, so this figure has to
-   * clear it: at 1920×1080 the spread costs ~1364px and this gives 1520.
+   * Wide enough for the widest thing that has to sit on it — the two-page spread and
+   * the packet shelf beside it — and no wider, so that on a big screen you are
+   * looking at a table in a dark room rather than at a wooden wall.
+   *
+   * Both tokens go through `--stage-w` / `--stage-pad` rather than being written
+   * inline, because `--shelf-room` in game.css subtracts them to size the shelf
+   * against the margin the book leaves. This is the one stage that narrows the box,
+   * and while it did so behind the formula's back the shelf was sized for a margin
+   * four times the one it was lying in and ran onto the page. See the :root block in
+   * game.css.
+   *
+   * **1520 was stale, and it cost the second column.** It was set when the packets
+   * were quarter-size tiles; they are card-sized now, and the shelf needs
+   * `2 × 96 + 12 gap + 22 padding = 226px` to hold two of them at the 96px floor.
+   * The table has to clear the book plus that margin on *both* sides, because the
+   * book is centred and only one of the two holds packets:
+   *
+   *     --stage-w  ≥  --book-w + 2 × (--shelf-gap + 226px + 16px) + 2 × --stage-pad
+   *
+   * At 1920×1080 that is 994 + 2×268 + 68 = 1598; at the same width on a taller
+   * window the book caps at 1040 and it becomes 1644. Hence 1660, which covers any
+   * 1920-wide window and leaves the shelf 257px — two columns of 111px packets. At
+   * 1520 it was 187px, which is under the 226 and dropped the pile to a single
+   * column of 96px.
+   *
+   * Full card parity would want ~1781 (93vw at 1920), and that is the line this is
+   * deliberately staying behind: two columns is what makes the packets read as a
+   * pile, and 79% of a card is the cheaper price. If the packets or the tilts grow,
+   * re-derive from the formula rather than nudging the number.
    */
-  width: min(1520px, 97vw);
-  margin: clamp(8px, 1.6vh, 22px) auto;
+  --stage-w: min(1660px, 97vw);
   /* Tighter side margins than the other five: the spread is a fixed size and this
      slab is narrower than the viewport, so the padding is what it can least
      afford. */
-  padding: clamp(18px, 2.4vw, 36px) clamp(12px, 2vw, 34px) clamp(22px, 2.8vw, 40px);
+  --stage-pad: clamp(12px, 2vw, 34px);
+
+  width: var(--stage-w);
+  margin: clamp(8px, 1.6vh, 22px) auto;
+  padding: clamp(18px, 2.4vw, 36px) var(--stage-pad) clamp(22px, 2.8vw, 40px);
   border-radius: 5px;
 
   /* Chamfer, edge grain, the light falling off, and the shadow on the floor. */

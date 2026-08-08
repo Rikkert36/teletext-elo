@@ -106,9 +106,24 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
    */
   const cardName = display;
 
+  /*
+   * Legends render as icoon cards: pale ground, monochrome photo, shards. See
+   * the `.card--icoon` block in card.css for what it is and why there is no
+   * frame on it.
+   *
+   * `card--icoon` sits *alongside* `card--{tier}` rather than replacing it —
+   * icoon is not a fifth tier, and the colourway selectors are written as
+   * `.card--icoon.card--zilver` so the tier still moves the metal.
+   *
+   * Not applied to empty slots. A silhouette's job is to be identically blank,
+   * and legends have their own pages in the album anyway.
+   */
+  const icoon = !empty && card.player.isLegend;
+
   const classes = [
     'card',
     empty ? 'card--empty' : `card--${card.tier}`,
+    icoon ? 'card--icoon' : '',
     sizeClass[size],
     className,
   ]
@@ -136,7 +151,9 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   return (
     <div className={classes} onClick={onClick} title={title}>
       <div className="card__inner">
-        {card.player.isLegend ? <span className="card__legend">legende</span> : null}
+        {/* Before the portrait, so the shards sit behind it and show only where
+            the mask has cleared the photo. */}
+        {icoon ? <span className="card__shards" aria-hidden="true" /> : null}
 
         <div className="card__header">
           <span className="card__overall">{empty ? '??' : card.overall}</span>
