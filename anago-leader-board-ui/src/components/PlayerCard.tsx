@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Card, avatarUrl, initialsFor, splitName } from '../mock/cardMock';
+import React, { useEffect, useState } from 'react';
+import { Card, avatarUrl, initialsFor, silhouetteUrl, splitName } from '../mock/cardMock';
 import { rikDevMark } from '../utils/brand';
 import '../styles/card.css';
 
@@ -88,6 +88,47 @@ const Portrait: React.FC<{ card: Card; empty: boolean; eager: boolean }> = ({
   );
 };
 
+/**
+ * The slot for a card you do not own: the player's own outline, in the tier ink.
+ *
+ * The mask is a separate asset rather than something derived from the photo at render
+ * time, because deriving it is the hard part — see `tools/silhouette` and
+ * `docs/silhouet-model-vergelijking.html`. A luminance threshold over the photo only
+ * works on a plain-backdrop headshot, which is about a third of the pool.
+ *
+ * **The photo is not loaded at all here.** The empty card used to render the avatar and
+ * black it out with a filter, which downloaded the full-size image — some of them are
+ * megabytes — to produce a flat rectangle. The mask is ~30 kB.
+ *
+ * A CSS mask cannot report a failed load, so the image is fetched up front and the
+ * result decides which of the two states renders. Without a mask this falls back to the
+ * bare plate, which is exactly what the card did before.
+ */
+const Silhouette: React.FC<{ playerId: string }> = ({ playerId }) => {
+  const [ready, setReady] = useState(false);
+  const url = silhouetteUrl(playerId);
+
+  useEffect(() => {
+    let live = true;
+    const probe = new Image();
+    probe.onload = () => { if (live) setReady(true); };
+    probe.onerror = () => { if (live) setReady(false); };
+    probe.src = url;
+    return () => { live = false; };
+  }, [url]);
+
+  if (!ready) return <div className="card__portrait" />;
+
+  return (
+    <div className="card__portrait">
+      <div
+        className="card__silhouette"
+        style={{ '--silhouette': `url(${url})` } as React.CSSProperties}
+      />
+    </div>
+  );
+};
+
 const PlayerCard: React.FC<PlayerCardProps> = ({
   card,
   size = 'md',
@@ -159,7 +200,11 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
           <span className="card__overall">{empty ? '??' : card.overall}</span>
         </div>
 
-        <Portrait card={card} empty={empty} eager={eager} />
+        {empty ? (
+          <Silhouette playerId={card.player.id} />
+        ) : (
+          <Portrait card={card} empty={empty} eager={eager} />
+        )}
 
         <div className="card__name">{cardName}</div>
       </div>

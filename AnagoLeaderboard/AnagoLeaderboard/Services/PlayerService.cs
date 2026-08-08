@@ -11,14 +11,16 @@ namespace AnagoLeaderboard.Services
     {
         private readonly DatabaseContext _dbContext;
         private readonly LeaderBoardService _leaderBoardService;
-        private readonly string _fileSystemBasePath;
+        private readonly AvatarStorage _storage;
+        private readonly SilhouetteService _silhouetteService;
 
-        public PlayerService(DatabaseContext dbContext, LeaderBoardService leaderBoardService, IConfiguration configuration)
+        public PlayerService(DatabaseContext dbContext, LeaderBoardService leaderBoardService,
+            AvatarStorage storage, SilhouetteService silhouetteService)
         {
             _dbContext = dbContext;
             _leaderBoardService = leaderBoardService;
-            _fileSystemBasePath = configuration.GetValue<string>("FileSystem:BasePath") 
-                                  ?? throw new ArgumentNullException("FileSystem:BasePath not configured");
+            _storage = storage;
+            _silhouetteService = silhouetteService;
         }
 
         public async Task<string> CreatePlayer(PlayerForm playerData)
@@ -32,11 +34,18 @@ namespace AnagoLeaderboard.Services
 
         private async Task SaveAvatar(string id, IFormFile avatar)
         {
-            var filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\{id}";
+            var filePath = _storage.AvatarPath(id)
+                           ?? throw new ArgumentException($"'{id}' is not a valid player id", nameof(id));
+
+            _storage.EnsureDirectories();
             using (var stream = new FileStream(filePath, FileMode.Create))
             {
                 await avatar.CopyToAsync(stream);
             }
+
+            // The silhouette belongs to this photo, so this is the only place it gets
+            // refreshed. If that fails the upload still counts as succeeded.
+            _silhouetteService.QueueRegenerate(id);
         }
 
         public async Task<DynamicRatingPlayer> GetPlayer(string id)
@@ -119,29 +128,29 @@ namespace AnagoLeaderboard.Services
 
         internal byte[] GetAvatar(string id)
         {
-            var filePath = Path.Combine(_fileSystemBasePath, "avatars", id);
-            if (File.Exists(filePath))
-            {
-            }
-            else
-            {
-                filePath = Path.Combine(_fileSystemBasePath, "avatars", "empty-avatar.jpg");
-            } 
+            return _storage.ReadAvatarOrFallback(id);
+        }
 
-            return System.IO.File.ReadAllBytes(filePath);
+        /// <summary>
+        /// The silhouette mask, or null when there is none.
+        ///
+        /// Unlike the avatar there is deliberately no fallback image here: the card has
+        /// its own empty state, and it can only choose that state if it knows the mask
+        /// is missing.
+        /// </summary>
+        internal (byte[] Bytes, DateTime LastModified)? GetSilhouette(string id)
+        {
+            var filePath = _storage.SilhouettePath(id);
+            if (filePath == null || !File.Exists(filePath)) return null;
+
+            return (File.ReadAllBytes(filePath), File.GetLastWriteTimeUtc(filePath));
         }
 
         internal async Task<byte[]> GetPlayerOneAvatar()
         {
             var players = await GetPlayers();
             var highestRatedPlayer = players.OrderByDescending(player => player.Rating).FirstOrDefault();
-            var filePath = Path.Combine(_fileSystemBasePath, "avatars", highestRatedPlayer.Id);
-            if (!File.Exists(filePath))
-            {
-                filePath = Path.Combine(_fileSystemBasePath, "avatars", "empty-avatar.jpg");
-            }
-
-            return System.IO.File.ReadAllBytes(filePath);
+            return _storage.ReadAvatarOrFallback(highestRatedPlayer.Id);
         }
 
         public async Task<int> GetPlayerRank(string id)

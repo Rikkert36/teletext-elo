@@ -28,6 +28,10 @@ builder.Services.AddScoped<GameService>();
 builder.Services.AddScoped<PlayerService>();
 builder.Services.AddScoped<ChampionService>();
 
+// No state, just paths and a process invocation, so singletons.
+builder.Services.AddSingleton<AvatarStorage>();
+builder.Services.AddSingleton<SilhouetteService>();
+
 builder.Services.AddControllers();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

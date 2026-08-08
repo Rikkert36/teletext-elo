@@ -574,6 +574,19 @@ export const avatarUrl = (playerId: string): string =>
   `${window.TAFELVOETBAL_SERVER_URL}/api/player/${playerId}/avatar`;
 
 /**
+ * The silhouette mask for a card you do not own yet.
+ *
+ * A PNG whose alpha channel is the mask and whose colour is meaningless — the card
+ * fills it with its own ink, so the tier decides the colour, not the file.
+ *
+ * Generated offline from the avatar by `tools/silhouette`, so the route **404s when
+ * there is no mask**: not every photo yields a silhouette, and the card needs to know
+ * that so it can fall back to the flat plate.
+ */
+export const silhouetteUrl = (playerId: string): string =>
+  `${window.TAFELVOETBAL_SERVER_URL}/api/player/${playerId}/silhouette`;
+
+/**
  * The one thing printed on the front of a packet: how many cards are in it.
  *
  * Nothing else. Not "kaarten", not why it was granted — the wrapper carries the

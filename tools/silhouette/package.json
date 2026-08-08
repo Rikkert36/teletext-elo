@@ -1,0 +1,16 @@
+{
+  "name": "silhouette-tool",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Generates silhouette masks from player avatars for the trading-card layer.",
+  "scripts": {
+    "model": "curl -L -o u2netp.onnx https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx",
+    "backfill": "node make-silhouettes.mjs --avatars ../../../data/avatars --out ../../../data/silhouettes --all"
+  },
+  "dependencies": {
+    "jpeg-js": "^0.4.4",
+    "onnxruntime-node": "^1.27.0",
+    "pngjs": "^7.0.0"
+  }
+}

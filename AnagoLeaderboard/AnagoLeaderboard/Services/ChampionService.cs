@@ -8,17 +8,19 @@ public class ChampionService
 {
     private readonly DatabaseContext _dbContext;
     private readonly GameService _gameService;
+    private readonly AvatarStorage _storage;
     private readonly Random _random;
 
     private const int RandomnessSeed = 36;
 
-    public ChampionService(DatabaseContext dbContext, GameService gameService)
+    public ChampionService(DatabaseContext dbContext, GameService gameService, AvatarStorage storage)
     {
         _dbContext = dbContext;
         _gameService = gameService;
+        _storage = storage;
         _random = new Random(RandomnessSeed);
     }
-    
+
     public async Task<byte[]> GetChampionAvatar()
     {
         var history = await GetChampionHistory();
@@ -28,13 +30,7 @@ public class ChampionService
             return Array.Empty<byte>();
         }
 
-        var filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\{champion.Id}";
-        if (!File.Exists(filePath))
-        {
-            filePath = @$"C:\tafelvoetbal\tafelvoetbal-server\data\avatars\empty-avatar.jpg";
-        }
-
-        return System.IO.File.ReadAllBytes(filePath);
+        return _storage.ReadAvatarOrFallback(champion.Id);
     }
 
     public async Task<List<ChampionChange>> GetChampionHistory()

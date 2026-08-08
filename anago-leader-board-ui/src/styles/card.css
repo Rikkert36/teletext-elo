@@ -545,8 +545,31 @@
   background: #1a1a1a;
 }
 
-.card--empty .card__portrait img {
-  filter: grayscale(1) brightness(0) opacity(0.45);
+/*
+ * The silhouette of the player you are missing.
+ *
+ * A block of ink masked by a PNG whose alpha channel carries the outline, generated
+ * offline from the avatar — see `tools/silhouette`. The colour lives here rather than
+ * in the file, so one mask serves whatever the slot's palette turns out to be.
+ *
+ * Lighter than the ground on purpose. The empty card is dark diagonal cloth, and a dark
+ * silhouette on it is not a silhouette but a black rectangle: what you are missing has
+ * to be lighter than what it lies on.
+ *
+ * `.card__portrait` already carries the two gradient masks every card has (the bottom
+ * fade and the top-left corner), so this one only needs its own. Nothing composites the
+ * two sets together — they are on different elements, and the parent clips the child.
+ */
+.card__silhouette {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, #b3ac9c 0%, #8d8778 100%);
+  -webkit-mask-image: var(--silhouette);
+  mask-image: var(--silhouette);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
 .card--empty .card__initials {

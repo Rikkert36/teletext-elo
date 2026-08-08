@@ -3,6 +3,7 @@ using AnagoLeaderboard.Models.RequestParameters;
 using AnagoLeaderboard.Models.Results;
 using AnagoLeaderboard.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace AnagoLeaderboard.Controllers
 {
@@ -84,6 +85,31 @@ namespace AnagoLeaderboard.Controllers
             var fileBytes = _playerService.GetAvatar(id);
             return File(fileBytes, "image/jpeg");
 
+        }
+
+        /// <summary>
+        /// The silhouette mask: a PNG where only the alpha channel matters, opaque where
+        /// the player is. Meant to be used as a CSS mask on a card you do not own yet.
+        ///
+        /// 404 when there is no mask, on purpose — the card has its own empty state and
+        /// needs to know when to use it. The album requests the whole pool at once, so
+        /// cache headers are sent along.
+        /// </summary>
+        [HttpGet("player/{id}/silhouette")]
+        [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
+        public IActionResult GetSilhouette(string id)
+        {
+            var silhouette = _playerService.GetSilhouette(id);
+            if (silhouette == null) return NotFound();
+
+            var (bytes, lastModified) = silhouette.Value;
+
+            // Regenerating a mask always rewrites the file, so write time plus length
+            // identifies a version well enough for a conditional GET. File() turns this
+            // into a 304 by itself when the browser sends If-None-Match.
+            var etag = new EntityTagHeaderValue($"\"{lastModified.Ticks:x}-{bytes.Length:x}\"");
+
+            return File(bytes, "image/png", lastModified, etag);
         }
 
         [HttpGet("player/{id}/games/page/{pageNumber}")]
