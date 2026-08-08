@@ -41,11 +41,62 @@ interface PlayerCardProps {
    * of it is off-screen, which is the case lazy loading is for.
    */
   eager?: boolean;
+  /**
+   * The pack opener's silhouette beat: hold back *who* it is after the flip has
+   * already said how good it is, and then write it on.
+   *
+   * Absent everywhere else, and that is the normal card. When set, the mask and
+   * the photo are both mounted and stacked, and the name is rendered as its
+   * individual groups so they can be lit one at a time.
+   *
+   * **This is deliberately not `empty`.** An empty slot wears the album's grey
+   * colourway with `??` where the overall goes, and resolving a gold ceremony
+   * into something that looks common is a bug that has already been fixed once
+   * (see "the glow survives the turn" in docs/trading-cards.md). Everything the
+   * flip earned stays on the card; only the identity is withheld.
+   */
+  reveal?: CardReveal;
   className?: string;
   onClick?: () => void;
 }
 
 const sizeClass: Record<CardSize, string> = { sm: 'card--sm', md: '', lg: 'card--lg' };
+
+/**
+ * How far through the pack opener's reveal beat a card is.
+ *
+ * Both fields are driven from `PackOpener`, not from here, because the same
+ * clock drives the sound: a tick is played for each character as it lands, and a
+ * component that timed its own writing would put the two on separate clocks.
+ * That is the same argument `animationSpeed.ts` makes for one multiplier across
+ * JS and CSS.
+ */
+export interface CardReveal {
+  /** How many of `nameGroups` are on the card. 0 while the silhouette holds alone. */
+  written: number;
+  /** True once the portrait has begun dissolving in. */
+  portrait: boolean;
+}
+
+/**
+ * The name band's text, split into the units the reveal writes one at a time.
+ *
+ * A group is **one non-space character plus any space before it**, so a space is
+ * revealed together with the character that follows it and never occupies a tick
+ * of its own. Without that, "Daan van der Beek" would pause three times for
+ * nothing and the rhythm would tell you how many words the name has before you
+ * could read any of them.
+ *
+ * `splitName` has already collapsed runs of whitespace and trimmed the ends, so
+ * the groups cover the string exactly — nothing is left over and nothing is
+ * dropped.
+ *
+ * Exported because `PackOpener` needs the *count* to schedule the ticks and to
+ * size the hold, and this is the one definition of what a tick corresponds to.
+ * Deriving it there separately is how the sound and the writing would drift.
+ */
+export const nameGroups = (card: Card): string[] =>
+  splitName(card.player.name).display.match(/\s*\S/g) ?? [];
 
 /**
  * How deep the pile is, in words. Shared with the card viewer so the tooltip and
@@ -67,7 +118,7 @@ const Portrait: React.FC<{ card: Card; empty: boolean; eager: boolean }> = ({
   const [failed, setFailed] = useState(false);
 
   return (
-    <div className="card__portrait">
+    <div className="card__portrait card__portrait--photo">
       {failed ? (
         <div className="card__initials">{initialsFor(card.player.name)}</div>
       ) : (
@@ -103,24 +154,36 @@ const Portrait: React.FC<{ card: Card; empty: boolean; eager: boolean }> = ({
  * A CSS mask cannot report a failed load, so the image is fetched up front and the
  * result decides which of the two states renders. Without a mask this falls back to the
  * bare plate, which is exactly what the card did before.
+ *
+ * `eager` skips that probe, for the same reason the portrait has one: the probe cannot
+ * resolve before the element's first frame — not even from cache — so the card spends at
+ * least one frame on the bare plate. The album can afford that and the pack opener cannot,
+ * because there the mask *is* the beat, and it is mounted fresh for every card. Every
+ * player in the pool has a mask, so the eager path simply trusts that; a mask that 404s
+ * degrades to a fully-masked-out layer, which is the bare plate again.
  */
-const Silhouette: React.FC<{ playerId: string }> = ({ playerId }) => {
-  const [ready, setReady] = useState(false);
+const Silhouette: React.FC<{ playerId: string; eager?: boolean }> = ({
+  playerId,
+  eager = false,
+}) => {
+  const [ready, setReady] = useState(eager);
   const url = silhouetteUrl(playerId);
 
   useEffect(() => {
+    if (eager) return undefined;
+
     let live = true;
     const probe = new Image();
     probe.onload = () => { if (live) setReady(true); };
     probe.onerror = () => { if (live) setReady(false); };
     probe.src = url;
     return () => { live = false; };
-  }, [url]);
+  }, [url, eager]);
 
-  if (!ready) return <div className="card__portrait" />;
+  if (!ready) return <div className="card__portrait card__portrait--mask" />;
 
   return (
-    <div className="card__portrait">
+    <div className="card__portrait card__portrait--mask">
       <div
         className="card__silhouette"
         style={{ '--silhouette': `url(${url})` } as React.CSSProperties}
@@ -135,6 +198,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   empty = false,
   count,
   eager = false,
+  reveal,
   className = '',
   onClick,
 }) => {
@@ -161,10 +225,18 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
    */
   const icoon = !empty && card.player.isLegend;
 
+  /*
+   * Two classes rather than one, because the dissolve has to be declared on a
+   * selector that survives the state change: `card--reveal` carries the
+   * transition and is present for the whole beat, `card--withheld` carries the
+   * withheld values and is what comes off.
+   */
   const classes = [
     'card',
     empty ? 'card--empty' : `card--${card.tier}`,
     icoon ? 'card--icoon' : '',
+    reveal ? 'card--reveal' : '',
+    reveal && !reveal.portrait ? 'card--withheld' : '',
     sizeClass[size],
     className,
   ]
@@ -190,7 +262,16 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
     .join(' · ');
 
   return (
-    <div className={classes} onClick={onClick} title={title}>
+    <div
+      className={classes}
+      onClick={onClick}
+      /*
+       * Nothing at all while the identity is being withheld — a tooltip naming
+       * the player is exactly what the beat is holding back, and the cursor is
+       * already sitting on the card because that is where the packet was.
+       */
+      title={reveal ? undefined : title}
+    >
       <div className="card__inner">
         {/* Before the portrait, so the shards sit behind it and show only where
             the mask has cleared the photo. */}
@@ -203,10 +284,44 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         {empty ? (
           <Silhouette playerId={card.player.id} />
         ) : (
-          <Portrait card={card} empty={empty} eager={eager} />
+          <>
+            {/*
+              Under the photo, not instead of it. Both layers are mounted for the
+              whole beat and the photo dissolves in on top — so nothing of the
+              card's ground is exposed at the halfway point, which is what a
+              two-element cross-fade at 50/50 would do. The mask never has to
+              fade out: the photo covers it exactly, since the two carry the same
+              portrait masks.
+            */}
+            {reveal ? <Silhouette playerId={card.player.id} eager /> : null}
+            <Portrait card={card} empty={empty} eager={eager} />
+          </>
         )}
 
-        <div className="card__name">{cardName}</div>
+        {/*
+          Two renderings of the same string. Everywhere but the opener it is one
+          text node, exactly as it always was.
+
+          During the reveal it is one span per group, **all of them present from
+          the first frame** and revealed by opacity alone. That is what stops the
+          band reflowing: the name is centred, so a version that appended
+          characters as they arrived would grow outward from the middle and shift
+          every glyph already on the card at every tick. Opacity does not affect
+          layout, so the full string reserves its box once and nothing moves
+          again.
+        */}
+        <div className="card__name">
+          {reveal
+            ? nameGroups(card).map((group, i) => (
+                <span
+                  key={i}
+                  className={`card__char${i < reveal.written ? ' card__char--in' : ''}`}
+                >
+                  {group}
+                </span>
+              ))
+            : cardName}
+        </div>
       </div>
     </div>
   );

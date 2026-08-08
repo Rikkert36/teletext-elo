@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import {
+  Card,
   Pack,
   RevealedCard,
   avatarUrl,
@@ -8,12 +9,15 @@ import {
   ceremonyLevelFor,
   ceremonyMaxBuildRatio,
   ceremonyShimmerRatio,
+  silhouetteUrl,
 } from '../mock/cardMock';
-import PlayerCard, { CardBack } from './PlayerCard';
+import PlayerCard, { CardBack, nameGroups } from './PlayerCard';
 import PackFace from './PackFace';
 import { packFoil } from '../utils/packFoil';
 import {
   playFlip,
+  playNameSettle,
+  playNameTick,
   playRarePayoff,
   playRareRise,
   playShimmerSweep,
@@ -24,14 +28,24 @@ import { getCeremonyMs, ms } from '../utils/animationSpeed';
 import '../styles/packopen.css';
 
 /*
- * Base timings, at a pacing multiplier of 1. A duplicate costs
- * 180 + 320 + 340 = 840ms and a new card 1180ms, so a 3-card pack of duplicates
- * lands at 420 + 3x840 = 2.94s and one of all-new cards at 3.96s. A rare pull
- * adds its 600ms held beat on top. Multiply by DEFAULT_SCALE for real figures.
+ * Base timings, at a pacing multiplier of 1. Multiply by DEFAULT_SCALE (2) for
+ * real figures.
  *
- * That is past the "under two seconds" target the design started with. It is a
- * deliberate trade for a hold long enough to actually read the card, and the
+ * A duplicate costs a flat 180 + 320 + 340 = 840ms, so a 3-card pack of
+ * duplicates lands at 420 + 3×840 = 2.94s. A rare pull adds its held build on
+ * top of whichever it is.
+ *
+ * **A new card no longer has one number**, because the silhouette beat writes the
+ * name a character at a time: 180 + 320 + 580 + 40 per character. That is 1160ms
+ * for "Bo" and 1640ms for "Daan van der Beek", and a 3-card pack of new cards
+ * runs about 4.5–5.0s against the 3.96s it used to. See `holdFor` for why the
+ * per-character rate is constant and is not to be normalised away.
+ *
+ * All of this is past the "under two seconds" target the design started with. It
+ * is a deliberate trade for a reveal long enough to be worth watching, and the
  * click-to-skip is what keeps it tolerable at roughly a thousand openings a year.
+ * The trade also unwinds on its own: as the album fills, fewer cards are new, so
+ * the long version becomes the rare one.
  *
  * These are passed through `ms()` at animation time, not at module load, so the
  * multiplier can be changed live and stays in lockstep with the CSS durations —
@@ -73,22 +87,131 @@ const HOLD_MS = 340;
  * rather than from the card announcing itself on arrival.
  */
 const CEREMONY_LEAD_MS = 320;
-/**
- * Extra time a card stays up when it filled an empty slot.
- *
- * A pleasant side effect: as the album fills, fewer cards are new, so packs get
- * quicker on their own — the pacing follows how much there is to look at.
- */
-const HOLD_NEW_BONUS_MS = 340;
 /** How long the revealed card takes to travel down into the row. */
 const SETTLE_MS = 460;
 
+/* ------------------------------------------------------------------ *
+ * The silhouette beat
+ *
+ * A new card turns over into its tier metal, its overall and the green rim, with
+ * the player still their own outline. Their name then spells itself out one
+ * character at a time — and only once it is complete does the face dissolve in.
+ *
+ * **Two events, in that order, and not one.** The name and the face used to land
+ * together, the fade starting just before the final character. That reads as a
+ * single arrival, which is tidy but flat: the run of characters builds to
+ * something and then the something is already there. Spelling the name out in
+ * full first gives the build an ending of its own, and leaves the face as a
+ * separate answer to a question you have just finished asking.
+ *
+ * Everything below is measured **from the flip landing**, not from the turn —
+ * the same convention `HOLD_MS` uses, and for the same reason.
+ *
+ *   0                       the card lands: metal, overall, rim, silhouette
+ *   SILHOUETTE_LEAD_MS      the write begins
+ *   + n × NAME_TICK_MS      character n lands, a tick every nth
+ *   ...+ writeMs            the last character; the name is complete
+ *   + REVEAL_GAP_MS         the beat that separates the two events
+ *   + PORTRAIT_FADE_MS      the face dissolves in, with the bell on its first frame
+ *   + READABLE_MS           fully readable, then the card goes to the row
+ *
+ * The first version of this beat had no write: it was a flat 150ms pause and
+ * then a dissolve, and it read as a glitch rather than as a build precisely
+ * because nothing happened during it. A pause is only suspense if something is
+ * visibly under way.
+ * ------------------------------------------------------------------ */
+
+/** The silhouette alone, before anything starts happening to it. */
+const SILHOUETTE_LEAD_MS = 120;
+
 /**
- * How long a card stays up once revealed. Depends on newness only — a rare
- * duplicate held as long as a rare new card, which made every 85+ pull feel
- * equally significant whether or not it changed the album.
+ * One character of the name.
+ *
+ * **Constant per character, so a long name genuinely takes longer.** "Anneloes
+ * Ernest" is fourteen ticks and "Bo" is two, and the post-flip window differs by
+ * almost a second at the settled multiplier. That was raised as both a pacing
+ * problem and an information leak — the rhythm tells you roughly how long the
+ * name is before you can read it — and accepted on both counts: a constant rate
+ * is what makes it read as *writing* rather than as a progress bar, and the
+ * alternative is every card taking as long as the longest.
+ *
+ * Do not "fix" this by normalising the total duration.
+ *
+ * Mirrored by `.card__char`'s transition in card.css, which is one tick long so
+ * that each character finishes exactly as the next begins.
  */
-const holdFor = (isNew: boolean): number => HOLD_MS + (isNew ? HOLD_NEW_BONUS_MS : 0);
+const NAME_TICK_MS = 55;
+
+/**
+ * Tick on every nth character, not on every one.
+ *
+ * The audio is deliberately decoupled from the write. At the settled ×2 scale a
+ * tick per character is one every 80ms, and under roughly 120–150ms of separation
+ * discrete clicks stop being heard as events at all and fuse into a rattle — so
+ * the run sounded like a texture rather than like characters landing.
+ *
+ * Thinning the sound rather than slowing the write keeps the two tunable
+ * separately: the write is paced for the eye and this is paced for the ear.
+ *
+ * Every second character lands roughly four ticks a second at the current rate.
+ * The final one always ticks too, whatever the count lands on, so the run has an
+ * audible end — the bell is no longer there to close it, having moved to the face.
+ */
+const TICK_EVERY_NTH = 2;
+
+/**
+ * The portrait's cross-dissolve. **Must match `.card--reveal`'s transition in
+ * card.css.**
+ *
+ * There was a green shimmer crossing the card over exactly this window, on the
+ * idea that the light was what brought the face. It went: a pass that fast reads
+ * as a flicker rather than as light travelling, and the face was fading in
+ * uniformly underneath it anyway, so the two had no visible relationship to each
+ * other. If a sweep comes back it has to actually carry the reveal — masking the
+ * photo in behind its leading edge — rather than passing over it.
+ */
+const PORTRAIT_FADE_MS = 180;
+
+/**
+ * The silence between the name completing and the face arriving.
+ *
+ * Small, but it cannot be zero. Two events with no gap between them are heard as
+ * one event, which is exactly what this restructure was undoing — the beat needs
+ * long enough for the last character to be seen to have landed, and no longer.
+ */
+const REVEAL_GAP_MS = 70;
+
+/**
+ * How long the finished card is simply left alone, once the portrait has landed.
+ *
+ * Deliberately `HOLD_MS` — exactly what a duplicate gets. The new card's extra
+ * time is spent on the build, not on lingering afterwards, which is the same
+ * argument that keeps rarity in the anticipation rather than in the dwell.
+ */
+const READABLE_MS = HOLD_MS;
+
+/** The write's length: one tick per character of the name as printed. */
+const writeMsFor = (card: Card): number => nameGroups(card).length * NAME_TICK_MS;
+
+/**
+ * How long a card stays up once revealed, measured from the end of the flip.
+ *
+ * A duplicate is unchanged and unchanging: `HOLD_MS`, nothing else. It skips the
+ * beat entirely, which is what makes the beat mean "new".
+ *
+ * A new card's window is **name-dependent** and so cannot be a constant any
+ * more — it is the lead, the write, the gap, the portrait's dissolve, and then
+ * the readable hold. The old `HOLD_NEW_BONUS_MS` is gone with it; the bonus is
+ * now literally the length of the build.
+ */
+const holdFor = (card: RevealedCard): number =>
+  card.isNew
+    ? SILHOUETTE_LEAD_MS +
+      writeMsFor(card) +
+      REVEAL_GAP_MS +
+      PORTRAIT_FADE_MS +
+      READABLE_MS
+    : HOLD_MS;
 
 const PARTICLE_COUNT = 24;
 
@@ -276,6 +399,19 @@ const PackOpener: React.FC<PackOpenerProps> = ({
   /** False during the hand-off gap, so the centre is briefly empty. */
   const [heroVisible, setHeroVisible] = useState(true);
   const [faceUp, setFaceUp] = useState(false);
+  /**
+   * How many characters of the name have been written, and whether the portrait
+   * has started dissolving in. Both only ever move for a *new* card — a duplicate
+   * turns straight into its full face, which is the whole point: the beat is what
+   * "new" looks like.
+   *
+   * The counter lives here rather than inside `PlayerCard` because it also drives
+   * the ticks: one sound per character, on the same timer that lights it. A card
+   * that wrote itself would put the sound and the writing on two clocks, which is
+   * the drift `animationSpeed.ts` exists to prevent.
+   */
+  const [written, setWritten] = useState(0);
+  const [portraitIn, setPortraitIn] = useState(false);
   const [glowing, setGlowing] = useState(false);
   /**
    * The full-screen bloom, tracked separately from `glowing`.
@@ -527,14 +663,62 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     setHeroVisible(true);
     setFaceUp(false);
     setFlagged(false);
+    setWritten(0);
+    setPortraitIn(false);
     setGlowing(false);
     setBlooming(false);
     setMotesOut(false);
     setPhase('revealing');
 
+    /* Called at the turn itself, by both the ceremony path and the plain one. */
     const advance = () => {
-      after(FLIP_MS, () => setFlagged(true));
-      after(FLIP_MS + holdFor(card.isNew), () => stepRef.current(index + 1));
+      /*
+       * The green rim enters *with* the turn rather than after it, so the flip
+       * resolves into metal, overall and rim together and the card arrives
+       * already marked as new. Its 240ms bloom therefore runs under the second
+       * half of the 320ms flip and is fully up as the card lands.
+       *
+       * It used to be scheduled at `FLIP_MS`, which put it a beat behind the
+       * face. That was invisible while the face was all there was; now the face
+       * is a silhouette for a moment, and the rim is one of the two things
+       * carrying that moment.
+       */
+      setFlagged(true);
+
+      /* The other one. Only a new card has anything to withhold. */
+      if (card.isNew) {
+        const groups = nameGroups(card);
+        const writeMs = groups.length * NAME_TICK_MS;
+        /* The instant the write begins; everything below is relative to it. */
+        const writeAt = FLIP_MS + SILHOUETTE_LEAD_MS;
+
+        /*
+         * `i + 1` ticks in, not `i`, so the first character lands one tick after
+         * the write begins rather than on the same frame as the silhouette's lead
+         * expiring. It also puts the last character exactly at
+         * `writeAt + writeMs`.
+         */
+        groups.forEach((_, i) => {
+          const last = i === groups.length - 1;
+          after(writeAt + (i + 1) * NAME_TICK_MS, () => {
+            setWritten(i + 1);
+            /* The last one always ticks, so the run is heard to end. */
+            if (last || i % TICK_EVERY_NTH === 0) playNameTick();
+          });
+        });
+
+        /*
+         * The second event. The name is complete and has been allowed to sit for
+         * a beat; the face then dissolves in, and the bell marks that arrival
+         * rather than the end of the writing.
+         */
+        after(writeAt + writeMs + REVEAL_GAP_MS, () => {
+          setPortraitIn(true);
+          playNameSettle();
+        });
+      }
+
+      after(FLIP_MS + holdFor(card), () => stepRef.current(index + 1));
     };
 
     const level = ceremonyLevelFor(card.overall);
@@ -654,6 +838,16 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     drawn.forEach((card) => {
       const img = new Image();
       img.src = avatarUrl(card.player.id);
+
+      /*
+       * And the masks, for the cards that will use one. The hero renders its
+       * silhouette eagerly — it cannot afford the probe the album uses — so the
+       * tear is the only cover there is for fetching it.
+       */
+      if (card.isNew) {
+        const mask = new Image();
+        mask.src = silhouetteUrl(card.player.id);
+      }
     });
 
     if (fastMode || prefersReducedMotion()) {
@@ -886,7 +1080,17 @@ const PackOpener: React.FC<PackOpenerProps> = ({
                   <CardBack />
                 </div>
                 <div className="opener__face opener__face--front">
-                  <PlayerCard card={current} eager />
+                  {/*
+                    A new card turns over into everything except a face: metal,
+                    overall and the green rim are all there, and the player is
+                    their own outline until the name is written on them. A
+                    duplicate is passed nothing and renders as it always did.
+                  */}
+                  <PlayerCard
+                    card={current}
+                    eager
+                    reveal={current.isNew ? { written, portrait: portraitIn } : undefined}
+                  />
                   {isPeak && faceUp ? <div className="opener__sweep" /> : null}
                 </div>
               </div>

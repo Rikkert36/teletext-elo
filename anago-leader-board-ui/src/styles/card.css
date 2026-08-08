@@ -495,6 +495,24 @@
   font-size: 8.5cqw;
   font-weight: normal;
   letter-spacing: 0.045em;
+  /*
+   * Off, so that the band lays out identically whether the name arrives as one
+   * text node or as one span per character.
+   *
+   * The pack opener's reveal writes the name a character at a time, which means
+   * splitting it into spans — and kerning does not apply across element
+   * boundaries, so the split version would be a fraction of a pixel wider than
+   * the plain one. That difference lands exactly at the hand-off, where the
+   * finished hero card is replaced by a freshly mounted slot: a centred name
+   * shifting as the card leaves is precisely the blink the `eager` prop exists
+   * to prevent elsewhere.
+   *
+   * The cost is nil in practice. At 0.045em of tracking the pairs a kerning
+   * table would tighten are already held apart, so it changes what the album
+   * renders by fractions of a pixel — and it makes an invariant true rather
+   * than merely close.
+   */
+  font-kerning: none;
   line-height: 1.2;
   padding-top: 0.28em;
   white-space: nowrap;
@@ -580,6 +598,141 @@
 .card--empty .card__overall,
 .card--empty .card__name {
   text-shadow: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * The silhouette beat, in the pack opener
+ *
+ * A new card turns over into its tier metal, its overall and the green "new"
+ * rim — and *not yet* into a face. The player is their own outline; then a
+ * shimmer crosses the card and writes their name on character by character in
+ * its wake, with the portrait dissolving in so that the face and the last letter
+ * land as one event. So the order you experience is how good → it's new → who.
+ *
+ * **This is not the empty slot's colourway and must never become it.** The
+ * ceremony builds to the flip, and resolving that build into something that
+ * looks like an unowned card is the same mistake as switching the gold glow off
+ * at the turn — which is recorded in the design doc as a bug that was fixed
+ * once already. Everything the build earned stays: the metal, the number, the
+ * rim. Only the identity is held back.
+ *
+ * It is still a *transition* rather than a stage, and it sits under the ceremony
+ * rather than beside it: the gold build runs before the flip and still climaxes
+ * there, and nothing here competes with that. The write is what gives the beat
+ * content — before it, the withheld moment was a static pause and read as a
+ * glitch rather than as something happening.
+ *
+ * The timings all live in `PackOpener.tsx`; the two durations below are the only
+ * halves that have to be spelled here, and both are noted as such.
+ * ---------------------------------------------------------------- */
+
+/*
+ * The outline reads as a shadow *on* the metal, so it is the tier ink rather
+ * than the empty slot's pale grey. The two grounds are opposites and so the two
+ * fills have to be: the empty card is dark cloth and needs a light figure, this
+ * one is bright metal and needs a dark one.
+ *
+ * Held short of solid, and with a gentle light-to-dark wash over it, so the
+ * metal's facets carry on through the figure. Solid ink read as a sticker cut
+ * to the shape of a person — the same objection that took the plates off the
+ * number and the name.
+ *
+ * `--tier-ink` rather than a literal, because the icoon's ink is its own colour
+ * (`#594d2c`) and a withheld icoon has to follow it.
+ *
+ * Scoped to `card--reveal` and **not** to `card--withheld`, which is the narrower
+ * class and was the obvious place for it. `card--withheld` comes off the moment
+ * the portrait starts fading in, so the fill would revert to the empty slot's
+ * pale grey underneath a photo that is still half transparent — the outline
+ * visibly changing colour as the face arrives over it. The mask layer has no
+ * reason to change at all: it is simply covered.
+ */
+.card--reveal .card__silhouette {
+  background-color: var(--tier-ink);
+  background-image: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(0, 0, 0, 0.22) 100%
+  );
+  opacity: 0.8;
+}
+
+/*
+ * The tier tint comes off the mask layer, and only there.
+ *
+ * `.card__portrait::after` multiplies the tier gradient over the photo, which
+ * works because the photo fills the box opaquely. The mask layer does not fill
+ * anything — the metal is its backdrop — so with nothing to multiply against,
+ * the tint composites as a flat 42% panel of tier colour over the card's own
+ * facets, dulling exactly the region the beat is drawing attention to.
+ *
+ * The empty slot never showed this because it lays an opaque `#1a1a1a` under
+ * its silhouette. Here the metal showing through *is* the point.
+ */
+.card--reveal .card__portrait--mask::after {
+  display: none;
+}
+
+/*
+ * The portrait's cross-dissolve.
+ *
+ * Declared on `card--reveal`, which is present for the whole beat — a transition
+ * declared only on the withheld state comes off with it and the dissolve becomes
+ * a cut.
+ *
+ * **Must match `PORTRAIT_FADE_MS` in PackOpener.tsx**, which schedules the hold
+ * around it: the opener starts this `PORTRAIT_LEAD_MS` before the final
+ * character so that the face and the name finish together, and then counts
+ * `READABLE_MS` from the end of it. If this duration and that constant drift,
+ * the card either moves on mid-dissolve or sits finished for longer than
+ * intended.
+ */
+.card--reveal .card__portrait--photo {
+  transition: opacity calc(180ms * var(--anim, 1)) ease-out;
+}
+
+.card--withheld .card__portrait--photo {
+  opacity: 0;
+}
+
+/*
+ * One character of the name.
+ *
+ * Opacity only, and no colour or glow of its own: the shimmer is already passing
+ * over the band as each character lands, and that is the light. Igniting every
+ * glyph as well would be a second light source doing the same job — the same
+ * objection that took the diagonal grain off the wrapper once the badge's own
+ * sheen was doing the work.
+ *
+ * The fade is one tick long (`NAME_TICK_MS`), so each character finishes exactly
+ * as the next begins: not a hard snap, and never two mid-fade at once, which
+ * blurs the rhythm the ticks are keeping.
+ */
+.card__char {
+  opacity: 0;
+  transition: opacity calc(40ms * var(--anim, 1)) linear;
+}
+
+.card__char--in {
+  opacity: 1;
+}
+
+/*
+ * Reduced motion never actually reaches this — the opener skips the whole reveal
+ * and lands on the results grid, where cards carry no `reveal` at all. This is
+ * the second guard, and it resolves to the finished state rather than to a card
+ * with no name on it.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .card--reveal .card__portrait--photo,
+  .card__char {
+    transition: none;
+  }
+
+  .card--withheld .card__portrait--photo,
+  .card__char {
+    opacity: 1;
+  }
 }
 
 /* ---------------------------------------------------------------- *

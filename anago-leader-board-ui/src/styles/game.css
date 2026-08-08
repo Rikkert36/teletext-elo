@@ -423,6 +423,26 @@
 }
 
 /*
+ * A control that is not on offer for the moment, without its absence moving
+ * anything. Used for "terug naar het album" for the length of a reveal.
+ *
+ * `visibility` rather than `display: none` or an unmount, because the row has to
+ * keep its box: the opener's whole layout is built so that nothing shifts between
+ * the click on the wrapper and the last card landing, and a button vanishing out
+ * of the column below it at the moment of the tear is exactly that shift. It is
+ * the same reason `.opener__hint` renders a `&nbsp;` during the tear rather than
+ * rendering nothing.
+ *
+ * It also takes the button out of the tab order and out of hit-testing for free,
+ * which `opacity: 0` would not — and unlike the shelf beside it, this one does not
+ * want to stay legible while it is out of play. A greyed-out exit invites the
+ * click it is refusing; an absent one does not.
+ */
+.game-button--away {
+  visibility: hidden;
+}
+
+/*
  * The packets themselves live in packopen.css — see `.pack-shelf`. Card-sized is
  * the target, but the margin is not always that generous, so the size is the
  * smallest of three things:

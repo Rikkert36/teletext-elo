@@ -11,7 +11,23 @@ Done and signed off: the mock data module, the `cardsClient` seam, the Panini ca
 face, the album's stiff 3D flip, the pack opener's five beats, the FLIP travel,
 the new-card marking, the four-level ceremony, and the D-minor payoff ladder.
 
-Newest: the **games gate dropped from 10 to 5**, for the card pool, the access
+Newest, and **on trial rather than signed off**: the **silhouette beat**. A new
+card flips into its tier metal, its overall and the green rim with the portrait
+still withheld as the player's own outline; then a green shimmer crosses the card
+and writes their name on a character at a time in its wake, one tick of sound
+each, with the portrait dissolving in so the face and the last letter land
+together. So a pull reads as *how good → it's new → who*. Duplicates are
+unchanged. The green rim moved from after the reveal to the turn itself.
+
+The first pass at this had no write — a flat pause, then a dissolve — and read as
+a glitch rather than a build, which is the note worth keeping: held time on its
+own is latency, and the eye reads latency as a fault. Two consequences to judge:
+the post-flip window is now **name-dependent** (1160ms for "Bo", 1640ms for "Daan
+van der Beek", both base), and `playNameTick` / `playNameSettle` are the first
+sounds added since the payoff ladder. Judge it on a **sub-75 new card** first —
+that is the majority case and the one with no ceremony under it.
+
+Before that: the **games gate dropped from 10 to 5**, for the card pool, the access
 gate and the legends pool alike. Four players join (Yannick, Sevda, Dmitry,
 Sandra), the set is 38 cards, and everyone's per-pack rate falls ~15%. `DHigh`
 stays at 2.5 — the slower completion is accepted, not compensated. See
@@ -1243,6 +1259,22 @@ Four things had to follow from it:
   - The gold build's vignette is `position: fixed` and covers the shelf for free, but
     only on the ~28% of cards that get a ceremony and only once it has ramped. The
     dim has to hold for the other 72%.
+  - **"terug naar het album" stands down with it**, and did not at first. The exit sat
+    live under the opener while the pile beside it was dimmed and unclickable, which
+    is a control contradicting the rule the shelf had just stated — and it was also a
+    hole in that rule, since `revealing` is raised by `onStart` and lowered only by
+    `onFinished`: leaving mid-reveal unmounted the one component that would ever have
+    lowered it, so the shelf stayed dim and inert for the rest of the session. It is
+    now hidden for the length of the reveal (`.game-button--away`) *and* `closeOpener`
+    clears the flag, because the flag's lifetime should be a property of the page and
+    not of a callback that may never arrive.
+    - `visibility`, and the row keeps its box. Unmounting it would shorten the column
+      at the exact moment the first card is rising out of the wrapper, which is the
+      one thing this stage is built never to do — the same reason `.opener__hint`
+      renders `&nbsp;` during the tear.
+    - Hidden rather than disabled, unlike the shelf. The shelf stays legible because
+      how many packets are left is worth knowing through the reveal; an exit has no
+      such value, and a greyed-out one invites the click it is refusing.
 - **Results do not accumulate.** Each packet gets its own reveal and its own grid,
   and `key={openingPack.id}` remounts the opener, which is what already guaranteed
   it. A running total across packets would turn a pile into a session and blur which
@@ -1323,6 +1355,158 @@ return the same.
 
 The results line reports **new** cards only ("3 nieuwe kaarten toegevoegd"), since
 counting all five claimed additions the album never got.
+
+#### The silhouette beat
+
+*On trial — built, not yet signed off.*
+
+A new card does not turn straight into a face. It turns into its **tier metal,
+its overall and the green rim**, with the player still their own outline — and
+then a shimmer crosses the card and **writes their name on, one character at a
+time, in its wake**, with the portrait dissolving in so that the face and the
+last letter land together. A duplicate is unchanged: flip, full card.
+
+So the order you experience a pull in is **how good → it's new → who**, which is
+the order the three facts actually matter in. It also gives "new" a moment of its
+own that is not a rim quietly appearing on a card you have already finished
+reading.
+
+**The first version had no write** — a flat 150ms pause and then a dissolve — and
+it read as dry, as a glitch rather than as a build. That is the lesson worth
+keeping: a pause is only suspense if something is visibly under way in it. Held
+time on its own is just latency, and the eye reads latency as a fault.
+
+The timeline, in base ms from the **flip landing** (×2 for real figures), all of
+it in `PackOpener.tsx`:
+
+| from flip | for | what |
+|---|---:|---|
+| 0 | `SILHOUETTE_LEAD_MS` 120 | the silhouette holds alone |
+| 120 | `NAME_TICK_MS` 40 × characters | the shimmer crosses, the name writes behind it |
+| last character − `PORTRAIT_LEAD_MS` 60 | `PORTRAIT_FADE_MS` 180 | the portrait cross-dissolves in |
+| then | `READABLE_MS` 340 | fully readable — exactly what a duplicate gets |
+
+- **Per-character timing is constant, so a long name genuinely takes longer.**
+  "Anneloes Ernest" is fourteen ticks and "Bo" is two: 1160ms against 1640ms for
+  the whole post-flip window. This was raised as both a pacing problem and an
+  information leak — the rhythm tells you roughly how long the name is before you
+  can read it — and **accepted on both counts**. A constant rate is what makes it
+  read as writing rather than as a progress bar, and the alternative is every card
+  paying the longest name's price. Do not normalise the duration.
+  - The cost is real and should be watched. Across the 38-card pool the printed
+    name averages **9.6 characters** (14 at the top — "Petar Drandarov", "Anneloes
+    Ernest", "Daan van der Beek", "Lotte Wesselman" — and 2 at the bottom), so a
+    mean new card runs ~1460ms base and a 3-card pack of new cards about 4.8s
+    against the 3.96s it used to. It unwinds on its own as the album fills and new
+    cards get rarer, but it is at its worst for a new collector, which is exactly
+    the wrong end.
+  - **The short names are where to look for it failing.** The shimmer's pass *is*
+    the write, so its duration is the name's: "Bo" is two ticks, which is a 160ms
+    crossing at the settled multiplier, and "Ida" 240ms. Those are flashes rather
+    than passes. There are only three cards under five characters (Bo, Ida, Niek)
+    so it may not matter — but if it does, note that the obvious fix is a floor on
+    the shimmer, and a floor decouples it from the characters and takes the wake
+    alignment with it. That is a real trade, not a free one.
+- **A space is revealed with the character after it**, never on a tick of its own
+  (`nameGroups`, one regex). Otherwise "Daan van der Beek" pauses three times for
+  nothing and the gaps tell you the word count before you can read a word.
+- **The whole string is laid out from the first frame and revealed by opacity.**
+  The name band is centred, so a version that appended characters as they arrived
+  would grow outward from the middle and shift every glyph already on the card at
+  every tick. Opacity does not affect layout; the box is reserved once and nothing
+  moves again.
+  - `font-kerning: none` on `.card__name` is part of this. Kerning does not apply
+    across element boundaries, so the span-per-character version would be a
+    fraction of a pixel wider than the plain text node the results row renders —
+    and that difference lands exactly at the hand-off. At 0.045em of tracking the
+    pairs a kerning table would tighten are already held apart, so it costs
+    nothing and makes the two renderings provably identical.
+  - No glow or colour change per glyph, only opacity. **The shimmer passing over
+    the band is already the light**, and igniting each letter as well would be a
+    second light source doing the same job — the objection that took the diagonal
+    grain off the wrapper once the badge's own sheen was carrying it.
+- **The write shimmer is green, not gold.** Same element idiom and the same
+  keyframes as the ceremony's, deliberately not the same colour: gold is the
+  rarity signal and green is the newness signal, which is the whole reason the rim
+  is cool green rather than a second warm glow. A gold pass over an
+  already-turned card would read as the ceremony continuing past its own climax,
+  at every tier, on cards that never had one. It is also dimmer and narrower than
+  the gold one (0.28/0.5 against 0.5/0.8, a 24% band against 32%) — that one
+  crosses a blank card back, this one crosses a face you are reading, and at
+  ceremony strength it washed the overall out as it went by.
+- **The counter lives in `PackOpener`, not in `PlayerCard`.** The same timer that
+  lights a character plays its tick, so the two cannot drift; a card that wrote
+  itself would put sound and picture on separate clocks. Same argument
+  `animationSpeed.ts` makes for one multiplier across JS and CSS.
+- **`holdFor` takes the card now, and `HOLD_NEW_BONUS_MS` is gone.** The post-flip
+  window is name-dependent, so it cannot be a constant: it is the lead, the write,
+  the tail of the portrait's dissolve past the last character, and then
+  `READABLE_MS`. The bonus a new card used to get is now literally the length of
+  its build. Duplicates are untouched — a flat `HOLD_MS`, and skipping the beat
+  entirely is what makes the beat mean "new".
+- **The portrait starts 60ms early on purpose.** The face and the name are one
+  fact — *who this is* — so they have to arrive as one event. Starting the fade on
+  the final character leaves the name complete and the face still resolving behind
+  it, which is two small endings where there should be one.
+- **The withheld card is emphatically not the album's empty slot.** It keeps the
+  metal, the real overall and the rim; the empty slot is the grey colourway with
+  `??` in the corner. This is the same trap as switching the gold glow off at the
+  turn — a build that resolves into something that looks common — and that one was
+  a real bug, fixed once already. `PlayerCard` takes `reveal`, not `empty`, and
+  the two must not be conflated.
+  - The mask's fill inverts accordingly: the empty slot is dark cloth and needs a
+    *light* figure, this is bright metal and needs a *dark* one. It is
+    `var(--tier-ink)` at 80% with a light-to-dark wash over it, so the metal's
+    facets carry on through the figure — solid ink read as a sticker cut to the
+    shape of a person, which is the objection that took the plates off the number
+    and the name.
+  - That fill is scoped to `.card--reveal` and **not** to `.card--withheld`, which
+    is the narrower class and the obvious place for it. `card--withheld` comes off
+    the moment the portrait starts fading in, so the outline would revert to the
+    empty slot's pale grey underneath a photo that is still half transparent — a
+    silhouette visibly changing colour as the face arrives over it. The mask layer
+    has no reason to change at all; it is simply covered.
+  - `.card__portrait::after` — the tier tint — is **removed from the mask layer**.
+    It multiplies over a photo, which fills the box opaquely; over a mask, whose
+    backdrop is the card's own metal, it composites as a flat 42% panel of tier
+    colour and dulls exactly the region the beat is drawing the eye to. The empty
+    slot never showed this because it lays an opaque `#1a1a1a` underneath.
+- **It sits under the ceremony, not beside it.** The gold build runs entirely
+  *before* the flip and still climaxes there; this runs entirely after. Nothing
+  here is level-aware — the write knows about the name, not about the tier — so
+  the governing rule that a build is identical at any timestamp `t` is untouched,
+  because none of this is part of that build.
+- **The green rim enters with the turn**, not at `FLIP_MS` after it. The flip has
+  to resolve into metal + overall + rim together, or the rim arrives as a fourth
+  beat behind a card you have already read. Its 240ms bloom runs under the second
+  half of the 320ms flip and is fully up as the card lands. It still persists into
+  the results row, which is how you see afterwards which cards were new.
+- **Both layers are mounted and the photo dissolves in on top**, rather than the
+  two cross-fading. At 50/50 a true cross-fade shows the card's ground through
+  both. The mask never needs to fade out at all: the photo covers it exactly,
+  since the two layers carry the same portrait masks.
+- **The mask is rendered eagerly here**, skipping the probe the album uses. The
+  probe cannot resolve before the element's first frame — not even from cache — and
+  the hero mounts a fresh card for every pull, so the album's one-frame bare plate
+  would be a blink in the middle of the beat. Same argument as `eager` on the
+  portrait, and the tear now preloads the masks alongside the avatars. Every player
+  in the pool has one, so there is no fallback path; a 404 degrades to a
+  masked-out layer, which is the bare plate again.
+- **No `title` for the whole beat.** A native tooltip naming the player is
+  precisely what is being written on, and the cursor is already sitting on the
+  card because that is where the packet was.
+- **Reduced motion and the skip both land on the finished card.** Neither ever
+  enters the reveal: reduced motion and fast mode jump straight from the click to
+  the results grid, and a click mid-reveal clears every pending timer and does the
+  same. Cards there carry no `reveal` prop at all, so they render exactly as they
+  do in the album. The `prefers-reduced-motion` block in card.css is a second
+  guard behind that, and it resolves to the *finished* state — a card with its
+  name on — rather than to a nameless one.
+
+Known and pre-existing, not introduced here: during a *duplicate's* ceremony the
+face-down card still carries its `title`, because `backface-visibility` hides the
+front face from painting but not from hit-testing. Hovering a rare duplicate for
+a second names it before it turns. New cards are covered by the rule above.
 
 ### The rare ceremony: graduated across the gold band
 
@@ -1610,6 +1794,42 @@ swells overlap and would otherwise clip.
   a flute), and `playDrop` — a sawtooth bending 210 → 34 Hz into level 4's hit,
   which read as a low sucking note.
 - Default on, persisted mute in the header.
+
+#### Writing the name: `playNameTick` and `playNameSettle`
+
+The beat was silent in its first version, and that is most of why it read as a
+glitch: nothing was happening and nothing said anything was about to. It now has
+one tick per character and a settle on the last, and the constraints on those two
+sounds are the whole design.
+
+- **Granular and non-pitched, both of them.** This is the constraint everything
+  else follows from. The ticks fire up to seventeen times *underneath* the D-minor
+  payoff, and any pitch either agrees with that chord and joins it or disagrees
+  and fights it. Noise can do neither, so a run of ticks stays texture rather than
+  becoming a counter-melody. It is also why `playNameSettle` has no `playBoom`
+  under it — low end would make it a hit, and the payoff is the only climax the
+  reveal has.
+- **The quietest sounds in the module**: 0.028 and 0.038, against `playSlot`'s
+  0.05 and `playFlip`'s 0.1.
+- **A tick is two grains, not one.** A single grain is a click, and a click is
+  what synthetic sounds like — the same reason the tear and the page turn are
+  clouds rather than bursts.
+- **The settle is the same grain, darker and longer** (1400–4200 Hz against
+  2400–5200, ~30ms against ~15). Lower and wider is what closes a phrase. A
+  resolve, not a sting.
+- **Nothing was added at the flip**, and the payoff has not moved. The ticks begin
+  `SILHOUETTE_LEAD_MS` after the card lands — 120 base, so 240ms — which puts the
+  first one well inside the chord's decay rather than under its impact. On a
+  common card the flip's own `playFlip`/`playSlot` have decayed by ~165ms, so the
+  ticks are the only thing there and are not competing with anything either.
+- **Identical at every ceremony level**, like everything else after the turn. The
+  ticks know about the name, not about the tier.
+
+This replaces the previous note here, which recorded that the beat was
+deliberately silent and that the fallback if it needed something was to move
+`playSlot()` off the flip. It needed something; this is it. `playSlot()` was left
+where it is — it belongs to the flip, not to this beat — but if the two now read
+as redundant on a common new card, that is still the thing to drop.
 
 ## Frontend changes
 

@@ -70,6 +70,13 @@ const CollectionPage: React.FC = () => {
    * True from the tear until the last card has settled — *not* for as long as the
    * opener is mounted. A sealed packet lying on the stage is a decision you have not
    * taken yet, so the pile beside it stays live and you can still change your mind.
+   *
+   * It is raised by the opener's `onStart` and lowered by its `onFinished`, so
+   * **every path that unmounts the opener has to lower it too**: an opener that is
+   * taken off screen never reaches `onFinished`, and the flag would then sit true
+   * for the rest of the session with the shelf dimmed and inert behind it. That is
+   * exactly what "terug naar het album" used to do. `closeOpener` is the one way
+   * out, and `choosePlayer` and `openPack` clear it for the same reason.
    */
   const [revealing, setRevealing] = useState(false);
   /** Index into `slotOrder` of the card being looked at, or null for none. */
@@ -129,6 +136,23 @@ const CollectionPage: React.FC = () => {
     setViewing(null);
     setRevealing(false);
     setOpeningPack(next);
+  };
+
+  /**
+   * Putting the opener away. The only way out of it.
+   *
+   * Clears `revealing` as well as the packet — see the flag's note. This used to be
+   * a bare `setOpeningPack(null)`, which meant that leaving mid-reveal unmounted the
+   * one component that would ever have lowered the flag, and the shelf stayed dimmed
+   * and unclickable until the page was reloaded.
+   *
+   * The button that calls it is hidden for the length of the reveal anyway, so this
+   * is now the guard rather than the fix — but the flag's lifetime should be a
+   * property of the page, not of a callback that may never arrive.
+   */
+  const closeOpener = () => {
+    setOpeningPack(null);
+    setRevealing(false);
   };
 
   const toggleFast = () => {
@@ -330,11 +354,26 @@ const CollectionPage: React.FC = () => {
                   onFinished={handleFinished}
                   fastMode={fastMode}
                 />
+                {/*
+                  The way back, and it is **not offered while the reveal is
+                  running**. The shelf beside the opener already stands down for
+                  that window — you cannot pick up a second packet with your hands
+                  full — and a live exit next to it was the one control that
+                  contradicted that, as well as the one way to strand `revealing`
+                  true.
+
+                  Hidden rather than unmounted, and the row keeps its box. Removing
+                  it would shorten the column at the exact moment the first card is
+                  rising out of the wrapper, and everything about this stage is
+                  built so that nothing moves from the click to the last card — see
+                  `.opener__stage`'s note, and the `&nbsp;` the opener's own hint
+                  line renders during the tear for precisely this reason.
+                */}
                 <div className="game-row" style={{ justifyContent: 'center' }}>
                   <button
                     type="button"
-                    className="game-button"
-                    onClick={() => setOpeningPack(null)}
+                    className={`game-button${revealing ? ' game-button--away' : ''}`}
+                    onClick={closeOpener}
                   >
                     terug naar het album
                   </button>

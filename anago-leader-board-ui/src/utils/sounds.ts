@@ -494,6 +494,81 @@ export const playSlot = (): void => {
 };
 
 /* ------------------------------------------------------------------ *
+ * Writing the name
+ *
+ * One tick per character as a new card's name is written in the shimmer's wake,
+ * so the beat has a pulse instead of being a silent pause.
+ *
+ * Both are **granular and non-pitched**, and that is the constraint that keeps
+ * them out of the payoff's way. A pitch — any pitch — either agrees with the
+ * D-minor chord and becomes part of it, or disagrees and fights it, and this
+ * fires up to seventeen times underneath it. Noise cannot do either.
+ *
+ * They are also the quietest sounds in the module: 0.028 and 0.038 against
+ * `playSlot`'s 0.05 and `playFlip`'s 0.1. A tick is a texture under the card,
+ * not an event.
+ * ------------------------------------------------------------------ */
+
+/**
+ * One character landing. Two short high grains, ~15ms end to end — small enough
+ * that a run of them reads as a rhythm rather than as a series of hits.
+ *
+ * Two rather than one because a single grain is a click, and a click is what a
+ * synthetic tick sounds like; the pair's randomised rate and filter give each
+ * one a slightly different colour, which is the same reason the tear and the
+ * page turn are clouds.
+ */
+export const playNameTick = (): void => {
+  playGrains({
+    count: 2,
+    spread: 0.006,
+    grainMs: [3, 9],
+    hz: [2400, 5200],
+    gain: 0.028,
+    q: 2.6,
+  });
+};
+
+/**
+ * The last character, landing with the portrait. The moment the whole beat exists
+ * for, so it is the one place in the run that gets a voice rather than a click.
+ *
+ * **This was grains only, and it was wrong.** The reasoning was to protect the
+ * D-minor payoff from a second climax, but that only holds for the 28% of cards
+ * that get a ceremony — and even there the chord has been decaying for most of a
+ * second by the time this lands. On a common there was never anything to protect,
+ * so the moment the beat builds to was marked with slightly more of the sound that
+ * had been playing all along, and read as dry.
+ *
+ * A bell, because the bell is already this product's sound for *a card has
+ * resolved*: it is in the payoff at every level, and the doc keeps it on D at
+ * every level. So this is the same voice, an octave up and much quieter — a coda
+ * to the payoff on a rare card, and the only bell on a common.
+ *
+ * D5 rather than a colour of its own: the tonic cannot clash with a D-minor chord
+ * that is still ringing, which a non-pitched hit large enough to be heard would
+ * have risked. The grain stays underneath as the character's own click, so the
+ * run still ends in the material it was made of.
+ *
+ * One absolute level covers both cases without a branch — against a gold's tail it
+ * sits under, and on a common it is the loudest thing in the reveal. Level 1's
+ * payoff bell is 0.028 on D4; this is deliberately just below it.
+ */
+export const playNameSettle = (): void => {
+  playGrains({
+    count: 3,
+    spread: 0.024,
+    grainMs: [4, 14],
+    hz: [1400, 4200],
+    gain: 0.026,
+    q: 2,
+    bias: 1.3,
+  });
+
+  playBell(D5, 0.026);
+};
+
+/* ------------------------------------------------------------------ *
  * Payoffs
  *
  * Open fifths and octaves with NO THIRD. A major triad is inherently cheerful;
