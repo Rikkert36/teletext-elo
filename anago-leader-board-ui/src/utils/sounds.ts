@@ -153,6 +153,12 @@ interface GrainCloudOptions {
   q?: number;
   /** >1 clusters grains toward the end, <1 toward the start. */
   bias?: number;
+  /**
+   * Seconds to hold the cloud back, so it can be scheduled *ahead* of the beat it
+   * belongs to. A forge blow needs its anticipation before the contact, and the
+   * caller only knows the moment of contact.
+   */
+  delay?: number;
 }
 
 const playGrains = ({
@@ -163,6 +169,7 @@ const playGrains = ({
   gain,
   q = 1.4,
   bias = 1,
+  delay = 0,
 }: GrainCloudOptions): void => {
   const ctx = getContext();
   if (!ctx) return;
@@ -171,7 +178,7 @@ const playGrains = ({
 
   for (let i = 0; i < count; i++) {
     const progress = Math.pow((i + Math.random()) / count, bias);
-    const at = now + progress * spread;
+    const at = now + delay + progress * spread;
     const duration = (grainMs[0] + Math.random() * (grainMs[1] - grainMs[0])) / 1000;
     const frequency = hz[0] + Math.random() * (hz[1] - hz[0]);
     // Envelope across the cloud, plus per-grain variation.
@@ -187,11 +194,12 @@ const playNoise = (
   toHz: number,
   gain: number,
   type: BiquadFilterType = 'lowpass',
+  delay = 0,
 ): void => {
   const ctx = getContext();
   if (!ctx) return;
 
-  const now = ctx.currentTime;
+  const now = ctx.currentTime + delay;
   const source = ctx.createBufferSource();
   source.buffer = getNoise(ctx);
 
@@ -494,78 +502,63 @@ export const playSlot = (): void => {
 };
 
 /* ------------------------------------------------------------------ *
- * Writing the name
+ * The reveal
  *
- * One tick per character as a new card's name is written in the shimmer's wake,
- * so the beat has a pulse instead of being a silent pause.
+ * One sound, for the one moment the beat exists for: the flash goes off and the
+ * card stops being a silhouette.
  *
- * Both are **granular and non-pitched**, and that is the constraint that keeps
- * them out of the payoff's way. A pitch — any pitch — either agrees with the
- * D-minor chord and becomes part of it, or disagrees and fights it, and this
- * fires up to seventeen times underneath it. Noise cannot do either.
- *
- * They are also the quietest sounds in the module: 0.028 and 0.038 against
- * `playSlot`'s 0.05 and `playFlip`'s 0.1. A tick is a texture under the card,
- * not an event.
+ * This was a run of per-word strikes, and the run was the problem. A name is one
+ * fact split into grammar — "Jasper / van / Buul" spends three dramatic beats,
+ * and one of them is "van". Splitting it padded the beat instead of building it,
+ * and each fragment was too small to carry a sound heavy enough to matter, so the
+ * sound was always louder than the thing it was happening to. One event, once.
  * ------------------------------------------------------------------ */
 
 /**
- * One character landing. Two short high grains, ~15ms end to end — small enough
- * that a run of them reads as a rhythm rather than as a series of hits.
+ * The card resolving: light, not impact.
  *
- * Two rather than one because a single grain is a click, and a click is what a
- * synthetic tick sounds like; the pair's randomised rate and filter give each
- * one a slightly different colour, which is the same reason the tear and the
- * page turn are clouds.
+ * **No low end at all, and that is the whole change.** This was a struck plate —
+ * contact grains over a 94 Hz body with a clang on top — and it was wrong for what
+ * is now on screen. A boom is *mass*, and the thing that happens to the card is a
+ * bloom of light expanding out of its centre; the two disagreed, and the sound
+ * kept reading as heavier than the picture. Nothing here goes below about 700 Hz.
+ *
+ * Three layers, all of them upward:
+ *
+ * 1. **Air opening.** A bandpass climbing 700 → 7200 Hz. A filter sweeping *up*
+ *    is the sound of something widening, which is exactly what the burst is
+ *    doing; the same sweep pointed down would be something closing.
+ * 2. **Sparkle.** Sparse high grains at a high Q, so each one rings for a moment
+ *    instead of clicking. Biased toward the start so the glitter arrives with the
+ *    light rather than trailing it.
+ * 3. **The chime**, held back to land when the light reaches the border and the
+ *    rim comes up — so what the ear hears arriving at the edge is what the eye
+ *    sees arriving there.
+ *
+ * D6 over D5, two and three octaves above the payoff's D4 bell. High enough to
+ * read as light rather than as metal, and still the tonic, so it cannot argue
+ * with a D-minor chord that may still be ringing on a rare card.
+ *
+ * @param rimAtMs Real ms from now until the light meets the border — the same
+ * number `PackOpener` uses to fire the rim, passed in rather than re-derived.
  */
-export const playNameTick = (): void => {
-  playGrains({
-    count: 2,
-    spread: 0.006,
-    grainMs: [3, 9],
-    hz: [2400, 5200],
-    gain: 0.028,
-    q: 2.6,
-  });
-};
+export const playNameReveal = (rimAtMs = 250): void => {
+  const rim = rimAtMs / 1000;
 
-/**
- * The last character, landing with the portrait. The moment the whole beat exists
- * for, so it is the one place in the run that gets a voice rather than a click.
- *
- * **This was grains only, and it was wrong.** The reasoning was to protect the
- * D-minor payoff from a second climax, but that only holds for the 28% of cards
- * that get a ceremony — and even there the chord has been decaying for most of a
- * second by the time this lands. On a common there was never anything to protect,
- * so the moment the beat builds to was marked with slightly more of the sound that
- * had been playing all along, and read as dry.
- *
- * A bell, because the bell is already this product's sound for *a card has
- * resolved*: it is in the payoff at every level, and the doc keeps it on D at
- * every level. So this is the same voice, an octave up and much quieter — a coda
- * to the payoff on a rare card, and the only bell on a common.
- *
- * D5 rather than a colour of its own: the tonic cannot clash with a D-minor chord
- * that is still ringing, which a non-pitched hit large enough to be heard would
- * have risked. The grain stays underneath as the character's own click, so the
- * run still ends in the material it was made of.
- *
- * One absolute level covers both cases without a branch — against a gold's tail it
- * sits under, and on a common it is the loudest thing in the reveal. Level 1's
- * payoff bell is 0.028 on D4; this is deliberately just below it.
- */
-export const playNameSettle = (): void => {
+  playNoise(0.34, 700, 7200, 0.05, 'bandpass');
+
   playGrains({
-    count: 3,
-    spread: 0.024,
-    grainMs: [4, 14],
-    hz: [1400, 4200],
-    gain: 0.026,
-    q: 2,
-    bias: 1.3,
+    count: 14,
+    spread: 0.2,
+    grainMs: [30, 130],
+    hz: [4200, 11000],
+    gain: 0.03,
+    q: 8,
+    bias: 0.7,
   });
 
-  playBell(D5, 0.026);
+  playBell(D6, 0.03, rim);
+  playBell(D5, 0.02, rim + 0.014);
 };
 
 /* ------------------------------------------------------------------ *
@@ -736,6 +729,8 @@ const D4 = 293.66;
 const F4 = 349.23;
 const A4 = 440;
 const D5 = 587.33;
+/** Only the reveal reaches this high — see `playNameReveal`. */
+const D6 = 1174.66;
 
 interface PayoffSpec {
   /** The chord itself. Each level is the one above it plus a voice. */

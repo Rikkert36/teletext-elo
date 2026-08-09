@@ -58,9 +58,16 @@ subject. It has no notion of faces, which is why it will happily and correctly o
 baguette if that is what the avatar is.
 
 Two passes. The first locates the subject in the whole photo; the second re-runs on a 5:7
-frame fitted around it. That second pass is not just a crop — the subject gets far more of
-the 320×320 input, so the mask is sharper too. Photos that are already head-and-shoulders
-skip the re-frame, which is most of them.
+frame fitted around it, where the subject gets far more of the 320×320 input and the mask
+comes out sharper. Photos that are already head-and-shoulders skip the second pass, which
+is most of them.
+
+The result is then projected back into the card's own crop. That step is not optional: the
+front end stretches the mask over the whole portrait box while the photo under it is
+`object-fit: cover` at `object-position: center 22%`, and nothing carries a frame across.
+A mask stored in the frame it was inferred from lands on the card blown up to fill it
+while the photo stays where it was — which is exactly what the three full-body avatars in
+the pool did before this existed.
 
 Afterwards only the largest connected component survives, which drops stray specks and
 any second person standing at the edge of frame.
@@ -73,4 +80,6 @@ wrong kind of thing. That is a judgement call for a human looking at the output,
 something the statistics can gate — the `area` and `dominance` numbers printed per player
 only tell you whether the mask is well-formed.
 
-Full-body photos come out correct but small; the re-frame pass is what keeps them usable.
+A full-body photo yields a small figure, because that is how large it is on the card too.
+The second pass makes the outline sharper; it cannot make the subject bigger, since the
+mask has to line up with a photo the front end crops its own way.

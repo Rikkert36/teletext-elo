@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import {
-  Card,
   Pack,
   RevealedCard,
   avatarUrl,
@@ -11,13 +10,12 @@ import {
   ceremonyShimmerRatio,
   silhouetteUrl,
 } from '../mock/cardMock';
-import PlayerCard, { CardBack, nameGroups } from './PlayerCard';
+import PlayerCard, { CardBack } from './PlayerCard';
 import PackFace from './PackFace';
 import { packFoil } from '../utils/packFoil';
 import {
   playFlip,
-  playNameSettle,
-  playNameTick,
+  playNameReveal,
   playRarePayoff,
   playRareRise,
   playShimmerSweep,
@@ -35,14 +33,12 @@ import '../styles/packopen.css';
  * duplicates lands at 420 + 3×840 = 2.94s. A rare pull adds its held build on
  * top of whichever it is.
  *
- * **A new card no longer has one number**, because the silhouette beat writes the
- * name a character at a time: 180 + 320 + 580 + 40 per character. That is 1160ms
- * for "Bo" and 1640ms for "Daan van der Beek", and a 3-card pack of new cards
- * runs about 4.5–5.0s against the 3.96s it used to. See `holdFor` for why the
- * per-character rate is constant and is not to be normalised away.
+ * A new card costs 180 + 320 + 880 = 1380ms for the silhouette beat, so 2.76s at
+ * the settled ×2 against a duplicate's 1.68s. One number for every new card,
+ * whatever their name — see `holdFor`.
  *
- * All of this is past the "under two seconds" target the design started with. It
- * is a deliberate trade for a reveal long enough to be worth watching, and the
+ * That is past the "under two seconds" target the design started with. It is a
+ * deliberate trade for a reveal long enough to be worth watching, and the
  * click-to-skip is what keeps it tolerable at roughly a thousand openings a year.
  * The trade also unwinds on its own: as the album fills, fewer cards are new, so
  * the long version becomes the rare one.
@@ -93,105 +89,85 @@ const SETTLE_MS = 460;
 /* ------------------------------------------------------------------ *
  * The silhouette beat
  *
- * A new card turns over into its tier metal, its overall and the green rim, with
- * the player still their own outline. Their name then spells itself out one
- * character at a time — and only once it is complete does the face dissolve in.
+ * A new card turns over into its tier metal and its overall, with the player
+ * still their own outline. The silhouette is allowed to register, and then light
+ * bursts from the centre of the card, opening the name and the face outwards
+ * behind it — and settling at the border as the green "new" rim.
  *
- * **Two events, in that order, and not one.** The name and the face used to land
- * together, the fade starting just before the final character. That reads as a
- * single arrival, which is tidy but flat: the run of characters builds to
- * something and then the something is already there. Spelling the name out in
- * full first gives the build an ending of its own, and leaves the face as a
- * separate answer to a question you have just finished asking.
+ * **One event.** This went through a long detour: the name arriving a character
+ * at a time, then a word at a time, each word struck on with its own blow and
+ * cooling from white-hot afterwards. All of it came out, for two reasons worth
+ * keeping written down.
+ *
+ * A name is a *single fact*, and splitting it spends its beats on grammar — one
+ * of "Jasper / van / Buul"'s three dramatic moments was the word "van". And each
+ * fragment was far too small to carry a sound heavy enough to matter, so the
+ * sound was permanently louder than the thing it was happening to. That mismatch
+ * is what read as silly, and no amount of tuning the blow fixed it, because the
+ * problem was never the blow.
  *
  * Everything below is measured **from the flip landing**, not from the turn —
  * the same convention `HOLD_MS` uses, and for the same reason.
  *
- *   0                       the card lands: metal, overall, rim, silhouette
- *   SILHOUETTE_LEAD_MS      the write begins
- *   + n × NAME_TICK_MS      character n lands, a tick every nth
- *   ...+ writeMs            the last character; the name is complete
- *   + REVEAL_GAP_MS         the beat that separates the two events
- *   + PORTRAIT_FADE_MS      the face dissolves in, with the bell on its first frame
+ *   0                       the card lands: metal, overall, silhouette
+ *   SILHOUETTE_LEAD_MS      the flash goes off; the clang; the card opens
+ *   + REVEAL_MS             the light reaches the border and becomes the rim
  *   + READABLE_MS           fully readable, then the card goes to the row
- *
- * The first version of this beat had no write: it was a flat 150ms pause and
- * then a dissolve, and it read as a glitch rather than as a build precisely
- * because nothing happened during it. A pause is only suspense if something is
- * visibly under way.
  * ------------------------------------------------------------------ */
 
 /** The silhouette alone, before anything starts happening to it. */
 const SILHOUETTE_LEAD_MS = 120;
 
 /**
- * One character of the name.
+ * The flash that reveals the card: light out of the centre point, pushing outward
+ * in every direction, with the name and the face opening behind it.
  *
- * **Constant per character, so a long name genuinely takes longer.** "Anneloes
- * Ernest" is fourteen ticks and "Bo" is two, and the post-flip window differs by
- * almost a second at the settled multiplier. That was raised as both a pacing
- * problem and an information leak — the rhythm tells you roughly how long the
- * name is before you can read it — and accepted on both counts: a constant rate
- * is what makes it read as *writing* rather than as a progress bar, and the
- * alternative is every card taking as long as the longest.
+ * **A bloom, not a beam**, and it took three attempts to get there. A beam has a
+ * defined edge, so the eye measures it against the reveal it is supposed to be
+ * carrying and any disagreement is glaring. First that was the ceremony's
+ * left-to-right shimmer, whose keyframes leave the light off the card for most of
+ * the run; then a pair of streaks parting from the centre line, which were exactly
+ * in step and still read as two objects rather than as one event. A bloom has no
+ * edge to be measured against — it lights the card, and the card is different
+ * afterwards.
  *
- * Do not "fix" this by normalising the total duration.
+ * **This is the light's duration *and* the reveal's, because they are the same
+ * motion.** There is deliberately no separate knob: the version that had them on
+ * two clocks is precisely the one that came apart.
  *
- * Mirrored by `.card__char`'s transition in card.css, which is one tick long so
- * that each character finishes exactly as the next begins.
+ * `ease-out` at both ends, so most of it happens in the first half — that is what
+ * makes it read as a flash rather than as something inflating. The floor is around
+ * 180, which the first attempt used and which never registered at all.
+ *
+ * **Must match `.card--reveal`'s wipe in card.css**, and `--reveal-ms` on
+ * `.opener__flash`, both of which are driven from this number.
  */
-const NAME_TICK_MS = 55;
+const REVEAL_MS = 280;
 
 /**
- * Tick on every nth character, not on every one.
+ * How far into the burst the light first meets the card's border.
  *
- * The audio is deliberately decoupled from the write. At the settled ×2 scale a
- * tick per character is one every 80ms, and under roughly 120–150ms of separation
- * discrete clicks stop being heard as events at all and fuse into a rattle — so
- * the run sounded like a texture rather than like characters landing.
+ * The burst is sized so its outer edge reaches the **corners** exactly as it ends
+ * (see `opener-reveal-burst`), but a circle expanding inside a 5:7 rectangle
+ * always meets the **sides** first — at scale 0.497 against the corners' 0.855,
+ * which is 56% of the way along the growth. `ease-out` front-loads that, putting
+ * it near 45% of the elapsed time.
  *
- * Thinning the sound rather than slowing the write keeps the two tunable
- * separately: the write is paced for the eye and this is paced for the ear.
- *
- * Every second character lands roughly four ticks a second at the current rate.
- * The final one always ticks too, whatever the count lands on, so the run has an
- * audible end — the bell is no longer there to close it, having moved to the face.
+ * That is when the rim lights. Firing it at the end of the burst instead — which
+ * is what it did — put the glow most of a second after the moment that is
+ * supposed to have caused it, and the two read as unrelated events rather than as
+ * one thing depositing another.
  */
-const TICK_EVERY_NTH = 2;
+const RIM_AT_FRACTION = 0.45;
 
 /**
- * The portrait's cross-dissolve. **Must match `.card--reveal`'s transition in
- * card.css.**
- *
- * There was a green shimmer crossing the card over exactly this window, on the
- * idea that the light was what brought the face. It went: a pass that fast reads
- * as a flicker rather than as light travelling, and the face was fading in
- * uniformly underneath it anyway, so the two had no visible relationship to each
- * other. If a sweep comes back it has to actually carry the reveal — masking the
- * photo in behind its leading edge — rather than passing over it.
- */
-const PORTRAIT_FADE_MS = 180;
-
-/**
- * The silence between the name completing and the face arriving.
- *
- * Small, but it cannot be zero. Two events with no gap between them are heard as
- * one event, which is exactly what this restructure was undoing — the beat needs
- * long enough for the last character to be seen to have landed, and no longer.
- */
-const REVEAL_GAP_MS = 70;
-
-/**
- * How long the finished card is simply left alone, once the portrait has landed.
+ * How long the finished card is simply left alone, once the flash has burned out.
  *
  * Deliberately `HOLD_MS` — exactly what a duplicate gets. The new card's extra
- * time is spent on the build, not on lingering afterwards, which is the same
+ * time is spent on the reveal, not on lingering afterwards, which is the same
  * argument that keeps rarity in the anticipation rather than in the dwell.
  */
 const READABLE_MS = HOLD_MS;
-
-/** The write's length: one tick per character of the name as printed. */
-const writeMsFor = (card: Card): number => nameGroups(card).length * NAME_TICK_MS;
 
 /**
  * How long a card stays up once revealed, measured from the end of the flip.
@@ -199,19 +175,13 @@ const writeMsFor = (card: Card): number => nameGroups(card).length * NAME_TICK_M
  * A duplicate is unchanged and unchanging: `HOLD_MS`, nothing else. It skips the
  * beat entirely, which is what makes the beat mean "new".
  *
- * A new card's window is **name-dependent** and so cannot be a constant any
- * more — it is the lead, the write, the gap, the portrait's dissolve, and then
- * the readable hold. The old `HOLD_NEW_BONUS_MS` is gone with it; the bonus is
- * now literally the length of the build.
+ * **Constant again.** It was briefly name-dependent, because the name arrived a
+ * word at a time and a long name therefore took longer — which meant the pacing
+ * of a pack varied with whose card came out of it. One flash is one duration for
+ * everybody.
  */
 const holdFor = (card: RevealedCard): number =>
-  card.isNew
-    ? SILHOUETTE_LEAD_MS +
-      writeMsFor(card) +
-      REVEAL_GAP_MS +
-      PORTRAIT_FADE_MS +
-      READABLE_MS
-    : HOLD_MS;
+  card.isNew ? SILHOUETTE_LEAD_MS + REVEAL_MS + READABLE_MS : HOLD_MS;
 
 const PARTICLE_COUNT = 24;
 
@@ -410,8 +380,9 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    * that wrote itself would put the sound and the writing on two clocks, which is
    * the drift `animationSpeed.ts` exists to prevent.
    */
-  const [written, setWritten] = useState(0);
   const [portraitIn, setPortraitIn] = useState(false);
+  /** The reveal flash is burning. Mounted for its length and no longer. */
+  const [flashing, setFlashing] = useState(false);
   const [glowing, setGlowing] = useState(false);
   /**
    * The full-screen bloom, tracked separately from `glowing`.
@@ -663,8 +634,8 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     setHeroVisible(true);
     setFaceUp(false);
     setFlagged(false);
-    setWritten(0);
     setPortraitIn(false);
+    setFlashing(false);
     setGlowing(false);
     setBlooming(false);
     setMotesOut(false);
@@ -672,50 +643,48 @@ const PackOpener: React.FC<PackOpenerProps> = ({
 
     /* Called at the turn itself, by both the ceremony path and the plain one. */
     const advance = () => {
-      /*
-       * The green rim enters *with* the turn rather than after it, so the flip
-       * resolves into metal, overall and rim together and the card arrives
-       * already marked as new. Its 240ms bloom therefore runs under the second
-       * half of the 320ms flip and is fully up as the card lands.
-       *
-       * It used to be scheduled at `FLIP_MS`, which put it a beat behind the
-       * face. That was invisible while the face was all there was; now the face
-       * is a silhouette for a moment, and the rim is one of the two things
-       * carrying that moment.
-       */
-      setFlagged(true);
-
-      /* The other one. Only a new card has anything to withhold. */
       if (card.isNew) {
-        const groups = nameGroups(card);
-        const writeMs = groups.length * NAME_TICK_MS;
-        /* The instant the write begins; everything below is relative to it. */
-        const writeAt = FLIP_MS + SILHOUETTE_LEAD_MS;
-
         /*
-         * `i + 1` ticks in, not `i`, so the first character lands one tick after
-         * the write begins rather than on the same frame as the silhouette's lead
-         * expiring. It also puts the last character exactly at
-         * `writeAt + writeMs`.
+         * One event. The silhouette is allowed to register, then light bursts out
+         * of the centre and opens the card behind it.
+         *
+         * This was a build: the name arrived a word at a time, each word struck on
+         * with its own blow, cooling from white-hot afterwards. It came out. A name
+         * is a single fact, and splitting it spent its beats on grammar — one of
+         * "Jasper / van / Buul"'s three dramatic moments was the word "van". And
+         * each fragment was far too small to carry a blow heavy enough to matter,
+         * so the sound was permanently louder than the thing it was happening to,
+         * which is what read as silly rather than as weighty.
          */
-        groups.forEach((_, i) => {
-          const last = i === groups.length - 1;
-          after(writeAt + (i + 1) * NAME_TICK_MS, () => {
-            setWritten(i + 1);
-            /* The last one always ticks, so the run is heard to end. */
-            if (last || i % TICK_EVERY_NTH === 0) playNameTick();
-          });
-        });
+        const flashAt = FLIP_MS + SILHOUETTE_LEAD_MS;
 
-        /*
-         * The second event. The name is complete and has been allowed to sit for
-         * a beat; the face then dissolves in, and the bell marks that arrival
-         * rather than the end of the writing.
-         */
-        after(writeAt + writeMs + REVEAL_GAP_MS, () => {
+        after(flashAt, () => {
+          setFlashing(true);
           setPortraitIn(true);
-          playNameSettle();
+          /* The chime inside it waits for the border; same number as the rim. */
+          playNameReveal(ms(REVEAL_MS * RIM_AT_FRACTION));
         });
+
+        /*
+         * The rim lights **the moment the light arrives at the border** — partway
+         * through the burst, not at the end of it. See `RIM_AT_FRACTION`.
+         *
+         * It used to come up with the turn, which made it something the card
+         * arrived already wearing. Now the light leaves the centre, opens the card
+         * on its way out, and what it deposits at the edge is the rim: the glow is
+         * the flash's residue rather than a second green thing that happened to be
+         * there anyway.
+         */
+        after(flashAt + REVEAL_MS * RIM_AT_FRACTION, () => setFlagged(true));
+
+        after(flashAt + REVEAL_MS, () => setFlashing(false));
+      } else {
+        /*
+         * A duplicate has no reveal to conclude, so there is nothing to wait for.
+         * (The rim only renders on a new card anyway — see `opener__flip--new` —
+         * but the flag is set on both paths so the two cannot drift.)
+         */
+        setFlagged(true);
       }
 
       after(FLIP_MS + holdFor(card), () => stepRef.current(index + 1));
@@ -1089,7 +1058,11 @@ const PackOpener: React.FC<PackOpenerProps> = ({
                   <PlayerCard
                     card={current}
                     eager
-                    reveal={current.isNew ? { written, portrait: portraitIn } : undefined}
+                    reveal={
+                      current.isNew
+                        ? { revealed: portraitIn }
+                        : undefined
+                    }
                   />
                   {isPeak && faceUp ? <div className="opener__sweep" /> : null}
                 </div>
@@ -1098,6 +1071,19 @@ const PackOpener: React.FC<PackOpenerProps> = ({
               {/* Outside the flip, so it stays flat while the card turns. Only
                   during the build — once face up, the card speaks for itself. */}
               {glowing && !faceUp && level > 0 ? <div className="opener__shimmer" /> : null}
+
+              {/*
+                And the pass that reveals a new card, after the flip rather than
+                before it — the other end of the same idea. Green, not gold: see
+                the block in packopen.css. Outside the flip for the same reason
+                the ceremony shimmer is.
+              */}
+              {flashing ? (
+                <div
+                  className="opener__flash"
+                  style={{ '--reveal-ms': `${ms(REVEAL_MS)}ms` } as React.CSSProperties}
+                />
+              ) : null}
             </div>
           </div>
 

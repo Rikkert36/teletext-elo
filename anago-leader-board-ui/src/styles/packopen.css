@@ -863,6 +863,108 @@
 }
 
 /*
+ * The light that reveals a new card, *after* the flip.
+ *
+ * **Green, not gold**, and that is the whole reason the "new" rim is a cool green
+ * rather than a second warm glow: gold is the rarity signal and green is the
+ * newness signal, and the two are independent facts. A gold bloom over a card that
+ * has already turned would read as the ceremony carrying on past its own climax —
+ * at every tier, including on cards that had no ceremony at all.
+ *
+ * Weaker than the ceremony's light, too. That one lights a card back with nothing
+ * on it; this one lights a face you are about to read, and at the ceremony's
+ * strength it washed the overall out as it passed.
+ *
+ * Outside `.opener__flip`, like the ceremony shimmer: light on the surface rather
+ * than printing on the card. Here there is a second reason — the flip's subtree
+ * depends on staying flattened for back-face culling, and this carries a
+ * `z-index`.
+ */
+.opener__flash {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/*
+ * **A flash out of the centre point, pushing outward in every direction.**
+ *
+ * Not a beam. Two versions of this were a travelling band — first the ceremony's
+ * left-to-right `opener-shimmer`, then a pair of streaks parting from the centre
+ * line — and both had the same trouble: a beam has a *defined edge*, so the eye
+ * measures it against the reveal it is supposed to be carrying, and any
+ * disagreement between the two is obvious. A bloom has no edge to measure. It
+ * lights the card, and the card is different afterwards.
+ *
+ * The reveal opens as a circle from the same point (`clip-path` in card.css), so
+ * light and reveal grow together outward rather than one chasing the other across.
+ *
+ * `ease-out` on both: nearly all of it happens in the first half, which is what
+ * makes it read as a flash rather than as something inflating.
+ *
+ * The green is the "new" rim's own colour, so light reaching the border and going
+ * out reads as being absorbed into the glow already sitting there.
+ */
+.opener__flash::before {
+  content: "";
+  position: absolute;
+  /* Wider than the card, so the bloom is past the corners before it is spent. */
+  inset: -25%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(240, 255, 248, 0.85) 0%,
+    rgba(190, 255, 224, 0.55) 34%,
+    rgba(152, 255, 206, 0.26) 62%,
+    rgba(152, 255, 206, 0) 78%
+  );
+  transform: scale(0.04);
+  animation: opener-reveal-burst var(--reveal-ms, 560ms) ease-out 1 forwards;
+}
+
+/*
+ * **The end scale is where the light reaches the corners, and it is arithmetic,
+ * not taste.**
+ *
+ * The gradient's reference radius is the element's farthest corner, and the
+ * element is 1.5× the card, so the visible edge — the 78% stop — sits at
+ * `s × 0.78 × 1.5 × diagonal / 2`. Setting that equal to the card's half-diagonal
+ * gives `s = 0.855`.
+ *
+ * It ran to 1.25 before, which meant the light met the sides 38% of the way in
+ * and the corners at 67%, then spent the last third expanding off-card with
+ * nothing left to light. The rim was fired at the end of that, so it arrived long
+ * after the moment it is supposed to be caused by. Ending on contact makes the
+ * animation's end *mean* something.
+ *
+ * The sides are reached before the corners regardless — a circle inside a 5:7
+ * rectangle always does — which is why the rim is lit partway through rather than
+ * here; see `RIM_AT_FRACTION` in PackOpener.tsx.
+ *
+ * The hold on opacity runs to 75%, so the light is still bright when it arrives
+ * at the border and goes out as the rim comes up. The two are one hand-off.
+ */
+@keyframes opener-reveal-burst {
+  from {
+    transform: scale(0.04);
+    opacity: 0.85;
+  }
+  18% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  to {
+    transform: scale(0.855);
+    opacity: 0;
+  }
+}
+
+/*
  * No level draws a hard gold edge — every shadow above is blurred. An outline
  * reads as a border printed on the card rather than as light coming off it.
  */
@@ -1265,13 +1367,18 @@
  * the results already carry the class when they mount, so no transition runs
  * there, which is right: their entrance animation is doing that job.
  *
- * Must comfortably finish inside the card's remaining hold. The glow starts when
- * the flip lands, so at 240ms it completes well before the card moves on; at the
- * 520ms this was first set to, it was still fading in when the card left.
+ * Must comfortably finish inside the card's remaining hold. It was 520 once and
+ * was still fading in when the card left; 240 cleared that easily.
+ *
+ * Now 160, because the rim no longer starts when the flip lands — it starts when
+ * the reveal flash reaches the border, partway through a 280ms burst. At 240 it
+ * was still ramping after the light had gone out, so the thing that was supposed
+ * to have *caused* the glow finished before the glow did. 160 lands it as the
+ * burst ends.
  */
 .opener__stage .card,
 .opener__slot .card {
-  transition: box-shadow calc(240ms * var(--anim, 1)) ease-out;
+  transition: box-shadow calc(160ms * var(--anim, 1)) ease-out;
 }
 
 /* ---------------------------------------------------------------- *
@@ -1437,6 +1544,8 @@
   .opener__radiance,
   .opener__shimmer,
   .opener__shimmer::before,
+  .opener__flash,
+  .opener__flash::before,
   .opener__sweep::before,
   .opener__particle,
   .opener__revealed .card,

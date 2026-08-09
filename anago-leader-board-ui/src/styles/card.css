@@ -674,48 +674,53 @@
 }
 
 /*
- * The portrait's cross-dissolve.
+ * The reveal: the name and the face opening from the centre line outwards, behind
+ * the two streaks that part from it.
  *
- * Declared on `card--reveal`, which is present for the whole beat — a transition
- * declared only on the withheld state comes off with it and the dissolve becomes
- * a cut.
+ * **The light carries the reveal; it does not pass over it.** This was a plain
+ * `transition: opacity` on the photo while a beam crossed the card on the same
+ * clock, and the two had no visible relationship — the light went by and the face
+ * happened to be fading underneath. It read as a flicker over an unrelated
+ * dissolve, and that beam was cut for it. A wipe puts the reveal *at* the light,
+ * which is where the silhouette ends and the player begins.
  *
- * **Must match `PORTRAIT_FADE_MS` in PackOpener.tsx**, which schedules the hold
- * around it: the opener starts this `PORTRAIT_LEAD_MS` before the final
- * character so that the face and the name finish together, and then counts
- * `READABLE_MS` from the end of it. If this duration and that constant drift,
- * the card either moves on mid-dissolve or sits finished for longer than
- * intended.
+ * **A circle out of the centre point**, so the card opens in every direction at
+ * once rather than being painted across it. The name is centred, so it resolves
+ * from its middle letters outwards and its two halves land symmetrically.
+ *
+ * 71% is not a taste figure. A percentage radius on `circle()` resolves against
+ * `√(w² + h²) / √2`, so the radius that exactly reaches a corner is `√2 / 2` —
+ * 70.71%. Below it the corners of the photo never arrive; far above it and the
+ * last part of the growth happens off the card, so the reveal finishes early and
+ * the light keeps going without it.
+ *
+ * `clip-path` rather than a mask: the boundary wants to be crisp, because that is
+ * what makes it read as an edge the light is pushing rather than as a gradient of
+ * its own. The bloom over it is soft, which is what softens it in practice.
+ *
+ * The name goes with the photo, on the same clip and the same clock. They are one
+ * fact — *who this is* — and the whole detour through revealing them separately,
+ * a word at a time, is written up in `PackOpener.tsx`.
+ *
+ * Declared on `card--reveal`, which is present for the whole beat: a transition
+ * declared only on the withheld state comes off with it and the wipe becomes a
+ * cut.
+ *
+ * **Must match `REVEAL_MS` in PackOpener.tsx**, which schedules the hold around it
+ * and drives `--reveal-ms` on the flash itself. If the two drift, the light and the
+ * edge it is supposed to be carrying separate.
  */
-.card--reveal .card__portrait--photo {
-  transition: opacity calc(180ms * var(--anim, 1)) ease-out;
+.card--reveal .card__portrait--photo,
+.card--reveal .card__name {
+  transition: clip-path calc(280ms * var(--anim, 1)) ease-out;
+  clip-path: circle(71% at 50% 50%);
 }
 
-.card--withheld .card__portrait--photo {
-  opacity: 0;
+.card--withheld .card__portrait--photo,
+.card--withheld .card__name {
+  clip-path: circle(0% at 50% 50%);
 }
 
-/*
- * One character of the name.
- *
- * Opacity only, and no colour or glow of its own: the shimmer is already passing
- * over the band as each character lands, and that is the light. Igniting every
- * glyph as well would be a second light source doing the same job — the same
- * objection that took the diagonal grain off the wrapper once the badge's own
- * sheen was doing the work.
- *
- * The fade is one tick long (`NAME_TICK_MS`), so each character finishes exactly
- * as the next begins: not a hard snap, and never two mid-fade at once, which
- * blurs the rhythm the ticks are keeping.
- */
-.card__char {
-  opacity: 0;
-  transition: opacity calc(40ms * var(--anim, 1)) linear;
-}
-
-.card__char--in {
-  opacity: 1;
-}
 
 /*
  * Reduced motion never actually reaches this — the opener skips the whole reveal
@@ -725,13 +730,13 @@
  */
 @media (prefers-reduced-motion: reduce) {
   .card--reveal .card__portrait--photo,
-  .card__char {
+  .card--reveal .card__name {
     transition: none;
   }
 
   .card--withheld .card__portrait--photo,
-  .card__char {
-    opacity: 1;
+  .card--withheld .card__name {
+    clip-path: none;
   }
 }
 

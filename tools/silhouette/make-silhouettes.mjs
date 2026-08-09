@@ -14,7 +14,9 @@
  * predicts which pixels belong to the dominant subject, which is exactly the thing a
  * luminance threshold could not know. Two passes: the first locates the subject in the
  * full photo, the second runs again on a 5:7 frame fitted around it, so a full-body
- * photo gets framed like a portrait instead of yielding a tiny figure.
+ * photo gives the model far more than a handful of pixels to work with. The result is
+ * then projected back into the card's own crop, which is the only frame the front end
+ * can line a mask up with.
  *
  * Output is a PNG whose alpha channel carries the mask and whose RGB is flat white, so
  * the front end can use it directly as a CSS mask over a block of ink.
@@ -40,8 +42,8 @@ const FRAME_CUTOFF = 0.25;
 /** Breathing room around the subject, as a share of its longest side. */
 const FRAME_MARGIN = 0.10;
 /**
- * Only re-frame when the fitted frame is meaningfully tighter than the default crop.
- * Head-and-shoulders photos are the rule, and they should be left alone.
+ * Only re-run on a fitted frame when it is meaningfully tighter than the default crop.
+ * Head-and-shoulders photos are the rule, and a second pass buys them nothing.
  */
 const FRAME_GAIN = 0.85;
 /**
@@ -192,6 +194,50 @@ function frameAroundSubject(mask, source) {
   return { x: Math.round(bx), y: Math.round(by), w: Math.round(bw), h: Math.round(bh) };
 }
 
+/**
+ * Draw the N×N mask, which covers `frame`, into the card's own crop at card size.
+ *
+ * The mask has to be *stored* in the card's frame no matter which frame it was inferred
+ * from. The front end stretches it over the whole portrait box (`mask-size: 100% 100%`)
+ * while the photo underneath is `object-fit: cover` at `object-position: center 22%` —
+ * that is `defaultFrame`, and nothing tells the front end otherwise. Handing it a mask
+ * cut to a tighter frame therefore blows the subject up to fill the card while the photo
+ * stays put, which is what happened to the three full-body avatars in the pool.
+ *
+ * Sampling clamps at the frame's edges rather than treating the outside as background.
+ * A fitted frame carries FRAME_MARGIN of background around the subject, so what gets
+ * replicated outward is background anyway — except where clampFrame ran the frame into
+ * the edge of the photo, and there the card's crop stops at that edge too.
+ *
+ * The mask is quantised to 8 bits before interpolating rather than after, which is what
+ * the resample this replaces did. Rounding once would be marginally better, but it would
+ * also nudge every mask in the pool by a few levels along its soft edge, and the point of
+ * this function is that a frame which already was the card's frame comes out unchanged.
+ * Measured over the pool it does: same bytes but for the outermost row and column, where
+ * the old resample interpolated with a negative weight and wrapped it through a Buffer.
+ */
+function project(mask, frame, card) {
+  const levels = new Uint8Array(N * N);
+  for (let i = 0; i < N * N; i++) levels[i] = Math.round(mask[i] * 255);
+
+  const out = new Uint8Array(CARD_W * CARD_H);
+  for (let y = 0; y < CARD_H; y++) {
+    // The card pixel's centre, in source pixels, and then in mask pixels.
+    const sy = card.y + (y + 0.5) * card.h / CARD_H;
+    const my = Math.max(0, Math.min(N - 1, (sy - frame.y) * N / frame.h - 0.5));
+    const y0 = Math.floor(my), y1 = Math.min(N - 1, y0 + 1), fy = my - y0;
+    for (let x = 0; x < CARD_W; x++) {
+      const sx = card.x + (x + 0.5) * card.w / CARD_W;
+      const mx = Math.max(0, Math.min(N - 1, (sx - frame.x) * N / frame.w - 0.5));
+      const x0 = Math.floor(mx), x1 = Math.min(N - 1, x0 + 1), fx = mx - x0;
+      const a = levels[y0 * N + x0] * (1 - fx) + levels[y0 * N + x1] * fx;
+      const b = levels[y1 * N + x0] * (1 - fx) + levels[y1 * N + x1] * fx;
+      out[y * CARD_W + x] = Math.round(a * (1 - fy) + b * fy);
+    }
+  }
+  return out;
+}
+
 /** Push a frame inside the image, shrinking it if it does not fit. */
 function clampFrame(frame, sw, sh) {
   let { x, y, w, h } = frame;
@@ -295,15 +341,8 @@ async function generate(session, avatarFile, outFile) {
   // Pass two: the chosen frame, where the subject now fills the input.
   const mask = await infer(session, src, source.width, source.height, frame);
 
-  const smallRgba = Buffer.alloc(N * N * 4);
-  for (let i = 0; i < N * N; i++) {
-    const v = Math.round(mask[i] * 255);
-    smallRgba[i * 4] = smallRgba[i * 4 + 1] = smallRgba[i * 4 + 2] = v;
-    smallRgba[i * 4 + 3] = 255;
-  }
-  const scaled = resample(smallRgba, N, N, CARD_W, CARD_H);
-  const grey = new Uint8Array(CARD_W * CARD_H);
-  for (let i = 0; i < CARD_W * CARD_H; i++) grey[i] = scaled[i * 4];
+  // Back into the card's crop, which is the frame the front end draws the photo in.
+  const grey = project(mask, frame, standard);
 
   keepLargest(grey, CARD_W, CARD_H, components(grey, CARD_W, CARD_H));
   const final = components(grey, CARD_W, CARD_H);

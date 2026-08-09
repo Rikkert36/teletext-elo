@@ -72,31 +72,15 @@ const sizeClass: Record<CardSize, string> = { sm: 'card--sm', md: '', lg: 'card-
  * JS and CSS.
  */
 export interface CardReveal {
-  /** How many of `nameGroups` are on the card. 0 while the silhouette holds alone. */
-  written: number;
-  /** True once the portrait has begun dissolving in. */
-  portrait: boolean;
+  /**
+   * True once the sweep has begun and the name and the face are coming in.
+   *
+   * One flag, because it is now one event. It was a word counter, a cooling
+   * duration and a per-blow knock, driving a name that arrived a word at a time —
+   * see the note over `.card__name` for why that came back out.
+   */
+  revealed: boolean;
 }
-
-/**
- * The name band's text, split into the units the reveal writes one at a time.
- *
- * A group is **one non-space character plus any space before it**, so a space is
- * revealed together with the character that follows it and never occupies a tick
- * of its own. Without that, "Daan van der Beek" would pause three times for
- * nothing and the rhythm would tell you how many words the name has before you
- * could read any of them.
- *
- * `splitName` has already collapsed runs of whitespace and trimmed the ends, so
- * the groups cover the string exactly — nothing is left over and nothing is
- * dropped.
- *
- * Exported because `PackOpener` needs the *count* to schedule the ticks and to
- * size the hold, and this is the one definition of what a tick corresponds to.
- * Deriving it there separately is how the sound and the writing would drift.
- */
-export const nameGroups = (card: Card): string[] =>
-  splitName(card.player.name).display.match(/\s*\S/g) ?? [];
 
 /**
  * How deep the pile is, in words. Shared with the card viewer so the tooltip and
@@ -236,7 +220,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
     empty ? 'card--empty' : `card--${card.tier}`,
     icoon ? 'card--icoon' : '',
     reveal ? 'card--reveal' : '',
-    reveal && !reveal.portrait ? 'card--withheld' : '',
+    reveal && !reveal.revealed ? 'card--withheld' : '',
     sizeClass[size],
     className,
   ]
@@ -299,29 +283,15 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
         )}
 
         {/*
-          Two renderings of the same string. Everywhere but the opener it is one
-          text node, exactly as it always was.
+          One text node, everywhere, including the reveal.
 
-          During the reveal it is one span per group, **all of them present from
-          the first frame** and revealed by opacity alone. That is what stops the
-          band reflowing: the name is centred, so a version that appended
-          characters as they arrived would grow outward from the middle and shift
-          every glyph already on the card at every tick. Opacity does not affect
-          layout, so the full string reserves its box once and nothing moves
-          again.
+          It was briefly one span per word so they could be lit one at a time. The
+          name went back to arriving whole because splitting it split *one fact*
+          into grammar — and a beat spent on the word "van" is a beat spent on
+          nothing. The sweep reveals the name and the face together now, so there
+          is nothing left to address individually.
         */}
-        <div className="card__name">
-          {reveal
-            ? nameGroups(card).map((group, i) => (
-                <span
-                  key={i}
-                  className={`card__char${i < reveal.written ? ' card__char--in' : ''}`}
-                >
-                  {group}
-                </span>
-              ))
-            : cardName}
-        </div>
+        <div className="card__name">{cardName}</div>
       </div>
     </div>
   );
