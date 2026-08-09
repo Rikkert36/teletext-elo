@@ -6,9 +6,18 @@
  * **Temporary** — when one is chosen its rules move into card.css and
  * packopen.css and this file goes.
  *
- * Two left: **D · gloeien**, the silhouette charging and draining, and **H ·
- * scherven**, the card breaking into cells whose skins take their shapes one at
- * a time. H's geometry comes from `utils/cardPieces.ts`.
+ * Two mechanics — the **glow** (the silhouette charging and draining) and the
+ * **break** (cells whose skins take their shapes one at a time, geometry in
+ * `utils/cardPieces.ts`) — each in a plain version and a *silhouette-first* one
+ * where the flip lands on bare metal and what the effect delivers is a glowing
+ * figure, with the face arriving after it:
+ *
+ *   D  gloeien                 glow, delivers the face
+ *   E  silhouet uit gloed      D exactly, with the figure not on the card when
+ *                              the flip lands. One value differs; see below
+ *   H  scherven                break, delivers the face
+ *   I  gloed uit het figuur    break, silhouette-first, lit by the figure itself
+ *   J  kaart uitgelicht        break, silhouette-first, lit by the stage pair
  *
  * They may not be rivals at all — the open idea is glow up to 84 and the break
  * from 85, so the shards become what the top of the scale gets rather than what
@@ -34,11 +43,17 @@
  * ------------------------------------------------------------------
  * `--reveal-ms`
  *
- * Published by `PackOpener` on `.opener__riser`, already through `ms()` — so it
- * is a *real* duration and must never be multiplied by `--anim` again. It is the
- * one clock: every duration and delay below is written as a fraction of it, so a
- * candidate's timing can be retuned from `revealStyle.ts` alone and the light
- * cannot come apart from the reveal it is carrying.
+ * Published by `PackOpener` on **`.opener__stage`**, already through `ms()` — so
+ * it is a *real* duration and must never be multiplied by `--anim` again. It is
+ * the one clock: every duration and delay below is written as a fraction of it,
+ * so a candidate's timing can be retuned from `revealStyle.ts` alone and the
+ * light cannot come apart from the reveal it is carrying.
+ *
+ * It sat on `.opener__riser` while the card and the flash were its only readers.
+ * The stage bloom and vignette are `position: fixed` siblings *outside* the
+ * riser — they have to be, or the stage's own clip would cut them back into the
+ * card-shaped rectangle they exist to replace — so it moved up to their nearest
+ * common ancestor. Nothing that read it before stopped.
  *
  * Multi-phase candidates use `@keyframes` rather than transitions throughout.
  * A transition has one curve, and every one of these builds slowly and lands
@@ -55,12 +70,39 @@
  * ------------------------------------------------------------------ */
 
 .reveal-d .opener__flash::before,
-.reveal-h .opener__flash::before {
+.reveal-e .opener__flash::before,
+.reveal-h .opener__flash::before,
+.reveal-i .opener__flash::before,
+.reveal-j .opener__flash::before {
   inset: 0;
   border-radius: 6px;
   transform: none;
   opacity: 0;
   animation: none;
+}
+
+/* ------------------------------------------------------------------ *
+ * No card-sized blob — I and J
+ *
+ * **A radial gradient on a card-shaped box cannot look like light.** A bare
+ * `circle` gradient sizes to the *farthest corner*, so on a 5:7 box the left and
+ * right edges sit only ~47% along its ramp — still around half alpha — and then
+ * the element simply ends. What you see is the box: hard sides, a visible top, a
+ * soft bottom. Growing the box makes the rectangle bigger, not the light softer.
+ *
+ * And it sits *over* the card at `z-index: 3`, so intensity added to it lands on
+ * top of the figure and the seams rather than behind them.
+ *
+ * D keeps it, and E with it: it has been there since round one, D won with it,
+ * and at D's strength the artefact is under the threshold where it shows. It is
+ * only when the thing is pushed hard — as the shard candidates needed — that it
+ * stops reading as light and starts reading as a lit rectangle. I and J put
+ * their light elsewhere instead.
+ * ------------------------------------------------------------------ */
+
+.reveal-i .opener__flash::before,
+.reveal-j .opener__flash::before {
+  display: none;
 }
 
 /* ================================================================== *
@@ -82,15 +124,21 @@
  * ================================================================== */
 
 .reveal-d .card--reveal .card__portrait--photo,
+.reveal-e .card--reveal .card__portrait--photo,
 .reveal-d .card--reveal .card__name,
+.reveal-e .card--reveal .card__name,
 .reveal-d .card--withheld .card__portrait--photo,
-.reveal-d .card--withheld .card__name {
+.reveal-e .card--withheld .card__portrait--photo,
+.reveal-d .card--withheld .card__name,
+.reveal-e .card--withheld .card__name {
   clip-path: none;
   transition: none;
 }
 
 .reveal-d .card--withheld .card__portrait--photo,
-.reveal-d .card--withheld .card__name {
+.reveal-e .card--withheld .card__portrait--photo,
+.reveal-d .card--withheld .card__name,
+.reveal-e .card--withheld .card__name {
   opacity: 0;
 }
 
@@ -99,12 +147,15 @@
  * cut to the shape of a person, which is the objection that took the plates off
  * the number and the name, and it holds just as well for a glowing one.
  */
-.reveal-d .card--reveal:not(.card--withheld) .card__silhouette {
+.reveal-d .card--reveal:not(.card--withheld) .card__silhouette,
+.reveal-e .card--reveal:not(.card--withheld) .card__silhouette {
   animation: reveal-charge var(--reveal-ms, 560ms) linear 1 forwards;
 }
 
 .reveal-d .card--reveal:not(.card--withheld) .card__portrait--photo,
-.reveal-d .card--reveal:not(.card--withheld) .card__name {
+.reveal-e .card--reveal:not(.card--withheld) .card__portrait--photo,
+.reveal-d .card--reveal:not(.card--withheld) .card__name,
+.reveal-e .card--reveal:not(.card--withheld) .card__name {
   animation: reveal-cool var(--reveal-ms, 560ms) linear 1 forwards;
 }
 
@@ -165,7 +216,8 @@
 }
 
 /* The surround charges with the figure and goes out with it. */
-.reveal-d .opener__flash::before {
+.reveal-d .opener__flash::before,
+.reveal-e .opener__flash::before {
   background: radial-gradient(
     circle at 50% 42%,
     rgba(240, 255, 248, 0.55) 0%,
@@ -201,32 +253,144 @@
  * D settles rather than pops: the light leaving is a release, not a blow, so the
  * card eases *down* out of the charge instead of jumping at it. It has been held
  * slightly large for the whole hold, and the drain is when it lets go.
+ *
+ * **The duration stops when the motion does, and that is not a tidiness point —
+ * it is the fix for a soft card.** This ran for the whole `--reveal-ms` with the
+ * last third of its timeline sitting on a dead `scale(1)`, and a *running*
+ * transform animation is what promotes `.card` to its own composited layer,
+ * whether or not the value is still moving. While promoted the card is a texture
+ * rather than live content: the photo is resampled and reads slightly soft, and
+ * the name loses subpixel antialiasing and renders visibly lighter — a different
+ * font, to the eye. Both snap back the instant the animation *ends* and the
+ * layer is folded away, which is what was being seen as the image coming into
+ * focus partway through the beat.
+ *
+ * So the animation now ends when the settle does, at 0.7 of the reveal, and the
+ * keyframe stops below are rescaled into that shorter span rather than moved.
+ * The photo is around a third up at that point and still behind a draining
+ * figure, so the repaint happens where it cannot be seen, and everything from
+ * there on is native resolution.
+ *
+ * **The trap is the duration, not the keyframe.** A first pass at this pulled
+ * the final `scale(1)` stop earlier and changed nothing at all, because the
+ * animation still had a third of its life left to run. Anything here that
+ * animates a transform on the card wants a duration that matches its motion.
  */
-.reveal-d .card--reveal:not(.card--withheld) {
-  animation: reveal-recoil-settle var(--reveal-ms, 560ms) linear 1;
+.reveal-d .card--reveal:not(.card--withheld),
+.reveal-e .card--reveal:not(.card--withheld) {
+  animation: reveal-recoil-settle calc(var(--reveal-ms, 560ms) * 0.7) linear 1;
 }
 
+/*
+ * **Percentages of 0.7 of the reveal, not of the reveal.** These were 52 / 62 /
+ * 86 when the animation ran the full length; they are the same three moments,
+ * rescaled into the shorter duration above so the settle itself is untouched.
+ * The old 86–100 tail was a dead hold on `scale(1)` and is what kept the card
+ * composited — see the note over the rule.
+ *
+ * In reveal-fractions the stops are still 0.52, 0.62 and 0.70.
+ */
 @keyframes reveal-recoil-settle {
   0% {
     transform: scale(1);
     animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.5);
   }
-  52% {
+  74.3% {
     transform: scale(1.016);
     animation-timing-function: linear;
   }
-  62% {
+  88.6% {
     transform: scale(1.016);
     animation-timing-function: cubic-bezier(0.16, 0.9, 0.3, 1);
-  }
-  86% {
-    transform: scale(1);
   }
   100% {
     transform: scale(1);
   }
 }
 
+
+/* ================================================================== *
+ * E · silhouet uit gloed — D, silhouette-first
+ *
+ * The card turns over into **bare metal and its overall**, with no figure at
+ * all, and the charge is what brings the figure in: out of nothing, up through
+ * green to a readable glowing silhouette, and only then white and away into the
+ * face.
+ *
+ * Everything is D's — the charge, the hold, the drain, the light, the settle —
+ * except the two rules below. D was already nearly this; what moved is where the
+ * ramp *starts*. At 0.8 opacity the figure was sitting there in tier ink before
+ * anything happened, so the charge only lit something you had been looking at
+ * for a second. From nothing, the same ramp is a reveal.
+ * ================================================================== */
+
+/*
+ * Bare metal for the lead. `card--reveal` rather than `card--withheld`, because
+ * the withheld class comes off the instant the motion starts and the animation
+ * below has to have something to ramp *from* — and because card.css's own
+ * `.card--reveal .card__silhouette` sets 0.8, which is exactly what must not be
+ * on screen when the flip lands.
+ */
+.reveal-e .card--reveal .card__silhouette {
+  opacity: 0;
+}
+
+.reveal-e .card--reveal:not(.card--withheld) .card__silhouette {
+  animation-name: reveal-charge-via;
+}
+
+/*
+ * **`reveal-charge` with one value changed**, and that is the entire candidate.
+ *
+ * Not a copy that drifted — every keyframe percentage, every colour, every blur
+ * radius and every easing is D's, and the only difference in the whole animation
+ * is `opacity` at 0%: `0.8` there, `0` here. If D is ever retuned this has to be
+ * retuned identically, or E stops being the experiment it is meant to be.
+ *
+ * It went a long way past that first. There was a bespoke ramp with a readable
+ * plateau, nine stops, a much larger bloom and its own stage lighting — all of
+ * it reasoned from "the charge has an extra job now, it has to deliver a figure
+ * legibly before burning it out". Every one of those choices made E harder to
+ * compare against the thing it is a variant of, and the comparison is the only
+ * reason it exists. **One variable.**
+ */
+@keyframes reveal-charge-via {
+  0% {
+    background-color: var(--tier-ink);
+    /* The one change. D has 0.8; the figure is not on the card yet here. */
+    opacity: 0;
+    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4);
+  }
+  40% {
+    background-color: #3f7f63;
+    opacity: 0.88;
+    filter: drop-shadow(0 0 3px rgba(152, 255, 206, 0.35));
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  52% {
+    background-color: #9dffd0;
+    opacity: 1;
+    filter: drop-shadow(0 0 16px rgba(152, 255, 206, 0.9));
+    animation-timing-function: linear;
+  }
+  62% {
+    background-color: #f4fffa;
+    opacity: 1;
+    filter: drop-shadow(0 0 22px rgba(210, 255, 236, 0.95));
+    animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
+  }
+  84% {
+    background-color: #f4fffa;
+    opacity: 0;
+    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+  }
+  100% {
+    background-color: #f4fffa;
+    opacity: 0;
+    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+  }
+}
 
 /* ================================================================== *
  * H · scherven — the break
@@ -370,7 +534,9 @@
  * shape one or three fills ahead of its skin. Both versions were cut: neither
  * was distinguishable from this one on a real pull.
  */
-.reveal-h .card--reveal:not(.card--withheld) .card__seam {
+.reveal-h .card--reveal:not(.card--withheld) .card__seam,
+.reveal-i .card--reveal:not(.card--withheld) .card__seam,
+.reveal-j .card--reveal:not(.card--withheld) .card__seam {
   animation-name: seam-front;
   animation-duration: calc(var(--reveal-ms, 560ms) * (var(--s2, 1) - var(--s1, 0)));
   animation-delay: calc(var(--reveal-ms, 560ms) * var(--s1, 0));
@@ -407,7 +573,9 @@
  * been filled. With `forwards` it stays at the base rule's `opacity: 0` until
  * its delay elapses and then takes its shape.
  */
-.reveal-h .card--reveal:not(.card--withheld) .card__piece {
+.reveal-h .card--reveal:not(.card--withheld) .card__piece,
+.reveal-i .card--reveal:not(.card--withheld) .card__piece,
+.reveal-j .card--reveal:not(.card--withheld) .card__piece {
   animation-name: skin-on;
   /* Nominal. `skin-on` holds one value, so what this actually decides is when
      `forwards` starts pinning it — the skin is present at `--at` and never
@@ -442,7 +610,11 @@
  * rule empties every cell.
  */
 .reveal-h .card--reveal .card__inner > .card__portrait--photo,
-.reveal-h .card--reveal .card__name {
+.reveal-i .card--reveal .card__inner > .card__portrait--photo,
+.reveal-j .card--reveal .card__inner > .card__portrait--photo,
+.reveal-h .card--reveal .card__name,
+.reveal-i .card--reveal .card__name,
+.reveal-j .card--reveal .card__name {
   clip-path: none;
   transition: none;
   opacity: 0;
@@ -450,7 +622,9 @@
 
 /* The backfill. Invisible by construction — it is the same image the skins
    already show. All it does is stop the card being faintly cracked forever. */
-.reveal-h .card--reveal:not(.card--withheld) .card__inner > .card__portrait--photo {
+.reveal-h .card--reveal:not(.card--withheld) .card__inner > .card__portrait--photo,
+.reveal-i .card--reveal:not(.card--withheld) .card__inner > .card__portrait--photo,
+.reveal-j .card--reveal:not(.card--withheld) .card__inner > .card__portrait--photo {
   animation: pieces-backfill calc(var(--reveal-ms, 560ms) * 0.01) linear
     calc(var(--reveal-ms, 560ms) * 0.99) both;
 }
@@ -469,7 +643,9 @@
  * and the beats it would spend on its own grammar are beats spent on nothing.
  * The face arrives in pieces; who it is arrives all at once.
  */
-.reveal-h .card--reveal:not(.card--withheld) .card__name {
+.reveal-h .card--reveal:not(.card--withheld) .card__name,
+.reveal-i .card--reveal:not(.card--withheld) .card__name,
+.reveal-j .card--reveal:not(.card--withheld) .card__name {
   animation: pieces-name calc(var(--reveal-ms, 560ms) * 0.05) ease-out
     calc(var(--reveal-ms, 560ms) * var(--pieces-name, 0.94)) both;
 }
@@ -491,7 +667,9 @@
  * Driven by `animation-delay` rather than by keyframe percentages, so it can be
  * aimed at `--pieces-name`. Nine knocks would be a rattle; one is an ending.
  */
-.reveal-h .card--reveal:not(.card--withheld) {
+.reveal-h .card--reveal:not(.card--withheld),
+.reveal-i .card--reveal:not(.card--withheld),
+.reveal-j .card--reveal:not(.card--withheld) {
   animation: pieces-recoil calc(var(--reveal-ms, 560ms) * 0.13) linear
     calc(var(--reveal-ms, 560ms) * var(--pieces-name, 0.94)) both;
 }
@@ -515,7 +693,9 @@
  * full-card glow on top of it flattens exactly the thing doing the work. It is
  * here so the last cell has something behind it.
  */
-.reveal-h .opener__flash::before {
+.reveal-h .opener__flash::before,
+.reveal-i .opener__flash::before,
+.reveal-j .opener__flash::before {
   background: radial-gradient(
     circle at 50% 44%,
     rgba(240, 255, 248, 0.4) 0%,
@@ -562,6 +742,332 @@
 
 .reveal-h .card--reveal {
   --pieces-name: 0.94;
+}
+
+/* ================================================================== *
+ * I · silhouet uit scherven — H, silhouette-first
+ *
+ * The card turns over into bare metal and its overall, and what the break
+ * delivers is a **glowing silhouette, one shard at a time** — the figure
+ * assembling out of nothing. It holds complete for a beat, and then it gives way
+ * to the face underneath it.
+ *
+ * The shards are exactly H's: same geometry, same schedule, same frontier seams.
+ * Only what is inside them changed, from a fragment of the photo to a fragment
+ * of the lit figure — which is a `PlayerCard` decision, not a CSS one.
+ *
+ * **The face arrives with the last shard, not after it.** There was a held beat
+ * here — `lastAt` 0.78 with the face at 0.88, so the assembled figure stood
+ * complete for ~580ms before giving way. It read as a stall. The reasoning was
+ * that three stages need three slots, and it was wrong: the last shard *is* the
+ * figure completing, so anything after it is the card waiting rather than the
+ * card resolving. `lastAt` is 0.88 and the face is at 0.90 — about 100ms behind,
+ * which is close enough to be one event and far enough that the shard is seen.
+ *
+ * **The two of them differ only in where the bloom comes from.** I gives every
+ * landed shard its own, so the card brightens because there is more lit figure
+ * on it; J puts one bloom over the whole card and ramps it on the clock. Same
+ * destination, opposite mechanism — I's intensity is a *consequence* of the
+ * progress and J's is a statement about it.
+ * ================================================================== */
+
+.reveal-i .card--reveal,
+.reveal-j .card--reveal {
+  /* The face landing. Just behind the last shard, so the accent stays one event. */
+  --pieces-name: 0.9;
+}
+
+/* ------------------------------------------------------------------ *
+ * I · the light comes out of the figure
+ *
+ * **One bloom on the shard layer, tracing the alpha of everything landed so
+ * far.** Which means it is shaped like the person, exists only around the parts
+ * that have arrived, and grows on its own as more of them do — an unlanded
+ * shoulder gives off nothing, because there is nothing there to cast light.
+ *
+ * One filter rather than one per shard, and that is not only cheaper. Twenty-two
+ * separate glows are twenty-two light sources that happen to be adjacent; the
+ * union of the landed shards is *the figure so far*, and a single filter over it
+ * is one light. The difference shows wherever two shards meet.
+ *
+ * The ramp on top is what makes it intensify beyond mere accumulation. Both
+ * effects are wanted: more figure means more light, and the light itself gets
+ * stronger as the run accelerates.
+ *
+ * Two things it also picks up, both accepted. The seam network is inside this
+ * layer, so it blooms too — thin lines, and their light is the same green, so it
+ * adds rather than muddies. And `.card` is `overflow: hidden`, so the bloom is
+ * clipped at the card border; the figure is central enough that little is lost.
+ * ------------------------------------------------------------------ */
+
+.reveal-i .card--reveal:not(.card--withheld) .card__pieces {
+  animation: figure-bloom var(--reveal-ms, 560ms) linear 1 forwards;
+}
+
+@keyframes figure-bloom {
+  0% {
+    filter: drop-shadow(0 0 4px rgba(190, 255, 224, 0.5))
+      drop-shadow(0 0 10px rgba(152, 255, 206, 0.3))
+      drop-shadow(0 0 20px rgba(120, 240, 185, 0.15));
+    /* Slow through the opening shards, which are a second apart — the light has
+       a long way to climb and nothing to gain by spending it early. */
+    animation-timing-function: cubic-bezier(0.5, 0, 0.7, 0.4);
+  }
+  60% {
+    filter: drop-shadow(0 0 8px rgba(214, 255, 236, 0.7))
+      drop-shadow(0 0 22px rgba(152, 255, 206, 0.5))
+      drop-shadow(0 0 48px rgba(120, 240, 185, 0.3));
+    animation-timing-function: cubic-bezier(0.3, 0.2, 0.4, 1);
+  }
+  /* The rush: shards landing fast, and the figure lighting the card properly. */
+  88% {
+    filter: drop-shadow(0 0 14px rgba(236, 255, 246, 0.9))
+      drop-shadow(0 0 40px rgba(190, 255, 224, 0.72))
+      drop-shadow(0 0 90px rgba(140, 245, 196, 0.48));
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+  /* Peak on the frame the face arrives. What fades after this is the shard layer
+     itself, which takes the bloom with it — see `via-shards-out`. */
+  100% {
+    filter: drop-shadow(0 0 20px rgba(248, 255, 252, 1))
+      drop-shadow(0 0 56px rgba(200, 255, 230, 0.85))
+      drop-shadow(0 0 120px rgba(140, 245, 196, 0.6));
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * J · one bloom over the card
+ *
+ * The other answer: a single bloom on the flash layer, ramping from nothing to
+ * full across the whole run and blowing out as the face lands.
+ *
+ * Much stronger than any other candidate's surround, because here it is not a
+ * surround — it is the thing being watched. Everywhere else the light sits under
+ * the effect; this is the effect's intensity made explicit.
+ *
+ * The ramp is deliberately smooth and does not know about the shards. If J wins
+ * over I, that is the finding: the build does not need to be *caused* by the
+ * progress, only to agree with it.
+ * ------------------------------------------------------------------ */
+
+/*
+ * **Contrast, not output** — the note already written over `.opener__dim` in
+ * packopen.css, in gold, and it is exactly what every card-sized attempt here
+ * kept failing. A soft gradient with nothing dark beside it just tints the
+ * screen, and past a point extra width actively *lowers* the card-to-surround
+ * contrast that does the reading. Darkening everything that is not the card
+ * costs no light at all and cannot wash the card out.
+ *
+ * So this is the gold pair in green, on the reveal's clock: the vignette pulls
+ * the room down as the bloom lifts the middle, and the card is the bright clear
+ * thing in it.
+ *
+ * `position: fixed`, so the stage's `overflow: hidden` cannot clip either of
+ * them into the rectangle this replaces. The vignette sits below the bloom, so
+ * the green still reads on top of the darkened field rather than being muted by
+ * it — same ordering, same reason, as the gold pair.
+ */
+.opener__vdim {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  pointer-events: none;
+}
+
+.opener__vbloom {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.opener__vdim-inner,
+.opener__vbloom-inner {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * The clear centre is measured in **card widths, not percentages**, which is the
+ * one mechanical thing to copy from the gold vignette. A percentage radius on a
+ * viewport-sized layer tracks the *window* rather than the card, so it clips the
+ * corners on a short window and leaves a wide undarkened margin on a large one.
+ * `--pack-w` is inherited from `.opener`.
+ *
+ * **And the same is true of the centre point**, which is the half of it the gold
+ * pair gets wrong. These layers are `position: fixed`, so `at 50% 45%` is the
+ * middle of the *window* — and the card sits well above that, so the hole and
+ * the bloom both landed off the thing they are about. `--card-cx` / `--card-cy`
+ * are the card's real centre in viewport pixels, measured once in `PackOpener`
+ * on the frame the motion starts. The percentage fallbacks are only ever used on
+ * a frame where nothing is drawn yet.
+ *
+ * 0.95 clears the card's half-diagonal (~0.86 × width at 5/7), so the card and
+ * its rim are never touched — only what surrounds them.
+ */
+.opener__vdim-inner {
+  background: radial-gradient(
+    circle at var(--card-cx, 50%) var(--card-cy, 45%),
+    rgba(0, 0, 0, 0) calc(var(--pack-w) * 0.95),
+    rgba(0, 0, 0, 0.3) calc(var(--pack-w) * 1.35),
+    rgba(0, 0, 0, 0.5) calc(var(--pack-w) * 2.1),
+    rgba(0, 0, 0, 0.58) 100%
+  );
+  opacity: 0;
+  animation: stage-dim var(--reveal-ms, 560ms) linear 1 forwards;
+}
+
+/* Runs to 100% so there is no ring edge on any viewport, and so an empty stage
+   is never left lit once the card has gone. */
+.opener__vbloom-inner {
+  background: radial-gradient(
+    circle at var(--card-cx, 50%) var(--card-cy, 45%),
+    rgba(232, 255, 244, 0.3) 0%,
+    rgba(168, 255, 214, 0.17) 34%,
+    rgba(140, 245, 196, 0.08) 62%,
+    rgba(120, 240, 185, 0.03) 84%,
+    transparent 100%
+  );
+  opacity: 0;
+  animation: stage-bloom var(--reveal-ms, 560ms) linear 1 forwards;
+}
+
+/* ------------------------------------------------------------------ *
+ * The ramps
+ *
+ * **Near-linear, with stops all the way along.** Both of these were a single
+ * segment on an ease-in curve — 0% straight to 90% — which meant almost nothing
+ * happened through the first half and then the room dropped in a rush. It reads
+ * as the effect switching on rather than building, and no amount of tuning the
+ * peak fixes it, because the problem was the shape of the ramp and not its
+ * height.
+ *
+ * The stops below are close to evenly spaced in *value*, so the light and the
+ * dark climb steadily from the first shard to the last. That is only affordable
+ * because both are now much weaker — a bloom this strong could not have been
+ * present early without washing out the shards that are the whole point, which
+ * is what pushed the old curve to the back in the first place. Toning down and
+ * making it gradual are the same change.
+ *
+ * Both end at nothing rather than being faded out by a class: they unmount with
+ * the flash, and there is no state after the motion to hang a fade on — an
+ * element that unmounts at full brightness cuts the light dead.
+ * ------------------------------------------------------------------ */
+
+@keyframes stage-dim {
+  0% {
+    opacity: 0;
+  }
+  24% {
+    opacity: 0.26;
+  }
+  52% {
+    opacity: 0.56;
+  }
+  78% {
+    opacity: 0.84;
+  }
+  /* Darkest just before the face, so the payoff lands in the quietest room. */
+  90% {
+    opacity: 1;
+    animation-timing-function: ease-out;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes stage-bloom {
+  0% {
+    opacity: 0;
+  }
+  22% {
+    opacity: 0.22;
+  }
+  46% {
+    opacity: 0.48;
+  }
+  72% {
+    opacity: 0.74;
+  }
+  /* Blown out on the frame the face arrives, and then gone, because what is
+     underneath it is the payoff. */
+  90% {
+    opacity: 1;
+    animation-timing-function: ease-in;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+
+/*
+ * Bare metal underneath: the ground figure is not the unrevealed state any more,
+ * because the shards are carrying the figure themselves.
+ *
+ * **Scoped to the shard candidates and emphatically not to `card--via`.** It was
+ * on `card--via` for one build, on the reasoning that hiding the ground figure
+ * is about *being silhouette-first* — and that hid E's figure too, which is the
+ * one thing E exists to show. E lights the ground figure; only a candidate that
+ * has something else to carry the figure with may take it away.
+ */
+.reveal-i .card--reveal .card__inner > .card__portrait--mask,
+.reveal-j .card--reveal .card__inner > .card__portrait--mask {
+  opacity: 0;
+}
+
+/*
+ * A shard's figure, lit. Green rather than tier ink, because this *is* the
+ * effect's light rather than something the light is falling on — and the wash
+ * over it stays for the same reason it does everywhere else: flat colour reads
+ * as a sticker cut to the shape of a person.
+ *
+ * The glow is clipped to the shard by `.card__piece-cut` above it, so the light
+ * stops at the break. That is right: the figure is arriving in pieces, and a
+ * halo spilling across a seam would deny the seam.
+ */
+.card--via .card__piece .card__silhouette {
+  background-color: #9dffd0;
+  background-image: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
+  opacity: 1;
+  filter: drop-shadow(0 0 7px rgba(152, 255, 206, 0.85));
+}
+
+/*
+ * The last beat: the assembled figure gives way and the face is underneath.
+ *
+ * The shard layer fades rather than the photo covering it, because the photo is
+ * rendered *below* the shards — and it has to be, since the shards are what the
+ * break is made of. So this resolves by subtraction, exactly as D's drain does,
+ * which is the right family resemblance for a candidate whose whole idea is that
+ * the silhouette was the thing being delivered.
+ */
+.reveal-i .card--reveal:not(.card--withheld) .card__pieces,
+.reveal-j .card--reveal:not(.card--withheld) .card__pieces {
+  animation: via-shards-out calc(var(--reveal-ms, 560ms) * 0.1) ease-in
+    calc(var(--reveal-ms, 560ms) * var(--pieces-name, 0.88)) both;
+}
+
+@keyframes via-shards-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* And the face, on the same clock — not the 99% backfill H uses, because here it
+   is an event rather than a repair. */
+.reveal-i .card--reveal:not(.card--withheld) .card__inner > .card__portrait--photo,
+.reveal-j .card--reveal:not(.card--withheld) .card__inner > .card__portrait--photo {
+  animation: pieces-backfill calc(var(--reveal-ms, 560ms) * 0.08) ease-out
+    calc(var(--reveal-ms, 560ms) * var(--pieces-name, 0.88)) both;
 }
 
 /* ------------------------------------------------------------------ *

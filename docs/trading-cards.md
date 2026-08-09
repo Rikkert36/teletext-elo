@@ -1645,6 +1645,126 @@ inside a single frame. 0.87 is what keeps an eighteen-cell run legible all the
 way down, and `revealMs` is re-derived from it. The break costs ~6.2s post-flip
 per new card and ~32s for a five-new-card pack.
 
+#### Round four: what the silhouette is *for*
+
+**Open.** Both mechanics now have a **silhouette-first** twin, on the same row.
+
+Every version so far treats the silhouette as the thing in the way: it is on the
+card when the flip lands, and the effect's job is to get rid of it. The twins
+invert that. The flip lands on **bare metal and the overall — no figure at all**,
+and what the effect *delivers* is a glowing silhouette. The face and the name
+then arrive after it, as a separate final beat.
+
+So the pull reads **how good → whose shape → who**, against the settled beat's
+how good → it's new → who. The silhouette stops being an obstacle and becomes
+the payload, which gives the effect something to do beyond uncovering a photo.
+
+| | Mechanic | What the effect delivers | Where the light is | Motion |
+|---|---|---|---|---|
+| **D · gloeien** | charge & drain | the face | the figure's own glow | ~1.6s |
+| **E · silhouet uit gloed** | charge & drain | a glowing figure, then the face | the figure's own bloom | ~2.2s |
+| **H · scherven** | the break | the face | the seams | ~4.8s |
+| **I · gloed uit het figuur** | the break | a glowing figure, then the face | the landed figure blooms | ~5.1s |
+| **J · kaart uitgelicht** | the break | as I | full-screen bloom + vignette | ~5.1s |
+
+##### The card-sized blob, and why it never worked
+
+Three attempts put the light in a radial gradient on `.opener__flash`, a
+card-shaped box sitting over the card at `z-index: 3`. All three failed the same
+two ways, and both are worth keeping written down.
+
+**It renders as a rectangle.** A bare `circle` gradient sizes to the *farthest
+corner*, so on a 5:7 box the left and right edges sit only ~47% along its own
+ramp — still around half alpha — and then the element ends. What you see is the
+box: hard sides, a visible top, a soft bottom. Growing the box (one version
+reached `inset: -26%`) makes the rectangle bigger, not the light softer.
+
+**And it washes the card out.** Every bit of intensity went on top of the figure
+and the seams — the two things it was supposed to be dramatising — so the card
+came out flat and pale, exactly as `.opener__dim`'s note in packopen.css predicts
+in gold: *"a big soft gradient with nothing dark next to it just makes the screen
+faintly yellow, and past a point extra width actively lowers the card-to-surround
+contrast that does the reading."*
+
+The two answers now on the row are the two ways out of that:
+
+- **Put the light in the figure** (E, I). A stack of `drop-shadow`s traces the
+  silhouette's alpha, so the glow is shaped like a person and exists only where
+  the figure does — in I, only around the shards that have *landed*, so it grows
+  on its own as the break proceeds. Stacked rather than single because one shadow
+  at a large radius is a smear and one at a small radius is a rim light; three
+  give a falloff. Every keyframe must carry the same number of shadows or the
+  list will not interpolate.
+  - I puts one filter on `.card__pieces` rather than one per shard. Cheaper, but
+    mainly *more correct*: twenty-two glows are twenty-two adjacent light
+    sources, whereas the union of the landed shards is "the figure so far" and
+    one filter over it is one light. It also blooms the seam network, which adds
+    rather than muddies since the green is the same.
+  - `.card` is `overflow: hidden`, so both are clipped at the card border. The
+    figure is central enough that little is lost; the alternative is a second
+    copy of the silhouette outside the card purely to cast light.
+- **Spend contrast instead of output** (J). The gold pair in green: a
+  full-screen bloom with a vignette under it, the surround pulled down as the
+  green comes up, so the card is the bright clear thing in a darkened room.
+  `position: fixed`, so the stage's clip cannot cut it back into a rectangle, and
+  the clear centre is measured in **card widths** rather than percentages —
+  a percentage radius on a viewport-sized layer tracks the window instead of the
+  card. The trade is that it dims the whole page on every new card, not only on a
+  rare one, and that is the thing to judge.
+  - This moved `--reveal-ms` from `.opener__riser` up to `.opener__stage`: the
+    fixed layers are siblings *outside* the riser, so the clock had to hang off
+    their nearest common ancestor.
+  - Both its ramps end at nothing rather than being faded out by a class. They
+    unmount with the flash, and there is no state after the motion to hang a fade
+    on — an element that unmounts at full brightness cuts the light dead.
+
+- **E is D with the ramp starting from nothing**, which was the whole of the
+  original observation and it is correct — at 0.8 opacity the figure was already
+  sitting there in tier ink, so the charge only lit something you had been
+  looking at for a second. From nothing, the same ramp is a reveal.
+  - It needs a **plateau D does not have**: a stretch at readable green between
+    arriving and going white. D ramps straight to white-hot, which is fine when
+    the figure was already there to be lit, but here the charge has to deliver a
+    silhouette legibly before it burns it out — and a figure is only a figure
+    while it is short of white. That plateau is most of E's extra 600ms.
+- **I and J are H with a silhouette inside each shard** instead of a photo
+  fragment. Same geometry, same schedule, same frontier seams; only the payload
+  changed, which is a `PlayerCard` decision rather than a CSS one.
+  - **The face arrives with the last shard, not after it.** There was a held beat
+    — `lastAt` 0.78 against a face at 0.88, so the assembled figure stood
+    complete for ~580ms first — and it read as a stall. The reasoning had been
+    that three stages need three slots, and it was wrong: **the last shard *is*
+    the figure completing**, so anything after it is the card waiting rather than
+    resolving. 0.88 and 0.90 are ~100ms apart, close enough to be one event and
+    far enough that the last shard is seen.
+  - They resolve **by subtraction**, like D's drain: the shard layer fades and
+    the face is underneath, because the photo is rendered below the shards and
+    has to be. A family resemblance worth having for a candidate whose point is
+    that the silhouette was the thing being delivered.
+  - **I and J differ only in where the bloom comes from.** I gives every landed
+    shard its own, so the card brightens because more of it is lit — the
+    intensity is a *consequence* of the progress and tracks the accelerating
+    rhythm without being told to, at the cost of a composited layer per shard (up
+    to 22). J puts one bloom over the card and ramps it on the clock, knowing
+    nothing about the shards. If J wins, the finding is that the build need not
+    be *caused* by the progress, only agree with it — and one layer is far
+    cheaper than 22.
+  - I's per-shard bloom sits on `.card__piece`, **outside** the clip. A filter is
+    applied before `clip-path`, so a glow declared on the figure inside
+    `.card__piece-cut` is cut off at the cell boundary — right for the small
+    seated glow each shard already has, useless for a bloom whose job is to
+    spread past the shard and add to its neighbours. Same rule that forced the
+    seams onto their own element.
+  - **Watch the empty shards.** A figure covers maybe half the card, so a shard
+    out at a corner delivers nothing but its own seams. That either reads as the
+    figure emerging within a spreading crack network or as half the shards doing
+    nothing, and it is the one thing here that cannot be reasoned out in advance.
+- **Hiding the ground figure is scoped to the shard candidates, not to
+  `card--via`.** It was on `card--via` for one build, on the reasoning that it is
+  about *being silhouette-first* — and that hid E's figure too, so E played as a
+  card that lit up and then showed a photo, with no silhouette at any point. Only
+  a candidate that has something else to carry the figure may take it away.
+
 **Open: this may not be an either/or.** The idea on the table is **glow (D) up to
 84 and shards from 85**, so the break is what the top of the scale gets rather
 than what every new card gets. Nothing is built for it — both are whole-beat

@@ -2,7 +2,7 @@
  * The card, broken into pieces — geometry, seams and schedule for the shard
  * reveal.
  *
- * A card breaks into seven to eleven cells that **tile it exactly**: no gaps, no
+ * A card breaks into cells that **tile it exactly**: no gaps, no
  * overlaps, and together they are the whole card. That is what makes them read
  * as one object coming apart rather than as fragments piled on top of each
  * other, and it is also what lets the finished state be pixel-identical to a
@@ -282,12 +282,15 @@ export interface BreakOptions {
    * area of a cell.
    */
   count: [number, number];
+  /**
+   * Where the last cell fills. The rest of the motion is whatever the candidate
+   * still has to do — settling, or in the silhouette-first variants an entire
+   * further beat in which the face arrives over the finished figure.
+   */
+  lastAt: number;
 }
 
-/** Where the last cell fills. The rest of the motion is the card settling. */
-const LAST_AT = 0.94;
-
-export const breakFor = ({ id, ease, count: range }: BreakOptions): CardBreak => {
+export const breakFor = ({ id, ease, count: range, lastAt }: BreakOptions): CardBreak => {
   const mode = MODES[Math.floor(hash(id, 3.1) * MODES.length)];
   const count = range[0] + Math.floor(hash(id, 5.7) * (range[1] - range[0] + 1));
   const focus = { x: 8 + hash(id, 11.3) * (W - 16), y: 10 + hash(id, 13.9) * (H - 20) };
@@ -350,7 +353,7 @@ export const breakFor = ({ id, ease, count: range }: BreakOptions): CardBreak =>
   for (let p = 1; p < order.length; p += 1) raw[p] = raw[p - 1] + ease ** (p - 1);
   const span = raw[raw.length - 1] || 1;
   /** Fill time by *position in the sequence*, not by cell. */
-  const atByPosition = raw.map((r) => (r / span) * LAST_AT);
+  const atByPosition = raw.map((r) => (r / span) * lastAt);
 
   const outCells: CardCell[] = new Array(cells.length);
   const positionOf: number[] = new Array(cells.length);
@@ -367,7 +370,7 @@ export const breakFor = ({ id, ease, count: range }: BreakOptions): CardBreak =>
           ? atByPosition[position + 1] - atByPosition[position]
           : /* The last cell has no successor; give it the previous gap so a
                candidate that scales its take by the gap still has a number. */
-            atByPosition[position] - atByPosition[position - 1] || LAST_AT,
+            atByPosition[position] - atByPosition[position - 1] || lastAt,
       cx: c.x,
       cy: (c.y / H) * 100,
       last: position === cells.length - 1,

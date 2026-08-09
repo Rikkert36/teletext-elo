@@ -172,8 +172,77 @@ const READABLE_MS = HOLD_MS;
  * rather than read here, so the hold and the beat it is waiting on cannot come
  * from two different candidates if one is switched mid-pack.
  */
-const holdFor = (card: RevealedCard, reveal: RevealStyle): number =>
-  card.isNew ? reveal.leadMs + reveal.revealMs + READABLE_MS : HOLD_MS;
+const holdFor = (card: RevealedCard, reveal: RevealStyle, leadMs: number): number =>
+  card.isNew ? leadMs + reveal.revealMs + READABLE_MS : HOLD_MS;
+
+/**
+ * Whether the ceremony hands its darkened room over to the reveal instead of
+ * giving it back at the turn.
+ *
+ * **Every rare new card, whatever the candidate.** The room belongs to the
+ * ceremony, not to the reveal: the question is only whether the build's surround
+ * recedes when the card turns, and on a card that still has a reveal to play it
+ * should not. What the reveal does inside that room — a charge, a break, a green
+ * stage light of its own — is a separate matter.
+ *
+ * What it fixes, at its worst on a candidate that lights the stage as well: the
+ * gold vignette faded over 620ms from the end of the flip while the green one
+ * climbed from *nothing* over the whole reveal, so the room recovered to about
+ * four fifths of full brightness roughly a second after the turn and then
+ * darkened all over again. Two builds with a hole between them — and the hole
+ * landed on the card at its emptiest and on the opening shards, which are the
+ * slowest and most deliberate of the run.
+ *
+ * On this path there is only ever **one vignette**. A candidate that brings its
+ * own does not mount it (see the render); what crosses at the turn is the
+ * *light* — gold bloom out, green bloom in — over a surround that never moves.
+ *
+ * The other combinations keep exactly what they had: a common new card has no
+ * gold room to inherit, and a duplicate has no reveal to hand it to.
+ */
+const handsOver = (card: RevealedCard, level: number): boolean => card.isNew && level > 0;
+
+/**
+ * The silhouette alone, before anything starts happening to it — zero when the
+ * card has no silhouette on it to look at.
+ *
+ * That beat exists so the figure registers before the effect begins, which is a
+ * real job on a candidate that lands showing one. On a **silhouette-first**
+ * candidate there is nothing there at all: the flip turns onto tier metal and an
+ * overall and then simply sits. Combined with a ceremony, that made it the
+ * emptiest second of the sequence, directly after the biggest moment in it — the
+ * build has already spent seconds letting the card register.
+ *
+ * Scoped to `viaSilhouette` rather than to the hand-over, deliberately. D and E
+ * land with the figure in tier ink and it does have to be seen before it starts
+ * charging, however long the build before it was.
+ */
+const leadFor = (card: RevealedCard, reveal: RevealStyle, level: number): number =>
+  handsOver(card, level) && reveal.viaSilhouette ? 0 : reveal.leadMs;
+
+/**
+ * How much shallower the carried vignette is than the ceremony's own.
+ *
+ * `.opener__dim--carry` swaps in `stage-dim`'s gradient — 0.58 at the edge
+ * against the build's 0.88 — because the two are dimming for opposite reasons.
+ * The build's room surrounds a card that is face down and has nothing to show;
+ * the reveal's surrounds the card you are reading, and at the build's depth it
+ * stops being a room and becomes a black field with a circle cut in it. That is
+ * exactly what the first version of the hand-over produced, by carrying the
+ * build's gradient to full: a depth nothing had ever held for more than the
+ * instant of the turn, now held for seconds on every card from 75 up.
+ *
+ * So the ceiling drops and **continuity is kept by the start value instead**.
+ * Multiplying the frozen fraction by this ratio gives the opacity at which the
+ * shallower gradient is the same darkness the deeper one had reached, so the
+ * surround does not change across the turn. Above level 2 it clamps at 1, which
+ * simply means the build had already gone past the reveal's ceiling and the
+ * carry holds there rather than climbing.
+ *
+ * **Both numbers live in packopen.css and this is the only copy.** Lower the
+ * alphas there and this has to be re-derived, or the room will step at the turn.
+ */
+const DIM_CARRY_MATCH = 0.88 / 0.58;
 
 const PARTICLE_COUNT = 24;
 
@@ -385,6 +454,24 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    */
   const [blooming, setBlooming] = useState(false);
   /**
+   * The ceremony's vignette is carrying the reveal, rather than receding at the
+   * turn like it does on every other card.
+   *
+   * A third flag on the gold pair, which is otherwise held to one rule: the two
+   * halves move together or they drift by a frame. This is the single case where
+   * they genuinely part company, and the reason is what each of them *is*. The
+   * bloom is light on the card, and it has to hand over to the green one. The
+   * vignette is the room, and the room has no business changing colour or coming
+   * back up just because the card turned. So the bloom still fades on `blooming`
+   * and the vignette ignores it, picking up its own frozen ramp and running it
+   * out to full dark at the face.
+   *
+   * See `handsOver`. Set at the *end* of the flip rather than at the turn: the
+   * freeze while the card is actually turning is still right, because a room
+   * holding still is what lets the turn be seen.
+   */
+  const [carrying, setCarrying] = useState(false);
+  /**
    * The mote layer's fade, tracked separately from `blooming` for the same kind of
    * reason `blooming` is separate from `glowing`.
    *
@@ -426,6 +513,22 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    * single-portrait path in `PlayerCard`.
    */
   const piecesRef = useRef<CardBreak | undefined>(undefined);
+  /**
+   * Where the card is on screen, in viewport pixels, for the stage bloom and
+   * vignette to centre themselves on.
+   *
+   * They are `position: fixed`, so a percentage centre is a percentage of the
+   * *window* — which put the clear hole and the bloom at the middle of the page
+   * rather than on the card, and the card sits well above that. The gold pair
+   * has the same construction and the same bug; it is simply less obvious under
+   * a glow that is already card-shaped.
+   *
+   * Measured once, in the callback that starts the motion: the card has landed
+   * and is stationary by then, and it stays put until the hand-off. A ref rather
+   * than state for the same reason as `piecesRef` — it is set before the state
+   * change that renders it, so the values are always this card's.
+   */
+  const cardCentre = useRef<{ x: number; y: number } | null>(null);
   /** The mote layer, so the turn can reach its elements and drain the stream. */
   const motesRef = useRef<HTMLDivElement | null>(null);
 
@@ -626,6 +729,27 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     timers.current.push(window.setTimeout(fn, ms(base)));
   }, []);
 
+  /**
+   * Notes where the card is on screen, for the fixed light layers to centre on.
+   *
+   * **Called immediately before the state change that turns a layer on**, never
+   * on a timer of its own: the ref has to be written before the render that
+   * reads it, and the moment a layer appears is also the moment the card is
+   * guaranteed to be sitting still. There are two such moments and they are far
+   * apart — the ceremony's build begins seconds before the flip, and the
+   * reveal's light begins after it — so measuring once per card would leave one
+   * of them centred on the previous card's position or on nothing at all.
+   *
+   * Not recomputed on resize. A reveal is a few seconds and the window is not
+   * going to move; if that ever stops being true this is where a listener goes.
+   */
+  const measureCard = useCallback(() => {
+    const rect = heroRef.current?.getBoundingClientRect();
+    cardCentre.current = rect
+      ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+      : null;
+  }, []);
+
   const finish = useCallback(() => {
     clearTimers();
     setPhase('done');
@@ -669,11 +793,27 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     setFlashing(false);
     setGlowing(false);
     setBlooming(false);
+    setCarrying(false);
     setMotesOut(false);
     setPhase('revealing');
 
+    /*
+     * Hoisted above `advance`, which needs it: the lead and the hand-over both
+     * depend on the level now, so the plain path and the ceremony path can no
+     * longer each work it out for themselves.
+     */
+    const level = ceremonyLevelFor(card.overall);
+
     /* Called at the turn itself, by both the ceremony path and the plain one. */
     const advance = () => {
+      /*
+       * Read once and threaded through both the schedule and the hold, because
+       * on the hand-over path it is not `reveal.leadMs` — see `leadFor`. Taking
+       * it twice from different places is how the beat and the wait it is
+       * measured against drift apart.
+       */
+      const lead = leadFor(card, reveal, level);
+
       if (card.isNew) {
         /*
          * One event. The silhouette is allowed to register, then light bursts out
@@ -687,9 +827,10 @@ const PackOpener: React.FC<PackOpenerProps> = ({
          * so the sound was permanently louder than the thing it was happening to,
          * which is what read as silly rather than as weighty.
          */
-        const flashAt = FLIP_MS + reveal.leadMs;
+        const flashAt = FLIP_MS + lead;
 
         after(flashAt, () => {
+          measureCard();
           setFlashing(true);
           setPortraitIn(true);
           /*
@@ -748,14 +889,20 @@ const PackOpener: React.FC<PackOpenerProps> = ({
         setFlagged(true);
       }
 
-      after(FLIP_MS + holdFor(card, reveal), () => stepRef.current(index + 1));
+      after(FLIP_MS + holdFor(card, reveal, lead), () => stepRef.current(index + 1));
     };
-
-    const level = ceremonyLevelFor(card.overall);
 
     if (level > 0) {
       // Arrives as an ordinary card, then the glow creeps in.
       after(CEREMONY_LEAD_MS, () => {
+        /*
+         * The gold bloom and vignette are fixed layers too, so they need the
+         * card's position for the same reason the reveal's pair does — and they
+         * need it *here*, because this build runs entirely before the flip and
+         * is long finished by the time the reveal measures. The riser's 180ms
+         * entrance is over well before this lead expires, so the rect is final.
+         */
+        measureCard();
         setGlowing(true);
         setBlooming(true);
 
@@ -787,9 +934,24 @@ const PackOpener: React.FC<PackOpenerProps> = ({
           // a common one the instant you could finally see who it was.
           // `playCard` clears it when the next card comes on.
           playRarePayoff(level);
-          // Bloom freezes at the turn (via --held) and then recedes as the card
-          // becomes readable — rather than cutting out or overstaying.
-          after(FLIP_MS, () => setBlooming(false));
+          /*
+           * Both halves freeze at the turn (via --held), and what happens to
+           * them at the end of the flip is where the two paths part.
+           *
+           * Ordinarily they simply recede together — the card is readable and a
+           * screen-filling glow over it has nothing left to do.
+           *
+           * On the hand-over path the *bloom* still goes, because the reveal is
+           * bringing its own green one and two lights on one card is the thing
+           * being fixed. The vignette does not: it picks up where it froze and
+           * keeps darkening the room through the whole break. Nothing about the
+           * surround should change at the turn, because the turn is not what the
+           * room is about.
+           */
+          after(FLIP_MS, () => {
+            setBlooming(false);
+            if (handsOver(card, level)) setCarrying(true);
+          });
           advance();
         });
       });
@@ -922,6 +1084,82 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     '--radiate-ms': `${ms(
       Math.round(getCeremonyMs() * (ceremonyMaxBuildRatio() - ceremonyShimmerRatio())),
     )}ms`,
+    /*
+     * The reveal's clock, on the stage rather than on the riser.
+     *
+     * It was on the riser, whose only readers were the card and the flash. The
+     * full-screen bloom and vignette are `position: fixed` siblings *outside*
+     * the riser — they have to be, or the stage's own clip would cut them — so
+     * the property has to hang off their nearest common ancestor instead. The
+     * riser is inside the stage, so nothing that read it before stops.
+     *
+     * Already through `ms()`, so no rule may multiply it by `--anim` again.
+     */
+    '--reveal-ms': `${ms(revealRef.current.revealMs)}ms`,
+    /*
+     * Where the candidate discharges, as a fraction of its own motion. The
+     * carried vignette is darkest here rather than at a fixed point, because
+     * "darkest room" and "the accent" are the same moment by definition — and
+     * the candidates do not agree on when that is: J lands its face at 0.9 while
+     * D and E drain at 0.62. A room still closing in after the payoff is
+     * building toward something that has already happened.
+     *
+     * Keyframe percentages cannot read a custom property, so the *duration* is
+     * scaled instead — see `opener__dim--carry`.
+     */
+    '--rim-at': `${revealRef.current.rimAt}`,
+    /*
+     * The carried ramp is delayed by the candidate's lead, because the carry
+     * begins at the end of the flip and the reveal it is timed against begins
+     * one lead later. Without it the room peaks early by exactly that much —
+     * 280ms real on D and E, which land their accent at 0.62 where it shows.
+     *
+     * The animation is `both`, not `forwards`, and that is load-bearing: through
+     * the delay it holds its own 0% frame, which is `--dim-carry-from` — where
+     * the ramp froze. With `forwards` alone the base rule's `opacity: 0` would
+     * apply instead and the room would snap to full brightness for the length of
+     * the lead, which is a worse version of the thing this whole path removes.
+     */
+    '--carry-delay': `${current === undefined ? 0 : ms(leadFor(current, revealRef.current, level))}ms`,
+    /*
+     * The opacity `opener__dim--carry` picks up from, so the surround is the
+     * same darkness on the frame before the turn and the frame after it.
+     *
+     * Two steps, and the second is easy to miss. First: how far the build's ramp
+     * had got when the card turned, as a fraction. Then `DIM_CARRY_MATCH`, which
+     * converts that into the *carried* gradient's scale — the carry is a third
+     * shallower, so the same darkness is a higher opacity on it. Without the
+     * conversion the room would visibly lift at the turn, which is the whole
+     * thing the hand-over exists to prevent.
+     *
+     * Derived from the same three ratios the freeze itself is, rather than read
+     * back off the element. `opener-dim-grow` is linear over the *longest*
+     * window, so the fraction of that window a level consumed is also the
+     * fraction of the ramp it rendered — which is only true while that animation
+     * stays linear. If it ever gets a curve, this has to gain the same one.
+     *
+     * Level 4 lands on 1: a 90+ has already taken the room fully dark, so the
+     * carry has nothing left to give and simply holds it there until the face.
+     */
+    '--dim-carry-from': Math.min(
+      1,
+      Math.max(
+        0,
+        (ceremonyBuildRatio(level) - ceremonyShimmerRatio()) /
+          (ceremonyMaxBuildRatio() - ceremonyShimmerRatio()),
+      ) * DIM_CARRY_MATCH,
+    ).toFixed(4),
+    /*
+     * The card's centre in viewport pixels, for the fixed stage layers. Absent
+     * until the motion starts, and the CSS falls back to the middle of the
+     * window — which is only ever seen on a frame where nothing is drawn yet.
+     */
+    ...(cardCentre.current
+      ? {
+          '--card-cx': `${Math.round(cardCentre.current.x)}px`,
+          '--card-cy': `${Math.round(cardCentre.current.y)}px`,
+        }
+      : null),
   } as React.CSSProperties;
 
   /** Only the new ones actually changed the album, so that is what gets reported. */
@@ -997,8 +1235,11 @@ const PackOpener: React.FC<PackOpenerProps> = ({
               <div
                 className={[
                   'opener__dim',
-                  faceUp ? 'opener__dim--held' : '',
-                  blooming ? '' : 'opener__dim--out',
+                  /* The freeze ends when the carry begins; they are the same
+                     ramp, and it cannot be both paused and running. */
+                  faceUp && !carrying ? 'opener__dim--held' : '',
+                  carrying ? 'opener__dim--carry' : '',
+                  blooming || carrying ? '' : 'opener__dim--out',
                 ]
                   .filter(Boolean)
                   .join(' ')}
@@ -1019,6 +1260,42 @@ const PackOpener: React.FC<PackOpenerProps> = ({
               >
                 <div className="opener__bloom-inner" />
               </div>
+            ) : null}
+
+            {/*
+              The reveal's own bloom and vignette, for the candidate that lights
+              the card the way the ceremony does.
+
+              **Mounted exactly with the flash**, so they start on the frame the
+              motion does and unmount as it ends. That is also why their ramps
+              have to return to nothing by 100% rather than being faded out by a
+              class: there is no state left after this to hang a fade on, and an
+              element that unmounts at full brightness cuts the light dead.
+
+              `position: fixed` in the CSS, like the gold pair — the stage is
+              `overflow: hidden`, and a bloom that stops at the stage's edge is
+              the card-shaped rectangle this replaces.
+            */}
+            {flashing && revealRef.current.stageBloom ? (
+              <>
+                {/*
+                  **Only when the ceremony is not already holding the room.**
+                  Two vignettes are two rooms: the gold one carrying and a green
+                  one climbing from nothing on top of it would double the
+                  darkening and put a second, differently-shaped hole around the
+                  card. On the hand-over path there is one surround for the whole
+                  card and the ceremony owns it — see `handsOver`.
+                */}
+                {carrying ? null : (
+                  <div className="opener__vdim">
+                    <div className="opener__vdim-inner" />
+                  </div>
+                )}
+                {/* The light always crosses, whoever is holding the room. */}
+                <div className="opener__vbloom">
+                  <div className="opener__vbloom-inner" />
+                </div>
+              </>
             ) : null}
 
             {/* Third layer of the build, same three flags again. Inside the stage
@@ -1078,22 +1355,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
               key={cursor}
               ref={heroRef}
               className={`opener__riser opener__riser--${cursor === 0 ? 'first' : 'next'}`}
-              /*
-                `--reveal-ms` sits here rather than on the flash, because it now
-                has two readers: the light *and* the card's own wipe, which is
-                inside the flip. Publishing it on their nearest common ancestor is
-                what makes "the light's duration is the reveal's" a fact about the
-                markup rather than a comment two files apart.
-
-                Already through `ms()`, so no rule may multiply it by `--anim`
-                again.
-              */
-              style={
-                {
-                  '--reveal-ms': `${ms(revealRef.current.revealMs)}ms`,
-                  ...(heroVisible ? null : { visibility: 'hidden' }),
-                } as React.CSSProperties
-              }
+              style={heroVisible ? undefined : { visibility: 'hidden' }}
             >
               <div
                 className={[
@@ -1137,7 +1399,11 @@ const PackOpener: React.FC<PackOpenerProps> = ({
                     eager
                     reveal={
                       current.isNew
-                        ? { revealed: portraitIn, pieces: piecesRef.current }
+                        ? {
+                            revealed: portraitIn,
+                            pieces: piecesRef.current,
+                            viaSilhouette: revealRef.current.viaSilhouette,
+                          }
                         : undefined
                     }
                   />

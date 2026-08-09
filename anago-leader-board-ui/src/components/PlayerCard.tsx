@@ -92,6 +92,16 @@ export interface CardReveal {
    * the single-portrait path below.
    */
   pieces?: CardBreak;
+  /**
+   * Silhouette-first: what the effect delivers is a glowing figure, and the face
+   * arrives after it as a separate beat.
+   *
+   * All this does here is decide **what is inside a shard** — a fragment of the
+   * lit figure rather than a fragment of the photo — and add `card--via` for the
+   * rules that hide the ground figure and land the face late. Everything about
+   * *when* still comes from the same clock in `PackOpener`.
+   */
+  viaSilhouette?: boolean;
 }
 
 /**
@@ -232,6 +242,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
     empty ? 'card--empty' : `card--${card.tier}`,
     icoon ? 'card--icoon' : '',
     reveal ? 'card--reveal' : '',
+    reveal?.viaSilhouette ? 'card--via' : '',
     reveal && !reveal.revealed ? 'card--withheld' : '',
     sizeClass[size],
     className,
@@ -338,7 +349,21 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
                   >
                     <div className="card__piece-cut" style={{ clipPath: cell.clip }}>
                       <div className="card__piece-skin">
-                        <Portrait card={card} empty={empty} eager />
+                        {/*
+                          What a shard delivers. Normally a fragment of the
+                          photo; silhouette-first, a fragment of the lit figure,
+                          with the photo held back for the beat after the break.
+
+                          Note that a shard out at a corner then delivers
+                          nothing but its own seams — the figure covers about
+                          half the card. That is inherent to the idea rather
+                          than a gap in it, and it is the thing to watch.
+                        */}
+                        {reveal.viaSilhouette ? (
+                          <Silhouette playerId={card.player.id} eager />
+                        ) : (
+                          <Portrait card={card} empty={empty} eager />
+                        )}
                       </div>
                     </div>
                   </div>

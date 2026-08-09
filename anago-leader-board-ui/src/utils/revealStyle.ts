@@ -104,6 +104,11 @@ export interface RevealPieces {
    * last ones land inside a single frame.
    */
   count: [number, number];
+  /**
+   * Where the last cell fills. 0.94 leaves just a settle; the silhouette-first
+   * variant lands it far earlier, because everything after it is a further beat.
+   */
+  lastAt: number;
 }
 
 export interface RevealStyle {
@@ -127,6 +132,33 @@ export interface RevealStyle {
    * to render a single portrait rather than a broken one.
    */
   pieces?: RevealPieces;
+  /**
+   * **Silhouette-first**: the flip lands on bare metal and the overall, with no
+   * figure at all, and what the effect reveals is a *glowing silhouette*. The
+   * face and the name arrive after that, as a separate final beat.
+   *
+   * Three stages rather than two — how good → who's shape → who — against the
+   * settled beat's how good → it's new → who. The silhouette stops being the
+   * thing that is in the way and becomes the thing that is being delivered, so
+   * the effect gets something to do that is not just uncovering a photo.
+   *
+   * Drives a `card--via` class in `PlayerCard`, which is what puts a silhouette
+   * inside each shard instead of a portrait.
+   */
+  viaSilhouette?: boolean;
+  /**
+   * Renders the reveal's own **full-screen bloom and vignette**, the pair the
+   * gold ceremony already uses — but green, on the reveal's clock, and with the
+   * vignette's clear centre sized to the card.
+   *
+   * The point is emphasis rather than output. Every card-sized glow tried so far
+   * failed the same way: a soft gradient with nothing dark next to it just makes
+   * the screen faintly green, and the layer sits over the card washing out the
+   * figure it is supposed to be dramatising. Darkening everything that is *not*
+   * the card costs no light at all and cannot wash it out — which is the note
+   * already written over `.opener__dim` in packopen.css, in gold.
+   */
+  stageBloom?: boolean;
 }
 
 export const REVEAL_STYLES: RevealStyle[] = [
@@ -142,6 +174,31 @@ export const REVEAL_STYLES: RevealStyle[] = [
    * are whole-beat candidates today and the switcher picks one for all cards.
    */
   { id: 'd', label: 'D · gloeien', leadMs: 140, revealMs: 820, rimAt: 0.62 },
+
+  /*
+   * **D, with one value changed.** The card turns over into bare metal and its
+   * overall — no figure at all — and the charge is what brings the figure in.
+   * Every timing is D's, every keyframe is D's, and the whole difference in the
+   * animation is the silhouette's opacity at 0%: `0.8` on D, `0` here. See
+   * `reveal-charge-via` in reveal.css.
+   *
+   * At 0.8 the figure was already sitting there in tier ink, so the charge only
+   * lit something you had been looking at for a second. From nothing, the same
+   * ramp is a reveal. That is the entire idea and it needed nothing else.
+   *
+   * **It had a great deal else, and all of it came out.** A bespoke ramp with a
+   * readable-green plateau, nine keyframes instead of five, a much larger
+   * three-shadow bloom, its own stage bloom and vignette, and a longer
+   * `revealMs` to fit them. Each was reasoned from "the charge has an extra job
+   * now — it must deliver a figure legibly before burning it out", which is not
+   * a silly thought. But every one of them made E harder to compare against the
+   * thing it is a variant *of*, and the comparison is the only reason it exists.
+   * The plateau in particular played as a dead 300ms freeze.
+   *
+   * **One variable.** If E is ever to beat D it has to be because of where the
+   * ramp starts, and nothing else may be in the way of seeing that.
+   */
+  { id: 'e', label: 'E · silhouet uit gloed', leadMs: 140, revealMs: 820, rimAt: 0.62 },
 
   /*
    * A shape lights and its skin is simply there with it, whole, on that frame.
@@ -183,7 +240,81 @@ export const REVEAL_STYLES: RevealStyle[] = [
     revealMs: 2400,
     /* The last cell filling. `LAST_AT` in cardPieces.ts is the same number. */
     rimAt: 0.94,
-    pieces: { ease: 0.87, count: [14, 22] },
+    pieces: { ease: 0.87, count: [14, 22], lastAt: 0.94 },
+  },
+
+  /*
+   * H, silhouette-first. The card turns over into bare metal and its overall,
+   * and what the break delivers is a **glowing silhouette, one shard at a time**
+   * — the figure assembling out of nothing. Then it dissolves and the face is
+   * underneath it.
+   *
+   * The shards are exactly H's: same geometry, same schedule, same frontier
+   * seams. Only what is inside them changed, from a fragment of the photo to a
+   * fragment of the lit figure.
+   *
+   * **The face arrives with the last shard, not after it.** There was a held
+   * beat here — `lastAt` 0.78 against a face at 0.88, so the assembled figure
+   * stood complete for ~580ms first. It read as a stall. The reasoning was that
+   * three stages need three slots, and it was wrong: the last shard *is* the
+   * figure completing, so anything after it is the card waiting rather than
+   * resolving. 0.88 and 0.90 are ~100ms apart, which is close enough to be one
+   * event and far enough that the last shard is seen.
+   *
+   * **I and J differ only in where the bloom comes from**, which is the one
+   * thing left to decide about this shape.
+   *
+   * **Watch the empty cells.** A silhouette covers maybe half the card, so a
+   * shard out at a corner delivers nothing but its own seams. That may read as
+   * the figure emerging within a spreading crack network, or as half the shards
+   * doing nothing — it is the one thing about this that cannot be reasoned out.
+   */
+  {
+    id: 'i',
+    /*
+     * **The light comes out of the figure.** One bloom on the shard layer,
+     * tracing the alpha of everything landed so far — so it is shaped like the
+     * person, exists only around the parts that have arrived, and grows for free
+     * as more of them do. A ramp on top of that makes it intensify.
+     *
+     * One filter rather than one per shard, which is both cheaper and more
+     * correct: the union of the landed shards is exactly "the figure so far",
+     * and twenty-two separate glows cannot add up to a single light source.
+     */
+    label: 'I · gloed uit het figuur',
+    leadMs: 180,
+    /* 0.88 of this is the shard run, which puts it within ~5% of H's absolute
+       pacing — the two are comparable as breaks, not just as ideas. */
+    revealMs: 2550,
+    /* The face landing. The accent belongs to whatever ends the reveal. */
+    rimAt: 0.9,
+    pieces: { ease: 0.87, count: [14, 22], lastAt: 0.88 },
+    viaSilhouette: true,
+  },
+  /*
+   * The same break, lit the way the gold ceremony lights a card: a **full-screen
+   * bloom with a vignette under it**, the surround pulled down as the green
+   * comes up, so the card is the bright clear thing in a darkened room.
+   *
+   * Every card-sized glow tried before this failed identically — a soft gradient
+   * with nothing dark beside it just tints the screen, and painted over the card
+   * it erases the figure it is meant to dramatise. This is the one shape of
+   * answer already proven in this codebase, and it is proven precisely because
+   * it spends contrast instead of light.
+   *
+   * The trade is that it dims the whole page on every new card, not just on a
+   * rare one. That is the thing to judge, and it is why this is a candidate
+   * rather than simply the fix.
+   */
+  {
+    id: 'j',
+    label: 'J · kaart uitgelicht',
+    leadMs: 180,
+    revealMs: 2550,
+    rimAt: 0.9,
+    pieces: { ease: 0.87, count: [14, 22], lastAt: 0.88 },
+    viaSilhouette: true,
+    stageBloom: true,
   },
 ];
 

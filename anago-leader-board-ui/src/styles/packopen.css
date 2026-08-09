@@ -1029,7 +1029,7 @@
   position: absolute;
   inset: 0;
   background: radial-gradient(
-    circle at 50% 45%,
+    circle at var(--card-cx, 50%) var(--card-cy, 45%),
     rgba(255, 240, 190, 0.7) 0%,
     rgba(255, 205, 96, 0.44) 48%,
     rgba(255, 182, 54, 0.22) 74%,
@@ -1091,6 +1091,16 @@
  * the card, so it clipped the card's corners on a short window and left a wide
  * undarkened margin on a large one. `--pack-w` is inherited from `.opener`.
  *
+ * **And the centre point had the same bug, for two years, in the other half of
+ * the same rule.** The radius was fixed to the card and the origin was left at
+ * `50% 45%` of the *viewport* — and these layers are `position: fixed`, so that
+ * is the middle of the window rather than the middle of the card, which sits
+ * well above it. The hole and the bloom were both offset from the thing they
+ * are about; it went unnoticed because a gold glow with no hard edge does not
+ * announce where its centre is. `--card-cx` / `--card-cy` are the card's real
+ * centre in viewport pixels, published on `.opener__stage` by `PackOpener`,
+ * which measures the riser on the frame this build begins.
+ *
  * 0.95 clears the card's half-diagonal (~0.86 × width at 5/7), so the card and
  * its rim are never touched — only what surrounds them.
  */
@@ -1098,7 +1108,7 @@
   position: absolute;
   inset: 0;
   background: radial-gradient(
-    circle at 50% 45%,
+    circle at var(--card-cx, 50%) var(--card-cy, 45%),
     rgba(0, 0, 0, 0) calc(var(--pack-w) * 0.95),
     rgba(0, 0, 0, 0.5) calc(var(--pack-w) * 1.35),
     rgba(0, 0, 0, 0.78) calc(var(--pack-w) * 2.1),
@@ -1118,6 +1128,120 @@
   }
   to {
     opacity: 1;
+  }
+}
+
+/*
+ * **The room is handed over rather than given back.**
+ *
+ * On a rare *new* card this vignette does not recede at the turn. It unfreezes
+ * and keeps going, on the reveal's clock, to full dark at the accent — so the
+ * surround darkens continuously from the shimmer all the way to the payoff and
+ * never once comes back up. **Every candidate**, because the room belongs to the
+ * ceremony rather than to the reveal; what the card does inside it is a separate
+ * question.
+ *
+ * What it replaces was the single largest visual fault in the combination, and
+ * worst on a candidate that lights the stage as well. The gold pair faded over
+ * 620ms from the end of the flip while the reveal's own vignette climbed from
+ * *nothing* over its whole length, so the room recovered to roughly four fifths
+ * of full brightness about a second after the turn and then darkened all over
+ * again. Two builds with a hole between them — and the hole landed on the card
+ * at its emptiest (silhouette-first, so bare metal and an overall, no figure at
+ * all) and on the two or three opening shards, which are the slowest and most
+ * deliberate of the run. Brightest room, emptiest card, nothing moving, directly
+ * after the biggest moment so far.
+ *
+ * A candidate that brings its own vignette does not mount it on this path —
+ * `PackOpener` suppresses it. Two vignettes are two rooms: they would double the
+ * darkening and cut a second, differently-shaped hole around the card.
+ *
+ * `--dim-carry-from` is where the ramp froze, published per level. The stops
+ * below are `stage-dim`'s, scaled into whatever headroom is left above it, so a
+ * card that froze at two thirds and one that froze at nothing both climb
+ * steadily and both arrive at full dark together. Deliberately the same shape as
+ * the green ramp it stands in for: near-linear with stops all the way along,
+ * because a single ease-in segment reads as the room switching off rather than
+ * closing in.
+ */
+/*
+ * **The duration is scaled so the peak lands on the candidate's accent**, not on
+ * a fixed point in the reveal. `opener-dim-carry` is darkest at its 90% stop, so
+ * running it for `revealMs × rimAt / 0.9` puts that stop exactly at `rimAt` —
+ * the frame the candidate discharges on, which is where the rim, the chime and
+ * the last visual change already land together.
+ *
+ * The candidates disagree about when that is and the difference is large: J
+ * brings its face in at 0.9, D and E drain at 0.62. A room still closing in
+ * after the payoff is building toward something that has already happened, which
+ * is precisely the note the reveal's own green ramp carries.
+ *
+ * At 0.9 the scale factor is 1 and this is simply the reveal's own length.
+ *
+ * `--reveal-ms` is already through `ms()`; no rule may scale it by `--anim`
+ * again, and a unitless ratio on top of it does not.
+ */
+/*
+ * **The carried room is the *reveal's* room, entered from wherever the build had
+ * got to** — not the ceremony's carried on at full strength.
+ *
+ * The gradient below is `stage-dim`'s, a third shallower than the one this
+ * element wears during the build (0.58 against 0.88 at the edge, 0.3 against 0.5
+ * at the first stop), and that difference is not decoration. The two vignettes
+ * are for opposite situations. The ceremony's dims a room around a card that is
+ * *face down* — there is nothing to look at, so it can be as deep as it likes.
+ * The reveal's dims a room around the card you are reading, and past a point it
+ * stops being a room and becomes a black field with a circle cut in it.
+ *
+ * The first version of the carry got this wrong in the most direct way: it took
+ * the ceremony's own gradient from wherever it froze all the way to full, so
+ * every card from 75 up sat in a depth that nothing had ever held for more than
+ * an instant — level 4 used to touch it on the frame of the turn and then fade.
+ * Held for seconds while you look at the card, it read as exactly what it is.
+ *
+ * The depth was never the point of the hand-over. **Continuity was**: the room
+ * not coming back up at the turn. So the ceiling comes down to the reveal's and
+ * the continuity is preserved by where the ramp *starts* — `--dim-carry-from` is
+ * converted into this gradient's scale in `PackOpener`, so the surround is the
+ * same darkness on the frame before the turn and the frame after it.
+ *
+ * If it is still too much, this ceiling is the one number to turn: lower the
+ * alphas below, and the start value follows on its own.
+ */
+.opener__dim--carry .opener__dim-inner {
+  background: radial-gradient(
+    circle at var(--card-cx, 50%) var(--card-cy, 45%),
+    rgba(0, 0, 0, 0) calc(var(--pack-w) * 0.95),
+    rgba(0, 0, 0, 0.3) calc(var(--pack-w) * 1.35),
+    rgba(0, 0, 0, 0.5) calc(var(--pack-w) * 2.1),
+    rgba(0, 0, 0, 0.58) 100%
+  );
+  animation: opener-dim-carry calc(var(--reveal-ms, 560ms) * var(--rim-at, 0.9) / 0.9) linear
+    var(--carry-delay, 0ms) 1 both;
+}
+
+@keyframes opener-dim-carry {
+  0% {
+    opacity: var(--dim-carry-from, 0);
+  }
+  24% {
+    opacity: calc(var(--dim-carry-from, 0) + (1 - var(--dim-carry-from, 0)) * 0.26);
+  }
+  52% {
+    opacity: calc(var(--dim-carry-from, 0) + (1 - var(--dim-carry-from, 0)) * 0.56);
+  }
+  78% {
+    opacity: calc(var(--dim-carry-from, 0) + (1 - var(--dim-carry-from, 0)) * 0.84);
+  }
+  /* Darkest on the accent — the duration above is scaled to put this stop
+     exactly on `--rim-at`, so the payoff lands in the quietest room there is.
+     Everything after it is the room letting go. */
+  90% {
+    opacity: 1;
+    animation-timing-function: ease-out;
+  }
+  100% {
+    opacity: 0;
   }
 }
 
@@ -1570,8 +1694,14 @@
   /*
    * Held at a fixed depth rather than ramped. Shallower than the full swell,
    * because with no build to earn it the dimming arrives all at once.
+   *
+   * The carry has to be named explicitly: it is a descendant selector and would
+   * otherwise outrank this one and put its ramp back. Same depth either way —
+   * the hand-over is about the room *not changing* at the turn, and a room that
+   * was never ramping in the first place already satisfies that.
    */
-  .opener__dim-inner {
+  .opener__dim-inner,
+  .opener__dim--carry .opener__dim-inner {
     animation: none;
     opacity: 0.6;
   }

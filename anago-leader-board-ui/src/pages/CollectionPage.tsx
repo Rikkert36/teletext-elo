@@ -553,17 +553,18 @@ const CollectionPage: React.FC = () => {
           </div>
 
           {/*
-            The silhouette beat's candidates: round one's winner (D) as the
-            control, and the five of the shard family. What each one is and what
-            it is trying to prove lives in utils/revealStyle.ts; delete this row,
-            that module, utils/cardPieces.ts and styles/reveal.css once one is
-            chosen.
+            The silhouette beat's candidates. Two mechanics — the glow (D) and
+            the break (H) — each in a plain version and a **silhouette-first**
+            version (E, I) where the flip lands on bare metal and what the effect
+            delivers is a glowing figure, with the face arriving after it. What
+            each one is and what it is trying to prove lives in
+            utils/revealStyle.ts; delete this row, that module,
+            utils/cardPieces.ts and styles/reveal.css once one is chosen.
 
             Only visible on a **new** card, so judge them on a fresh collection
             ("leegmaken") — a pack of duplicates skips the beat entirely, which is
-            what makes the beat mean "new". The shard family also breaks
-            differently per player, so judge each one across several cards rather
-            than on one pull.
+            what makes the beat mean "new". The break also differs per player, so
+            judge it across several cards rather than on one pull.
           */}
           <div className="game-row" style={{ marginTop: 10 }}>
             <span className="game-muted" style={{ minWidth: 128 }}>
