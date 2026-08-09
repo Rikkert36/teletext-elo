@@ -52,6 +52,17 @@ its tokens into `.game-stage` and delete the other nine, `stageTheme.ts`,
 A book style is being chosen separately and independently (`utils/albumStyle.ts`) —
 that is the book, this is what it lies on.
 
+**The second open visual decision:** how the silhouette beat resolves
+(`utils/revealStyle.ts` + `styles/reveal.css` + `utils/cardPieces.ts`, switchable
+live from the test panel). Three rounds in, two candidates remain: **D · gloeien**
+(the silhouette charging and draining) and **H · scherven** (the card breaking
+into cells whose skins take their shapes one at a time). See "Candidates for the
+payoff" below — and note the open question of whether they are rivals at all, or
+the low and high ends of the scale. Once one is picked, fold
+its rules into card.css / packopen.css, bring its timings back into
+`PackOpener.tsx` as constants, and delete the modules, `reveal.css` and the
+switcher.
+
 **Then:** phase 2, the backend. Nothing in `AnagoLeaderboard/` has been touched.
 
 Two smaller things still open:
@@ -1507,6 +1518,203 @@ Known and pre-existing, not introduced here: during a *duplicate's* ceremony the
 face-down card still carries its `title`, because `backface-visibility` hides the
 front face from painting but not from hit-testing. Hovering a rare duplicate for
 a second names it before it turns. New cards are covered by the rule above.
+
+### Candidates for the payoff
+
+**Open**, live behind the test panel's *onthulling* row.
+
+#### What round one established
+
+The expanding circle resolved the card in one even gesture, and an even gesture
+has no payoff in it. Six candidates were compared — the shipped circle (A), a
+photographic develop (B), a teletekst line paint (C), a charge-and-cool inside
+the silhouette (D), a three-stage fracture (E) and a long wait resolved by one
+cut (F). **D won.** A, B, C, E and F were deleted rather than parked: a switcher
+with ten entries is a switcher nobody uses.
+
+Everything below inherits these, and so must anything added later:
+
+- **Something must accumulate.** A burst that starts and finishes at one rate
+  discharges nothing. Every candidate names something that builds during the
+  wait, so the end of it is a release rather than an arrival.
+- **Build slow, land fast.** 60–80% of the length goes almost nowhere and it
+  resolves in the last fifth. A resolution as long as its own build reads as a
+  fade.
+- **The card recoils.** It never reacted to its own reveal, which was the largest
+  single miss of the round. Under 200ms, never more than 3%, on `.card` so the
+  rim's `box-shadow` pops with it. **Keep this whichever candidate wins.**
+- **The accent is single.** `rimAt` is *not* a taste figure per candidate — it is
+  the frame that candidate discharges on, and the rim, the chime and the last
+  visual change all land there together.
+- **The eyes are the payoff.** Nothing may make the face nameable before the
+  discharge. A mechanism that gives the face away halfway has already spent the
+  beat.
+
+**D · gloeien**, kept: the silhouette lights from within — tier ink to green to
+white-hot — holds at the top for ~90ms with nothing else moving, and then the
+light *drains* and leaves a face behind it. The only candidate that resolves by
+subtraction, and the reason it won: every other reveal answers "when does the
+face arrive", this one answers "where did the light go". `rimAt` 0.62, at the
+drain rather than at the peak — the rim is the residue of that light leaving.
+
+#### Round two: the shard family
+
+The card breaks into **seven to eleven cells that tile it exactly**, and their
+skins take their shapes one at a time. Shape, count and order are generated per
+card from the player id, so no two players break alike and each always breaks the
+same way as itself.
+
+Three attempts got this wrong before it worked, and each mistake looks reasonable
+on paper, so all three are worth keeping written down:
+
+- **Pieces flew onto the surface** — first from off-card, then from behind the
+  figure. Both read as objects being *placed* rather than as a card resolving.
+  **Nothing travels now.** A skin takes its shape where the shape already is, and
+  any future version that moves a cell across the card is this mistake again.
+- **Every card broke into the same arrangement.** A jittered 3×4 grid always
+  gives one roughly central cell ringed by the rest; the jitter moves seams a few
+  percent and changes nothing you can see. Seeds are now placed by one of three
+  **break modes** (`scatter`, `cluster`, `strata`) with a per-card cell count,
+  because count is the coarsest thing the eye reads.
+- **The seams were a glow around each filled piece.** A `drop-shadow` can only
+  halo something that is already there, so it can never draw the edge *between*
+  two states — and every internal edge stayed drawn on a finished card.
+
+**The seam is the frontier.** This is the rule the whole family now hangs on: a
+line exists exactly where revealed meets unrevealed. Two neighbouring cells both
+filled means no line between them — not faded, *gone*, because there is no
+unrevealed side for it to be the edge of. The network thins as the card fills and
+at the end it does not exist, because there is no frontier anywhere.
+
+That is why `cardPieces.ts` returns an **edge list** and not just polygons. Each
+internal edge is tagged during clipping with the cell on its other side, so its
+whole life is determined: it lights when the first of its two cells fills and
+dies when the second does. Stroking each cell separately would draw every
+internal edge twice and leave a permanent web across a finished card. Edges along
+the card's own border are not returned at all — outside the card is not
+unrevealed territory, and the rim already lives there.
+
+Three implementation notes that are not obvious:
+
+- **Seams are SVG `<line>`s with `vector-effect="non-scaling-stroke"`**, one
+  `drop-shadow` on the whole `<svg>` rather than one per line. A 1.6px stroke
+  needs the glow to read as light on metal instead of as a drawn border, and
+  paying for it once is one composited layer instead of twenty.
+- **Three elements per cell.** The outer is scheduled, the middle carries the
+  clip and **never moves**, the inner is the skin and is the only thing a
+  candidate may animate. A transform on the clipped element drags the shape
+  around with the skin, and then there is nothing fixed for the skin to snap to.
+- **A seam is scheduled by delay and duration**, not by keyframe percentages —
+  every seam has different moments and a keyframe percentage cannot read a custom
+  property. Its whole life is `front` to `gone`.
+
+**Pacing.** The gaps accelerate — the first cell sits alone for the best part of
+a second and every wait after it is 0.76 of the last, so the sequence ends in a
+rush. `revealMs: 1700` is *derived*, not chosen: a nine-cell card spends 25% of
+its motion on the first wait, which at the settled ×2 is ~860ms. Change `ease`
+and it has to be re-derived or the weight goes. The beat runs ~3.4s real, about
+4.4s post-flip for a new card and ~24s for a five-new-card pack — far past the
+original "under two seconds" target, and a deliberate trade. Click-to-skip covers
+the impatient case and the long version gets rarer as the album fills.
+
+Schedules are **normalised**, so a seven-cell card and an eleven-cell card take
+exactly as long as each other. Same rule that made the beat's length independent
+of the name: one duration for everybody, whatever they broke into.
+
+**Round three, settled: the only visible axis is granularity.** Five shard
+candidates were compared and **four were cut for being indistinguishable** from
+the plain snap — a skin pulling tight onto its shape, a skin flooding it from the
+centre, and two that announced shapes one and three fills ahead of their skins.
+
+That is a general result, not a verdict on those four. The seizing is over inside
+a frame and the eye is on the card rather than on any one cell, so anything that
+varies *how a single cell resolves* cannot be seen. **Do not propose a sixth.**
+
+What can be seen is **how many cells there are and how fast they come** — and a
+fifth candidate, the same break at seven to eleven cells rather than fourteen to
+twenty-two, tested exactly that and lost on its merits. The finer break is the
+better answer to the only axis that reads.
+
+**H · scherven** is what is left: 14–22 cells, `ease` 0.87, ~4.8s of motion,
+opening on a ~650ms wait and closing on ~70ms.
+
+**`ease` is not free once the count moves.** The gaps are a geometric series, so
+at the coarse break's 0.76 the sum barely grows as cells are added — doubling the
+count at that ratio spends every extra shard in a tail where the last ones land
+inside a single frame. 0.87 is what keeps an eighteen-cell run legible all the
+way down, and `revealMs` is re-derived from it. The break costs ~6.2s post-flip
+per new card and ~32s for a five-new-card pack.
+
+**Open: this may not be an either/or.** The idea on the table is **glow (D) up to
+84 and shards from 85**, so the break is what the top of the scale gets rather
+than what every new card gets. Nothing is built for it — both are whole-beat
+candidates today and the switcher picks one for all cards.
+
+Notes:
+
+- **The name is never one of the cells.** A name broken into fragments is the
+  word-at-a-time version in another costume — a name is a single fact and the
+  beats spent on its own grammar are beats spent on nothing. The face arrives in
+  pieces; *who it is* arrives all at once, with the last cell.
+- **Only the last cell knocks the card.** Nine knocks is a rattle; one is an
+  ending. Driven by `animation-delay` off `--pieces-name`, because the accent
+  moves per candidate and a keyframe percentage cannot read a custom property.
+- **The backfill is load-bearing.** Independently antialiased clip paths leave
+  hairlines along shared edges, so the plain portrait is brought up behind the
+  skins at 99%. Invisible — it is the same image — but without it a finished card
+  stays faintly cracked forever.
+- **A cell's own portrait must be walled off from the beat's rules.**
+  `.card--reveal .card__portrait--photo` is a descendant selector and a cell's
+  portrait is a descendant of the card, so those rules emptied every cell and
+  collapsed the entire family into one late pop. Fixed with a reset *and* a `>`
+  combinator; anything added later that selects `.card__portrait--photo` inside
+  `.card--reveal` has the same problem.
+- **Every shard gets the same snap as it lands** (`playShardSnap`), scheduled off
+  the same `at` fractions the CSS animates from, so a sound cannot drift off the
+  shape it belongs to. The run *is* the beat; one sound followed by thin ticks
+  makes the opening shard the event and every other one decoration.
+  - **`playShardSnap` takes no arguments, and that is the finding.** The first
+    version was a small dry tick that varied across the run — quieter and
+    brighter toward the end — and it sounded wrong for a reason that had nothing
+    to do with the tick. **The first shard lands on the same frame as
+    `playNameReveal`**, so it was heard *through* that sound's air and sparkle
+    while every shard after it was heard bare. The tick was fine; the comparison
+    was the bug. Fixed at both ends: the snap carries its own air, and
+    `playNameReveal` takes `air = false` for the shard family so nothing stacks
+    on shard one. It keeps its chime, because the rim still arrives.
+  - **It is glass, and that came from removing things.** The version before it
+    was air, mid grains and a 168 Hz body — the recipe for a piece of wood being
+    set down. The low end is what made it wood and the broad soft band under it
+    is what stopped anything ringing. Now: a 30ms contact sweeping *down* from
+    9k (a hard strike is a click decaying; a rising sweep is something opening,
+    which is right for the bloom and wrong here), high grains at **Q 16** so they
+    ring rather than click, and `playGlassRing`.
+  - **`playGlassRing` is inharmonic**, and that is the whole difference between
+    glass and a tone: struck glass rings on plate modes, so the ratios are
+    1 / 2.32 / 3.5 / 4.9 and deliberately not 2 / 3 / 4. A harmonic stack at
+    these frequencies is a bell. Decays are 65–200ms against `playBell`'s 5.6s,
+    because twenty of these land inside four seconds; a 2ms attack against its
+    8ms, because glass has no rise at all.
+  - **No low end anywhere**, which reverses the earlier note here. A shard *is* a
+    physical event and does want contact — but the contact belongs in the click
+    and the grains, and putting it in the bass made it a heavy object.
+    `playNameReveal` reached the same conclusion from the other direction.
+  - **A different size of glass each time**: the ring's fundamental is drawn from
+    1850–2900 Hz per call, because a card breaking into eighteen pieces does not
+    produce eighteen identical shards. It stays clear of a D-minor chord that may
+    still be ringing because the partials are inharmonic and above 1.8k — the ear
+    takes them as size, not as pitch. Same reason the ceremony's riser is pure
+    air.
+  - **Short layers only.** At the end of a run the snaps are 40ms apart, so
+    anything with a tail smears into the next four.
+  - The break is computed once into a ref in `playCard`, **not** memoised on
+    `cards[cursor]`. The memo was a real bug: `playCard` schedules the sound
+    before the state change that brings the card on, so it still held the
+    *previous* card's cells and every snap was timed to a different break than
+    the one on screen.
+- Only new cards get the beat, so judge on a fresh collection (*leegmaken*) — and
+  because the family breaks differently per player, judge each across several
+  cards rather than on one pull.
 
 ### The rare ceremony: graduated across the gold band
 

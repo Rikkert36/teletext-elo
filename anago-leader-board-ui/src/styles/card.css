@@ -706,13 +706,18 @@
  * declared only on the withheld state comes off with it and the wipe becomes a
  * cut.
  *
- * **Must match `REVEAL_MS` in PackOpener.tsx**, which schedules the hold around it
- * and drives `--reveal-ms` on the flash itself. If the two drift, the light and the
- * edge it is supposed to be carrying separate.
+ * **Driven by `--reveal-ms`**, published on `.opener__riser` from the live reveal
+ * candidate's `revealMs` and already scaled by the pacing multiplier — so it must
+ * not be multiplied by `--anim` again. It is the same value the flash runs on and
+ * the same one the hold is scheduled around; if the two ever drift, the light and
+ * the edge it is supposed to be carrying separate.
+ *
+ * The fallback is candidate A's 280 at the settled ×2, for the album and the
+ * viewer, where the property is absent and `.card--reveal` never appears anyway.
  */
 .card--reveal .card__portrait--photo,
 .card--reveal .card__name {
-  transition: clip-path calc(280ms * var(--anim, 1)) ease-out;
+  transition: clip-path var(--reveal-ms, 560ms) ease-out;
   clip-path: circle(71% at 50% 50%);
 }
 

@@ -33,6 +33,7 @@ import {
   getAlbumStyle,
   setAlbumStyle,
 } from '../utils/albumStyle';
+import { REVEAL_STYLES, getRevealStyle, setRevealStyle } from '../utils/revealStyle';
 import { playRareRise } from '../utils/sounds';
 import '../styles/game.css';
 
@@ -84,6 +85,7 @@ const CollectionPage: React.FC = () => {
   const [fastMode, setFastMode] = useState(() => read(FAST_KEY) === 'true');
   const [stageTheme, setStageThemeState] = useState<StageTheme>(getStageTheme);
   const [albumStyle, setAlbumStyleState] = useState<AlbumStyle>(getAlbumStyle);
+  const [revealStyle, setRevealStyleState] = useState(getRevealStyle);
 
   /** Auditions a level at exactly the length and intensity a real reveal uses. */
   const previewRiser = (level: number) =>
@@ -548,6 +550,39 @@ const CollectionPage: React.FC = () => {
                 {option.label}
               </button>
             ))}
+          </div>
+
+          {/*
+            The silhouette beat's candidates: round one's winner (D) as the
+            control, and the five of the shard family. What each one is and what
+            it is trying to prove lives in utils/revealStyle.ts; delete this row,
+            that module, utils/cardPieces.ts and styles/reveal.css once one is
+            chosen.
+
+            Only visible on a **new** card, so judge them on a fresh collection
+            ("leegmaken") — a pack of duplicates skips the beat entirely, which is
+            what makes the beat mean "new". The shard family also breaks
+            differently per player, so judge each one across several cards rather
+            than on one pull.
+          */}
+          <div className="game-row" style={{ marginTop: 10 }}>
+            <span className="game-muted" style={{ minWidth: 128 }}>
+              onthulling
+            </span>
+            {REVEAL_STYLES.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className="game-button game-button--small"
+                onClick={() => setRevealStyleState(setRevealStyle(option.id))}
+                disabled={revealStyle.id === option.id}
+              >
+                {option.label}
+              </button>
+            ))}
+            <span className="game-muted">
+              {ms(revealStyle.leadMs)} + {ms(revealStyle.revealMs)} ms
+            </span>
           </div>
 
           {/*

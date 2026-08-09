@@ -1,0 +1,599 @@
+/* ================================================================== *
+ * Silhouette-beat candidates
+ *
+ * Live behind the test panel's *onthulling* row. See `utils/revealStyle.ts` for
+ * what is being judged and what round one settled; this file is the mechanics.
+ * **Temporary** — when one is chosen its rules move into card.css and
+ * packopen.css and this file goes.
+ *
+ * Two left: **D · gloeien**, the silhouette charging and draining, and **H ·
+ * scherven**, the card breaking into cells whose skins take their shapes one at
+ * a time. H's geometry comes from `utils/cardPieces.ts`.
+ *
+ * They may not be rivals at all — the open idea is glow up to 84 and the break
+ * from 85, so the shards become what the top of the scale gets rather than what
+ * every new card gets. Nothing is built for that yet.
+ *
+ * ------------------------------------------------------------------
+ * How they attach
+ *
+ * Every rule is scoped to a `reveal-<id>` class on <html>, which puts it one
+ * class above the base rules in card.css and packopen.css and lets it override
+ * them without `!important`.
+ *
+ * Two hooks do all the work, and both already existed:
+ *
+ * - **`.card--withheld` coming off** is the start of the motion. Adding an
+ *   animation to `.card--reveal:not(.card--withheld)` therefore starts it at
+ *   exactly the right instant — which a plain `animation-delay` cannot do, since
+ *   the card element mounts *before* the flip and a rare card's build can hold it
+ *   there for seconds.
+ * - **`.opener__flash` is mounted for exactly `--reveal-ms`**, so anything on it
+ *   is guaranteed to run the length of the motion and unmount as it ends.
+ *
+ * ------------------------------------------------------------------
+ * `--reveal-ms`
+ *
+ * Published by `PackOpener` on `.opener__riser`, already through `ms()` — so it
+ * is a *real* duration and must never be multiplied by `--anim` again. It is the
+ * one clock: every duration and delay below is written as a fraction of it, so a
+ * candidate's timing can be retuned from `revealStyle.ts` alone and the light
+ * cannot come apart from the reveal it is carrying.
+ *
+ * Multi-phase candidates use `@keyframes` rather than transitions throughout.
+ * A transition has one curve, and every one of these builds slowly and lands
+ * fast — two rates, which needs per-keyframe `animation-timing-function`.
+ * ================================================================== */
+
+/* ------------------------------------------------------------------ *
+ * Shared: unmake the base burst
+ *
+ * `.opener__flash::before` is the gold-ceremony-shaped bloom the deleted
+ * candidate A used — a circle inset -25%, scaled up from 0.04. Every surviving
+ * candidate wants a different light, so all of them start from a clean
+ * full-bleed rectangle and build their own.
+ * ------------------------------------------------------------------ */
+
+.reveal-d .opener__flash::before,
+.reveal-h .opener__flash::before {
+  inset: 0;
+  border-radius: 6px;
+  transform: none;
+  opacity: 0;
+  animation: none;
+}
+
+/* ================================================================== *
+ * D · gloeien — round one's winner, unchanged
+ *
+ * The silhouette is the actor, not the obstacle. It lights from within — tier
+ * ink to green to white-hot — holds at the top for a beat with nothing else
+ * moving, and then the light *drains* and a face is left behind it.
+ *
+ * The only candidate that resolves by subtraction, and the reason it won: every
+ * other reveal answers "when does the face arrive", and this one answers "where
+ * did the light go". The hold at the peak is what makes it land — roughly 90ms
+ * in which the card is at its brightest and completely still, so the cool-down
+ * is a release rather than a continuation.
+ *
+ * `rimAt` is 0.62, at the drain rather than at the peak: the rim is the residue
+ * of that light leaving, which is the same argument that moved it off the end of
+ * the old burst.
+ * ================================================================== */
+
+.reveal-d .card--reveal .card__portrait--photo,
+.reveal-d .card--reveal .card__name,
+.reveal-d .card--withheld .card__portrait--photo,
+.reveal-d .card--withheld .card__name {
+  clip-path: none;
+  transition: none;
+}
+
+.reveal-d .card--withheld .card__portrait--photo,
+.reveal-d .card--withheld .card__name {
+  opacity: 0;
+}
+
+/*
+ * The wash from card.css stays: a flat colour would make the figure a sticker
+ * cut to the shape of a person, which is the objection that took the plates off
+ * the number and the name, and it holds just as well for a glowing one.
+ */
+.reveal-d .card--reveal:not(.card--withheld) .card__silhouette {
+  animation: reveal-charge var(--reveal-ms, 560ms) linear 1 forwards;
+}
+
+.reveal-d .card--reveal:not(.card--withheld) .card__portrait--photo,
+.reveal-d .card--reveal:not(.card--withheld) .card__name {
+  animation: reveal-cool var(--reveal-ms, 560ms) linear 1 forwards;
+}
+
+@keyframes reveal-charge {
+  0% {
+    background-color: var(--tier-ink);
+    opacity: 0.8;
+    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4);
+  }
+  /* Slow to start: for the first third it is barely more than a warm outline,
+     which is what makes the top of the ramp feel earned. */
+  40% {
+    background-color: #3f7f63;
+    opacity: 0.88;
+    filter: drop-shadow(0 0 3px rgba(152, 255, 206, 0.35));
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  52% {
+    background-color: #9dffd0;
+    opacity: 1;
+    filter: drop-shadow(0 0 16px rgba(152, 255, 206, 0.9));
+    animation-timing-function: linear;
+  }
+  /* The hold. Nothing moves — this is the beat the whole candidate is built on. */
+  62% {
+    background-color: #f4fffa;
+    opacity: 1;
+    filter: drop-shadow(0 0 22px rgba(210, 255, 236, 0.95));
+    animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
+  }
+  /* The drain. Faster than the charge, and the figure is gone before the photo
+     is fully up so the two never read as a crossfade. */
+  84% {
+    background-color: #f4fffa;
+    opacity: 0;
+    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+  }
+  100% {
+    background-color: #f4fffa;
+    opacity: 0;
+    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+  }
+}
+
+@keyframes reveal-cool {
+  0%,
+  60% {
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.3, 1);
+  }
+  86% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* The surround charges with the figure and goes out with it. */
+.reveal-d .opener__flash::before {
+  background: radial-gradient(
+    circle at 50% 42%,
+    rgba(240, 255, 248, 0.55) 0%,
+    rgba(190, 255, 224, 0.32) 52%,
+    rgba(152, 255, 206, 0.12) 76%,
+    rgba(152, 255, 206, 0) 90%
+  );
+  animation: reveal-charge-light var(--reveal-ms, 560ms) linear 1 forwards;
+}
+
+@keyframes reveal-charge-light {
+  0% {
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4);
+  }
+  52% {
+    opacity: 0.7;
+    animation-timing-function: ease-out;
+  }
+  62% {
+    opacity: 1;
+    animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
+  }
+  88% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/*
+ * D settles rather than pops: the light leaving is a release, not a blow, so the
+ * card eases *down* out of the charge instead of jumping at it. It has been held
+ * slightly large for the whole hold, and the drain is when it lets go.
+ */
+.reveal-d .card--reveal:not(.card--withheld) {
+  animation: reveal-recoil-settle var(--reveal-ms, 560ms) linear 1;
+}
+
+@keyframes reveal-recoil-settle {
+  0% {
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.5);
+  }
+  52% {
+    transform: scale(1.016);
+    animation-timing-function: linear;
+  }
+  62% {
+    transform: scale(1.016);
+    animation-timing-function: cubic-bezier(0.16, 0.9, 0.3, 1);
+  }
+  86% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+
+/* ================================================================== *
+ * H · scherven — the break
+ *
+ * The card breaks into fourteen to twenty-two cells that tile it exactly, and
+ * their skins take their shapes one at a time. Shape, count and order are
+ * generated per card from the player id, so no two players break alike and each
+ * breaks the same way as itself.
+ *
+ * ------------------------------------------------------------------
+ * The three rules
+ *
+ * **Nothing travels.** A cell's skin takes its shape where the shape already is.
+ * Two earlier versions had pieces flying onto the surface — first from off-card,
+ * then from behind the figure — and both read as objects being placed rather
+ * than as a card resolving. There is no translation anywhere in this family, and
+ * anything added later that moves a cell across the card is the same mistake
+ * again.
+ *
+ * **The seam is the frontier, not a per-cell outline.** A line exists exactly
+ * where revealed meets unrevealed. Two neighbouring cells both filled means no
+ * line between them — not faded, *gone*, because there is no unrevealed side for
+ * it to be the edge of. The network thins as the card fills and by the end it
+ * does not exist. That is why the seams are one stroked line per internal edge,
+ * scheduled from its two cells, rather than an outline drawn round each shape.
+ *
+ * **Unrevealed is the figure; revealed is a skin over it.** The silhouette is
+ * underneath and needs no fade of its own: the cells tile the whole card, so the
+ * last one to fill covers the last of it.
+ *
+ * ------------------------------------------------------------------
+ * The schedule
+ *
+ * `--at` is when a cell's skin takes its shape and `--gap` is how long it then
+ * sits alone. Both come from `cardPieces.ts`, normalised so a seven-cell card
+ * and an eleven-cell card take exactly as long as each other — one duration for
+ * everybody, whatever they broke into.
+ *
+ * The gaps accelerate: the first cell is alone for the best part of a second and
+ * is a single deliberate event, and every wait after it is shorter. Candidates
+ * whose skin takes time to seize its shape scale that motion by `--gap` too, so
+ * the first take is as unhurried as its wait and the last few are as quick.
+ *
+ * ------------------------------------------------------------------
+ * The one knob here
+ *
+ *   --pieces-name   when the name lands and the card is knocked. Equal to the
+ *                   last cell's fill, and `rimAt` in revealStyle.ts must agree.
+ *
+ * The knob that matters is not in this file. Granularity — `count` and `ease` in
+ * `revealStyle.ts` — is the only thing about this that turned out to be visible;
+ * five variations on *how a skin seizes its shape* were built and cut.
+ * ================================================================== */
+
+.card__pieces {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.card__piece {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+}
+
+/*
+ * The shape. **Never animated, by anyone** — a candidate that transforms this
+ * element drags the shape around with the skin, and then there is nothing fixed
+ * for the skin to snap to.
+ */
+.card__piece-cut {
+  position: absolute;
+  inset: 0;
+}
+
+/* The skin. The only thing a candidate may move. */
+.card__piece-skin {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * **A cell contains a plain, finished portrait, and none of the beat's own rules
+ * may reach it.**
+ *
+ * This is not a precaution. `.card--reveal .card__portrait--photo` is a
+ * descendant selector, and a cell's portrait *is* a descendant of the card — so
+ * every rule written for the one portrait the beat is revealing also landed on
+ * the ones inside the cells. They were held at `opacity: 0` until the backfill
+ * and clipped to `circle(0%)` by card.css before that, which made every cell an
+ * empty box and collapsed the whole family into one late pop.
+ *
+ * Two halves to the fix and both are needed: this reset, and the `>` in the
+ * rules below that keeps them on the card's own portrait. Anything added later
+ * that selects `.card__portrait--photo` inside `.card--reveal` has to do the
+ * same.
+ */
+.card--reveal .card__piece .card__portrait--photo {
+  clip-path: none;
+  transition: none;
+  animation: none;
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------ *
+ * The seams
+ * ------------------------------------------------------------------ */
+
+.card__seams {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /*
+   * One filter for the whole network rather than one per line. The glow is what
+   * makes a 1.6px stroke read as light on metal instead of as a drawn border,
+   * and paying for it once is the difference between one composited layer and
+   * twenty.
+   */
+  filter: drop-shadow(0 0 3px rgba(152, 255, 206, 0.85));
+}
+
+.card__seam {
+  fill: none;
+  stroke: rgba(222, 255, 240, 0.95);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0;
+}
+
+/*
+ * A seam's whole life is `--s1` to `--s2`: it is drawn the moment the first of
+ * its two cells fills, and it stops existing when the second one does.
+ *
+ * Delay and duration rather than keyframe percentages, because every seam has
+ * different moments and a keyframe percentage cannot read a custom property.
+ *
+ * There was briefly a third moment — a dim "pending" phase that announced a
+ * shape one or three fills ahead of its skin. Both versions were cut: neither
+ * was distinguishable from this one on a real pull.
+ */
+.reveal-h .card--reveal:not(.card--withheld) .card__seam {
+  animation-name: seam-front;
+  animation-duration: calc(var(--reveal-ms, 560ms) * (var(--s2, 1) - var(--s1, 0)));
+  animation-delay: calc(var(--reveal-ms, 560ms) * var(--s1, 0));
+  animation-fill-mode: forwards;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+}
+
+/*
+ * The frontier. Full strength for its whole life and then out — the tail is 8%
+ * of however long that life is, so a seam that stands for a second dies in 80ms
+ * and one that stands for a hundred dies in eight. Proportional, because a fixed
+ * tail would be a slow cool-down on the early seams and a cut on the late ones,
+ * and this is a boundary being consumed rather than a light going off.
+ */
+@keyframes seam-front {
+  0%,
+  92% {
+    opacity: 1;
+    animation-timing-function: ease-in;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Scheduling, shared
+ * ------------------------------------------------------------------ */
+
+/*
+ * **`forwards`, not `both`.** With `both` a cell would paint its 0% frame from
+ * the first frame of the beat, so every skin would be on the card before any had
+ * been filled. With `forwards` it stays at the base rule's `opacity: 0` until
+ * its delay elapses and then takes its shape.
+ */
+.reveal-h .card--reveal:not(.card--withheld) .card__piece {
+  animation-name: skin-on;
+  /* Nominal. `skin-on` holds one value, so what this actually decides is when
+     `forwards` starts pinning it — the skin is present at `--at` and never
+     transitions, because a skin that fades in is a piece placed on the surface
+     again. `--gap` keeps it inside the cell's own slot regardless. */
+  animation-duration: calc(var(--reveal-ms, 560ms) * var(--gap, 0.1) * 0.5);
+  animation-delay: calc(var(--reveal-ms, 560ms) * var(--at, 0));
+  animation-iteration-count: 1;
+  animation-fill-mode: forwards;
+  animation-timing-function: linear;
+}
+
+/*
+ * Present from its own first frame. Duration is irrelevant to this one — the
+ * skin exists at `--at` and does not fade in, because a skin that fades in is
+ * back to being a piece placed on the surface.
+ */
+@keyframes skin-on {
+  from,
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * The whole card is withheld until the cells take over — the single portrait and
+ * the name are both driven from here, and the base wipe in card.css is not this
+ * family's mechanism.
+ *
+ * **`.card__inner > `**, so this is the card's own portrait and never one inside
+ * a cell. See the note above the cell reset: without the child combinator this
+ * rule empties every cell.
+ */
+.reveal-h .card--reveal .card__inner > .card__portrait--photo,
+.reveal-h .card--reveal .card__name {
+  clip-path: none;
+  transition: none;
+  opacity: 0;
+}
+
+/* The backfill. Invisible by construction — it is the same image the skins
+   already show. All it does is stop the card being faintly cracked forever. */
+.reveal-h .card--reveal:not(.card--withheld) .card__inner > .card__portrait--photo {
+  animation: pieces-backfill calc(var(--reveal-ms, 560ms) * 0.01) linear
+    calc(var(--reveal-ms, 560ms) * 0.99) both;
+}
+
+@keyframes pieces-backfill {
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * The name lands whole, with the last cell.
+ *
+ * It is deliberately **not** one of the cells. A name broken into fragments is
+ * the word-at-a-time version again in another costume — a name is a single fact,
+ * and the beats it would spend on its own grammar are beats spent on nothing.
+ * The face arrives in pieces; who it is arrives all at once.
+ */
+.reveal-h .card--reveal:not(.card--withheld) .card__name {
+  animation: pieces-name calc(var(--reveal-ms, 560ms) * 0.05) ease-out
+    calc(var(--reveal-ms, 560ms) * var(--pieces-name, 0.94)) both;
+}
+
+@keyframes pieces-name {
+  from {
+    opacity: 0;
+    transform: scale(1.06);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/*
+ * The knock, once, on the last cell.
+ *
+ * Driven by `animation-delay` rather than by keyframe percentages, so it can be
+ * aimed at `--pieces-name`. Nine knocks would be a rattle; one is an ending.
+ */
+.reveal-h .card--reveal:not(.card--withheld) {
+  animation: pieces-recoil calc(var(--reveal-ms, 560ms) * 0.13) linear
+    calc(var(--reveal-ms, 560ms) * var(--pieces-name, 0.94)) both;
+}
+
+@keyframes pieces-recoil {
+  0% {
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.2, 0, 0.3, 1);
+  }
+  38% {
+    transform: scale(1.028);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/*
+ * The surround. Deliberately weak — the seam network is already the light, and a
+ * full-card glow on top of it flattens exactly the thing doing the work. It is
+ * here so the last cell has something behind it.
+ */
+.reveal-h .opener__flash::before {
+  background: radial-gradient(
+    circle at 50% 44%,
+    rgba(240, 255, 248, 0.4) 0%,
+    rgba(190, 255, 224, 0.2) 52%,
+    rgba(152, 255, 206, 0.06) 78%,
+    rgba(152, 255, 206, 0) 92%
+  );
+  animation: pieces-light var(--reveal-ms, 560ms) linear 1 forwards;
+}
+
+@keyframes pieces-light {
+  0% {
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.4);
+  }
+  /* Creeping up under the whole sequence, still low when the last cell fills. */
+  88% {
+    opacity: 0.34;
+    animation-timing-function: ease-out;
+  }
+  95% {
+    opacity: 1;
+    animation-timing-function: ease-in;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * H · scherven
+ *
+ * The skin is simply there, whole, on the frame its shape lights. No motion of
+ * any kind: the card is one shape more revealed than it was, and the seams
+ * around it are the proof.
+ *
+ * **The one knob it has is not in this file.** Granularity — how many cells and
+ * how fast they come — is the only axis that turned out to be visible at all,
+ * and it lives entirely in `count` and `ease` in `revealStyle.ts`. Five
+ * alternatives were built and cut: four varied *how a single cell resolves* and
+ * were indistinguishable, and the fifth was this at half the cell count and lost
+ * on its merits. There is nothing left here to vary.
+ * ------------------------------------------------------------------ */
+
+.reveal-h .card--reveal {
+  --pieces-name: 0.94;
+}
+
+/* ------------------------------------------------------------------ *
+ * Reduced motion
+ *
+ * Never actually reached — the opener skips the whole reveal and lands on the
+ * results grid, where cards carry no `reveal` prop at all and therefore no cells
+ * either. This is the same second guard card.css keeps, and it resolves to the
+ * *finished* card rather than to a nameless one.
+ * ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .card--reveal,
+  .card--reveal .card__portrait--photo,
+  .card--reveal .card__name,
+  .card--reveal .card__silhouette,
+  .card__piece,
+  .card__piece-skin,
+  .card__seam,
+  .opener__flash::before {
+    animation: none !important;
+  }
+
+  .card--reveal .card__portrait--photo,
+  .card--reveal .card__name {
+    clip-path: none;
+    opacity: 1;
+    filter: none;
+  }
+
+  /* The cells are redundant once the portrait under them is up. */
+  .card--reveal .card__pieces {
+    display: none;
+  }
+}

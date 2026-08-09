@@ -541,24 +541,155 @@ export const playSlot = (): void => {
  *
  * @param rimAtMs Real ms from now until the light meets the border — the same
  * number `PackOpener` uses to fire the rim, passed in rather than re-derived.
+ * @param air Whether to play layers 1 and 2. **False for the shard reveal**,
+ * where the beat opens with a shard rather than with a bloom: the first shard
+ * lands on this exact frame, so the air and sparkle stacked onto it and made
+ * that one snap sound like a different, better event than the nine after it.
+ * Every shard now carries its own air (`playShardSnap`), and what is left here
+ * is the chime — which is still right, because the rim still arrives and still
+ * wants announcing.
  */
-export const playNameReveal = (rimAtMs = 250): void => {
+export const playNameReveal = (rimAtMs = 250, air = true): void => {
   const rim = rimAtMs / 1000;
 
-  playNoise(0.34, 700, 7200, 0.05, 'bandpass');
+  if (air) {
+    playNoise(0.34, 700, 7200, 0.05, 'bandpass');
 
-  playGrains({
-    count: 14,
-    spread: 0.2,
-    grainMs: [30, 130],
-    hz: [4200, 11000],
-    gain: 0.03,
-    q: 8,
-    bias: 0.7,
-  });
+    playGrains({
+      count: 14,
+      spread: 0.2,
+      grainMs: [30, 130],
+      hz: [4200, 11000],
+      gain: 0.03,
+      q: 8,
+      bias: 0.7,
+    });
+  }
 
   playBell(D6, 0.03, rim);
   playBell(D5, 0.02, rim + 0.014);
+};
+
+/**
+ * A small piece of glass, struck.
+ *
+ * Four **inharmonic** partials, which is the whole difference between glass and
+ * a tone. Struck glass rings on the modes of a plate, not on a harmonic series —
+ * so the ratios below are deliberately not 2, 3, 4. A harmonic stack at these
+ * frequencies is a bell or a flute; only the inharmonicity says *glass*.
+ *
+ * **Decays in the low hundreds of milliseconds**, not seconds. `playBell` is the
+ * same idea an order of magnitude longer (5.6s on its fundamental) because it is
+ * the only sustaining voice in a payoff; here twenty of these land inside four
+ * seconds, and at the end of a run they are 40ms apart. Anything with a real
+ * tail turns the last third into a wash. The exponential decay puts most of the
+ * energy in the first 50ms regardless, which is what a tink is.
+ *
+ * A 2ms attack, an order of magnitude faster than `playBell`'s 8ms. Glass has no
+ * rise at all; anything slower reads as a struck metal plate.
+ *
+ * Nothing below the fundamental, and the fundamental is high. There is no low end
+ * anywhere in this sound — that is what the old version got wrong, and one 168 Hz
+ * body was enough to make the whole thing wood.
+ */
+const playGlassRing = (fundamental: number, gain: number): void => {
+  const ctx = getContext();
+  if (!ctx) return;
+
+  /* Ratio, level, decay — plate modes rather than a harmonic series. */
+  const partials: Array<[number, number, number]> = [
+    [1, 1, 0.2],
+    [2.32, 0.52, 0.14],
+    [3.5, 0.3, 0.1],
+    [4.9, 0.16, 0.065],
+  ];
+
+  const start = ctx.currentTime;
+
+  partials.forEach(([ratio, level, decay]) => {
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = fundamental * ratio;
+
+    const amp = ctx.createGain();
+    amp.gain.setValueAtTime(0.0001, start);
+    amp.gain.linearRampToValueAtTime(gain * level, start + 0.002);
+    amp.gain.exponentialRampToValueAtTime(0.0001, start + decay);
+
+    osc.connect(amp);
+    amp.connect(getMaster(ctx));
+
+    /* Some room, but far less than the payoff bell gets. A shard is a small hard
+       object in the same space as the card, not a struck instrument in a hall. */
+    const send = ctx.createGain();
+    send.gain.value = 0.3;
+    amp.connect(send).connect(getReverbSend(ctx));
+
+    osc.start(start);
+    osc.stop(start + decay + 0.05);
+  });
+};
+
+/**
+ * One shard taking its shape, in the shard reveal.
+ *
+ * **Every shard gets one, and every one is identical.** The beat is a run of the
+ * same event at an accelerating rate, and the run *is* the beat — one sound at
+ * the start and thin ticks after it makes the opening shard the event and every
+ * other one decoration, which is backwards.
+ *
+ * It is deliberately as full as it is, and the reason is worth recording. The
+ * first version was a small dry tick that varied across the run — quieter and
+ * brighter toward the end — and it sounded wrong for a reason that had nothing
+ * to do with the tick: the first shard lands on the same frame as
+ * `playNameReveal`, so it was heard *through* that sound's air and sparkle while
+ * every shard after it was heard bare. The tick was never the problem; the
+ * comparison was. It now carries its own air, and `playNameReveal` drops its
+ * opening layers when the shard family is driving (`air: false`) so nothing
+ * stacks on shard one.
+ *
+ * **It is glass**, and that took removing things rather than adding them. The
+ * version before this was air, mid grains and a 168 Hz body, which is the recipe
+ * for a piece of wood being set down: the low end is what made it wood, and the
+ * broad soft band under it is what stopped anything ringing. Three layers now,
+ * all of them short and high, because at the end of the run they are 40ms apart
+ * and anything with a tail smears into the next four:
+ *
+ * 1. **The contact**, a 30ms bandpass sweeping *down* from 9k. Falling, not
+ *    rising: a hard object striking is a click decaying, where a rising sweep is
+ *    something opening — which is right for the bloom in `playNameReveal` and
+ *    wrong here.
+ * 2. **Edge scatter**, high grains at Q 16. The Q is the point — at 4 a grain
+ *    clicks, and at 16 it *rings*, which is the difference between chipping and
+ *    tapping. This is what the ear reads as the broken edge.
+ * 3. **The ring**, `playGlassRing`, on inharmonic plate modes.
+ *
+ * **No low end at all**, which is a reversal: the previous note here argued a
+ * shard is a physical event and wants a trace of contact. It does — but the
+ * contact is in layers 1 and 2, and putting it in the *bass* made it a heavy
+ * object. `playNameReveal` reached the same conclusion from the other direction.
+ *
+ * **A different size of glass each time.** The ring's fundamental is drawn from
+ * 1850–2900 Hz per call, because a card breaking into eighteen pieces does not
+ * produce eighteen identical shards, and eighteen identical tinks read as a
+ * sample on repeat. It is a scatter, not a melody — the partials are inharmonic
+ * and above 1.8k, so the ear takes them as size rather than as pitch, which is
+ * what keeps this clear of a D-minor chord that may still be ringing.
+ */
+export const playShardSnap = (): void => {
+  playNoise(0.03, 9000, 3800, 0.042, 'bandpass');
+
+  playGrains({
+    count: 6,
+    spread: 0.022,
+    grainMs: [8, 46],
+    hz: [3400, 9200],
+    gain: 0.03,
+    q: 16,
+    bias: 0.6,
+  });
+
+  playGlassRing(1850 + Math.random() * 1050, 0.03);
 };
 
 /* ------------------------------------------------------------------ *

@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import {
   Pack,
@@ -18,12 +24,16 @@ import {
   playNameReveal,
   playRarePayoff,
   playRareRise,
+  playShardSnap,
   playShimmerSweep,
   playSlot,
   playTear,
 } from '../utils/sounds';
 import { getCeremonyMs, ms } from '../utils/animationSpeed';
+import { CardBreak, breakFor } from '../utils/cardPieces';
+import { RevealStyle, getRevealStyle } from '../utils/revealStyle';
 import '../styles/packopen.css';
+import '../styles/reveal.css';
 
 /*
  * Base timings, at a pacing multiplier of 1. Multiply by DEFAULT_SCALE (2) for
@@ -33,15 +43,23 @@ import '../styles/packopen.css';
  * duplicates lands at 420 + 3×840 = 2.94s. A rare pull adds its held build on
  * top of whichever it is.
  *
- * A new card costs 180 + 320 + 880 = 1380ms for the silhouette beat, so 2.76s at
- * the settled ×2 against a duplicate's 1.68s. One number for every new card,
- * whatever their name — see `holdFor`.
+ * A new card costs the flip plus its candidate's own beat, which is `leadMs +
+ * revealMs + READABLE_MS` — see `holdFor` and `utils/revealStyle.ts`. One number
+ * for every new card, whatever their name and whatever they broke into.
  *
- * That is past the "under two seconds" target the design started with. It is a
- * deliberate trade for a reveal long enough to be worth watching, and the
- * click-to-skip is what keeps it tolerable at roughly a thousand openings a year.
- * The trade also unwinds on its own: as the album fills, fewer cards are new, so
- * the long version becomes the rare one.
+ * **The shard family is much longer than anything before it**: 180 + 1500 + 340
+ * = 2020 base for the beat, so 320 + 2020 = 2340 base and about **4.7s real** at
+ * the settled ×2, against a duplicate's 1.68s. That is the price of the first
+ * piece taking a full second, which is where the weight comes from — a shorter
+ * one reads as fast and flimsy however many pieces it has, which is exactly what
+ * the previous attempt proved.
+ *
+ * That is far past the "under two seconds" target the design started with, and
+ * it is a deliberate trade for a reveal worth watching. Click-to-skip is what
+ * keeps it tolerable at roughly a thousand openings a year, and the trade
+ * unwinds on its own: as the album fills, fewer cards are new, so the long
+ * version becomes the rare one. A five-card pack of *new* cards is the worst
+ * case at roughly 24s, and only a new collector ever sees it.
  *
  * These are passed through `ms()` at animation time, not at module load, so the
  * multiplier can be changed live and stays in lockstep with the CSS durations —
@@ -115,50 +133,20 @@ const SETTLE_MS = 460;
  *   + READABLE_MS           fully readable, then the card goes to the row
  * ------------------------------------------------------------------ */
 
-/** The silhouette alone, before anything starts happening to it. */
-const SILHOUETTE_LEAD_MS = 120;
-
-/**
- * The flash that reveals the card: light out of the centre point, pushing outward
- * in every direction, with the name and the face opening behind it.
+/*
+ * **The three numbers below now live in `utils/revealStyle.ts`**, one set per
+ * candidate, while the five alternatives to the expanding circle are being
+ * compared in the test panel. `getRevealStyle()` returns the live one and
+ * candidate A is exactly what these constants used to hold — 120 / 280 / 0.45 —
+ * so nothing about the shipped beat has changed by moving them.
  *
- * **A bloom, not a beam**, and it took three attempts to get there. A beam has a
- * defined edge, so the eye measures it against the reveal it is supposed to be
- * carrying and any disagreement is glaring. First that was the ceremony's
- * left-to-right shimmer, whose keyframes leave the light off the card for most of
- * the run; then a pair of streaks parting from the centre line, which were exactly
- * in step and still read as two objects rather than as one event. A bloom has no
- * edge to be measured against — it lights the card, and the card is different
- * afterwards.
+ * Everything they governed still holds and is repeated there: the light's
+ * duration *is* the reveal's, the rim fires partway through rather than at the
+ * end, and none of it is level-aware. Read that file before changing any of it.
  *
- * **This is the light's duration *and* the reveal's, because they are the same
- * motion.** There is deliberately no separate knob: the version that had them on
- * two clocks is precisely the one that came apart.
- *
- * `ease-out` at both ends, so most of it happens in the first half — that is what
- * makes it read as a flash rather than as something inflating. The floor is around
- * 180, which the first attempt used and which never registered at all.
- *
- * **Must match `.card--reveal`'s wipe in card.css**, and `--reveal-ms` on
- * `.opener__flash`, both of which are driven from this number.
+ * When one candidate is chosen, bring its three numbers back here as constants
+ * and delete the module.
  */
-const REVEAL_MS = 280;
-
-/**
- * How far into the burst the light first meets the card's border.
- *
- * The burst is sized so its outer edge reaches the **corners** exactly as it ends
- * (see `opener-reveal-burst`), but a circle expanding inside a 5:7 rectangle
- * always meets the **sides** first — at scale 0.497 against the corners' 0.855,
- * which is 56% of the way along the growth. `ease-out` front-loads that, putting
- * it near 45% of the elapsed time.
- *
- * That is when the rim lights. Firing it at the end of the burst instead — which
- * is what it did — put the glow most of a second after the moment that is
- * supposed to have caused it, and the two read as unrelated events rather than as
- * one thing depositing another.
- */
-const RIM_AT_FRACTION = 0.45;
 
 /**
  * How long the finished card is simply left alone, once the flash has burned out.
@@ -179,9 +167,13 @@ const READABLE_MS = HOLD_MS;
  * word at a time and a long name therefore took longer — which meant the pacing
  * of a pack varied with whose card came out of it. One flash is one duration for
  * everybody.
+ *
+ * Constant *per candidate*, that is: the reveal style is taken as an argument
+ * rather than read here, so the hold and the beat it is waiting on cannot come
+ * from two different candidates if one is switched mid-pack.
  */
-const holdFor = (card: RevealedCard): number =>
-  card.isNew ? SILHOUETTE_LEAD_MS + REVEAL_MS + READABLE_MS : HOLD_MS;
+const holdFor = (card: RevealedCard, reveal: RevealStyle): number =>
+  card.isNew ? reveal.leadMs + reveal.revealMs + READABLE_MS : HOLD_MS;
 
 const PARTICLE_COUNT = 24;
 
@@ -411,6 +403,29 @@ const PackOpener: React.FC<PackOpenerProps> = ({
 
   const timers = useRef<number[]>([]);
   const cardsRef = useRef<RevealedCard[]>([]);
+  /**
+   * The candidate this card is being played on. A ref rather than state: it is
+   * set in `playCard` before the state changes that trigger the render, so the
+   * `--reveal-ms` published below is always the one the timers were built from —
+   * and it must not cause a render of its own, which would restart the CSS
+   * animations mid-beat.
+   */
+  const revealRef = useRef<RevealStyle>(getRevealStyle());
+  /**
+   * How the current card breaks, for the shard candidates.
+   *
+   * **A ref set in `playCard`, not a `useMemo` over `cards[cursor]`.** The memo
+   * was a real bug: `playCard` schedules this card's sound *before* the state
+   * change that brings the card on, so at that moment the memo still held the
+   * previous card's break — every shard tick would have been timed to a
+   * different card's cells than the one on screen. Computing it once at the top
+   * of `playCard` and reading it back here means picture and sound are provably
+   * the same set.
+   *
+   * `undefined` for every non-shard candidate, which is what selects the plain
+   * single-portrait path in `PlayerCard`.
+   */
+  const piecesRef = useRef<CardBreak | undefined>(undefined);
   /** The mote layer, so the turn can reach its elements and drain the stream. */
   const motesRef = useRef<HTMLDivElement | null>(null);
 
@@ -630,6 +645,22 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     const card = cardsRef.current[index];
     if (!card) return;
 
+    /*
+     * Read once, at the top of the card, and threaded through everything below.
+     * The switcher can be clicked mid-pack, and a card whose rim was scheduled
+     * from one candidate and whose hold came from another would drift.
+     */
+    const reveal = getRevealStyle();
+    revealRef.current = reveal;
+    /*
+     * Before any state change, so the render this call triggers reads the break
+     * belonging to *this* card — and so the ticks scheduled below are timed to
+     * the same cells the card is about to draw.
+     */
+    piecesRef.current = reveal.pieces
+      ? breakFor({ id: card.player.id, ...reveal.pieces })
+      : undefined;
+
     setCursor(index);
     setHeroVisible(true);
     setFaceUp(false);
@@ -656,28 +687,58 @@ const PackOpener: React.FC<PackOpenerProps> = ({
          * so the sound was permanently louder than the thing it was happening to,
          * which is what read as silly rather than as weighty.
          */
-        const flashAt = FLIP_MS + SILHOUETTE_LEAD_MS;
+        const flashAt = FLIP_MS + reveal.leadMs;
 
         after(flashAt, () => {
           setFlashing(true);
           setPortraitIn(true);
-          /* The chime inside it waits for the border; same number as the rim. */
-          playNameReveal(ms(REVEAL_MS * RIM_AT_FRACTION));
+          /*
+           * The chime inside it waits for the accent; same number as the rim.
+           *
+           * Its opening air and sparkle are suppressed for the shard family: the
+           * first shard lands on this exact frame, so those layers stacked onto
+           * it and made that one snap a fuller event than every shard after it.
+           * Each shard carries its own air now.
+           */
+          playNameReveal(ms(reveal.revealMs * reveal.rimAt), !reveal.pieces);
         });
 
         /*
-         * The rim lights **the moment the light arrives at the border** — partway
-         * through the burst, not at the end of it. See `RIM_AT_FRACTION`.
+         * The same snap for every shard, on the frame it takes its shape.
+         *
+         * **All of them, identically.** The beat is a run of one event at an
+         * accelerating rate, and the run *is* the beat — one sound followed by
+         * thin ticks makes the opening shard the event and every other one
+         * decoration, which is backwards. `playShardSnap` takes no arguments for
+         * exactly that reason.
+         *
+         * Scheduled off the same `at` fractions the CSS animates from, so a snap
+         * cannot drift off the shape it belongs to. That is the argument
+         * `animationSpeed.ts` makes for one multiplier across JS and CSS, and
+         * the reason the break is computed once into a ref above rather than
+         * derived separately here.
+         *
+         * The last shard keeps the chime on top of its snap: it is the accent,
+         * and it should land harder than the ones before it.
+         */
+        piecesRef.current?.cells.forEach((cell) => {
+          after(flashAt + reveal.revealMs * cell.at, playShardSnap);
+        });
+
+        /*
+         * The rim lights **at the candidate's own accent** — partway through the
+         * motion, never at the end of it. See `rimAt` in `revealStyle.ts`: for
+         * the base bloom that is where the light arrives at the border, and for
+         * every alternative it is where that candidate discharges.
          *
          * It used to come up with the turn, which made it something the card
-         * arrived already wearing. Now the light leaves the centre, opens the card
-         * on its way out, and what it deposits at the edge is the rim: the glow is
-         * the flash's residue rather than a second green thing that happened to be
+         * arrived already wearing. Now the reveal deposits it: the glow is the
+         * light's residue rather than a second green thing that happened to be
          * there anyway.
          */
-        after(flashAt + REVEAL_MS * RIM_AT_FRACTION, () => setFlagged(true));
+        after(flashAt + reveal.revealMs * reveal.rimAt, () => setFlagged(true));
 
-        after(flashAt + REVEAL_MS, () => setFlashing(false));
+        after(flashAt + reveal.revealMs, () => setFlashing(false));
       } else {
         /*
          * A duplicate has no reveal to conclude, so there is nothing to wait for.
@@ -687,7 +748,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
         setFlagged(true);
       }
 
-      after(FLIP_MS + holdFor(card), () => stepRef.current(index + 1));
+      after(FLIP_MS + holdFor(card, reveal), () => stepRef.current(index + 1));
     };
 
     const level = ceremonyLevelFor(card.overall);
@@ -843,6 +904,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
 
   const current = cards[cursor];
   const level = current === undefined ? 0 : ceremonyLevelFor(current.overall);
+
   /** The very top of the scale keeps the sweep and the particle burst. */
   const isPeak = level >= 4;
 
@@ -1016,7 +1078,22 @@ const PackOpener: React.FC<PackOpenerProps> = ({
               key={cursor}
               ref={heroRef}
               className={`opener__riser opener__riser--${cursor === 0 ? 'first' : 'next'}`}
-              style={heroVisible ? undefined : { visibility: 'hidden' }}
+              /*
+                `--reveal-ms` sits here rather than on the flash, because it now
+                has two readers: the light *and* the card's own wipe, which is
+                inside the flip. Publishing it on their nearest common ancestor is
+                what makes "the light's duration is the reveal's" a fact about the
+                markup rather than a comment two files apart.
+
+                Already through `ms()`, so no rule may multiply it by `--anim`
+                again.
+              */
+              style={
+                {
+                  '--reveal-ms': `${ms(revealRef.current.revealMs)}ms`,
+                  ...(heroVisible ? null : { visibility: 'hidden' }),
+                } as React.CSSProperties
+              }
             >
               <div
                 className={[
@@ -1060,7 +1137,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
                     eager
                     reveal={
                       current.isNew
-                        ? { revealed: portraitIn }
+                        ? { revealed: portraitIn, pieces: piecesRef.current }
                         : undefined
                     }
                   />
@@ -1078,12 +1155,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
                 the block in packopen.css. Outside the flip for the same reason
                 the ceremony shimmer is.
               */}
-              {flashing ? (
-                <div
-                  className="opener__flash"
-                  style={{ '--reveal-ms': `${ms(REVEAL_MS)}ms` } as React.CSSProperties}
-                />
-              ) : null}
+              {flashing ? <div className="opener__flash" /> : null}
             </div>
           </div>
 
