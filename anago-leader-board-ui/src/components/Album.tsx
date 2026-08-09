@@ -3,7 +3,7 @@ import { Card, CardPlayer, toCard } from '../mock/cardMock';
 import PlayerCard, { ownedLabel } from './PlayerCard';
 import AlbumDecor, { olympLevel, pagePaint } from './AlbumDecor';
 import useIsMobile from '../hooks/useIsMobile';
-import { playPageTurn } from '../utils/sounds';
+import { playCoverTurn, playPageTurn } from '../utils/sounds';
 import { AlbumStyle } from '../utils/albumStyle';
 import '../styles/album.css';
 import '../styles/albumstyle.css';
@@ -290,6 +290,19 @@ const PageFace: React.FC<{
  * Album
  * ------------------------------------------------------------------ */
 
+/**
+ * The cover is a board on a glued spine and sounds nothing like a sheet, so the
+ * two moves get different sounds — see `playCoverTurn`.
+ *
+ * The move that turns the cover is the one between the shut book and the first
+ * spread, in either direction: leaf 0 on the desktop book, page 0 on mobile.
+ * Everything else is paper.
+ */
+const playTurnSound = (from: number, to: number): void => {
+  if (Math.min(from, to) === 0) playCoverTurn();
+  else playPageTurn();
+};
+
 interface AlbumProps {
   sections: AlbumSection[];
   /** Whose album this is. Printed on the cover. */
@@ -393,7 +406,7 @@ const Album: React.FC<AlbumProps> = ({
       if (isMobile) {
         setMobilePage((current) => {
           const next = Math.min(Math.max(current + delta, 0), pages.length - 1);
-          if (next !== current) playPageTurn();
+          if (next !== current) playTurnSound(current, next);
           return next;
         });
         return;
@@ -404,7 +417,7 @@ const Album: React.FC<AlbumProps> = ({
         if (next === current) return current;
         // The leaf that moves is the one being turned, in either direction.
         setMoving(delta > 0 ? current : next);
-        playPageTurn();
+        playTurnSound(current, next);
         return next;
       });
     },

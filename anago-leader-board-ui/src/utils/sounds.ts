@@ -16,6 +16,13 @@
  *    the big pulls feel monumental rather than merely loud.
  */
 
+/*
+ * The face reveal's candidates, while they are being compared. Only the id and
+ * the label live there; the sounds are down in `playNameReveal`, because they
+ * are built from the private helpers in this file. Goes away with the switcher.
+ */
+import { getRevealSound } from './revealSound';
+
 const MUTE_KEY = 'tafelvoetbal.cards.muted';
 
 let context: AudioContext | null = null;
@@ -187,7 +194,26 @@ const playGrains = ({
   }
 };
 
-/** A filtered noise band — still useful under the grains. */
+/**
+ * A filtered noise band — still useful under the grains.
+ *
+ * **`q` and `space` are what make this able to be an event rather than a bed.**
+ * At the default Q of 0.7 the band is three octaves wide, so its energy is
+ * spread thin and it reads as air however much gain it is given; dry, it also
+ * sits in a different room from `playBell`, which sends 0.9 of every partial to
+ * the reverb. A sweep meant to be *heard* — as against felt underneath
+ * something — needs a narrow Q so it has a pitch centre to follow, and a send so
+ * it shares the space with whatever it is arriving alongside.
+ *
+ * That is the whole reason the reveal's layers were inaudible next to its chime:
+ * five sine partials with a 5.6s tail and a full send, against a wide dry band
+ * at two thirds of the nominal gain. The numbers looked comparable and were not
+ * remotely.
+ *
+ * @param q Filter Q. Above about 4 the sweep reads as a voice; leave it at 0.7
+ * for a bed.
+ * @param space How much goes to the shared reverb, 0–1.
+ */
 const playNoise = (
   duration: number,
   fromHz: number,
@@ -195,6 +221,8 @@ const playNoise = (
   gain: number,
   type: BiquadFilterType = 'lowpass',
   delay = 0,
+  q = 0.7,
+  space = 0,
 ): void => {
   const ctx = getContext();
   if (!ctx) return;
@@ -205,7 +233,7 @@ const playNoise = (
 
   const filter = ctx.createBiquadFilter();
   filter.type = type;
-  filter.Q.value = 0.7;
+  filter.Q.value = q;
   filter.frequency.setValueAtTime(fromHz, now);
   filter.frequency.exponentialRampToValueAtTime(Math.max(toHz, 40), now + duration);
 
@@ -215,8 +243,84 @@ const playNoise = (
 
   source.connect(filter).connect(amp);
   amp.connect(getMaster(ctx));
+
+  if (space > 0) {
+    const send = ctx.createGain();
+    send.gain.value = space;
+    amp.connect(send).connect(getReverbSend(ctx));
+  }
+
   source.start(now);
   source.stop(now + duration);
+};
+
+/**
+ * A swish: filtered noise whose band arcs *up and back down again*.
+ *
+ * `playNoise` can only ramp its filter one way, and one way is the wrong shape
+ * for anything that passes you. A sheet sweeping past is dull at the start of its
+ * arc, brightest as it goes by, and dull again as it settles — a monotonic sweep
+ * reads as a fade instead of as a movement, which is most of why the old page
+ * turn sounded like a noise burst rather than like paper.
+ *
+ * @param peakAt Where in the arc the band is brightest, 0–1.
+ */
+const playSwish = (opts: {
+  duration: number;
+  fromHz: number;
+  peakHz: number;
+  toHz: number;
+  gain: number;
+  q?: number;
+  peakAt?: number;
+  delay?: number;
+  space?: number;
+}): void => {
+  const ctx = getContext();
+  if (!ctx) return;
+
+  const {
+    duration,
+    fromHz,
+    peakHz,
+    toHz,
+    gain,
+    q = 1,
+    peakAt = 0.45,
+    delay = 0,
+    space = 0,
+  } = opts;
+
+  const now = ctx.currentTime + delay;
+  const source = ctx.createBufferSource();
+  source.buffer = getNoise(ctx);
+  // Same reason the grains randomise theirs: two turns in a row must not match.
+  source.playbackRate.value = 0.85 + Math.random() * 0.35;
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'bandpass';
+  filter.Q.value = q;
+  filter.frequency.setValueAtTime(fromHz, now);
+  filter.frequency.exponentialRampToValueAtTime(peakHz, now + duration * peakAt);
+  filter.frequency.exponentialRampToValueAtTime(Math.max(toHz, 40), now + duration);
+
+  const amp = ctx.createGain();
+  amp.gain.setValueAtTime(0.0001, now);
+  // Rises faster than it falls: the page accelerates off the stack and coasts.
+  amp.gain.linearRampToValueAtTime(gain, now + duration * peakAt * 0.7);
+  amp.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+  source.connect(filter).connect(amp);
+  amp.connect(getMaster(ctx));
+
+  if (space > 0) {
+    const send = ctx.createGain();
+    send.gain.value = space;
+    amp.connect(send).connect(getReverbSend(ctx));
+  }
+
+  source.start(now, Math.random() * 2);
+  source.stop(now + duration + 0.03);
 };
 
 /** Low end. The short pitch drop is what gives weight, not volume. */
@@ -242,11 +346,11 @@ const playBoom = (frequency: number, duration: number, gain: number, delay = 0):
 };
 
 /** The thud at the moment of impact — dark, no top end. */
-const playImpact = (gain: number, duration = 0.55): void => {
+const playImpact = (gain: number, duration = 0.55, delay = 0): void => {
   const ctx = getContext();
   if (!ctx) return;
 
-  const now = ctx.currentTime;
+  const now = ctx.currentTime + delay;
   const source = ctx.createBufferSource();
   source.buffer = getNoise(ctx);
 
@@ -268,6 +372,57 @@ const playImpact = (gain: number, duration = 0.55): void => {
 
   source.start(now);
   source.stop(now + duration);
+};
+
+/**
+ * A short struck tone. `playBell` an order of magnitude shorter.
+ *
+ * The bell exists to be the only sustaining voice in a payoff, so it rings for
+ * 5.6 seconds on five partials. That is far too much for anything that has to
+ * land more than once — four of these arrive inside 140ms in the arpeggio, and
+ * at the bell's decay they would be a wash rather than a run. Two partials and a
+ * few hundred milliseconds is what makes a note an *event*.
+ *
+ * The upper partial is at 2.76 rather than at 2, which is one of `playBell`'s
+ * own tubular ratios: harmonic gives a flute, slightly inharmonic gives glass.
+ */
+const playPing = (
+  frequency: number,
+  gain: number,
+  delay = 0,
+  decay = 0.38,
+  space = 0.5,
+): void => {
+  const ctx = getContext();
+  if (!ctx) return;
+
+  const start = ctx.currentTime + delay;
+
+  ([[1, 1, decay], [2.76, 0.3, decay * 0.6]] as Array<[number, number, number]>).forEach(
+    ([ratio, level, length]) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = frequency * ratio;
+
+      const amp = ctx.createGain();
+      amp.gain.setValueAtTime(0.0001, start);
+      /* 2ms, like the glass that used to be here: struck things have no rise. */
+      amp.gain.linearRampToValueAtTime(gain * level, start + 0.002);
+      amp.gain.exponentialRampToValueAtTime(0.0001, start + length);
+
+      osc.connect(amp);
+      amp.connect(getMaster(ctx));
+
+      if (space > 0) {
+        const send = ctx.createGain();
+        send.gain.value = space;
+        amp.connect(send).connect(getReverbSend(ctx));
+      }
+
+      osc.start(start);
+      osc.stop(start + length + 0.05);
+    },
+  );
 };
 
 /* ------------------------------------------------------------------ *
@@ -473,19 +628,130 @@ export const playFlip = (): void => {
   playBoom(160, 0.1, 0.08, 0.015);
 };
 
-/** Paper flexing and dropping — longer, softer, no bright edge. */
+/**
+ * One sheet turning: peel, arc, settle.
+ *
+ * A page turn is **three events, not one**, and the previous version had only the
+ * middle of them — a crackle cloud over a downward noise band, which is the sound
+ * of paper being crumpled somewhere nearby rather than of a page going over.
+ * What makes it read as a turn is the shape:
+ *
+ * 1. **The peel.** A few bright, tight grains as the sheet unsticks from the one
+ *    beneath it. Short and early — this is the transient the ear times the whole
+ *    gesture from.
+ * 2. **The arc**, `playSwish`: the sheet passing, brightest in the middle.
+ * 3. **The settle.** A last flutter and a soft, dark slap as it lies down.
+ *
+ * **No `playBoom`.** The old one dropped a 120 Hz sine on the landing, and a sheet
+ * of paper has no low end whatsoever — that boom is what made this sound like a
+ * book being closed every time a page was turned. What weight it has comes from a
+ * lowpassed noise tick instead, which is a slap and not a note.
+ */
 export const playPageTurn = (): void => {
   playGrains({
-    count: 28,
-    spread: 0.34,
-    grainMs: [8, 30],
-    hz: [520, 3000],
-    gain: 0.055,
-    q: 1.1,
-    bias: 1.35,
+    count: 7,
+    spread: 0.045,
+    grainMs: [3, 9],
+    hz: [1900, 5600],
+    gain: 0.042,
+    q: 3.2,
+    bias: 0.8,
   });
-  playNoise(0.32, 420, 150, 0.05);
-  playBoom(120, 0.14, 0.055, 0.26);
+
+  playSwish({
+    duration: 0.34,
+    fromHz: 900,
+    peakHz: 2700,
+    toHz: 750,
+    gain: 0.05,
+    q: 0.85,
+    peakAt: 0.42,
+    space: 0.12,
+  });
+
+  /* The fibres. Denser and brighter than before, and biased to the middle of the
+     arc, where the sheet is moving fastest. */
+  playGrains({
+    count: 32,
+    spread: 0.28,
+    grainMs: [3, 13],
+    hz: [1300, 6800],
+    gain: 0.028,
+    q: 2.6,
+    delay: 0.02,
+  });
+
+  playGrains({
+    count: 6,
+    spread: 0.055,
+    grainMs: [4, 18],
+    hz: [700, 2600],
+    gain: 0.036,
+    q: 1.8,
+    delay: 0.3,
+  });
+  playNoise(0.1, 1000, 240, 0.045, 'lowpass', 0.305);
+};
+
+/**
+ * The front board going over — the album opening or shutting.
+ *
+ * Same three-part shape as `playPageTurn` and nothing else in common, because a
+ * cover is not a big page: it is a stiff board hinged on a glued spine, and all
+ * three differences are audible.
+ *
+ * - **The spine, not a peel.** Sparse low grains at a high Q, spread over a
+ *   quarter of a second: stick-slip, which is what a creak physically is. A board
+ *   does not unstick from anything, it resists and then gives.
+ * - **A dark, slow arc.** An octave and a half below the page's, over nearly
+ *   twice the time, and only a thin skin of paper rustle on top — board is
+ *   laminated and has almost no fibre noise of its own.
+ * - **It lands.** This is the one turn in the album that *does* get a boom: mass
+ *   dropping onto the table, through the shared reverb so the room answers it.
+ */
+export const playCoverTurn = (): void => {
+  playGrains({
+    count: 12,
+    spread: 0.24,
+    grainMs: [18, 70],
+    hz: [190, 640],
+    gain: 0.05,
+    q: 9,
+    bias: 0.85,
+  });
+
+  playSwish({
+    duration: 0.6,
+    fromHz: 420,
+    peakHz: 1150,
+    toHz: 320,
+    gain: 0.07,
+    q: 0.7,
+    peakAt: 0.5,
+    space: 0.3,
+  });
+
+  playGrains({
+    count: 13,
+    spread: 0.46,
+    grainMs: [6, 26],
+    hz: [850, 3400],
+    gain: 0.018,
+    q: 2,
+    delay: 0.06,
+  });
+
+  playImpact(0.085, 0.3, 0.55);
+  playBoom(76, 0.28, 0.07, 0.55);
+  playGrains({
+    count: 8,
+    spread: 0.085,
+    grainMs: [5, 20],
+    hz: [420, 1900],
+    gain: 0.03,
+    q: 1.6,
+    delay: 0.55,
+  });
 };
 
 /** A card sliding into its slot: brief friction, then a tiny stop. */
@@ -539,157 +805,161 @@ export const playSlot = (): void => {
  * read as light rather than as metal, and still the tonic, so it cannot argue
  * with a D-minor chord that may still be ringing on a rare card.
  *
- * @param rimAtMs Real ms from now until the light meets the border — the same
- * number `PackOpener` uses to fire the rim, passed in rather than re-derived.
- * @param air Whether to play layers 1 and 2. **False for the shard reveal**,
- * where the beat opens with a shard rather than with a bloom: the first shard
- * lands on this exact frame, so the air and sparkle stacked onto it and made
- * that one snap sound like a different, better event than the nine after it.
- * Every shard now carries its own air (`playShardSnap`), and what is left here
- * is the chime — which is still right, because the rim still arrives and still
- * wants announcing.
+ * **The whole of the above is candidate 0**, and it is on trial rather than
+ * settled — see `revealSound.ts`, which is where the eight options and the
+ * reasoning behind them live. In particular: the rising sweep in layer 1 was
+ * written for a *burst*, and D drains. That is what the candidates are about.
+ *
+ * @param rimAtMs Real ms from now until the beat discharges — the same number
+ * `PackOpener` uses to fire the rim, passed in rather than re-derived. Every
+ * candidate times itself in fractions of this and takes nothing else.
  */
-export const playNameReveal = (rimAtMs = 250, air = true): void => {
+export const playNameReveal = (rimAtMs = 250): void => {
   const rim = rimAtMs / 1000;
 
-  if (air) {
-    playNoise(0.34, 700, 7200, 0.05, 'bandpass');
+  switch (getRevealSound().id) {
+    /*
+     * ---------------------------------------------------------------------
+     * 1 · walkout — *FIFA Ultimate Team*
+     *
+     * Chest, not ears. The energy is in the bass and the bass *is* the event.
+     *
+     * **Every rule this file has about the reveal is deliberately broken here**,
+     * and that is the candidate. The note above says a boom is mass and the
+     * thing happening to the card is light, so nothing may go below 700 Hz —
+     * true of a bloom bursting outward, and the whole question is whether it is
+     * true of a face arriving. FUT's reveal is famous for being *felt*, and it
+     * is entirely sub and crowd.
+     *
+     * Four layers: the riser that has been building through the charge, a sine
+     * dropping 88 → 52 Hz on the accent, a dark thud giving that a transient to
+     * sit on, and a bright narrow sweep upward so there is something above
+     * 1 kHz to cut through it. The crowd wash starts just *before* the accent —
+     * a crowd reacts fractionally early, and it is the only layer allowed to.
+     */
+    case 'walkout':
+      playNoise(rim * 0.92, 260, 3000, 0.055, 'bandpass', 0, 1.2, 0.3);
+      playNoise(1.0, 420, 2600, 0.05, 'bandpass', Math.max(0, rim - 0.06), 0.8, 0.75);
+      playBoom(52, 0.95, 0.3, rim);
+      playImpact(0.2, 0.7, rim);
+      playNoise(0.46, 900, 9200, 0.11, 'bandpass', rim, 7, 0.4);
+      break;
 
-    playGrains({
-      count: 14,
-      spread: 0.2,
-      grainMs: [30, 130],
-      hz: [4200, 11000],
-      gain: 0.03,
-      q: 8,
-      bias: 0.7,
-    });
+    /*
+     * ---------------------------------------------------------------------
+     * 2 · folie — *MTG Arena, and a real foil card catching the light*
+     *
+     * **No attack anywhere.** Nothing is struck and nothing lands; a surface is
+     * turned in the light and you hear the sheen travel across it. That suits a
+     * card whose whole face is tier metal, and it is the one candidate here
+     * that reveals a *texture* rather than announcing an event.
+     *
+     * The sheen is two narrow bands sweeping the same span, detuned and offset
+     * by ~40ms. Neither is the sound: what you hear is the beating between them
+     * moving as the sweeps diverge and reconverge, which is a flanger built out
+     * of the two filters already available rather than out of a delay line.
+     *
+     * It resolves on a thin high ping rather than a bell — the sheen reaching
+     * the far edge, not a note being struck. `playPing`'s upper partial at 2.76
+     * is what keeps it glass instead of flute.
+     */
+    case 'folie':
+      playNoise(rim * 1.45, 2400, 6800, 0.08, 'bandpass', rim * 0.12, 9, 0.4);
+      playNoise(rim * 1.45, 2620, 6280, 0.075, 'bandpass', rim * 0.12 + 0.04, 11, 0.4);
+      playGrains({
+        count: 9,
+        spread: rim * 0.9,
+        grainMs: [40, 150],
+        hz: [5200, 12000],
+        gain: 0.018,
+        q: 12,
+        bias: 1.4,
+      });
+      playPing(3136, 0.026, rim, 0.5);
+      playPing(4699, 0.014, rim + 0.02, 0.34);
+      break;
+
+    /*
+     * ---------------------------------------------------------------------
+     * 5 · arpeggio — *Pokémon TCG, and every gacha ever made*
+     *
+     * Shameless, and it works on everybody. Where the shipped sound is one
+     * struck note, this is a run of four landing *into* the accent — which is
+     * the difference between hearing "note" and hearing "yes".
+     *
+     * D5 · F5 · A5 · D6, which is a D-minor arpeggio: the same chord the payoff
+     * ladder is built on. That is not a flourish — it means the run cannot
+     * argue with a rare card's chord for free, which is the constraint the old
+     * D6/D5 chime was chosen to satisfy and the only part of it worth keeping.
+     * F natural, not F♯, for exactly the reason the payoff gives.
+     *
+     * 45ms apart and rising in gain, so the last note is both the loudest and
+     * the one on the accent. Short decays — at `playBell`'s 5.6s the four would
+     * be a chord rather than a run, which is what `playPing` exists for.
+     *
+     * **The send opens as the run climbs**, 0.72 → 1.02, rather than sitting at
+     * one value for all four. Uniformly wet, the run arrives already in a large
+     * room and the lead notes smear into the one that matters; opening it puts
+     * the dry attacks at the bottom where the rhythm is, and the space at the
+     * top where the payoff is. The room appears to grow as the notes rise, which
+     * is the same build-slow-land-fast shape the picture has.
+     *
+     * The last note carries the most of it *and* the longest decay, so the tail
+     * is still ringing under the drain — the reverb is what stops the run
+     * stopping dead the moment the face arrives.
+     */
+    case 'arp': {
+      playNoise(rim * 0.8, 700, 5200, 0.04, 'bandpass');
+      [D5, F5, A5, D6].forEach((note, i) => {
+        const at = rim - (3 - i) * 0.045;
+        playPing(note, 0.02 + i * 0.005, Math.max(0, at), 0.42 + i * 0.2, 0.72 + i * 0.1);
+      });
+      playGrains({
+        count: 12,
+        spread: 0.26,
+        grainMs: [30, 120],
+        hz: [4600, 11000],
+        gain: 0.026,
+        q: 8,
+        bias: 1.3,
+        delay: rim,
+      });
+      break;
+    }
+
+    /*
+     * ---------------------------------------------------------------------
+     * 0 · nu — the shipped sound, kept as the thing to beat.
+     *
+     * Rising air over glass grains, then two tubular-bell partials at D6 and D5
+     * held back to the accent. Two things about it are worth knowing while
+     * judging the others.
+     *
+     * **Its sweep climbs, and D drains.** The note above says a filter sweeping
+     * up "is the sound of something widening, which is exactly what the burst is
+     * doing" — and that was written for the expanding circle that lost. Nothing
+     * expands any more.
+     *
+     * **Its pitch is inherited, not chosen.** D6 over D5 sits two and three
+     * octaves above the payoff's D4 bell so it stays tonic and cannot argue with
+     * a D-minor chord — a constraint that only exists on the ~28% of cards that
+     * get a ceremony at all.
+     */
+    default:
+      playNoise(0.34, 700, 7200, 0.05, 'bandpass');
+      playGrains({
+        count: 14,
+        spread: 0.2,
+        grainMs: [30, 130],
+        hz: [4200, 11000],
+        gain: 0.03,
+        q: 8,
+        bias: 0.7,
+      });
+      playBell(D6, 0.03, rim);
+      playBell(D5, 0.02, rim + 0.014);
+      break;
   }
-
-  playBell(D6, 0.03, rim);
-  playBell(D5, 0.02, rim + 0.014);
-};
-
-/**
- * A small piece of glass, struck.
- *
- * Four **inharmonic** partials, which is the whole difference between glass and
- * a tone. Struck glass rings on the modes of a plate, not on a harmonic series —
- * so the ratios below are deliberately not 2, 3, 4. A harmonic stack at these
- * frequencies is a bell or a flute; only the inharmonicity says *glass*.
- *
- * **Decays in the low hundreds of milliseconds**, not seconds. `playBell` is the
- * same idea an order of magnitude longer (5.6s on its fundamental) because it is
- * the only sustaining voice in a payoff; here twenty of these land inside four
- * seconds, and at the end of a run they are 40ms apart. Anything with a real
- * tail turns the last third into a wash. The exponential decay puts most of the
- * energy in the first 50ms regardless, which is what a tink is.
- *
- * A 2ms attack, an order of magnitude faster than `playBell`'s 8ms. Glass has no
- * rise at all; anything slower reads as a struck metal plate.
- *
- * Nothing below the fundamental, and the fundamental is high. There is no low end
- * anywhere in this sound — that is what the old version got wrong, and one 168 Hz
- * body was enough to make the whole thing wood.
- */
-const playGlassRing = (fundamental: number, gain: number): void => {
-  const ctx = getContext();
-  if (!ctx) return;
-
-  /* Ratio, level, decay — plate modes rather than a harmonic series. */
-  const partials: Array<[number, number, number]> = [
-    [1, 1, 0.2],
-    [2.32, 0.52, 0.14],
-    [3.5, 0.3, 0.1],
-    [4.9, 0.16, 0.065],
-  ];
-
-  const start = ctx.currentTime;
-
-  partials.forEach(([ratio, level, decay]) => {
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = fundamental * ratio;
-
-    const amp = ctx.createGain();
-    amp.gain.setValueAtTime(0.0001, start);
-    amp.gain.linearRampToValueAtTime(gain * level, start + 0.002);
-    amp.gain.exponentialRampToValueAtTime(0.0001, start + decay);
-
-    osc.connect(amp);
-    amp.connect(getMaster(ctx));
-
-    /* Some room, but far less than the payoff bell gets. A shard is a small hard
-       object in the same space as the card, not a struck instrument in a hall. */
-    const send = ctx.createGain();
-    send.gain.value = 0.3;
-    amp.connect(send).connect(getReverbSend(ctx));
-
-    osc.start(start);
-    osc.stop(start + decay + 0.05);
-  });
-};
-
-/**
- * One shard taking its shape, in the shard reveal.
- *
- * **Every shard gets one, and every one is identical.** The beat is a run of the
- * same event at an accelerating rate, and the run *is* the beat — one sound at
- * the start and thin ticks after it makes the opening shard the event and every
- * other one decoration, which is backwards.
- *
- * It is deliberately as full as it is, and the reason is worth recording. The
- * first version was a small dry tick that varied across the run — quieter and
- * brighter toward the end — and it sounded wrong for a reason that had nothing
- * to do with the tick: the first shard lands on the same frame as
- * `playNameReveal`, so it was heard *through* that sound's air and sparkle while
- * every shard after it was heard bare. The tick was never the problem; the
- * comparison was. It now carries its own air, and `playNameReveal` drops its
- * opening layers when the shard family is driving (`air: false`) so nothing
- * stacks on shard one.
- *
- * **It is glass**, and that took removing things rather than adding them. The
- * version before this was air, mid grains and a 168 Hz body, which is the recipe
- * for a piece of wood being set down: the low end is what made it wood, and the
- * broad soft band under it is what stopped anything ringing. Three layers now,
- * all of them short and high, because at the end of the run they are 40ms apart
- * and anything with a tail smears into the next four:
- *
- * 1. **The contact**, a 30ms bandpass sweeping *down* from 9k. Falling, not
- *    rising: a hard object striking is a click decaying, where a rising sweep is
- *    something opening — which is right for the bloom in `playNameReveal` and
- *    wrong here.
- * 2. **Edge scatter**, high grains at Q 16. The Q is the point — at 4 a grain
- *    clicks, and at 16 it *rings*, which is the difference between chipping and
- *    tapping. This is what the ear reads as the broken edge.
- * 3. **The ring**, `playGlassRing`, on inharmonic plate modes.
- *
- * **No low end at all**, which is a reversal: the previous note here argued a
- * shard is a physical event and wants a trace of contact. It does — but the
- * contact is in layers 1 and 2, and putting it in the *bass* made it a heavy
- * object. `playNameReveal` reached the same conclusion from the other direction.
- *
- * **A different size of glass each time.** The ring's fundamental is drawn from
- * 1850–2900 Hz per call, because a card breaking into eighteen pieces does not
- * produce eighteen identical shards, and eighteen identical tinks read as a
- * sample on repeat. It is a scatter, not a melody — the partials are inharmonic
- * and above 1.8k, so the ear takes them as size rather than as pitch, which is
- * what keeps this clear of a D-minor chord that may still be ringing.
- */
-export const playShardSnap = (): void => {
-  playNoise(0.03, 9000, 3800, 0.042, 'bandpass');
-
-  playGrains({
-    count: 6,
-    spread: 0.022,
-    grainMs: [8, 46],
-    hz: [3400, 9200],
-    gain: 0.03,
-    q: 16,
-    bias: 0.6,
-  });
-
-  playGlassRing(1850 + Math.random() * 1050, 0.03);
 };
 
 /* ------------------------------------------------------------------ *
@@ -860,6 +1130,9 @@ const D4 = 293.66;
 const F4 = 349.23;
 const A4 = 440;
 const D5 = 587.33;
+/** The lead note of the reveal's rising chime — see `playNameReveal`. */
+const F5 = 698.46;
+const A5 = 880;
 /** Only the reveal reaches this high — see `playNameReveal`. */
 const D6 = 1174.66;
 

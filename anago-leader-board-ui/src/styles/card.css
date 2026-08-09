@@ -673,75 +673,197 @@
   display: none;
 }
 
-/*
- * The reveal: the name and the face opening from the centre line outwards, behind
- * the two streaks that part from it.
+/* ---------------------------------------------------------------- *
+ * The reveal · D · gloeien
  *
- * **The light carries the reveal; it does not pass over it.** This was a plain
- * `transition: opacity` on the photo while a beam crossed the card on the same
- * clock, and the two had no visible relationship — the light went by and the face
- * happened to be fading underneath. It read as a flicker over an unrelated
- * dissolve, and that beam was cut for it. A wipe puts the reveal *at* the light,
- * which is where the silhouette ends and the player begins.
+ * The silhouette is the actor, not the obstacle. It lights from within — tier
+ * ink to green to white-hot — holds at the top for a beat with nothing else
+ * moving, and then the light **drains** and a face is left behind it.
  *
- * **A circle out of the centre point**, so the card opens in every direction at
- * once rather than being painted across it. The name is centred, so it resolves
- * from its middle letters outwards and its two halves land symmetrically.
+ * The only one of ten candidates that resolved by subtraction, and the reason
+ * it won: every other reveal answered "when does the face arrive", and this one
+ * answers "where did the light go". The hold at the peak is what makes it land —
+ * roughly 90ms in which the card is at its brightest and completely still, so
+ * the cool-down is a release rather than a continuation.
  *
- * 71% is not a taste figure. A percentage radius on `circle()` resolves against
- * `√(w² + h²) / √2`, so the radius that exactly reaches a corner is `√2 / 2` —
- * 70.71%. Below it the corners of the photo never arrive; far above it and the
- * last part of the growth happens off the card, so the reveal finishes early and
- * the light keeps going without it.
+ * The accent is at 0.62, on the drain rather than on the peak: the rim is the
+ * residue of that light leaving. `REVEAL_RIM_AT` in PackOpener.tsx is the same
+ * number, and the rim, the chime and the last visual change all land on it.
  *
- * `clip-path` rather than a mask: the boundary wants to be crisp, because that is
- * what makes it read as an edge the light is pushing rather than as a gradient of
- * its own. The bloom over it is soft, which is what softens it in practice.
+ * **Driven by `--reveal-ms`**, published on `.opener__stage` and already scaled
+ * by the pacing multiplier — so it must not be multiplied by `--anim` again. It
+ * is the same value the flash runs on and the same one the hold is scheduled
+ * around; if the two ever drift, the light and what it is carrying separate.
  *
- * The name goes with the photo, on the same clip and the same clock. They are one
- * fact — *who this is* — and the whole detour through revealing them separately,
- * a word at a time, is written up in `PackOpener.tsx`.
+ * **Keyframes rather than transitions throughout.** A transition has one curve,
+ * and this builds slowly and lands fast — two rates, which needs per-keyframe
+ * `animation-timing-function`.
  *
- * Declared on `card--reveal`, which is present for the whole beat: a transition
- * declared only on the withheld state comes off with it and the wipe becomes a
- * cut.
- *
- * **Driven by `--reveal-ms`**, published on `.opener__riser` from the live reveal
- * candidate's `revealMs` and already scaled by the pacing multiplier — so it must
- * not be multiplied by `--anim` again. It is the same value the flash runs on and
- * the same one the hold is scheduled around; if the two ever drift, the light and
- * the edge it is supposed to be carrying separate.
- *
- * The fallback is candidate A's 280 at the settled ×2, for the album and the
- * viewer, where the property is absent and `.card--reveal` never appears anyway.
- */
+ * The first two rules undo what candidate A left behind: it wiped the photo and
+ * the name in with a growing `clip-path` circle, and D dissolves them instead.
+ * ---------------------------------------------------------------- */
 .card--reveal .card__portrait--photo,
-.card--reveal .card__name {
-  transition: clip-path var(--reveal-ms, 560ms) ease-out;
-  clip-path: circle(71% at 50% 50%);
+.card--reveal .card__name,
+.card--withheld .card__portrait--photo,
+.card--withheld .card__name {
+  clip-path: none;
+  transition: none;
 }
 
 .card--withheld .card__portrait--photo,
 .card--withheld .card__name {
-  clip-path: circle(0% at 50% 50%);
+  opacity: 0;
 }
 
+/*
+ * The wash from card.css stays: a flat colour would make the figure a sticker
+ * cut to the shape of a person, which is the objection that took the plates off
+ * the number and the name, and it holds just as well for a glowing one.
+ */
+.card--reveal:not(.card--withheld) .card__silhouette {
+  animation: reveal-charge var(--reveal-ms, 560ms) linear 1 forwards;
+}
+
+.card--reveal:not(.card--withheld) .card__portrait--photo,
+.card--reveal:not(.card--withheld) .card__name {
+  animation: reveal-cool var(--reveal-ms, 560ms) linear 1 forwards;
+}
+
+@keyframes reveal-charge {
+  0% {
+    background-color: var(--tier-ink);
+    opacity: 0.8;
+    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4);
+  }
+  /* Slow to start: for the first third it is barely more than a warm outline,
+     which is what makes the top of the ramp feel earned. */
+  40% {
+    background-color: #3f7f63;
+    opacity: 0.88;
+    filter: drop-shadow(0 0 3px rgba(152, 255, 206, 0.35));
+    animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
+  }
+  52% {
+    background-color: #9dffd0;
+    opacity: 1;
+    filter: drop-shadow(0 0 16px rgba(152, 255, 206, 0.9));
+    animation-timing-function: linear;
+  }
+  /* The hold. Nothing moves — this is the beat the whole candidate is built on. */
+  62% {
+    background-color: #f4fffa;
+    opacity: 1;
+    filter: drop-shadow(0 0 22px rgba(210, 255, 236, 0.95));
+    animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
+  }
+  /* The drain. Faster than the charge, and the figure is gone before the photo
+     is fully up so the two never read as a crossfade. */
+  84% {
+    background-color: #f4fffa;
+    opacity: 0;
+    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+  }
+  100% {
+    background-color: #f4fffa;
+    opacity: 0;
+    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+  }
+}
+
+@keyframes reveal-cool {
+  /* Flat until 60%: the photo waits for the drain rather than starting under the
+     plateau, so the figure and the face never read as a crossfade. */
+  0%,
+  60% {
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.3, 1);
+  }
+  86% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/*
+ * D settles rather than pops: the light leaving is a release, not a blow, so the
+ * card eases *down* out of the charge instead of jumping at it. It has been held
+ * slightly large for the whole hold, and the drain is when it lets go.
+ *
+ * **The duration stops when the motion does, and that is not a tidiness point —
+ * it is the fix for a soft card.** This ran for the whole `--reveal-ms` with the
+ * last third of its timeline sitting on a dead `scale(1)`, and a *running*
+ * transform animation is what promotes `.card` to its own composited layer,
+ * whether or not the value is still moving. While promoted the card is a texture
+ * rather than live content: the photo is resampled and reads slightly soft, and
+ * the name loses subpixel antialiasing and renders visibly lighter — a different
+ * font, to the eye. Both snap back the instant the animation *ends* and the
+ * layer is folded away, which is what was being seen as the image coming into
+ * focus partway through the beat.
+ *
+ * So the animation now ends when the settle does, at 0.7 of the reveal, and the
+ * keyframe stops below are rescaled into that shorter span rather than moved.
+ * The photo is around a third up at that point and still behind a draining
+ * figure, so the repaint happens where it cannot be seen, and everything from
+ * there on is native resolution.
+ *
+ * **The trap is the duration, not the keyframe.** A first pass at this pulled
+ * the final `scale(1)` stop earlier and changed nothing at all, because the
+ * animation still had a third of its life left to run. Anything here that
+ * animates a transform on the card wants a duration that matches its motion.
+ */
+.card--reveal:not(.card--withheld) {
+  animation: reveal-recoil-settle calc(var(--reveal-ms, 560ms) * 0.7) linear 1;
+}
+
+/*
+ * **Percentages of 0.7 of the reveal, not of the reveal.** These were 52 / 62 /
+ * 86 when the animation ran the full length; they are the same three moments,
+ * rescaled into the shorter duration above so the settle itself is untouched.
+ * The old 86–100 tail was a dead hold on `scale(1)` and is what kept the card
+ * composited — see the note over the rule.
+ *
+ * In reveal-fractions the stops are still 0.52, 0.62 and 0.70.
+ */
+@keyframes reveal-recoil-settle {
+  0% {
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.7, 0.5);
+  }
+  74.3% {
+    transform: scale(1.016);
+    animation-timing-function: linear;
+  }
+  88.6% {
+    transform: scale(1.016);
+    animation-timing-function: cubic-bezier(0.16, 0.9, 0.3, 1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
 
 /*
  * Reduced motion never actually reaches this — the opener skips the whole reveal
- * and lands on the results grid, where cards carry no `reveal` at all. This is
- * the second guard, and it resolves to the finished state rather than to a card
- * with no name on it.
+ * and lands on the results grid, where cards carry no `reveal` prop at all. This
+ * is the second guard, and it resolves to the finished card rather than to a
+ * nameless one.
  */
 @media (prefers-reduced-motion: reduce) {
+  .card--reveal,
   .card--reveal .card__portrait--photo,
-  .card--reveal .card__name {
-    transition: none;
+  .card--reveal .card__name,
+  .card--reveal .card__silhouette {
+    animation: none;
   }
 
   .card--withheld .card__portrait--photo,
   .card--withheld .card__name {
     clip-path: none;
+    opacity: 1;
+    filter: none;
   }
 }
 

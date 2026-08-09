@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Album, { AlbumSection, albumSlotOrder } from '../components/Album';
 import CardViewer from '../components/CardViewer';
 import GameShell from '../components/GameShell';
-import PackOpener from '../components/PackOpener';
+import PackOpener, { REVEAL_MS, REVEAL_RIM_AT } from '../components/PackOpener';
 import PackTile from '../components/PackTile';
 import PlayerPicker from '../components/PlayerPicker';
 import { CollectionState, mockCardsClient, mockDebug } from '../clients/cardsClient';
@@ -33,8 +33,8 @@ import {
   getAlbumStyle,
   setAlbumStyle,
 } from '../utils/albumStyle';
-import { REVEAL_STYLES, getRevealStyle, setRevealStyle } from '../utils/revealStyle';
-import { playRareRise } from '../utils/sounds';
+import { REVEAL_SOUNDS, getRevealSound, setRevealSound } from '../utils/revealSound';
+import { playNameReveal, playRareRise } from '../utils/sounds';
 import '../styles/game.css';
 
 const PLAYER_KEY = 'tafelvoetbal.cards.playerId';
@@ -85,11 +85,21 @@ const CollectionPage: React.FC = () => {
   const [fastMode, setFastMode] = useState(() => read(FAST_KEY) === 'true');
   const [stageTheme, setStageThemeState] = useState<StageTheme>(getStageTheme);
   const [albumStyle, setAlbumStyleState] = useState<AlbumStyle>(getAlbumStyle);
-  const [revealStyle, setRevealStyleState] = useState(getRevealStyle);
+  const [revealSound, setRevealSoundState] = useState(getRevealSound);
 
   /** Auditions a level at exactly the length and intensity a real reveal uses. */
   const previewRiser = (level: number) =>
     playRareRise(ms(Math.round(getCeremonyMs() * ceremonyBuildRatio(level))), level / 4);
+
+  /**
+   * Auditions the face reveal at exactly the accent a real one uses.
+   *
+   * The candidates are timed in fractions of the reveal and take only the accent
+   * from the caller, so passing the beat's own number is the whole of what makes
+   * this the real thing rather than an approximation — and it tracks the pacing
+   * multiplier for free, because `ms()` is what produces it.
+   */
+  const previewRevealSound = () => playNameReveal(ms(REVEAL_MS * REVEAL_RIM_AT));
 
   useEffect(() => {
     let cancelled = false;
@@ -553,37 +563,49 @@ const CollectionPage: React.FC = () => {
           </div>
 
           {/*
-            The silhouette beat's candidates. Two mechanics — the glow (D) and
-            the break (H) — each in a plain version and a **silhouette-first**
-            version (E, I) where the flip lands on bare metal and what the effect
-            delivers is a glowing figure, with the face arriving after it. What
-            each one is and what it is trying to prove lives in
-            utils/revealStyle.ts; delete this row, that module,
-            utils/cardPieces.ts and styles/reveal.css once one is chosen.
+            What the face reveal sounds like. The shipped sound plus three that
+            each bring their own accent voice rather than a garnish on a shared
+            bell — see the note in utils/revealSound.ts about why the first
+            version of this row was not an audition at all. What each one is
+            and what it is trying to prove lives in utils/revealSound.ts. Delete
+            this row and that module once one is chosen, and fold the winner into
+            `playNameReveal` as its only body.
 
-            Only visible on a **new** card, so judge them on a fresh collection
-            ("leegmaken") — a pack of duplicates skips the beat entirely, which is
-            what makes the beat mean "new". The break also differs per player, so
-            judge it across several cards rather than on one pull.
+            ▶ auditions the current one at the live candidate's own accent, so it
+            can be judged without opening a pack — but judge the winner on a real
+            new card too, because on a rare one it plays over a D-minor chord and
+            that is the only thing it has to survive.
           */}
           <div className="game-row" style={{ marginTop: 10 }}>
             <span className="game-muted" style={{ minWidth: 128 }}>
-              onthulling
+              onthullingsgeluid
             </span>
-            {REVEAL_STYLES.map((option) => (
+            <button
+              type="button"
+              className="game-button game-button--small"
+              onClick={previewRevealSound}
+            >
+              ▶
+            </button>
+            {REVEAL_SOUNDS.map((option) => (
               <button
                 key={option.id}
                 type="button"
                 className="game-button game-button--small"
-                onClick={() => setRevealStyleState(setRevealStyle(option.id))}
-                disabled={revealStyle.id === option.id}
+                onClick={() => {
+                  setRevealSoundState(setRevealSound(option.id));
+                  /*
+                   * Plays as it is picked. Auditioning a sound is one click, not
+                   * two, and switching without hearing the result is the one
+                   * thing this row exists to prevent.
+                   */
+                  previewRevealSound();
+                }}
+                disabled={revealSound.id === option.id}
               >
                 {option.label}
               </button>
             ))}
-            <span className="game-muted">
-              {ms(revealStyle.leadMs)} + {ms(revealStyle.revealMs)} ms
-            </span>
           </div>
 
           {/*

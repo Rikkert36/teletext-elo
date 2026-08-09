@@ -2089,6 +2089,18 @@ swells overlap and would otherwise clip.
   irregular crackles with randomised playback rate, buffer offset, filter
   frequency and gain. A single filtered noise burst with a smooth decay is
   precisely what "fake" sounds like.
+- **A turn is three events: peel, arc, settle.** The arc is `playSwish`, whose
+  band rises *and falls again* — a one-way filter ramp reads as a fade rather
+  than as something passing you, which is why the first page turn sounded like
+  paper being crumpled nearby instead of a page going over. It also has **no
+  boom**: a sheet has no low end, and the 120 Hz sine that used to land on it
+  made every turn sound like the book being shut.
+- **The cover has its own sound** (`playCoverTurn`), because a cover is a stiff
+  board on a glued spine, not a big page: a stick-slip creak instead of a peel,
+  an arc an octave and a half lower over twice the time, almost no fibre rustle —
+  and it is the one turn that *does* get a boom, because it lands. Fires on the
+  move between the shut book and the first spread in either direction, which is
+  leaf 0 on desktop and page 0 on mobile.
 - **The shimmer phase has its own sound** (`playShimmerSweep`), scaled to the
   shimmer length so it lands on the phase boundary.
 - **The build-up is a reverse cymbal** — a highpass noise swell over a clean sine

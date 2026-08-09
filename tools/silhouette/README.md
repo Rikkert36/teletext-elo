@@ -57,10 +57,32 @@ u2netp is a *salient object* network: it predicts which pixels belong to the dom
 subject. It has no notion of faces, which is why it will happily and correctly outline a
 baguette if that is what the avatar is.
 
-Two passes. The first locates the subject in the whole photo; the second re-runs on a 5:7
-frame fitted around it, where the subject gets far more of the 320×320 input and the mask
-comes out sharper. Photos that are already head-and-shoulders skip the second pass, which
-is most of them.
+The model runs over the whole photo first. When the subject sits in a corner of it there
+is a second pass on a 5:7 frame fitted around it, where the subject gets far more of the
+320×320 input and the mask comes out sharper. Two of the 71 avatars in the pool are like
+that; for the rest the whole photo is the best view there is and the first reading stands.
+
+Skipping the second pass is not just a saving. It used to run either way, falling back to
+the card's own 5:7 crop when there was nothing to fit — and on a landscape photo that crop
+is a narrow column out of the middle, which is *less* of the photo than the first pass
+already saw. The model reads it as a different scene: given Luuk's avatar whole it returns
+all three heads and both bodies, and given the column it returns the middle head alone,
+because the outer two are now cut off at the frame edge and stop being part of the salient
+object. The better mask was then discarded in favour of the worse one.
+
+Every frame is read twice, mirrored the second time. The network is not left-right
+symmetric: on a low-contrast photo it will hold one side of a subject and let the other
+fade into the background, and which side that is flips with the image. Mark's avatar is
+the case in point — read one way his right arm and the chair he leans on fade out below
+the threshold, read mirrored they are solid.
+
+The two readings are combined by taking the higher of them wherever the lower one also
+sees something, and deferring to the lower one where it does not. A plain maximum is what
+recovers Mark's arm, but it also lets one confident reading carry a piece of background in
+with no vote to overrule it: on Luc Geurts' avatar the plain reading takes a wedge of the
+mural behind him and the mirrored one does not, and the wedge lands on the card as a
+triangle beside his face. What separates the two cases is not the winning reading — both
+are around 0.8 — but the losing one, 0.38 for Mark's arm against 0.07 for the wedge.
 
 The result is then projected back into the card's own crop. That step is not optional: the
 front end stretches the mask over the whole portrait box while the photo under it is
@@ -70,7 +92,11 @@ while the photo stays where it was — which is exactly what the three full-body
 the pool did before this existed.
 
 Afterwards only the largest connected component survives, which drops stray specks and
-any second person standing at the edge of frame.
+any second person standing at the edge of frame. It finds something to drop on 1 of the 71
+avatars; it used to do far more, and both of the steps above have since taken over part of
+its job — a subject whose far side faded out left that side behind as a component of its
+own, and the bystander beside Daan Verkade is now dropped a step earlier, because the two
+readings disagreed about him.
 
 ## Known limits
 
@@ -83,3 +109,7 @@ only tell you whether the mask is well-formed.
 A full-body photo yields a small figure, because that is how large it is on the card too.
 The second pass makes the outline sharper; it cannot make the subject bigger, since the
 mask has to line up with a photo the front end crops its own way.
+
+A subject the card's crop cuts through is masked as far as the crop goes and no further,
+so a wide group photo becomes whichever part of the group is in the middle. The mask is
+right; it is the framing that leaves the rest outside the card.

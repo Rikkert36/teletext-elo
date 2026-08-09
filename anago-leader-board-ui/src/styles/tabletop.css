@@ -30,6 +30,19 @@
  *   table casts, and `--vignette` is how far the light falls off. A lamp to one
  *   side gives long shadows and a hard vignette; a bright even room gives short
  *   ones. Objects disagreeing about where the light is kills it instantly.
+ *   The vignette carries a **spread** as well as a blur: blur alone puts its
+ *   darkest point exactly on the border and has half of itself outside the box,
+ *   so the edges stayed thin however far the blur was pushed. The spread moves
+ *   the shadow's own edge inwards, and the blur then softens it into the middle —
+ *   which is what makes the slab read as lit from above rather than printed.
+ *
+ *   **Two stops, not one.** `--vignette` holds a *list* of shadows, and the two
+ *   do different jobs: a tight dark band hugging the rim, and a wide soft falloff
+ *   reaching a couple of hundred pixels in. Trying to get both out of a single
+ *   shadow is what put a ceiling on how deep this could go — past a point the
+ *   blur is so wide that the rim itself goes pale, and pushing the alpha to
+ *   compensate greys out the whole slab. Split, the rim can be near-black while
+ *   the middle keeps its timber. Anything added here must stay a list.
  * - **Ink follows the timber, not the theme.** `--table-ink` has to read against
  *   the actual wood, so it is light on walnut and dark on pine. Every text token
  *   maps to it.
@@ -150,11 +163,25 @@
   padding: clamp(18px, 2.4vw, 36px) var(--stage-pad) clamp(22px, 2.8vw, 40px);
   border-radius: 5px;
 
-  /* Chamfer, edge grain, the light falling off, and the shadow on the floor. */
+  /*
+   * Edge grain, the light falling off, and the shadow on the floor.
+   *
+   * **No lit lip on the top edge.** There used to be an `inset 0 1px 0` white
+   * hairline here as the chamfer catching the light, and it has to stay gone: it
+   * is the only light-coloured thing the slab paints on its own border, and once
+   * the vignette went deep it read as a grey outline drawn round the table rather
+   * than as a bevel. That is a contrast effect, not an alpha one — against
+   * mid-brown timber 0.16 white was a subtle edge; against a near-black rim even
+   * 0.07 is a visible line, so dimming it does not help and only removing it does.
+   * The rim now reads purely as the wood turning away from the lamp.
+   */
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.5),
-    var(--vignette, inset 0 0 140px rgba(0, 0, 0, 0.5)),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.65),
+    var(
+      --vignette,
+      inset 0 0 60px 8px rgba(0, 0, 0, 0.55),
+      inset 0 0 260px 60px rgba(0, 0, 0, 0.8)
+    ),
     0 26px 60px rgba(0, 0, 0, 0.85),
     0 6px 16px rgba(0, 0, 0, 0.6);
 
@@ -332,7 +359,9 @@
   --accent-light: #e8c88a;
   --accent-dark: #4a3712;
   --drop: 4px 7px 14px rgba(20, 11, 2, 0.55);
-  --vignette: inset 0 0 150px rgba(0, 0, 0, 0.6);
+  --vignette:
+    inset 0 0 64px 10px rgba(0, 0, 0, 0.6),
+    inset 0 0 280px 66px rgba(0, 0, 0, 0.86);
   --book-inside: linear-gradient(150deg, #365434 0%, #22381f 60%, #2c4527 100%);
 
   background-color: #5d4220;
@@ -376,7 +405,12 @@
   --accent-light: #5e3a12;
   --accent-dark: #40260a;
   --drop: 2px 5px 11px rgba(60, 40, 14, 0.4);
-  --vignette: inset 0 0 120px rgba(90, 60, 24, 0.22);
+  /* Daylight, so this one stays the lightest of the five even after the lift —
+     but bare pine with no edge at all was reading as a flat swatch. Warm brown
+     rather than black: on pale timber a neutral shadow greys the wood off. */
+  --vignette:
+    inset 0 0 56px 8px rgba(72, 44, 14, 0.5),
+    inset 0 0 240px 52px rgba(72, 44, 14, 0.6);
   --book-inside: linear-gradient(150deg, #6b5030 0%, #4a371f 60%, #5a4327 100%);
 
   background-color: #cba572;
@@ -438,7 +472,9 @@
   --accent-light: #eec18a;
   --accent-dark: #4c1c11;
   --drop: 3px 8px 18px rgba(14, 5, 2, 0.6);
-  --vignette: inset 0 0 190px rgba(0, 0, 0, 0.72);
+  --vignette:
+    inset 0 0 76px 12px rgba(0, 0, 0, 0.68),
+    inset 0 0 340px 78px rgba(0, 0, 0, 0.92);
   --book-inside: linear-gradient(150deg, #2f5a39 0%, #1c3a24 60%, #26482d 100%);
 
   background-color: #4e1d12;
@@ -482,7 +518,9 @@
   --accent-light: #ffdca6;
   --accent-dark: #4e3212;
   --drop: 2px 6px 13px rgba(50, 30, 8, 0.5);
-  --vignette: inset 0 0 110px rgba(60, 34, 8, 0.3);
+  --vignette:
+    inset 0 0 60px 9px rgba(46, 24, 5, 0.56),
+    inset 0 0 250px 56px rgba(46, 24, 5, 0.68);
   --book-inside: linear-gradient(150deg, #2c5c38 0%, #1a3c23 60%, #24492c 100%);
 
   background-color: #a87b45;
@@ -514,7 +552,11 @@
   --accent-light: #f0cf92;
   --accent-dark: #3c2408;
   --drop: 4px 9px 20px rgba(8, 4, 1, 0.6);
-  --vignette: inset 0 0 200px rgba(0, 0, 0, 0.8);
+  /* The low lamp: the hardest rim and the deepest reach of the five, which is the
+     whole reason for choosing walnut. */
+  --vignette:
+    inset 0 0 88px 14px rgba(0, 0, 0, 0.75),
+    inset 0 0 380px 92px rgba(0, 0, 0, 0.95);
   --book-inside: linear-gradient(150deg, #4a2c1c 0%, #2c1810 60%, #3a2216 100%);
 
   background-color: #33200f;

@@ -12,10 +12,12 @@
  *
  * How it works: u2netp is a salient-object network. It has no notion of faces — it
  * predicts which pixels belong to the dominant subject, which is exactly the thing a
- * luminance threshold could not know. Two passes: the first locates the subject in the
- * full photo, the second runs again on a 5:7 frame fitted around it, so a full-body
- * photo gives the model far more than a handful of pixels to work with. The result is
- * then projected back into the card's own crop, which is the only frame the front end
+ * luminance threshold could not know. It runs over the full photo first, and again on a
+ * 5:7 frame fitted around the subject when there is one tight enough to be worth it, so
+ * a full-body photo gives the model far more than a handful of pixels to work with. Each
+ * frame is read twice, mirrored the second time, and the readings are combined by taking
+ * the higher of the two wherever the lower one agrees there is anything there. The result
+ * is then projected back into the card's own crop, which is the only frame the front end
  * can line a mask up with.
  *
  * Output is a PNG whose alpha channel carries the mask and whose RGB is flat white, so
@@ -44,14 +46,35 @@ const FRAME_MARGIN = 0.10;
 /**
  * Only re-run on a fitted frame when it is meaningfully tighter than the default crop.
  * Head-and-shoulders photos are the rule, and a second pass buys them nothing.
+ *
+ * Two of the 71 avatars in the pool clear this. That is the point: for the other 69 the
+ * whole photo is the best view there is, and re-running on anything narrower can only
+ * take context away — see `generate`.
  */
 const FRAME_GAIN = 0.85;
 /**
- * Binarisation cutoff for the connected-component cleanup. Measured, not guessed: at
- * 0.50 a soft mask like Mark's shatters into 19 pieces and "keep the largest" throws
- * half the subject away, while at 0.25 it stays a single piece.
+ * Binarisation cutoff for the connected-component cleanup. Measured, not guessed: it was
+ * chosen when a soft mask like Mark's shattered into 19 pieces at 0.50 and "keep the
+ * largest" threw half the subject away, while at 0.25 it stayed a single piece.
+ *
+ * Reading every frame both ways has since taken most of that softness out — over the pool
+ * no mask now loses as much as 1% of itself at 0.50 either. Left at 0.25 anyway: nothing
+ * argues for raising it, and a low cutoff is what keeps the antialiased edge outside the
+ * binarised shape, which is the assumption `keepLargest` grows back from.
  */
 const SOLID = 64;
+/**
+ * How much the weaker of the two readings has to see before the stronger one is taken at
+ * face value — see `combine`.
+ *
+ * Swept over the pool. It only has to clear the noise the losing reading leaves behind,
+ * and going higher buys nothing: 0.04 and 0.10 both remove Luc's wedge completely, while
+ * 0.10 takes three times as much off Daan Verkade's shirt, whose two readings disagree
+ * softly over a large area and come out moth-eaten rather than trimmed. Only three masks
+ * in the pool move by more than 2% of the card at 0.04, and they are the three this was
+ * looked at on.
+ */
+const AGREEMENT = 0.04;
 
 function parseArgs(argv) {
   const args = {};
@@ -127,10 +150,8 @@ function defaultFrame(sw, sh) {
   return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
 }
 
-/** Run the model once over a given frame; returns the raw mask at N×N, 0..1. */
-async function infer(session, src, sw, sh, frame) {
-  const small = crop(src, sw, sh, frame, N, N);
-
+/** Run the model over one N×N view; returns the raw mask at N×N, 0..1. */
+async function run(session, small) {
   // Divide by the brightest pixel rather than by 255, as rembg does: it lifts a dark
   // photo before normalisation.
   let max = 0;
@@ -154,6 +175,58 @@ async function infer(session, src, sw, sh, frame) {
   const mask = new Float32Array(N * N);
   for (let i = 0; i < N * N; i++) mask[i] = (raw[i] - lo) / span;
   return mask;
+}
+
+/** Run the model once over a given frame; returns the raw mask at N×N, 0..1. */
+async function infer(session, src, sw, sh, frame) {
+  return run(session, crop(src, sw, sh, frame, N, N));
+}
+
+/**
+ * The same frame read mirrored, with the mask flipped back to match the photo.
+ *
+ * The network is not symmetric: on a low-contrast photo it will hold one side of a
+ * subject confidently and let the other fade into the background, and which side that is
+ * flips with the image. Mark's avatar is the case in point — read one way his right arm
+ * and the chair he leans on drop below the threshold and the cleanup then removes them
+ * outright, read mirrored they are solid.
+ */
+async function inferMirrored(session, src, sw, sh, frame) {
+  const small = crop(src, sw, sh, frame, N, N);
+  const flipped = Buffer.alloc(N * N * 4);
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      small.copy(flipped, (y * N + (N - 1 - x)) * 4, (y * N + x) * 4, (y * N + x + 1) * 4);
+    }
+  }
+  const mask = await run(session, flipped);
+  const out = new Float32Array(N * N);
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) out[y * N + (N - 1 - x)] = mask[y * N + x];
+  }
+  return out;
+}
+
+/**
+ * Combine the two readings of a frame: the higher of the two, but only where the lower
+ * one also sees something.
+ *
+ * Taking the maximum outright is what recovers a subject the network let fade — but it
+ * also means one confident reading can carry a piece of background in unopposed, and
+ * there is no vote to overrule it. On Luc's avatar the plain reading takes a wedge of the
+ * mural behind him at 0.78 and the mirrored one puts it at 0.07; the wedge lands on the
+ * card as a triangle beside his face. The two cases look identical to a maximum and are
+ * far apart on the weaker reading, which is the signal this gates on: Mark's arm, the
+ * thing reading both ways exists to recover, sits at 0.38 there. Uncertain is not the
+ * same as absent.
+ */
+function combine(a, b) {
+  const out = new Float32Array(a.length);
+  for (let i = 0; i < a.length; i++) {
+    const lo = Math.min(a[i], b[i]), hi = Math.max(a[i], b[i]);
+    out[i] = lo >= AGREEMENT ? hi : lo;
+  }
+  return out;
 }
 
 /**
@@ -291,8 +364,15 @@ function components(mask, w, h) {
  * Keep only the largest component.
  *
  * u2netp routinely leaves specks behind — a bright patch above a head, a shoulder of
- * someone standing just in frame. One person is one piece. This is also what removes the
- * bystander next to Daan Verkade, with no face detector involved.
+ * someone standing just in frame. One person is one piece, and no face detector is
+ * involved in deciding which.
+ *
+ * It has something to remove on 1 of the 71 avatars in the pool, and used to be load
+ * bearing for many more. Both other steps have eaten into its job: a reading that faded
+ * out over half a subject left that half as its own component for this to delete, and
+ * `combine` fills those in first. The bystander next to Daan Verkade, once the example
+ * of what this is for, now goes there too — the two readings disagreed about him, which
+ * is the same observation one step earlier.
  *
  * The soft edge of the mask lies outside the binarised shape, so the kept region is
  * grown a few pixels first; otherwise the antialiasing gets cut off and the outline
@@ -323,13 +403,14 @@ async function generate(session, avatarFile, outFile) {
   const src = Buffer.from(source.data);
   const whole = { x: 0, y: 0, w: source.width, h: source.height };
 
-  // Pass one: the full photo, to find where the subject is.
+  // The full photo, which both locates the subject and is the reading kept unless
+  // something tighter turns out to be worth having.
   const located = await infer(session, src, source.width, source.height, whole);
 
   const standard = defaultFrame(source.width, source.height);
   const fitted = frameAroundSubject(located, whole);
 
-  let frame = standard, reframed = false;
+  let frame = whole, reframed = false;
   if (fitted) {
     const clamped = clampFrame(fitted, source.width, source.height);
     if (clamped.w * clamped.h < FRAME_GAIN * standard.w * standard.h) {
@@ -338,8 +419,23 @@ async function generate(session, avatarFile, outFile) {
     }
   }
 
-  // Pass two: the chosen frame, where the subject now fills the input.
-  const mask = await infer(session, src, source.width, source.height, frame);
+  /*
+   * A second pass only when the frame actually tightens around the subject.
+   *
+   * It used to run unconditionally, and where it did not reframe it fell back to the
+   * card's own 5:7 crop — which on a landscape photo is a narrow column cut out of the
+   * middle. That is strictly less of the photo than pass one already saw, and the model
+   * reads it as a different scene: on Luuk's avatar the whole-photo pass returns all
+   * three heads and both bodies, and the cropped one returns the middle head alone,
+   * because the two outer heads are now sliced off at the frame edge and stop being part
+   * of the salient object. The better mask was then thrown away for the worse one, on 69
+   * of the 71 avatars in the pool.
+   */
+  const read = reframed
+    ? await infer(session, src, source.width, source.height, frame)
+    : located;
+  const mirrored = await inferMirrored(session, src, source.width, source.height, frame);
+  const mask = combine(read, mirrored);
 
   // Back into the card's crop, which is the frame the front end draws the photo in.
   const grey = project(mask, frame, standard);

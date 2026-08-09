@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Card, avatarUrl, initialsFor, silhouetteUrl, splitName } from '../mock/cardMock';
-import { CardBreak, SEAM_VIEWBOX } from '../utils/cardPieces';
 import { rikDevMark } from '../utils/brand';
 import '../styles/card.css';
 
@@ -81,27 +80,6 @@ export interface CardReveal {
    * see the note over `.card__name` for why that came back out.
    */
   revealed: boolean;
-  /**
-   * The shard candidates only: the cells this card breaks into and the seams
-   * between them, generated in `PackOpener` from the player id.
-   *
-   * Computed there rather than here for the reason everything else about the
-   * beat is — one clock. `PlayerCard` renders whatever it is handed and times
-   * nothing, so a cell cannot fill on a frame the sound and the rim disagree
-   * with. Absent for every non-shard candidate, which is exactly what selects
-   * the single-portrait path below.
-   */
-  pieces?: CardBreak;
-  /**
-   * Silhouette-first: what the effect delivers is a glowing figure, and the face
-   * arrives after it as a separate beat.
-   *
-   * All this does here is decide **what is inside a shard** — a fragment of the
-   * lit figure rather than a fragment of the photo — and add `card--via` for the
-   * rules that hide the ground figure and land the face late. Everything about
-   * *when* still comes from the same clock in `PackOpener`.
-   */
-  viaSilhouette?: boolean;
 }
 
 /**
@@ -242,7 +220,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
     empty ? 'card--empty' : `card--${card.tier}`,
     icoon ? 'card--icoon' : '',
     reveal ? 'card--reveal' : '',
-    reveal?.viaSilhouette ? 'card--via' : '',
     reveal && !reveal.revealed ? 'card--withheld' : '',
     sizeClass[size],
     className,
@@ -302,116 +279,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
             */}
             {reveal ? <Silhouette playerId={card.player.id} eager /> : null}
             <Portrait card={card} empty={empty} eager={eager} />
-
-            {/*
-              The shard candidates.
-
-              **Unrevealed is the figure showing; revealed is a skin covering
-              it.** Nothing travels and nothing is placed: a cell's skin takes
-              its shape where the shape already is, and the silhouette
-              underneath is simply covered as the card fills. By the last cell
-              it is covered entirely, which is why it needs no fade of its own.
-
-              **Over the plain portrait, not instead of it.** The one underneath
-              is held at zero until the last cell has filled and then brought up
-              behind them, which backfills the hairlines that independently
-              antialiased clip paths leave along their shared edges. Without it
-              the finished card is faintly cracked, and this beat has to resolve
-              into a card indistinguishable from every other.
-
-              Seven to eleven copies of one `<img>`: one fetch, one decode, that
-              many paint references. They exist only on the hero card, only while
-              a new one is being revealed.
-            */}
-            {reveal?.pieces ? (
-              <div className="card__pieces" aria-hidden="true">
-                {reveal.pieces.cells.map((cell, i) => (
-                  /*
-                    Three elements per cell, and each earns its place. The
-                    outer one is scheduled; the middle one carries the clip and
-                    never moves, because the clip *is* the shape and the shape
-                    is fixed; the inner one is the skin, which is the only thing
-                    a candidate is allowed to animate. Putting a transform on
-                    the clipped element instead would drag the shape around with
-                    the skin, and then there is nothing for the skin to snap to.
-                  */
-                  <div
-                    key={i}
-                    className={`card__piece${cell.last ? ' card__piece--last' : ''}`}
-                    style={
-                      {
-                        '--at': cell.at.toFixed(4),
-                        '--gap': cell.gap.toFixed(4),
-                        '--cx': `${cell.cx.toFixed(2)}%`,
-                        '--cy': `${cell.cy.toFixed(2)}%`,
-                      } as React.CSSProperties
-                    }
-                  >
-                    <div className="card__piece-cut" style={{ clipPath: cell.clip }}>
-                      <div className="card__piece-skin">
-                        {/*
-                          What a shard delivers. Normally a fragment of the
-                          photo; silhouette-first, a fragment of the lit figure,
-                          with the photo held back for the beat after the break.
-
-                          Note that a shard out at a corner then delivers
-                          nothing but its own seams — the figure covers about
-                          half the card. That is inherent to the idea rather
-                          than a gap in it, and it is the thing to watch.
-                        */}
-                        {reveal.viaSilhouette ? (
-                          <Silhouette playerId={card.player.id} eager />
-                        ) : (
-                          <Portrait card={card} empty={empty} eager />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                {/*
-                  The seams, as real stroked lines rather than a glow around a
-                  filled shape — a `drop-shadow` can only ever halo something
-                  that is already there, so it can never draw an edge *between*
-                  two states.
-
-                  One line per internal edge, and each one's whole life is
-                  decided by its two cells: it lights when the first of them
-                  fills and dies when the second does. So the network is exactly
-                  the boundary between revealed and unrevealed at every instant,
-                  it thins as the card fills, and at the end there is nothing
-                  left to remove. Edges along the card's own border are not in
-                  the list at all — outside the card is not unrevealed
-                  territory, and the rim already lives there.
-                */}
-                <svg
-                  className="card__seams"
-                  viewBox={SEAM_VIEWBOX}
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
-                >
-                  {reveal.pieces.seams.map((seam, i) => (
-                    <line
-                      key={i}
-                      className="card__seam"
-                      x1={seam.x1}
-                      y1={seam.y1}
-                      x2={seam.x2}
-                      y2={seam.y2}
-                      /* Kept in px whatever the card is scaled to. A seam is a
-                         drawn line, not a feature of the artwork. */
-                      vectorEffect="non-scaling-stroke"
-                      style={
-                        {
-                          '--s1': seam.front.toFixed(4),
-                          '--s2': seam.gone.toFixed(4),
-                        } as React.CSSProperties
-                      }
-                    />
-                  ))}
-                </svg>
-              </div>
-            ) : null}
           </>
         )}
 

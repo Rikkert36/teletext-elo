@@ -890,76 +890,64 @@
 }
 
 /*
- * **A flash out of the centre point, pushing outward in every direction.**
+ * **The surround charges with the figure and goes out with it.**
  *
- * Not a beam. Two versions of this were a travelling band — first the ceremony's
- * left-to-right `opener-shimmer`, then a pair of streaks parting from the centre
- * line — and both had the same trouble: a beam has a *defined edge*, so the eye
- * measures it against the reveal it is supposed to be carrying, and any
- * disagreement between the two is obvious. A bloom has no edge to measure. It
- * lights the card, and the card is different afterwards.
+ * This was candidate A's burst — a circle scaled up from 0.04 out to the card's
+ * corners, with the reveal opening as a matching circle underneath it. Ten
+ * candidates were compared and D won; A and its expanding light were deleted
+ * with the other eight, and what is left is the light D always wanted: a soft
+ * full-bleed field that brightens with the charge, peaks with the white-out and
+ * is gone before the photo is legible.
  *
- * The reveal opens as a circle from the same point (`clip-path` in card.css), so
- * light and reveal grow together outward rather than one chasing the other across.
+ * Full-bleed and edgeless on purpose. A beam has a *defined edge*, so the eye
+ * measures it against the reveal it is supposed to be carrying and any
+ * disagreement is obvious; two versions of this were travelling bands and both
+ * failed that way. A field has no edge to measure. It lights the card, and the
+ * card is different afterwards.
  *
- * `ease-out` on both: nearly all of it happens in the first half, which is what
- * makes it read as a flash rather than as something inflating.
+ * The green is the "new" rim's own colour, so light reaching the border and
+ * going out reads as being absorbed into the glow already sitting there.
  *
- * The green is the "new" rim's own colour, so light reaching the border and going
- * out reads as being absorbed into the glow already sitting there.
+ * Timed in fractions of `--reveal-ms` like everything else in the beat: 52% is
+ * the bright green, 62% is the white-out and the accent, 88% is gone. It has to
+ * be clear of the photo before the photo is readable, which is the same
+ * constraint `reveal-recoil-settle` in card.css lands its own motion under.
  */
 .opener__flash::before {
   content: "";
   position: absolute;
-  /* Wider than the card, so the bloom is past the corners before it is spent. */
-  inset: -25%;
-  border-radius: 50%;
+  inset: 0;
+  border-radius: 6px;
+  /* Held at nothing until the keyframes take it; the element is mounted for the
+     length of the beat and must not show on its first frame. */
+  opacity: 0;
   background: radial-gradient(
-    circle at 50% 50%,
-    rgba(240, 255, 248, 0.85) 0%,
-    rgba(190, 255, 224, 0.55) 34%,
-    rgba(152, 255, 206, 0.26) 62%,
-    rgba(152, 255, 206, 0) 78%
+    circle at 50% 42%,
+    rgba(240, 255, 248, 0.55) 0%,
+    rgba(190, 255, 224, 0.32) 52%,
+    rgba(152, 255, 206, 0.12) 76%,
+    rgba(152, 255, 206, 0) 90%
   );
-  transform: scale(0.04);
-  animation: opener-reveal-burst var(--reveal-ms, 560ms) ease-out 1 forwards;
+  animation: reveal-charge-light var(--reveal-ms, 560ms) linear 1 forwards;
 }
 
-/*
- * **The end scale is where the light reaches the corners, and it is arithmetic,
- * not taste.**
- *
- * The gradient's reference radius is the element's farthest corner, and the
- * element is 1.5× the card, so the visible edge — the 78% stop — sits at
- * `s × 0.78 × 1.5 × diagonal / 2`. Setting that equal to the card's half-diagonal
- * gives `s = 0.855`.
- *
- * It ran to 1.25 before, which meant the light met the sides 38% of the way in
- * and the corners at 67%, then spent the last third expanding off-card with
- * nothing left to light. The rim was fired at the end of that, so it arrived long
- * after the moment it is supposed to be caused by. Ending on contact makes the
- * animation's end *mean* something.
- *
- * The sides are reached before the corners regardless — a circle inside a 5:7
- * rectangle always does — which is why the rim is lit partway through rather than
- * here; see `RIM_AT_FRACTION` in PackOpener.tsx.
- *
- * The hold on opacity runs to 75%, so the light is still bright when it arrives
- * at the border and goes out as the rim comes up. The two are one hand-off.
- */
-@keyframes opener-reveal-burst {
-  from {
-    transform: scale(0.04);
-    opacity: 0.85;
+@keyframes reveal-charge-light {
+  0% {
+    opacity: 0;
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4);
   }
-  18% {
+  52% {
+    opacity: 0.7;
+    animation-timing-function: ease-out;
+  }
+  62% {
     opacity: 1;
+    animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
   }
-  75% {
-    opacity: 1;
+  88% {
+    opacity: 0;
   }
-  to {
-    transform: scale(0.855);
+  100% {
     opacity: 0;
   }
 }
