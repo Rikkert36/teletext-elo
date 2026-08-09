@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Album, { AlbumSection, albumSlotOrder } from '../components/Album';
 import CardViewer from '../components/CardViewer';
 import GameShell from '../components/GameShell';
-import PackOpener, { REVEAL_MS, REVEAL_RIM_AT } from '../components/PackOpener';
+import PackOpener from '../components/PackOpener';
 import PackTile from '../components/PackTile';
 import PlayerPicker from '../components/PlayerPicker';
 import { CollectionState, mockCardsClient, mockDebug } from '../clients/cardsClient';
@@ -12,29 +12,8 @@ import {
   Pack,
   RevealedCard,
   activePool,
-  ceremonyBuildRatio,
   splitName,
 } from '../mock/cardMock';
-import {
-  DEFAULT_CEREMONY_MS,
-  DEFAULT_SCALE,
-  getCeremonyMs,
-  ms,
-} from '../utils/animationSpeed';
-import {
-  STAGE_THEMES,
-  StageTheme,
-  getStageTheme,
-  setStageTheme,
-} from '../utils/stageTheme';
-import {
-  ALBUM_STYLES,
-  AlbumStyle,
-  getAlbumStyle,
-  setAlbumStyle,
-} from '../utils/albumStyle';
-import { REVEAL_SOUNDS, getRevealSound, setRevealSound } from '../utils/revealSound';
-import { playNameReveal, playRareRise } from '../utils/sounds';
 import '../styles/game.css';
 
 const PLAYER_KEY = 'tafelvoetbal.cards.playerId';
@@ -83,23 +62,6 @@ const CollectionPage: React.FC = () => {
   /** Index into `slotOrder` of the card being looked at, or null for none. */
   const [viewing, setViewing] = useState<number | null>(null);
   const [fastMode, setFastMode] = useState(() => read(FAST_KEY) === 'true');
-  const [stageTheme, setStageThemeState] = useState<StageTheme>(getStageTheme);
-  const [albumStyle, setAlbumStyleState] = useState<AlbumStyle>(getAlbumStyle);
-  const [revealSound, setRevealSoundState] = useState(getRevealSound);
-
-  /** Auditions a level at exactly the length and intensity a real reveal uses. */
-  const previewRiser = (level: number) =>
-    playRareRise(ms(Math.round(getCeremonyMs() * ceremonyBuildRatio(level))), level / 4);
-
-  /**
-   * Auditions the face reveal at exactly the accent a real one uses.
-   *
-   * The candidates are timed in fractions of the reveal and take only the accent
-   * from the caller, so passing the beat's own number is the whole of what makes
-   * this the real thing rather than an approximation — and it tracks the pacing
-   * multiplier for free, because `ms()` is what produces it.
-   */
-  const previewRevealSound = () => playNameReveal(ms(REVEAL_MS * REVEAL_RIM_AT));
 
   useEffect(() => {
     let cancelled = false;
@@ -395,7 +357,6 @@ const CollectionPage: React.FC = () => {
               <Album
                 sections={sections}
                 owner={ownerName}
-                style={albumStyle}
                 onCardOpen={(id) => {
                   const found = slotOrder.findIndex((s) => s.card.player.id === id);
                   if (found >= 0) setViewing(found);
@@ -409,9 +370,9 @@ const CollectionPage: React.FC = () => {
       )}
 
       {/*
-        `--debug` keeps the tabletop stages (F–J) from dressing the test panel as a
-        piece of furniture along with everything else on the table. It is
-        scaffolding, and it has to stay readable rather than in character.
+        `--debug` is what exempts this panel from the table's rule that nothing on
+        it gets a panel — see game.css. It is scaffolding, and it has to stay
+        readable rather than in character.
       */}
       {SHOW_DEBUG ? (
         <div className="game-plate game-plate--debug" style={{ marginTop: 18 }}>
@@ -504,137 +465,6 @@ const CollectionPage: React.FC = () => {
             >
               kansen (console)
             </button>
-          </div>
-
-          {/*
-            Stage-direction comparison. Swaps a class on <html>, which re-themes
-            the chrome and the book's inside covers together. Delete once one is
-            chosen.
-          */}
-          {/*
-            Two rows, because the two families answer different questions. A–E ask
-            what screen the book is displayed on; F–J ask what table it is lying on
-            — and in those, the rest of the page becomes objects on that table too.
-          */}
-          {[
-            { label: 'achtergrond', tabletop: false },
-            { label: 'tafelblad', tabletop: true },
-          ].map((group) => (
-            <div key={group.label} className="game-row" style={{ marginTop: 10 }}>
-              <span className="game-muted" style={{ minWidth: 128 }}>
-                {group.label}
-              </span>
-              {STAGE_THEMES.filter((theme) => 'tabletop' in theme === group.tabletop).map(
-                (theme) => (
-                  <button
-                    key={theme.id}
-                    type="button"
-                    className="game-button game-button--small"
-                    onClick={() => setStageThemeState(setStageTheme(theme.id))}
-                    disabled={stageTheme === theme.id}
-                  >
-                    {theme.label}
-                  </button>
-                ),
-              )}
-            </div>
-          ))}
-
-          {/*
-            Album candidates. Independent of the stage theme — that is the screen
-            the book sits on, this is the book. Delete once one is chosen, along
-            with utils/albumStyle.ts and styles/albumstyle.css.
-          */}
-          <div className="game-row" style={{ marginTop: 10 }}>
-            <span className="game-muted" style={{ minWidth: 128 }}>
-              album
-            </span>
-            {ALBUM_STYLES.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className="game-button game-button--small"
-                onClick={() => setAlbumStyleState(setAlbumStyle(option.id))}
-                disabled={albumStyle === option.id}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          {/*
-            What the face reveal sounds like. The shipped sound plus three that
-            each bring their own accent voice rather than a garnish on a shared
-            bell — see the note in utils/revealSound.ts about why the first
-            version of this row was not an audition at all. What each one is
-            and what it is trying to prove lives in utils/revealSound.ts. Delete
-            this row and that module once one is chosen, and fold the winner into
-            `playNameReveal` as its only body.
-
-            ▶ auditions the current one at the live candidate's own accent, so it
-            can be judged without opening a pack — but judge the winner on a real
-            new card too, because on a rare one it plays over a D-minor chord and
-            that is the only thing it has to survive.
-          */}
-          <div className="game-row" style={{ marginTop: 10 }}>
-            <span className="game-muted" style={{ minWidth: 128 }}>
-              onthullingsgeluid
-            </span>
-            <button
-              type="button"
-              className="game-button game-button--small"
-              onClick={previewRevealSound}
-            >
-              ▶
-            </button>
-            {REVEAL_SOUNDS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                className="game-button game-button--small"
-                onClick={() => {
-                  setRevealSoundState(setRevealSound(option.id));
-                  /*
-                   * Plays as it is picked. Auditioning a sound is one click, not
-                   * two, and switching without hearing the result is the one
-                   * thing this row exists to prevent.
-                   */
-                  previewRevealSound();
-                }}
-                disabled={revealSound.id === option.id}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-
-          {/*
-            Auditions the build-up sound for each level without opening a pack.
-            The pacing itself is settled (DEFAULT_SCALE and DEFAULT_CEREMONY_MS in
-            utils/animationSpeed.ts) and no longer adjustable here.
-          */}
-          <div className="game-row" style={{ marginTop: 10 }}>
-            <span className="game-muted" style={{ minWidth: 128 }}>
-              opbouw beluisteren
-            </span>
-            {[
-              { level: 1, label: '▶ 75+' },
-              { level: 2, label: '▶ 80+' },
-              { level: 3, label: '▶ 85+' },
-              { level: 4, label: '▶ 90+' },
-            ].map(({ level, label }) => (
-              <button
-                key={level}
-                type="button"
-                className="game-button game-button--small"
-                onClick={() => previewRiser(level)}
-              >
-                {label}
-              </button>
-            ))}
-            <span className="game-muted">
-              ×{DEFAULT_SCALE.toFixed(2)} tempo → {ms(DEFAULT_CEREMONY_MS)} ms opbouw
-            </span>
           </div>
         </div>
       ) : null}

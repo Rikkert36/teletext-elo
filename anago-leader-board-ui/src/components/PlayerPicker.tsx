@@ -68,10 +68,9 @@ const PlayerPicker: React.FC<PlayerPickerProps> = ({ players, value, onChange })
             padding: 0,
             listStyle: 'none',
             /*
-             * Tokenised rather than hard-coded brass: the tabletop stages print
-             * this list on paper, where black-on-brass reads as a hole in the
-             * page. Fallbacks are the original values, so every other theme is
-             * untouched.
+             * Tokenised rather than hard-coded brass, so the list is stained wood
+             * belonging to the table rather than a lit panel floating over it.
+             * The fallbacks are the original values.
              */
             background: 'var(--menu-bg, #1f180e)',
             border: '1px solid var(--menu-border, #6b5325)',

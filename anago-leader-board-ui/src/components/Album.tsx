@@ -1,12 +1,9 @@
 import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardPlayer, toCard } from '../mock/cardMock';
 import PlayerCard, { ownedLabel } from './PlayerCard';
-import AlbumDecor, { olympLevel, pagePaint } from './AlbumDecor';
 import useIsMobile from '../hooks/useIsMobile';
 import { playCoverTurn, playPageTurn } from '../utils/sounds';
-import { AlbumStyle } from '../utils/albumStyle';
 import '../styles/album.css';
-import '../styles/albumstyle.css';
 
 const SLOTS_PER_PAGE = 6;
 
@@ -65,13 +62,6 @@ interface AlbumPage {
   /** Cover only: the line above the name. */
   kicker?: string;
   slots: Slot[];
-  /**
-   * Mean overall of the players on this page.
-   *
-   * The book is sorted ascending, so this climbs as you turn through it — which
-   * is what the `olymp` style dresses each page to.
-   */
-  rank: number;
 }
 
 /* ------------------------------------------------------------------ *
@@ -109,7 +99,6 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
       title: owner ?? 'Verzamelalbum',
       subtitle: `${owned} / ${total} spelers`,
       slots: [],
-      rank: 0,
     });
   }
 
@@ -143,7 +132,7 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
      * only later ones can need padding.
      */
     if (pages.length % 2 === 0) {
-      pages.push({ kind: 'slots', title: '', slots: [], rank: 0 });
+      pages.push({ kind: 'slots', title: '', slots: [] });
     }
 
     for (let i = 0; i < section.players.length; i += SLOTS_PER_PAGE) {
@@ -157,7 +146,6 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
         title: head,
         subtitle: tally,
         slots,
-        rank: slots.reduce((sum, s) => sum + s.card.overall, 0) / slots.length,
       });
     }
   });
@@ -200,7 +188,6 @@ const flippedForPage = (page: number): number => Math.ceil(page / 2);
 const PageFace: React.FC<{
   page: AlbumPage | undefined;
   index: number;
-  style: AlbumStyle;
   /**
    * Whether this page is the one on screen.
    *
@@ -210,7 +197,7 @@ const PageFace: React.FC<{
    */
   visible: boolean;
   onCardOpen?: (playerId: string) => void;
-}> = ({ page, index, style, visible, onCardOpen }) => {
+}> = ({ page, index, visible, onCardOpen }) => {
   if (!page) return <div className="album__page" />;
 
   if (page.kind === 'cover') {
@@ -224,26 +211,8 @@ const PageFace: React.FC<{
     );
   }
 
-  /*
-   * The page's palette is published as custom properties so the paper colour in
-   * albumstyle.css and the artwork in AlbumDecor are driven by the same four
-   * values — they cannot drift into disagreeing about what page this is.
-   */
-  const level = olympLevel(page.rank);
-  const paint = pagePaint(style, index, level);
-  const vars = paint
-    ? ({
-        '--pg-a': paint.a,
-        '--pg-b': paint.b,
-        '--pg-ink': paint.ink,
-        '--pg-accent': paint.accent,
-      } as React.CSSProperties)
-    : undefined;
-
   return (
-    <div className="album__page" style={vars}>
-      <AlbumDecor style={style} index={index} level={level} paint={paint} />
-
+    <div className="album__page">
       <div className="album__page-header">
         <span className="album__page-title">{page.title}</span>
         {page.subtitle ? <span className="album__page-sub">{page.subtitle}</span> : null}
@@ -307,8 +276,6 @@ interface AlbumProps {
   sections: AlbumSection[];
   /** Whose album this is. Printed on the cover. */
   owner?: string;
-  /** Phase-1 only: which of the candidate album styles to render. */
-  style?: AlbumStyle;
   /** Rendered under the book, e.g. the page controls' surroundings. */
   footer?: ReactNode;
   /** A card was clicked. Opens it in the viewer. */
@@ -326,7 +293,6 @@ interface AlbumProps {
 const Album: React.FC<AlbumProps> = ({
   sections,
   owner,
-  style = 'leder',
   footer,
   onCardOpen,
   focusPlayerId,
@@ -517,7 +483,6 @@ const Album: React.FC<AlbumProps> = ({
         <div
           className={[
             'album',
-            `album--${style}`,
             isMobile ? 'album--mobile' : '',
             closed && !isMobile ? 'album--closed' : '',
           ]
@@ -550,7 +515,6 @@ const Album: React.FC<AlbumProps> = ({
                     <PageFace
                       page={page}
                       index={index}
-                      style={style}
                       visible={index === mobilePage}
                       onCardOpen={onCardOpen}
                     />
@@ -576,7 +540,6 @@ const Album: React.FC<AlbumProps> = ({
                     <PageFace
                       page={pages[leaf * 2]}
                       index={leaf * 2}
-                      style={style}
                       visible={leaf === flipped}
                       onCardOpen={onCardOpen}
                     />
@@ -585,7 +548,6 @@ const Album: React.FC<AlbumProps> = ({
                     <PageFace
                       page={pages[leaf * 2 + 1]}
                       index={leaf * 2 + 1}
-                      style={style}
                       visible={leaf === flipped - 1}
                       onCardOpen={onCardOpen}
                     />

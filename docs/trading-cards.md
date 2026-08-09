@@ -1,6 +1,6 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-06)
+## Where this stands (last updated 2026-08-09)
 
 **Phase 1 (frontend on mock data) is essentially complete.** Everything below the
 "Presentation layer" heading has been built and iterated on at length; the
@@ -42,17 +42,24 @@ fills the screen with its full name, nickname, tier and duplicate count, browsab
 left and right through the whole book. The count also reaches the album's tooltip.
 The page-turn strips narrowed to the page margin to make room for the click.
 
-**The one open visual decision:** which stage direction to use
-(`utils/stageTheme.ts`, switchable live from the test panel — see the tables under
-"Framing"). Ten candidates in two families: **A–E** treat the stage as a screen the
-book is displayed on, **F–J** as a table it is lying on. Once one is picked, fold
-its tokens into `.game-stage` and delete the other nine, `stageTheme.ts`,
-`tabletop.css` and the switcher.
+**Three visual decisions closed, and folded in.** All three were live switchers in
+the test panel; each winner is now the only body of code left, and the losing
+candidates, their modules and their rows are deleted.
 
-A book style is being chosen separately and independently (`utils/albumStyle.ts`) —
-that is the book, this is what it lies on.
+- **The stage is H · mahonie** — a french-polished mahogany table seen from
+  straight above. Chosen over nine others: four screen directions (teletekst,
+  sportuitzending, plakboek, vitrine, arcade) and four other timbers. Folded into
+  `.game-stage`; `stageTheme.ts` and `tabletop.css` are gone. See "Framing".
+- **The album is 1 · leer**, the leather book — the quiet control the five loud
+  Panini-style candidates were being judged against, and it beat all of them.
+  `albumStyle.ts`, `albumstyle.css` and `AlbumDecor.tsx` are gone, along with the
+  `--pg-*` page palettes and the per-page artwork they drove; album.css is the
+  whole book again.
+- **The face reveal sounds like 3 · arpeggio** — D5 · F5 · A5 · D6 rising into the
+  accent, over the shipped single chime and over a FIFA-style walkout and an MTG
+  foil sheen. Folded into `playNameReveal`; `revealSound.ts` is gone. See "Sound".
 
-**The second open visual decision:** how the silhouette beat resolves
+**Separately, and open:** how the silhouette beat resolves
 (`utils/revealStyle.ts` + `styles/reveal.css` + `utils/cardPieces.ts`, switchable
 live from the test panel). Three rounds in, two candidates remain: **D · gloeien**
 (the silhouette charging and draining) and **H · scherven** (the card breaking
@@ -115,7 +122,7 @@ sized by how well they did, and collections build toward a legends unlock.
 | Legends | Completing the active set permanently unlocks inactive (≥5 games) players in packs, alongside actives. Rated on all-time-high. |
 | Cards ↔ games | `CardInstance.GameId` FK with cascade delete. |
 | Cards ↔ players | `SubjectPlayerId` FK, **also cascade**. Player deletion only ever happens for accidentally-created players, so losing their cards is correct. |
-| Presentation | 2002 **PC-game** screen, no OS chrome. Token-driven; **ten directions still being chosen between**, in two families — five screens (A–E) and five wooden tabletops (F–J). |
+| Presentation | Not a screen: a **mahogany table** seen from above, with the book, the packets and the controls as objects lying on it. No OS chrome, token-driven. Chosen from ten candidates in two families — five screens, five timbers. |
 | Album | Hand-rolled stiff CSS 3D page flip. No new dependency. |
 | Card face | **Panini**: photo near-full-bleed and masked into the metal, no plates, first name only, DIN type, no stats. |
 | Icoon | The **legend** colourway, not a fifth tier: monochrome photo, pale ground, shards, **no frame**. Replaces the `legende` pill. Tier moves the metal. No effect on rarity. |
@@ -448,31 +455,95 @@ counts gracefully.
 
 ## Architecture
 
+Four production endpoints, one development-only, one hook, and no background jobs.
+
+| | | |
+| --- | --- | --- |
+| `GET` | `api/cards/pool` | **Built.** Every player a pack can contain: actives on their current rating, legends on their all-time high. |
+| `GET` | `api/collection/{playerId}` | The whole page in one response — pool, legends, owned counts, available packs, unlock state, eligibility. |
+| `POST` | `api/collection/{playerId}/packs/{packId}/claim` | Rolls, files the cards, returns them with `isNew` and `copies`. |
+| `GET` | `api/collection/players` | The type-ahead: active, ≥ `MinGames`. |
+| `POST` | `api/collection/{playerId}/packs/debug` | Development only. Same options as `mockDebug.grantPack`. |
+| `POST` | `api/collection/gifts` | Later. Present packs, the one grant-shaped thing left. |
+
+**The seam has been carrying this contract, not this document.**
+[cardsClient.ts](anago-leader-board-ui/src/clients/cardsClient.ts) defines
+`CollectionState` and a third call (`getSelectablePlayers`) that the sketch which
+used to sit here never mentioned. When the two disagree, the seam is right.
+
+### Packs are derived, not granted
+
+An available pack is **computed**, not stored:
+
 ```
-POST /api/game ─► insert Game
-                └─► for each of 4 players: size pack, roll cards, insert rows
-
-POST /api/collection/packs/{id}/reveal   ─► marks revealed, returns cards
-GET  /api/collection/{playerId}          ─► cards + unrevealed packs, live overalls
+available(player, today) =
+      games today the player took part in     minus  PackClaim rows
+    + the daily freebie                       minus  a daily claim
+    + gift rows not yet claimed                      (later)
 ```
 
-### Roll at reveal
+`CreateGame` inserts nothing. This was originally specified the other way round —
+a `PackGrant` row written per participant inside the game hook — and deriving is
+better for four reasons, three of which close gaps the granting design accepted
+in writing:
 
-A pack belongs to a player, so the reveal endpoint credits that player
-regardless of who clicked it — the cards cannot be stolen either way. Rolling at
-reveal therefore costs nothing in safety and avoids writing card rows for packs
-that expire unopened. With a same-day expiry window, ratings cannot drift
-meaningfully between grant and reveal.
+- **"Cards must never break game submission" stops being a rule and becomes a
+  fact.** There is no hook, so there is nothing to fail and nothing to wrap.
+- **`PUT /api/game/{id}` re-rolls correctly.** The accepted gap — edits do not
+  re-roll already-granted packs — disappears: an unclaimed pack is sized from the
+  game's *current* score, so correcting a mis-entered 10-2 resizes it, while a
+  claimed one is rightly left alone.
+- **Deleting a game takes its unclaimed packs with it** with no cascade rule at
+  all; they simply stop being derived. Only `CardInstance.GameId` still needs the
+  cascade, for the claimed half.
+- **No expiry job and no read filter.** "Today's games" *is* the window — which
+  also turns hard same-day expiry from a settled decision into a one-line knob.
+- **No lazy materialisation for the daily freebie.** It is "does a claim row exist
+  for me for today?", which is a read.
+
+**Sizing is a pure function of the game row.**
+[GameWithAnalytics](AnagoLeaderboard/AnagoLeaderboard/Models/Results/GameWithAnalytics.cs)
+already computes `ExpectedScore` and `ActualScore` from the four stored
+`OldRating`s — no leaderboard replay, and immutable, because those are frozen on
+the row when the game is written. So `expectedMargin = 10 − ExpectedScore`,
+`actualMargin = 10 − ActualScore`, and the bonus is
+`actualMargin − expectedMargin ≥ 3`, sign-flipped for the second team. The
+opponent bonus and the wrapper's reason come off the same row.
+
+Two consequences, one of them a real cost:
+
+- **Pack ids become synthetic and stable**: `game:{gameId}`, `daily:{yyyy-MM-dd}`,
+  `gift:{giftId}`. A small win — the packet pile's tilt and sheen are seeded from
+  the id deliberately (see "The shelf stays up"), and a derived id is stable across
+  refetches by construction rather than by care.
+- **Claiming needs `playerId` in the path**, because a synthetic id no longer
+  identifies an owner — and those ids are *guessable* from the public games list,
+  where a grant GUID was not. The harm is the bounded one below (the cards still
+  land with the owner), but the bar for spoiling somebody's reveal is lower than it
+  was, and that is a deliberate trade rather than an oversight.
+
+### Roll at claim
+
+A pack belongs to a player, so the claim endpoint credits that player regardless
+of who clicked it — the cards cannot be stolen either way. Rolling at claim
+therefore costs nothing in safety and avoids writing card rows for packs that
+expire unopened. With a same-day window, ratings cannot drift meaningfully
+between the game and the claim.
 
 ### Hard daily expiry
 
-Unrevealed at end of day = gone. Absence from the office means you were not
+Unclaimed at end of day = gone. Absence from the office means you were not
 playing and so earned no game packs anyway, and the free daily pack is a reward
 for visiting, so there is nothing to lose by not visiting. The one real case is
 an end-of-day game, which is the player's own call — and the app is now mobile
 friendly, so opening on a phone is quick.
 
 "Day" = server-local date, consistent with `DateTime.Now` used throughout.
+
+Under derivation this needs no enforcing: the window is the query. Widening it to
+three days, or to forever, is one date filter — so the decision stays settled but
+stops being expensive to revisit. Gifts are the deliberate exception and carry
+their own `ExpiresAt`, because a present that vanishes overnight is a mean present.
 
 ### Impersonation: type-ahead, not a dropdown
 
@@ -503,12 +574,18 @@ but it's the first time score entry has carried a reward.
 
 ### Cards must never break game submission
 
-A failure anywhere in pack granting must **not** roll back the game insert.
-Wrap and log; a lost pack is acceptable, a lost game is not.
+A failure anywhere in pack granting must **not** roll back the game insert. A lost
+pack is acceptable, a lost game is not.
+
+This used to be a rule enforced by wrapping the grant hook in a try/catch. Under
+derivation there is no hook: `CreateGame` writes a game and nothing else, and the
+packs that game entitles four people to are worked out when somebody asks. The
+rule is now structural, and **the way to break it again is to reintroduce a write
+into `CreateGame`.** Don't.
 
 ### Anti-farming
 
-Packs only come from game creation, so farming means polluting the leaderboard
+Packs only come from games, so farming means polluting the leaderboard
 everyone watches — self-punishing and visible. Plus: **enforce the duplicate
 check server-side.** It currently exists only as an advisory endpoint
 ([GameController.cs:38](AnagoLeaderboard/AnagoLeaderboard/Controllers/GameController.cs#L38))
@@ -526,22 +603,32 @@ New entities in `Models/Results/`, registered in
 The existing `OwnsOne` flattening and absent Game→Player FKs are legacy shape;
 new tables should use real FKs.
 
-- **`PackGrant`** — `Id`, `PlayerId`, `GameId` (nullable for daily freebies,
-  cascade delete), `Reason`, `Size`, `OpponentBonus` (bool — the draw needs to
-  know, and the grant outlives the reveal), `CreatedAt`, `RevealedAt` (nullable).
+- **`PackClaim`** — `Id`, `PlayerId`, `Source` (`Game` | `Daily` | `Gift`),
+  `GameId` (nullable, cascade), `ClaimDate`, `ClaimedAt`. Unique on
+  `(PlayerId, Source, GameId)` and on `(PlayerId, Source, ClaimDate)` for dailies.
+  **Those indexes are the double-claim guard** — two tabs racing means one insert
+  fails, and that failure is the 409. There is no separate check to forget.
 - **`CardInstance`** — `Id`, `PlayerId` (owner), `SubjectPlayerId` (who's on the
-  card, cascade delete), `PackGrantId`, `GameId` (cascade delete), `IsLegend`,
+  card, cascade delete), `PackClaimId`, `GameId` (cascade delete), `IsLegend`,
   `MintedAt`.
 - **`PlayerCollectionState`** — `PlayerId`, `LegendsUnlockedAt` (nullable). A
   permanent latch, so new joiners and players crossing 5 games don't
   un-complete an existing unlock.
+- **`PackGift`**, later — `Id`, `PlayerId` (nullable: null means everyone), `Size`,
+  `Reason`, `CreatedAt`, `ExpiresAt` (nullable). The only grant-shaped table in
+  the design, because a present cannot be derived from anything that happened.
 
-Cascade on `GameId` for **both** `CardInstance` and `PackGrant`, so deleting a
-game removes its cards *and* any still-unrevealed packs it granted. This is not
-tidiness — pack size depends on the score, so a mis-entered 10-2 mints 5 cards
-where 10-9 mints 3, and deleting the game to correct it must take the
-illegitimate rewards with it. Accepted gap: `PUT /api/game/{id}` edits do **not**
-re-roll already-granted packs.
+Cascade on `GameId` for `CardInstance`, so deleting a game removes the cards it
+minted. This is not tidiness — pack size depends on the score, so a mis-entered
+10-2 mints 5 cards where 10-9 mints 3, and deleting the game to correct it must
+take the illegitimate rewards with it. **Unclaimed packs need no rule**: they were
+never rows, and a deleted game stops being derived.
+
+**Do not flush `PackClaim` nightly.** The derivation only ever looks at today, so
+old rows are never read again and flushing buys nothing — while costing a
+scheduled job, which is a moving part in a design whose main virtue is having
+none. A few thousand rows a year is nothing in SQLite, and they are a free record
+of where a card came from.
 
 Generate with `dotnet ef migrations add AddCardCollection` — `dotnet-ef 8.0.0`
 is pinned in `.config/dotnet-tools.json`.
@@ -578,89 +665,74 @@ No animation library is used (no framer-motion, react-spring or GSAP — only
 `@emotion/react` via MUI and plain CSS), and none was added. Everything is plain
 CSS plus a hand-written FLIP.
 
-### Framing: a game screen, not an OS window
+### Framing: a table, not a screen and not an OS window
 
 The first attempt took "Windows XP aesthetic" literally and built a Luna dialog
 with a title bar and window buttons. Wrong read — the reference is the era's
-**games**, not its dialogs.
+**games**, not its dialogs. The second read it as a game *screen*, which was
+closer and still wrong: there is no screen. There is a **french-polished mahogany
+table seen from straight above**, with the book, the packets and the controls
+lying on it, and the site's black is the room around it.
 
-`/collectie` is full-bleed with no width cap. Nav, leaderboard, games and player
-pages stay pure teletext, untouched.
+Nav, leaderboard, games and player pages stay pure teletext, untouched.
 
 The stage is **fully token-driven** — one set of custom properties covers the
-header, footer, plates, buttons, tabs, input, meter, readouts *and* the book's
-inside covers (`--book-inside`), so a visual direction is a block of overrides
-plus a background.
+header, footer, plates, buttons, input, meter, readouts *and* the book's inside
+covers (`--book-inside`).
 
-**Still choosing between five directions** (`utils/stageTheme.ts`, switchable
-live from the test panel). They differ in geometry and depth model, not just
-palette:
+#### How this was chosen
 
-| | | character |
-| --- | --- | --- |
-| A | teletekst | zero depth — no gradients, shadows or radii; Mode-7 font, solid RGB colour blocks. Matches the rest of the site. |
-| B | sportuitzending | everything sheared — `clip-path` parallelogram buttons and plates, skewed rules, huge italic DIN |
-| C | plakboek | cut-paper labels rotated a fraction of a degree, tape across the corners, nothing square to the page |
-| D | vitrine | no textures, gradients or shadows at all; hairlines, wide tracking, controls are text with a rule under them |
-| E | arcade | dithered checkerboard instead of gradients, hard 2px pixel bevels that invert on press |
+Ten candidates in two families, all switchable live from the test panel while the
+question was open. **A–E** treated the stage as a screen the book was displayed on
+and differed in geometry and depth model, not just palette: `teletekst` (zero
+depth, Mode-7, solid RGB blocks), `sportuitzending` (everything sheared),
+`plakboek` (cut paper rotated off square), `vitrine` (hairlines and air, controls
+as text) and `arcade` (dithered checkerboard, hard 2px bevels). **F–J** were the
+table, differing only in timber: `eiken`, `grenen`, `mahonie`, `beuken`, `noten`.
 
-If **A** wins, the album itself needs rethinking — a leather-and-brass book on
-flat teletext black shares no visual language with it.
+**H · mahonie won**, and the family it belongs to is the larger half of that:
+deep red-brown, ribbon figure, and one glued top rather than loose boards — so the
+board seams and the per-board tone shift the other four timbers needed are gone
+entirely, and what a polished finish gives instead is a **specular streak** across
+the top and a hard vignette at the corners.
 
-#### The tabletop family (F–J)
+Three rules the table follows, each of them arrived at by getting it wrong first:
 
-A second, later premise, in `styles/tabletop.css` and marked with an extra
-`stage-tabletop` class: A–E treat the stage as a **screen the book is displayed
-on**; F–J treat it as a **wooden table the book is lying on**, seen from straight
-above. Which changes far more than the background, and is why they are a family
-rather than five more themes.
-
-All five are **bare wood**, and differ only in the timber. Three rules the family
-follows, each of them arrived at by getting it wrong first:
-
-1. **The table is a table-sized object, not a background.** `width: min(1520px,
-   97vw)`, centred, with a chamfered edge that catches the light and a shadow on
-   the floor; the site's black is the room around it. Bleeding the wood to the
-   edges of the viewport made it a texture behind a page. The figure has to clear
-   the album, which sizes itself from the *viewport* rather than from its
-   container — at 1920×1080 the spread and the shelf cost ~1364px.
+1. **The table is a table-sized object, not a background.** `width: min(1660px,
+   97vw)`, centred, with an edge that catches the light and a shadow on the floor.
+   Bleeding the wood to the edges of the viewport made it a texture behind a page.
+   The figure has to clear the album, which sizes itself from the *viewport*
+   rather than from its container — see "The shelf was overlapping the book" for
+   where 1660 comes from.
 2. **Nothing is spread on it.** An earlier pass put a felt blotter, a paper
    placemat, a baize inlay and a café cloth under the book. Covering the wood with
-   a mat defeats the only thing these five are for. Bare wood, the book, the
+   a mat defeats the only thing the timber is for. Bare wood, the book, the
    packets and the keys.
 3. **Everything is an object or it is engraved.** There is no chrome to hang things
    on, so a control is either a physical thing lying on the wood — a key, a packet,
    a slot cut into the surface — or it is type cut into it. Nothing gets a panel:
-   the header, the footer and the packet shelf have no background at all, and the
-   shelf's label is simply engraved above the packets. Buttons become keys with a
-   light face, a hard bottom edge and 2px of travel.
+   the header, the footer and the packet shelf have no background at all. Buttons
+   are keys with a light face, a hard bottom edge and 2px of travel.
 
-Hence `--table-ink` rather than a single ink token: it has to read against the
-actual timber, so it is light on walnut and dark on pine, and every text token maps
-to it. `--drop` and `--vignette` are the other two — the shadow everything casts
-and how far the light falls off. Objects disagreeing about where the light is kills
-it instantly. There are also no rules (`.game-rule` is hidden): a brass divider is
-screen furniture, and the space between two objects on a table is the divider.
+`--drop` is the shadow everything on the table casts; objects disagreeing about
+where the light is kills it instantly. `--ink` and `--ink-dim` are warm and light
+because the timber is dark. There are also **no rules** — `.game-rule` is gone
+from the shell entirely: a brass divider is screen furniture, and the space
+between two objects on a table is the divider.
 
 The test panel is deliberately exempt (`.game-plate--debug`): it is scaffolding,
 and it has to stay readable rather than in character.
 
-| | | timber | boards | light |
-| --- | --- | --- | --- | --- |
-| F | eiken | mid-warm quarter-sawn oak, real flake | 138px | lamp above left; coffee ring |
-| G | grenen | scrubbed pale pine, knots, no flake | 208px | flat daylight, almost no falloff |
-| H | mahonie | deep red-brown, ribbon figure, french-polished | none — one glued top | specular streak, hard corner vignette |
-| I | beuken | pale-to-mid beech, very tight, heavy fleck | 116px | even and neutral, no lamp |
-| J | noten | dark walnut, the strongest figure | 124px | lamp hung low, everything else dark |
-
 **The wood is real noise, not gradients.** The first pass faked grain with
 `repeating-linear-gradient` and read as corduroy — grain is noise stretched along
 one axis, irregular and self-similar at several scales, and a repeating gradient is
-by definition none of those. So the five share three inline `feTurbulence` layers
-as data URIs (`--grain-figure`, `--grain-tight`, `--grain-flake`) with
-`baseFrequency` stretched hard along x so the noise elongates into grain running
-the table's length, blended `overlay`/`soft-light` over a base tone, plus board
-seams and the lamp's sheen. No asset is fetched and nothing animates.
+by definition none of those. So the grain is two inline `feTurbulence` layers as
+data URIs (`--grain-figure` for the broad ribbon bands, `--grain-tight` for the
+pores) with `baseFrequency` stretched hard along x so the noise elongates into
+grain running the table's length, blended `overlay`/`soft-light` over a base tone,
+under the lamp's highlight. No asset is fetched and nothing animates. A third
+layer, `--grain-flake`, was the ray fleck of quarter-sawn oak and beech; mahogany
+has none, so it went with those candidates.
 
 Two details that are load-bearing:
 
@@ -670,10 +742,8 @@ Two details that are load-bearing:
   per-layer background opacity. The matrix maps luminance into a band around
   mid-grey, which is exactly the value `overlay` and `soft-light` leave untouched.
 
-A species is then a base colour, which of the three layers it uses, the board
-width and its light. Eight layers in a fixed order, so an unused one is spelt
-`none` rather than left out — the parallel `background-size` / `-repeat` /
-`-blend-mode` lists have to stay aligned.
+Four layers in a fixed order, so the parallel `background-size` / `-repeat` /
+`-blend-mode` lists stay aligned.
 
 **Packets are packets.** The side panel used to hold buttons captioned
 "3 kaarten". A button that *describes* a packet is a worse object than the packet,
@@ -1315,9 +1385,9 @@ At 1920×1080 the slab is 1520 wide and leaves the book 229px a side; the formul
 believed it had 381 and handed the shelf its full 352px cap. The shelf was sized for a
 margin four times the one it was lying in.
 
-So `--stage-w` joins `--stage-pad` on `:root`, `.game-stage` and the tabletop override
-both read their `width` and `padding` from the tokens, and `--shelf-room` subtracts the
-tokens rather than a literal. The rule the original comment was reaching for, stated
+So `--stage-w` joins `--stage-pad` on `:root`, `.game-stage` reads its `width` and
+`padding` from the tokens, and `--shelf-room` subtracts the tokens rather than a
+literal. The rule the original comment was reaching for, stated
 properly: **anything that changes the stage's box changes the tokens, not the box.**
 
 #### The table is 1660, not 1520
@@ -1887,6 +1957,14 @@ Implementation notes, each of which cost a round:
   analytically — `peak * Math.min(1, actual / rampEnd)` — because reading
   `gain.value` on an automated param returns the value *now*, not the ramp's
   future value, which gutted the riser at every cutoff.
+- **The riser's noise source is looped**, because the shared buffer in
+  `getNoise` is three seconds and a level 4 radiation is 3960ms real at the ×2
+  multiplier. A `BufferSource` that runs off the end of its buffer goes silent
+  and its later `stop()` is a no-op, so the air cut out a second before the card
+  turned while the gain ramp climbed on — audible only on 90+, since level 3 is
+  2640ms and still fits. This appeared when the radiation was stretched to 1980
+  and is the reason to loop rather than to grow the buffer: the fix holds
+  whatever the build length becomes.
 - The glow **survives the turn**. Switching it off at reveal meant all that
   build-up resolved into a card that looked exactly like a common one.
 - **The build reads by contrast, not by output.** The gold was pushed brighter and
@@ -1925,9 +2003,9 @@ Implementation notes, each of which cost a round:
       not the delay.
     - `MOTE_DRAIN_RATE` is 3, bounded by the card's departure: every mote must be
       absorbed before the card leaves for the row, or it is converging on nothing.
-      Worst case is the longest cycle in `MOTES` (760) on a mote that has just set
-      out — 253 at ×3 — so the layer empties about as the flip lands, well inside the
-      660 a duplicate stays up for. `MOTE_DRAIN_MS` (260) has to stay above that
+      Worst case is the longest *flight* in `MOTES` (~183) on a mote that has just set
+      out — 61 at ×3 — so the layer empties well before the flip lands, and well inside
+      the 660 a duplicate stays up for. `MOTE_DRAIN_MS` (70) has to stay above that
       figure, or the fade starts while the slowest motes are still travelling.
   - **The motes' fade is its own flag (`motesOut`), not `blooming`.** Sharing
     `blooming` is what made the drain invisible: the bloom and vignette must recede
@@ -1989,12 +2067,16 @@ Implementation notes, each of which cost a round:
       custom properties the keyframes read, a mote mid-flight would jump to a new
       angle and distance each time `faceUp` or `motesOut` flipped.
   - **Speed comes from the flight fraction, which is why cycle length and flight speed
-    are separate numbers.** A mote flies over the first **45%** of its cycle
-    (`opener-mote-in`) and spends the remaining 70% landed and invisible. Velocity is
-    distance over *flight time*, so the flight can be shortened — making a mote fly
-    faster — without touching the cycle, which is what governs how often the stream
-    repeats. Currently ~3× the original velocity at a cycle mean of ~1160, which is
-    exactly where the cycle started.
+    are separate numbers.** A mote flies over the first **30%** of its cycle
+    (`opener-mote-in`, `MOTE_FLIGHT`) and spends the remaining 70% landed and
+    invisible. Velocity is distance over *flight time*, so the flight can be shortened
+    — making a mote fly faster — without touching the cycle, which is what governs how
+    often the stream repeats.
+    - **`MOTE_SPEED` is the knob for plain speed, and it is now 12.4** — 2.5× where it
+      sat before, asked for directly. Raising it scales the cycle down with it (mean
+      ~465, from ~1160), so the density is untouched: the same ~30% of the motes are
+      airborne, they just cross faster and set out again sooner. Use this rather than
+      the flight fraction unless the intent really is to trade density for speed.
     - **Lowering the flight fraction thins the stream**, since only that fraction of
       the motes is airborne at any moment. `MOTE_COUNT` has to rise to compensate —
       it went 14 → 24 when the fraction went 0.45 → 0.30, holding about 7 motes on
@@ -2103,6 +2185,33 @@ swells overlap and would otherwise clip.
   leaf 0 on desktop and page 0 on mobile.
 - **The shimmer phase has its own sound** (`playShimmerSweep`), scaled to the
   shimmer length so it lands on the phase boundary.
+- **The face reveal is a rising arpeggio** (`playNameReveal`): D5 · F5 · A5 · D6,
+  45ms apart, rising in gain into the accent, over an air sweep and with the
+  sparkle released on the landing. Chosen over three others — the shipped single
+  chime, a FIFA-style walkout (sub and crowd) and an MTG-style foil sheen (no
+  attack anywhere).
+
+  The chime it replaced was **one struck note held back to the accent**, written
+  when the card resolved by *expanding*. It does not: it charges, holds, and the
+  light **drains**. A single strike announces an event; a run builds into one,
+  which is the shape the picture has. Its pitch was also inherited rather than
+  chosen — D6 over D5, high above the payoff's D4 bell so it stayed tonic — so the
+  run keeps that for free by being **a D-minor arpeggio**, the payoff's own chord.
+
+  The reverb send **opens as the run climbs**, 0.72 → 1.02. Uniformly wet, the
+  lead notes smear into the one that matters; opening it puts the dry attacks at
+  the bottom where the rhythm is and the space at the top where the payoff is, and
+  the last note's tail is still ringing under the drain.
+
+  Nothing in it goes below ~700 Hz. A boom is mass and what happens to this card
+  is light, which is exactly what the walkout candidate was there to test — it
+  read as heavier than the picture every time.
+
+  The first version of this comparison was **not an audition at all**, and that is
+  the most useful thing about it: all eight entries ended on the same two
+  tubular-bell partials, so the loudest layer was common to every option and only
+  the garnish differed. They sounded the same because they nearly were. Whatever
+  marks the accent is open; a bell is one answer out of an enormous space.
 - **The build-up is a reverse cymbal** — a highpass noise swell over a clean sine
   sub, no pitch movement. Chosen by ear from ten candidates; everything that
   climbed read as thin or busy, and a sawtooth sub in the 38–190 Hz range through

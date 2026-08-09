@@ -373,8 +373,8 @@
 }
 
 /*
- * One slot per grid cell. The card sits inside it, and the slot draws whatever
- * holds the card down — see the per-style mounts in albumstyle.css.
+ * One slot per grid cell. The card sits inside it, and the slot draws the mount
+ * that holds the card down — see `.album__slot::before` below.
  *
  * The slot carries the card's aspect ratio so the two boxes are *identical*.
  * Without it the slot is as tall as the grid row and a mount drawn on it cannot
@@ -419,8 +419,11 @@
  * An empty slot has to *show* it, and the way to do that is to draw it over the
  * ghost rather than to make it bigger: an outline a few pixels proud is not the
  * position the card occupies, it is a slightly wrong rectangle drawn around it.
- * The mount fills are all translucent tints, so on top they read as a die-cut
- * edge on the exact footprint without hiding who is missing.
+ * The fill is a translucent tint, so on top it reads as a die-cut edge on the
+ * exact footprint without hiding who is missing.
+ *
+ * A dashed gilt rule rather than corner ticks: brackets plus a dashed rule read
+ * as two ideas competing on one small rectangle.
  */
 .album__slot::before {
   content: "";
@@ -429,6 +432,8 @@
   z-index: 0;
   pointer-events: none;
   border-radius: 6px;
+  border: 2px dashed rgba(138, 112, 67, 0.55);
+  background: rgba(107, 83, 37, 0.05);
 }
 
 .album__slot--empty::before {
@@ -450,19 +455,8 @@
   box-shadow: none;
 }
 
-/*
- * The leather album's empty position: a dashed gilt rule on the card's exact
- * footprint, like every other style. Corner ticks were tried and dropped — the
- * edge is a dash everywhere, and brackets plus a dashed rule read as two ideas
- * competing on one small rectangle.
- */
-.album--leder .album__slot::before {
-  border: 2px dashed rgba(138, 112, 67, 0.55);
-  background: rgba(107, 83, 37, 0.05);
-}
-
 /* Printed placeholder, not a dark card sitting in a bright album. */
-.album--leder .album__slot--empty .card {
+.album__slot--empty .card {
   --tier-a: #e7ddc4;
   --tier-b: #cec2a2;
   --tier-ink: #8a7d5f;

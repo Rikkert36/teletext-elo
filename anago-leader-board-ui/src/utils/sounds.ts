@@ -16,13 +16,6 @@
  *    the big pulls feel monumental rather than merely loud.
  */
 
-/*
- * The face reveal's candidates, while they are being compared. Only the id and
- * the label live there; the sounds are down in `playNameReveal`, because they
- * are built from the private helpers in this file. Goes away with the switcher.
- */
-import { getRevealSound } from './revealSound';
-
 const MUTE_KEY = 'tafelvoetbal.cards.muted';
 
 let context: AudioContext | null = null;
@@ -781,185 +774,71 @@ export const playSlot = (): void => {
  * ------------------------------------------------------------------ */
 
 /**
- * The card resolving: light, not impact.
+ * The card resolving: a rising run landing on the accent.
  *
- * **No low end at all, and that is the whole change.** This was a struck plate —
- * contact grains over a 94 Hz body with a clang on top — and it was wrong for what
- * is now on screen. A boom is *mass*, and the thing that happens to the card is a
- * bloom of light expanding out of its centre; the two disagreed, and the sound
- * kept reading as heavier than the picture. Nothing here goes below about 700 Hz.
+ * Shameless, and it works on everybody — *Pokémon TCG, and every gacha ever
+ * made*. Four short glassy notes rising *into* the moment the rim comes up,
+ * which is the difference between hearing "note" and hearing "yes".
  *
- * Three layers, all of them upward:
+ * **This replaced a single struck chime, and the reason is worth keeping.** The
+ * chime was one bell held back to the accent, written when the card resolved by
+ * *expanding* — a bloom of light bursting out of its centre. It does not: it
+ * charges to white-hot, holds, and then the light **drains** and a face is
+ * underneath. A single strike announces an event; a run builds into one, which is
+ * the shape the picture actually has.
  *
- * 1. **Air opening.** A bandpass climbing 700 → 7200 Hz. A filter sweeping *up*
- *    is the sound of something widening, which is exactly what the burst is
- *    doing; the same sweep pointed down would be something closing.
- * 2. **Sparkle.** Sparse high grains at a high Q, so each one rings for a moment
- *    instead of clicking. Biased toward the start so the glitter arrives with the
- *    light rather than trailing it.
- * 3. **The chime**, held back to land when the light reaches the border and the
- *    rim comes up — so what the ear hears arriving at the edge is what the eye
- *    sees arriving there.
+ * The chime's pitch was also inherited rather than chosen — D6 over D5, two and
+ * three octaves above the payoff's D4 bell so it stayed tonic and could not argue
+ * with a D-minor chord. That constraint only exists on the ~28% of cards that get
+ * a ceremony at all, but it is free to satisfy, so the run keeps it: **D5 · F5 ·
+ * A5 · D6 is a D-minor arpeggio**, the same chord the payoff ladder is built on.
+ * F natural, not F♯, for exactly the reason the payoff gives.
  *
- * D6 over D5, two and three octaves above the payoff's D4 bell. High enough to
- * read as light rather than as metal, and still the tonic, so it cannot argue
- * with a D-minor chord that may still be ringing on a rare card.
+ * Four layers:
  *
- * **The whole of the above is candidate 0**, and it is on trial rather than
- * settled — see `revealSound.ts`, which is where the eight options and the
- * reasoning behind them live. In particular: the rising sweep in layer 1 was
- * written for a *burst*, and D drains. That is what the candidates are about.
+ * 1. **Air opening**, under the whole thing — a bandpass climbing 700 → 5200 Hz.
+ * 2. **The run.** 45ms apart and rising in gain, so the last note is both the
+ *    loudest and the one on the accent. Short decays: at `playBell`'s 5.6s tail
+ *    the four would be a chord rather than a run, which is what `playPing` is
+ *    for.
+ * 3. **Sparkle**, released on the accent rather than spread across the build, so
+ *    the glitter belongs to the landing.
+ *
+ * **The reverb send opens as the run climbs**, 0.72 → 1.02, rather than sitting
+ * at one value for all four. Uniformly wet, the run arrives already in a large
+ * room and the lead notes smear into the one that matters; opening it puts the
+ * dry attacks at the bottom where the rhythm is, and the space at the top where
+ * the payoff is. The room appears to grow as the notes rise, which is the same
+ * build-slow-land-fast shape the picture has. The last note carries the most of
+ * it *and* the longest decay, so the tail is still ringing under the drain — the
+ * reverb is what stops the run stopping dead the moment the face arrives.
+ *
+ * Nothing here goes below about 700 Hz. A boom is *mass*, and what happens to
+ * this card is light; a low-end version was tried (a FIFA-style walkout, sub and
+ * crowd) and it read as heavier than the picture every time.
  *
  * @param rimAtMs Real ms from now until the beat discharges — the same number
- * `PackOpener` uses to fire the rim, passed in rather than re-derived. Every
- * candidate times itself in fractions of this and takes nothing else.
+ * `PackOpener` uses to fire the rim, passed in rather than re-derived. Everything
+ * below is timed in fractions of it and takes nothing else.
  */
 export const playNameReveal = (rimAtMs = 250): void => {
   const rim = rimAtMs / 1000;
 
-  switch (getRevealSound().id) {
-    /*
-     * ---------------------------------------------------------------------
-     * 1 · walkout — *FIFA Ultimate Team*
-     *
-     * Chest, not ears. The energy is in the bass and the bass *is* the event.
-     *
-     * **Every rule this file has about the reveal is deliberately broken here**,
-     * and that is the candidate. The note above says a boom is mass and the
-     * thing happening to the card is light, so nothing may go below 700 Hz —
-     * true of a bloom bursting outward, and the whole question is whether it is
-     * true of a face arriving. FUT's reveal is famous for being *felt*, and it
-     * is entirely sub and crowd.
-     *
-     * Four layers: the riser that has been building through the charge, a sine
-     * dropping 88 → 52 Hz on the accent, a dark thud giving that a transient to
-     * sit on, and a bright narrow sweep upward so there is something above
-     * 1 kHz to cut through it. The crowd wash starts just *before* the accent —
-     * a crowd reacts fractionally early, and it is the only layer allowed to.
-     */
-    case 'walkout':
-      playNoise(rim * 0.92, 260, 3000, 0.055, 'bandpass', 0, 1.2, 0.3);
-      playNoise(1.0, 420, 2600, 0.05, 'bandpass', Math.max(0, rim - 0.06), 0.8, 0.75);
-      playBoom(52, 0.95, 0.3, rim);
-      playImpact(0.2, 0.7, rim);
-      playNoise(0.46, 900, 9200, 0.11, 'bandpass', rim, 7, 0.4);
-      break;
-
-    /*
-     * ---------------------------------------------------------------------
-     * 2 · folie — *MTG Arena, and a real foil card catching the light*
-     *
-     * **No attack anywhere.** Nothing is struck and nothing lands; a surface is
-     * turned in the light and you hear the sheen travel across it. That suits a
-     * card whose whole face is tier metal, and it is the one candidate here
-     * that reveals a *texture* rather than announcing an event.
-     *
-     * The sheen is two narrow bands sweeping the same span, detuned and offset
-     * by ~40ms. Neither is the sound: what you hear is the beating between them
-     * moving as the sweeps diverge and reconverge, which is a flanger built out
-     * of the two filters already available rather than out of a delay line.
-     *
-     * It resolves on a thin high ping rather than a bell — the sheen reaching
-     * the far edge, not a note being struck. `playPing`'s upper partial at 2.76
-     * is what keeps it glass instead of flute.
-     */
-    case 'folie':
-      playNoise(rim * 1.45, 2400, 6800, 0.08, 'bandpass', rim * 0.12, 9, 0.4);
-      playNoise(rim * 1.45, 2620, 6280, 0.075, 'bandpass', rim * 0.12 + 0.04, 11, 0.4);
-      playGrains({
-        count: 9,
-        spread: rim * 0.9,
-        grainMs: [40, 150],
-        hz: [5200, 12000],
-        gain: 0.018,
-        q: 12,
-        bias: 1.4,
-      });
-      playPing(3136, 0.026, rim, 0.5);
-      playPing(4699, 0.014, rim + 0.02, 0.34);
-      break;
-
-    /*
-     * ---------------------------------------------------------------------
-     * 5 · arpeggio — *Pokémon TCG, and every gacha ever made*
-     *
-     * Shameless, and it works on everybody. Where the shipped sound is one
-     * struck note, this is a run of four landing *into* the accent — which is
-     * the difference between hearing "note" and hearing "yes".
-     *
-     * D5 · F5 · A5 · D6, which is a D-minor arpeggio: the same chord the payoff
-     * ladder is built on. That is not a flourish — it means the run cannot
-     * argue with a rare card's chord for free, which is the constraint the old
-     * D6/D5 chime was chosen to satisfy and the only part of it worth keeping.
-     * F natural, not F♯, for exactly the reason the payoff gives.
-     *
-     * 45ms apart and rising in gain, so the last note is both the loudest and
-     * the one on the accent. Short decays — at `playBell`'s 5.6s the four would
-     * be a chord rather than a run, which is what `playPing` exists for.
-     *
-     * **The send opens as the run climbs**, 0.72 → 1.02, rather than sitting at
-     * one value for all four. Uniformly wet, the run arrives already in a large
-     * room and the lead notes smear into the one that matters; opening it puts
-     * the dry attacks at the bottom where the rhythm is, and the space at the
-     * top where the payoff is. The room appears to grow as the notes rise, which
-     * is the same build-slow-land-fast shape the picture has.
-     *
-     * The last note carries the most of it *and* the longest decay, so the tail
-     * is still ringing under the drain — the reverb is what stops the run
-     * stopping dead the moment the face arrives.
-     */
-    case 'arp': {
-      playNoise(rim * 0.8, 700, 5200, 0.04, 'bandpass');
-      [D5, F5, A5, D6].forEach((note, i) => {
-        const at = rim - (3 - i) * 0.045;
-        playPing(note, 0.02 + i * 0.005, Math.max(0, at), 0.42 + i * 0.2, 0.72 + i * 0.1);
-      });
-      playGrains({
-        count: 12,
-        spread: 0.26,
-        grainMs: [30, 120],
-        hz: [4600, 11000],
-        gain: 0.026,
-        q: 8,
-        bias: 1.3,
-        delay: rim,
-      });
-      break;
-    }
-
-    /*
-     * ---------------------------------------------------------------------
-     * 0 · nu — the shipped sound, kept as the thing to beat.
-     *
-     * Rising air over glass grains, then two tubular-bell partials at D6 and D5
-     * held back to the accent. Two things about it are worth knowing while
-     * judging the others.
-     *
-     * **Its sweep climbs, and D drains.** The note above says a filter sweeping
-     * up "is the sound of something widening, which is exactly what the burst is
-     * doing" — and that was written for the expanding circle that lost. Nothing
-     * expands any more.
-     *
-     * **Its pitch is inherited, not chosen.** D6 over D5 sits two and three
-     * octaves above the payoff's D4 bell so it stays tonic and cannot argue with
-     * a D-minor chord — a constraint that only exists on the ~28% of cards that
-     * get a ceremony at all.
-     */
-    default:
-      playNoise(0.34, 700, 7200, 0.05, 'bandpass');
-      playGrains({
-        count: 14,
-        spread: 0.2,
-        grainMs: [30, 130],
-        hz: [4200, 11000],
-        gain: 0.03,
-        q: 8,
-        bias: 0.7,
-      });
-      playBell(D6, 0.03, rim);
-      playBell(D5, 0.02, rim + 0.014);
-      break;
-  }
+  playNoise(rim * 0.8, 700, 5200, 0.04, 'bandpass');
+  [D5, F5, A5, D6].forEach((note, i) => {
+    const at = rim - (3 - i) * 0.045;
+    playPing(note, 0.02 + i * 0.005, Math.max(0, at), 0.42 + i * 0.2, 0.72 + i * 0.1);
+  });
+  playGrains({
+    count: 12,
+    spread: 0.26,
+    grainMs: [30, 120],
+    hz: [4600, 11000],
+    gain: 0.026,
+    q: 8,
+    bias: 1.3,
+    delay: rim,
+  });
 };
 
 /* ------------------------------------------------------------------ *
@@ -1129,11 +1008,11 @@ const A3 = 220;
 const D4 = 293.66;
 const F4 = 349.23;
 const A4 = 440;
+/* The reveal's arpeggio is these four — see `playNameReveal`. */
 const D5 = 587.33;
-/** The lead note of the reveal's rising chime — see `playNameReveal`. */
 const F5 = 698.46;
 const A5 = 880;
-/** Only the reveal reaches this high — see `playNameReveal`. */
+/** Only the reveal reaches this high. */
 const D6 = 1174.66;
 
 interface PayoffSpec {

@@ -13,8 +13,7 @@ import '../styles/packopen.css';
  *
  * The tilt and the sheen offset are derived from the pack's **id** rather than
  * random, so a re-render never reshuffles the pile — the same three packets keep
- * lying the same way, which is what makes them read as objects. Same reasoning as
- * the confetti scatter in AlbumDecor.
+ * lying the same way, which is what makes them read as objects.
  *
  * It used to be the array index, which was stable only for as long as the shelf
  * outlived nothing: the opener now runs *beside* the pile rather than replacing it,

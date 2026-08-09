@@ -1,13 +1,48 @@
 /**
- * The stage the album sits on.
+ * The stage the album lies on: a french-polished mahogany table, seen from
+ * straight above.
  *
- * Everything here is driven by custom properties, so a visual direction is a
- * block of token overrides plus a background — see the five theme blocks at the
- * bottom. The theme is a class on <html> (utils/stageTheme.ts) so it can be
- * switched live.
+ * Settled after ten candidates in two families — five that treated the stage as a
+ * *screen* the book was displayed on, five as a *table it was lying on*. This is
+ * the second premise: there is no screen and no page, there is a table with a book
+ * on it, and the site's black is the room around it.
  *
- * The book and the cards are deliberately untouched by the themes; only the
- * surface, the chrome and the accents change.
+ * Three rules it follows, all of them learned by getting them wrong first:
+ *
+ * 1. **The table is a table-sized object, not a background.** It has a width, an
+ *    edge that catches the light and a shadow on the floor. Bleeding the wood to
+ *    the edges of the viewport made it a texture behind a page.
+ * 2. **Nothing is spread on it.** An earlier pass put a blotter, a placemat and a
+ *    baize inlay under the book, and covering the wood with a mat defeats the
+ *    whole point of having timber. Bare wood, the book, the packets and the keys.
+ * 3. **Everything is an object or it is engraved.** There is no chrome to hang
+ *    things on, so a control is either a physical thing lying on the wood — a key,
+ *    a packet, a recessed slot — or it is type cut into the surface. Nothing gets
+ *    a panel. The test panel is the one exemption (`.game-plate--debug`): it is
+ *    phase-1 scaffolding and has to stay readable rather than in character.
+ *
+ * Two conventions worth knowing:
+ *
+ * - **One light, one shadow direction.** `--drop` is the shadow everything on the
+ *   table casts. Objects disagreeing about where the light is kills it instantly.
+ *   The vignette carries a **spread** as well as a blur: blur alone puts its
+ *   darkest point exactly on the border and has half of itself outside the box,
+ *   so the edges stayed thin however far the blur was pushed. The spread moves the
+ *   shadow's own edge inwards, and the blur then softens it into the middle —
+ *   which is what makes the slab read as lit from above rather than printed.
+ *
+ *   **Two stops, not one.** The vignette is a *list* of shadows doing two
+ *   different jobs: a tight dark band hugging the rim, and a wide soft falloff
+ *   reaching a couple of hundred pixels in. Trying to get both out of a single
+ *   shadow is what put a ceiling on how deep this could go — past a point the blur
+ *   is so wide that the rim itself goes pale, and pushing the alpha to compensate
+ *   greys out the whole slab. Split, the rim can be near-black while the middle
+ *   keeps its timber. Anything added there must stay a list.
+ * - **Ink reads against the timber.** `--ink` and `--ink-dim` are warm and light
+ *   because the wood is dark red-brown; every text token maps to them.
+ *
+ * The book and the cards are deliberately untouched by any of this; only the
+ * surface, the chrome and the accents belong to the table.
  */
 
 /*
@@ -16,105 +51,214 @@
  * table is left beside the book. If they drift apart the pack shelf starts
  * overlapping the book, so they read from one value.
  *
- * **`--stage-w` is here because they did drift apart.** The screen stages (A–E) are
- * full bleed, so the width was written as a bare `100vw` inside `--shelf-room` and
- * the padding was the only token that needed to exist. The tabletop stages (F–J)
- * then made the stage a table-sized *object* — `min(1520px, 97vw)`, centred, with
- * tighter padding of its own — and `--shelf-room` went on measuring the viewport.
- * At 1920 the table is 1520 wide and leaves the book 44px a side, while the formula
- * still believed it had 196: the shelf was sized for a margin four times the one it
- * was lying in, so it ran onto the page.
+ * **They are here because they did drift apart.** The width was once a bare `100vw`
+ * written inside `--shelf-room`, from when the stage was full bleed. Making the
+ * stage a table-sized *object* — capped, centred, with tighter padding of its own —
+ * left `--shelf-room` measuring the viewport: at 1920 the table was 1520 wide and
+ * left the book 44px a side while the formula still believed it had 196, so the
+ * shelf was sized for a margin four times the one it was lying in and ran onto the
+ * page.
  *
  * Anything that changes the stage's box must change these, not `.game-stage`'s own
- * `width`/`padding` — which now read from here, so the two cannot disagree again.
+ * `width`/`padding` — which read from here, so the two cannot disagree again.
+ *
+ * **1520 was stale, and it cost the second column.** It was set when the packets
+ * were quarter-size tiles; they are card-sized now, and the shelf needs
+ * `2 × 96 + 12 gap + 22 padding = 226px` to hold two of them at the 96px floor.
+ * The table has to clear the book plus that margin on *both* sides, because the
+ * book is centred and only one of the two holds packets:
+ *
+ *     --stage-w  ≥  --book-w + 2 × (--shelf-gap + 226px + 16px) + 2 × --stage-pad
+ *
+ * At 1920×1080 that is 994 + 2×268 + 68 = 1598; at the same width on a taller
+ * window the book caps at 1040 and it becomes 1644. Hence 1660, which covers any
+ * 1920-wide window and leaves the shelf 257px — two columns of 111px packets. At
+ * 1520 it was 187px, which is under the 226 and dropped the pile to a single
+ * column of 96px.
+ *
+ * Full card parity would want ~1781 (93vw at 1920), and that is the line this is
+ * deliberately staying behind: two columns is what makes the packets read as a
+ * pile, and 79% of a card is the cheaper price. If the packets or the tilts grow,
+ * re-derive from the formula rather than nudging the number.
+ *
+ * The padding is tighter than a full-bleed stage would take: the spread is a fixed
+ * size and the slab is narrower than the viewport, so the padding is what it can
+ * least afford.
  */
 :root {
-  --stage-w: 100vw;
-  --stage-pad: clamp(8px, 3vw, 40px);
+  --stage-w: min(1660px, 97vw);
+  --stage-pad: clamp(12px, 2vw, 34px);
 }
 
+/* ================================================================ *
+ * The wood
+ *
+ * Layered gradients cannot make convincing wood. Grain is *noise stretched along
+ * one axis* — irregular, self-similar at several scales, never repeating — and a
+ * repeating-linear-gradient is by definition the opposite of all three. Striped
+ * gradients read as corduroy, which is what the first pass at this looked like.
+ *
+ * So the grain is real noise: an inline SVG `feTurbulence` as a data URI, with
+ * `baseFrequency` stretched hard along x (low) against y (high) so the noise
+ * elongates into grain running the length of the table. No asset is fetched and
+ * nothing animates.
+ *
+ * Two characters at two scales, because one is never enough:
+ *
+ *   --grain-figure  the broad ribbon bands, what you see from across the room
+ *   --grain-tight   the pores and hairlines, what you see up close
+ *
+ * (A third, ray fleck, belonged to the quarter-sawn oak and beech candidates.
+ * Mahogany has none, so it went with them.)
+ *
+ * Each is a grey stretched over the whole slab (`100% 100%`, never tiled):
+ * turbulence does not tile, and a stretched instance also has no seam. Strength is
+ * baked into each one's colour matrix rather than set as a token, because CSS has
+ * no per-layer background opacity — the matrix maps luminance into a band around
+ * mid-grey, which `overlay` and `soft-light` leave untouched.
+ *
+ * Four layers, fixed order, so the parallel `background-size` / `-repeat` /
+ * `-blend-mode` lists stay aligned.
+ *
+ * **No board seams and no board tone-shift.** Both existed for the four candidates
+ * sawn into loose boards; a french-polished top is one glued panel with no visible
+ * joints, which is exactly why this one won over the others.
+ * ================================================================ */
+
 .game-stage {
-  /* --- tokens: defaults are the Brass direction --- */
-  --accent: #a9853c;
-  --accent-light: #e6c98a;
-  --accent-dark: #4a3712;
-  --ink: #f0e6cd;
-  --ink-dim: #a89b7c;
+  --grain-figure: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1400' height='1000'%3E%3Cfilter id='w' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.048' numOctaves='3' seed='4'/%3E%3CfeColorMatrix type='matrix' values='.333 .333 .333 0 0 .333 .333 .333 0 0 .333 .333 .333 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='1400' height='1000' filter='url(%23w)'/%3E%3C/svg%3E");
+
+  --grain-tight: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1400' height='1000'%3E%3Cfilter id='w' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.011 0.55' numOctaves='2' seed='9'/%3E%3CfeColorMatrix type='matrix' values='.267 .267 .267 0 .1 .267 .267 .267 0 .1 .267 .267 .267 0 .1 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='1400' height='1000' filter='url(%23w)'/%3E%3C/svg%3E");
+
+  /* --- tokens --- */
+  --accent: #a3572c;
+  --accent-light: #eec18a;
+  --accent-dark: #4c1c11;
+  --ink: #f6e3c6;
+  --ink-dim: #c3a281;
+
+  /* The one light, and the shadow every object on the table casts under it. */
+  --drop: 3px 8px 18px rgba(14, 5, 2, 0.6);
 
   --title-font: Georgia, "Times New Roman", serif;
-  --title-ink: #e6c98a;
-  --title-shadow: 0 2px 0 #2b2008, 0 3px 10px rgba(0, 0, 0, 0.8);
+  --title-ink: var(--ink);
+  --title-shadow: 0 2px 3px rgba(0, 0, 0, 0.75);
   --title-spacing: 2px;
   --title-transform: uppercase;
 
+  /* The test panel's frame — the only plate left, and deliberately not furniture. */
   --plate-from: #34291a;
   --plate-to: #1f180e;
   --plate-border: #4a3712;
 
-  --btn-from: #e2c17c;
-  --btn-mid: #b8933f;
-  --btn-to: #8a6a28;
-  --btn-ink: #2a1f08;
-  --btn-border: #4a3712;
-  --btn-hi: rgba(255, 250, 222, 0.75);
-  --btn-text-shadow: 0 1px 0 rgba(255, 245, 205, 0.55);
+  /* Recessed slots cut into the wood: input and meter. */
+  --input-bg: rgba(0, 0, 0, 0.42);
+  --meter-from: color-mix(in srgb, var(--accent) 55%, #fff);
+  --meter-mid: var(--accent);
+  --meter-to: color-mix(in srgb, var(--accent) 70%, #000);
 
-  --input-bg: #14100a;
-  --meter-from: #cfe58a;
-  --meter-mid: #7aa832;
-  --meter-to: #4d7315;
+  /* The picker's suggestion list: stained wood, so it belongs to the table. */
+  --menu-bg: rgba(26, 17, 9, 0.97);
+  --menu-border: rgba(0, 0, 0, 0.8);
+  --menu-ink: #f2e5cd;
+  --menu-hi: var(--accent);
+  --menu-hi-ink: #fff8e6;
 
-  /* Inside covers of the book, so the binding does not clash with the stage. */
-  --book-inside: linear-gradient(150deg, #35592c 0%, #223d1b 60%, #2d4d24 100%);
+  /* Inside covers of the book, so the binding does not clash with the surface. */
+  --book-inside: linear-gradient(150deg, #2f5a39 0%, #1c3a24 60%, #26482d 100%);
 
   position: relative;
   min-height: 78vh;
-  /* No `width` here on purpose: a block already fills its parent, and `100vw` would
-     count the scrollbar and overflow. `--stage-w` describes that width for the shelf
-     formula; only a stage that genuinely constrains the box sets both (tabletop.css). */
-  padding: 18px var(--stage-pad) 28px;
+  width: var(--stage-w);
+  margin: clamp(8px, 1.6vh, 22px) auto;
+  padding: clamp(18px, 2.4vw, 36px) var(--stage-pad) clamp(22px, 2.8vw, 40px);
+  border-radius: 5px;
   box-sizing: border-box;
   font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
   color: var(--ink);
   overflow: hidden;
 
-  /* Wood panelling under a warm lamp. */
-  background-color: #2a1d10;
+  /*
+   * Deep red-brown, ribbon figure, and a polished finish — so the highlight is a
+   * specular sheen rather than a matte falloff, and the corners go hard.
+   */
+  background-color: #4e1d12;
   background-image:
-    repeating-linear-gradient(
-      92deg,
-      rgba(0, 0, 0, 0.16) 0 3px,
-      rgba(255, 255, 255, 0.03) 3px 7px,
-      rgba(0, 0, 0, 0.1) 7px 11px
-    ),
-    radial-gradient(ellipse 70% 45% at 50% 6%, rgba(255, 226, 160, 0.22), transparent 72%),
-    radial-gradient(ellipse 95% 85% at 50% 45%, #4a3520 0%, #2c1e11 60%, #150e07 100%);
-  box-shadow: inset 0 0 180px rgba(0, 0, 0, 0.85);
+    radial-gradient(ellipse 56% 40% at 50% -6%, rgba(255, 216, 162, 0.26), transparent 72%),
+    var(--grain-tight),
+    var(--grain-figure),
+    radial-gradient(ellipse 112% 96% at 50% -8%, #833926 0%, #4c1c11 55%, #250c06 100%);
+  background-size: auto, 100% 100%, 100% 100%, auto;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat;
+  background-blend-mode: screen, overlay, soft-light, normal;
+
+  /*
+   * Edge grain, the light falling off, and the shadow on the floor.
+   *
+   * **No lit lip on the top edge.** There used to be an `inset 0 1px 0` white
+   * hairline here as the chamfer catching the light, and it has to stay gone: it
+   * is the only light-coloured thing the slab paints on its own border, and once
+   * the vignette went deep it read as a grey outline drawn round the table rather
+   * than as a bevel. That is a contrast effect, not an alpha one — against
+   * mid-brown timber 0.16 white was a subtle edge; against a near-black rim even
+   * 0.07 is a visible line, so dimming it does not help and only removing it does.
+   * The rim now reads purely as the wood turning away from the lamp.
+   */
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.65),
+    inset 0 0 76px 12px rgba(0, 0, 0, 0.68),
+    inset 0 0 340px 78px rgba(0, 0, 0, 0.92),
+    0 26px 60px rgba(0, 0, 0, 0.85),
+    0 6px 16px rgba(0, 0, 0, 0.6);
 }
 
-.game-rule {
-  height: 3px;
-  margin: 12px 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--accent-dark) 8%,
-    var(--accent) 50%,
-    var(--accent-dark) 92%,
-    transparent 100%
+/*
+ * The polish: one long specular streak across the top, as a gloss finish gives.
+ * Positioned, so it would otherwise paint over the content — hence the z-index on
+ * everything the page renders below.
+ */
+.game-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    102deg,
+    transparent 0 24%,
+    rgba(255, 236, 200, 0.09) 34%,
+    rgba(255, 244, 214, 0.15) 41%,
+    rgba(255, 236, 200, 0.06) 48%,
+    transparent 60%
   );
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+.game-header,
+.game-footer,
+.game-notice,
+.album-layout,
+.opener,
+.game-row,
+.game-plate--debug {
+  position: relative;
+  z-index: 1;
 }
 
 /* ---------------------------------------------------------------- *
  * Header
  * ---------------------------------------------------------------- */
 
+/*
+ * No brass rule under it. A divider is a piece of screen furniture and there is no
+ * screen here — the space between two objects on a table is the divider, so the
+ * margin the rule used to contribute lives on the header and the footer instead.
+ */
 .game-header {
   display: flex;
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
+  margin-bottom: clamp(12px, 1.8vw, 22px);
 }
 
 .game-title {
@@ -169,39 +313,50 @@
  * Controls
  * ---------------------------------------------------------------- */
 
+/*
+ * Buttons are small keys lying on the wood: a light face, a hard bottom edge in
+ * the accent, a real shadow, and 2px of travel when pressed. The dark border and
+ * the shadow are what separate them from the timber.
+ */
 .game-button {
   font-family: Tahoma, Verdana, sans-serif;
   font-size: 12px;
   font-weight: bold;
-  color: var(--btn-ink);
-  text-shadow: var(--btn-text-shadow);
-  background: linear-gradient(180deg, var(--btn-from) 0%, var(--btn-mid) 46%, var(--btn-to) 100%);
-  border: 1px solid var(--btn-border);
-  border-radius: 3px;
   padding: 7px 15px;
   cursor: pointer;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 12%, #fff) 0%,
+    color-mix(in srgb, var(--accent) 34%, #fff) 100%
+  );
+  color: color-mix(in srgb, var(--accent) 80%, #000);
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  border-radius: 3px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
   box-shadow:
-    inset 0 1px 0 var(--btn-hi),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.22),
-    0 3px 6px rgba(0, 0, 0, 0.45);
+    inset 0 1px 0 rgba(255, 255, 255, 0.85),
+    0 2px 0 color-mix(in srgb, var(--accent) 65%, #000),
+    var(--drop);
 }
 
 .game-button:hover:not(:disabled) {
-  filter: brightness(1.12);
+  filter: brightness(1.07);
 }
 
 .game-button:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.45);
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.35),
+    0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
 .game-button:disabled {
-  background: linear-gradient(180deg, #6b6149 0%, #4b422f 100%);
-  color: var(--ink-dim);
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  background: linear-gradient(180deg, #d8d2c4 0%, #b7b1a2 100%);
+  color: #6f6a5e;
   cursor: default;
-  border-color: var(--accent-dark);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 2px 4px rgba(0, 0, 0, 0.4);
+  border-color: rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 3px 7px rgba(0, 0, 0, 0.4);
   filter: none;
 }
 
@@ -210,17 +365,20 @@
   font-size: 11px;
 }
 
+/* A slot cut into the surface rather than a lit screen. */
 .game-input {
   font-family: Tahoma, Verdana, sans-serif;
   font-size: 12px;
   color: var(--ink);
   background: var(--input-bg);
-  border: 1px solid var(--accent-dark);
+  border: 1px solid rgba(0, 0, 0, 0.6);
   border-radius: 3px;
   padding: 6px 8px;
   width: 100%;
   box-sizing: border-box;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    inset 0 2px 7px rgba(0, 0, 0, 0.6),
+    0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .game-input::placeholder {
@@ -230,7 +388,7 @@
 .game-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--accent);
+  box-shadow: inset 0 2px 7px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--accent);
 }
 
 .game-check {
@@ -250,12 +408,14 @@
 .game-meter {
   height: 18px;
   background: var(--input-bg);
-  border: 1px solid var(--accent-dark);
+  border: 1px solid rgba(0, 0, 0, 0.6);
   border-radius: 3px;
   padding: 2px;
   display: flex;
   gap: 2px;
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.6);
+  box-shadow:
+    inset 0 2px 7px rgba(0, 0, 0, 0.6),
+    0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .game-meter__chunk {
@@ -270,7 +430,7 @@
 }
 
 .game-meter__chunk--empty {
-  background: rgba(255, 255, 255, 0.045);
+  background: rgba(0, 0, 0, 0.3);
   box-shadow: none;
 }
 
@@ -283,6 +443,7 @@
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
+  margin-top: clamp(14px, 2vw, 24px);
 }
 
 .game-readout {
@@ -318,6 +479,28 @@
 }
 
 /*
+ * Type cut into the surface. Every one of these sits directly on timber, so they
+ * all need the same faint relief under them or they float.
+ *
+ * Written as descendants of `.game-stage` rather than bare, because `.opener__hint`
+ * hard-codes a warm grey of its own in packopen.css: at equal specificity which of
+ * the two wins would come down to the order the bundler happens to concatenate the
+ * files in, which is not a thing to depend on.
+ */
+.game-stage .game-notice,
+.game-stage .game-readout,
+.game-stage .game-muted,
+.game-stage .game-check,
+.game-stage .album__nav-label,
+.game-stage .opener__hint {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+.game-stage .opener__hint {
+  color: var(--ink-dim);
+}
+
+/*
  * The book is centred on the stage, and the shelf lies in the margin beside it.
  *
  * This was a two-column flex row, which meant the book centred inside whatever
@@ -338,13 +521,13 @@
   /*
    * How much table is left beside the book, per side. Every term is
    * viewport-relative (`--book-w` is `--page-w × 2`, `--page-w` is vw/vh, and
-   * `--stage-w` is either `100vw` or a cap on it), so this can be resolved in CSS
-   * without measuring anything — which is what lets the shelf size itself to the
-   * room it actually has.
+   * `--stage-w` is a cap on 97vw), so this can be resolved in CSS without
+   * measuring anything — which is what lets the shelf size itself to the room it
+   * actually has.
    *
-   * `--stage-w` and `--stage-pad` rather than `100vw` and a literal, so that the
-   * tabletop stages — where the stage is a 1520px slab rather than the window — get
-   * the margin they actually have. See the :root block at the top of this file.
+   * `--stage-w` and `--stage-pad` rather than `100vw` and a literal, because the
+   * stage is a table-sized slab rather than the window and the margin beside the
+   * book is the slab's, not the viewport's. See the :root block at the top.
    *
    * `--stage-w` counts the scrollbar where it is viewport-derived and
    * `.album-layout` does not, hence the 16px: it keeps the shelf off the book on a
@@ -525,559 +708,4 @@
   .album-layout--opening .album-side {
     display: none;
   }
-}
-
-/* ================================================================ *
- * THEMES
- *
- * Five genuinely different styles, not five palettes. Each changes the geometry,
- * the depth model and the shape language, not just the colours — so every theme
- * overrides structure as well as tokens.
- *
- * Once one is picked, fold it into the base rules above and delete the rest along
- * with utils/stageTheme.ts and the switcher in the test panel.
- * ================================================================ */
-
-/* --- A · TELETEKST -----------------------------------------------------
- * Matches the rest of the site. Zero depth: no gradients, no shadows, no
- * rounded corners, no bevels anywhere. Pure black, saturated Mode-7 RGB, solid
- * colour blocks for controls. Structurally the opposite of every other theme.
- * -------------------------------------------------------------------- */
-
-.stage-teletext .game-stage {
-  --ink: #ffffff;
-  --ink-dim: #00ffff;
-  --accent: #ffff00;
-  --accent-light: #ffff00;
-  --accent-dark: #ffffff;
-  --input-bg: #000000;
-  --book-inside: #0000aa;
-
-  font-family: "Teletext", "Courier New", monospace;
-  background: #000;
-  box-shadow: none;
-}
-
-.stage-teletext .game-title {
-  font-family: "Teletext", monospace;
-  color: #ffff00;
-  text-shadow: none;
-  letter-spacing: 2px;
-}
-
-.stage-teletext .game-subtitle,
-.stage-teletext .game-readout,
-.stage-teletext .game-notice,
-.stage-teletext .game-muted,
-.stage-teletext .game-check {
-  font-family: "Teletext", monospace;
-  font-style: normal;
-}
-
-/* The classic colour bar. */
-.stage-teletext .game-rule {
-  height: 10px;
-  background: linear-gradient(
-    90deg,
-    #ff0000 0 16.66%,
-    #00ff00 16.66% 33.33%,
-    #ffff00 33.33% 50%,
-    #0000ff 50% 66.66%,
-    #ff00ff 66.66% 83.33%,
-    #00ffff 83.33% 100%
-  );
-  box-shadow: none;
-}
-
-.stage-teletext .game-button {
-  font-family: "Teletext", monospace;
-  background: #00ff00;
-  color: #000;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  text-shadow: none;
-  filter: none;
-}
-
-.stage-teletext .game-button:hover:not(:disabled) {
-  background: #ffff00;
-  filter: none;
-}
-
-.stage-teletext .game-button:active:not(:disabled) {
-  transform: none;
-  background: #ffffff;
-  box-shadow: none;
-}
-
-.stage-teletext .game-button:disabled {
-  background: #555;
-  color: #000;
-  box-shadow: none;
-  border: none;
-}
-
-.stage-teletext .game-plate__label {
-  font-family: "Teletext", monospace;
-  color: #00ffff;
-}
-
-.stage-teletext .game-input {
-  font-family: "Teletext", monospace;
-  border: 2px solid #00ffff;
-  border-radius: 0;
-  box-shadow: none;
-  color: #fff;
-}
-
-.stage-teletext .game-meter {
-  border: 2px solid #00ffff;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.stage-teletext .game-meter__chunk {
-  background: #00ff00;
-  box-shadow: none;
-}
-
-.stage-teletext .album__nav-label {
-  font-family: "Teletext", monospace;
-}
-
-/* --- B · BROADCAST -----------------------------------------------------
- * 2002 sports television. Everything is a diagonal: buttons and plates are
- * sheared parallelograms, the rules are skewed, the title is huge and italic.
- * Rectangles are the exception rather than the rule.
- * -------------------------------------------------------------------- */
-
-.stage-broadcast .game-stage {
-  --ink: #ffffff;
-  --ink-dim: #8fa6d4;
-  --accent: #e8342f;
-  --accent-light: #ffd24a;
-  --accent-dark: #0a1c44;
-  --input-bg: #071433;
-  --book-inside: linear-gradient(150deg, #12295e 0%, #071433 60%, #0d1f47 100%);
-
-  background-color: #05102a;
-  background-image:
-    linear-gradient(
-      110deg,
-      transparent 38%,
-      rgba(232, 52, 47, 0.14) 38% 42%,
-      transparent 42% 46%,
-      rgba(255, 210, 74, 0.1) 46% 48%,
-      transparent 48%
-    ),
-    linear-gradient(
-      110deg,
-      transparent 60%,
-      rgba(255, 255, 255, 0.05) 60% 72%,
-      transparent 72%
-    ),
-    linear-gradient(160deg, #113a7a 0%, #071634 55%, #03091c 100%);
-  box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.7);
-}
-
-.stage-broadcast .game-title {
-  font-family: "Bahnschrift SemiCondensed", Bahnschrift, "DIN Condensed", Impact, sans-serif;
-  font-size: clamp(26px, 3.6vw, 46px);
-  font-style: italic;
-  color: #fff;
-  text-shadow: 3px 3px 0 var(--accent);
-  letter-spacing: 1px;
-}
-
-.stage-broadcast .game-rule {
-  height: 6px;
-  background: linear-gradient(90deg, var(--accent) 0 22%, #ffd24a 22% 30%, #0d2a5e 30% 100%);
-  transform: skewX(-24deg);
-  box-shadow: none;
-}
-
-/* Sheared on both edges, with a thick signal bar down the leading side. */
-.stage-broadcast .game-button {
-  clip-path: polygon(9px 0, 100% 0, calc(100% - 9px) 100%, 0 100%);
-  border: none;
-  border-radius: 0;
-  background: linear-gradient(90deg, var(--accent) 0 5px, #12326e 5px 100%);
-  color: #fff;
-  font-family: "Bahnschrift SemiCondensed", Bahnschrift, "Segoe UI", sans-serif;
-  font-style: italic;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-  box-shadow: none;
-  padding: 8px 20px;
-}
-
-.stage-broadcast .game-button:hover:not(:disabled) {
-  background: linear-gradient(90deg, #ffd24a 0 5px, #1a4290 5px 100%);
-  filter: none;
-}
-
-.stage-broadcast .game-button:disabled {
-  background: linear-gradient(90deg, #3d4a68 0 5px, #16203a 5px 100%);
-  color: #7d89a5;
-  box-shadow: none;
-}
-
-.stage-broadcast .game-plate {
-  clip-path: polygon(14px 0, 100% 0, calc(100% - 14px) 100%, 0 100%);
-  border: none;
-  border-radius: 0;
-  background: linear-gradient(100deg, #12326e 0%, #0a1c44 100%);
-  box-shadow: none;
-  padding: 12px 24px;
-}
-
-/* --- C · PLAKBOEK ------------------------------------------------------
- * A physical scrapbook. Nothing is square to the page: labels are cut paper,
- * slightly rotated, taped down. Depth comes from paper stacking rather than
- * bevels, and the irregularity is the point.
- * -------------------------------------------------------------------- */
-
-.stage-scrapbook .game-stage {
-  --ink: #3b3227;
-  --ink-dim: #7b6b53;
-  --accent: #9c4a32;
-  --accent-light: #6b4a2a;
-  --accent-dark: #c9b393;
-  --input-bg: #fffdf6;
-  --book-inside: linear-gradient(150deg, #7a6242 0%, #52402a 60%, #675031 100%);
-
-  background-color: #cdb894;
-  background-image:
-    repeating-linear-gradient(
-      48deg,
-      rgba(120, 92, 56, 0.06) 0 2px,
-      transparent 2px 6px
-    ),
-    repeating-linear-gradient(
-      -42deg,
-      rgba(120, 92, 56, 0.05) 0 2px,
-      transparent 2px 7px
-    ),
-    radial-gradient(ellipse 95% 85% at 50% 40%, #dcc9a6 0%, #c9b591 60%, #a8916c 100%);
-  box-shadow: inset 0 0 120px rgba(110, 82, 46, 0.5);
-}
-
-.stage-scrapbook .game-title {
-  font-family: Georgia, "Times New Roman", serif;
-  color: var(--accent);
-  text-shadow: none;
-  letter-spacing: 3px;
-  transform: rotate(-1.2deg);
-  border: 3px double var(--accent);
-  padding: 2px 12px;
-  opacity: 0.85;
-}
-
-.stage-scrapbook .game-rule {
-  height: 8px;
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(190, 170, 130, 0.85) 0 14px,
-    rgba(160, 138, 96, 0.7) 14px 16px
-  );
-  transform: rotate(-0.3deg);
-  box-shadow: 0 2px 3px rgba(90, 68, 38, 0.2);
-}
-
-/* Hand-cut paper labels, dashed like a cut line, each sitting slightly askew. */
-.stage-scrapbook .game-button {
-  background: #fdf8ea;
-  color: #3b3227;
-  border: 1px dashed #9a8560;
-  border-radius: 1px;
-  font-family: Georgia, "Times New Roman", serif;
-  text-shadow: none;
-  box-shadow: 1px 2px 4px rgba(90, 68, 38, 0.28);
-  transform: rotate(-0.7deg);
-}
-
-.stage-scrapbook .game-button:nth-of-type(even) {
-  transform: rotate(0.8deg);
-}
-
-.stage-scrapbook .game-button:hover:not(:disabled) {
-  background: #fffdf6;
-  transform: rotate(0deg) translateY(-1px);
-  filter: none;
-}
-
-.stage-scrapbook .game-button:disabled {
-  background: #e4dbc6;
-  color: #9a8f78;
-  box-shadow: none;
-}
-
-.stage-scrapbook .game-plate {
-  background: #f6efdc;
-  border: 1px solid #bda887;
-  border-radius: 1px;
-  box-shadow: 2px 3px 6px rgba(90, 68, 38, 0.25);
-  transform: rotate(-0.35deg);
-  position: relative;
-}
-
-/* Tape across the top-left corner. */
-.stage-scrapbook .game-plate::before {
-  content: "";
-  position: absolute;
-  top: -9px;
-  left: -14px;
-  width: 58px;
-  height: 20px;
-  background: rgba(232, 222, 190, 0.72);
-  border-left: 1px solid rgba(255, 255, 255, 0.5);
-  border-right: 1px solid rgba(160, 140, 100, 0.35);
-  transform: rotate(-38deg);
-}
-
-.stage-scrapbook .game-plate__label {
-  font-family: Georgia, serif;
-  color: var(--accent);
-}
-
-.stage-scrapbook .game-input,
-.stage-scrapbook .game-meter {
-  border: 1px solid #bda887;
-  box-shadow: inset 0 2px 4px rgba(120, 96, 60, 0.18);
-}
-
-/* --- D · VITRINE ------------------------------------------------------
- * The album as a museum exhibit. No textures, no gradients, no shadows on the
- * chrome at all. Hairlines, wide letter-spacing and a great deal of air;
- * controls are text with a rule under them rather than objects.
- * -------------------------------------------------------------------- */
-
-.stage-vitrine .game-stage {
-  --ink: #26292c;
-  --ink-dim: #83898f;
-  --accent: #26292c;
-  --accent-light: #4a5056;
-  --accent-dark: #cfd3d7;
-  --input-bg: #ffffff;
-  --book-inside: linear-gradient(150deg, #3c4247 0%, #23272a 60%, #313639 100%);
-
-  background: #e9ebed;
-  box-shadow: none;
-  padding-top: 34px;
-}
-
-.stage-vitrine .game-title {
-  font-family: Georgia, "Times New Roman", serif;
-  font-weight: normal;
-  font-size: clamp(16px, 1.7vw, 22px);
-  letter-spacing: 9px;
-  color: #26292c;
-  text-shadow: none;
-}
-
-.stage-vitrine .game-subtitle {
-  font-style: normal;
-  letter-spacing: 2px;
-  font-size: 11px;
-  text-transform: uppercase;
-}
-
-.stage-vitrine .game-rule {
-  height: 1px;
-  background: #cfd3d7;
-  box-shadow: none;
-  margin: 20px 0;
-}
-
-.stage-vitrine .game-button {
-  background: none;
-  border: none;
-  border-bottom: 1px solid #26292c;
-  border-radius: 0;
-  color: #26292c;
-  font-size: 10px;
-  font-weight: normal;
-  letter-spacing: 2.5px;
-  text-transform: uppercase;
-  text-shadow: none;
-  box-shadow: none;
-  padding: 5px 2px;
-}
-
-.stage-vitrine .game-button:hover:not(:disabled) {
-  border-bottom-color: #8a9096;
-  color: #6a7076;
-  filter: none;
-}
-
-.stage-vitrine .game-button:active:not(:disabled) {
-  transform: none;
-  box-shadow: none;
-}
-
-.stage-vitrine .game-button:disabled {
-  background: none;
-  border-bottom: 1px solid #d6dade;
-  color: #b3b8bd;
-  box-shadow: none;
-}
-
-.stage-vitrine .game-plate {
-  background: none;
-  border: 1px solid #d6dade;
-  border-radius: 0;
-  box-shadow: none;
-  padding: 16px 18px;
-}
-
-.stage-vitrine .game-plate__label {
-  color: #83898f;
-  letter-spacing: 3px;
-}
-
-.stage-vitrine .game-input {
-  border: none;
-  border-bottom: 1px solid #b3b8bd;
-  border-radius: 0;
-  box-shadow: none;
-  color: #26292c;
-}
-
-.stage-vitrine .game-meter {
-  border: 1px solid #d6dade;
-  border-radius: 0;
-  box-shadow: none;
-  height: 8px;
-}
-
-.stage-vitrine .game-meter__chunk {
-  background: #26292c;
-  box-shadow: none;
-}
-
-.stage-vitrine .game-meter__chunk--empty {
-  background: #dfe2e5;
-}
-
-/* --- E · ARCADE ------------------------------------------------------
- * Late-90s game menu. Dithered checkerboards instead of gradients, hard 2px
- * pixel bevels instead of soft ones, no curves and no anti-aliased shading
- * anywhere. High contrast, limited palette.
- * -------------------------------------------------------------------- */
-
-.stage-arcade .game-stage {
-  --ink: #ffffff;
-  --ink-dim: #9fb0e8;
-  --accent: #ffcf3a;
-  --accent-light: #ffe98a;
-  --accent-dark: #16277a;
-  --input-bg: #0b1244;
-  --book-inside: #202a6e;
-
-  background-color: #141c56;
-  /* Dither: a 4px checkerboard, the era's substitute for a gradient. */
-  background-image:
-    repeating-conic-gradient(
-      from 0deg at 50% 50%,
-      rgba(255, 255, 255, 0.045) 0% 25%,
-      transparent 25% 50%
-    ),
-    linear-gradient(180deg, #2a3796 0%, #141c56 55%, #070b2c 100%);
-  background-size: 8px 8px, auto;
-  box-shadow: inset 0 0 0 4px #070b2c;
-}
-
-.stage-arcade .game-title {
-  font-family: "Courier New", monospace;
-  font-weight: bold;
-  color: #ffcf3a;
-  letter-spacing: 3px;
-  text-shadow: 3px 3px 0 #070b2c;
-}
-
-.stage-arcade .game-subtitle {
-  font-family: "Courier New", monospace;
-  font-style: normal;
-}
-
-.stage-arcade .game-rule {
-  height: 6px;
-  background: repeating-linear-gradient(
-    90deg,
-    #ffcf3a 0 6px,
-    #070b2c 6px 12px
-  );
-  box-shadow: none;
-}
-
-/* Hard two-pixel bevel: light top-left, dark bottom-right, nothing in between. */
-.stage-arcade .game-button {
-  font-family: "Courier New", monospace;
-  font-weight: bold;
-  background: #3a5bd9;
-  color: #fff;
-  border: none;
-  border-radius: 0;
-  text-shadow: 1px 1px 0 #0b1244;
-  box-shadow:
-    inset 2px 2px 0 #8fa8ff,
-    inset -2px -2px 0 #16277a;
-}
-
-.stage-arcade .game-button:hover:not(:disabled) {
-  background: #5171ef;
-  filter: none;
-}
-
-.stage-arcade .game-button:active:not(:disabled) {
-  transform: none;
-  box-shadow:
-    inset 2px 2px 0 #16277a,
-    inset -2px -2px 0 #8fa8ff;
-}
-
-.stage-arcade .game-button:disabled {
-  background: #3b4272;
-  color: #7d84ad;
-  box-shadow:
-    inset 2px 2px 0 #565d94,
-    inset -2px -2px 0 #23284f;
-}
-
-.stage-arcade .game-plate {
-  background: #202a6e;
-  border: none;
-  border-radius: 0;
-  box-shadow:
-    inset 2px 2px 0 #4a58a8,
-    inset -2px -2px 0 #0b1244;
-}
-
-.stage-arcade .game-plate__label {
-  font-family: "Courier New", monospace;
-  color: #ffcf3a;
-}
-
-.stage-arcade .game-input {
-  font-family: "Courier New", monospace;
-  border: none;
-  border-radius: 0;
-  box-shadow:
-    inset 2px 2px 0 #0b1244,
-    inset -2px -2px 0 #4a58a8;
-}
-
-.stage-arcade .game-meter {
-  border: none;
-  border-radius: 0;
-  box-shadow:
-    inset 2px 2px 0 #0b1244,
-    inset -2px -2px 0 #4a58a8;
-}
-
-.stage-arcade .game-meter__chunk {
-  background: #ffcf3a;
-  box-shadow: none;
 }

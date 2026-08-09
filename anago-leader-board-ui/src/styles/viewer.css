@@ -128,10 +128,10 @@
    * card, in exactly the mask's shape.
    *
    * Fixed here rather than on `.card--empty` itself, because the book's ghosting is
-   * *not* this transparency — it comes from the per-style rules in albumstyle.css
-   * that override `--tier-a`/`--tier-b` and apply `opacity`. Basing the empty card
-   * globally would leave those alone but turn `.album--leder`'s placeholders, which
-   * override to opaque cream, into solid cards on a cream page.
+   * *not* this transparency — it comes from `.album__slot--empty .card` in album.css,
+   * which overrides `--tier-a`/`--tier-b` to opaque cream and applies `opacity`.
+   * Basing the empty card globally would turn those placeholders into solid cards on
+   * a cream page.
    */
   background-color: #211f19;
   box-shadow:

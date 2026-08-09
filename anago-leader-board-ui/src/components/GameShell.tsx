@@ -1,7 +1,6 @@
 import React, { ReactNode, useState } from 'react';
 import { isMuted, setMuted } from '../utils/sounds';
 import '../styles/game.css';
-import '../styles/tabletop.css';
 
 interface GameShellProps {
   /**
@@ -14,17 +13,18 @@ interface GameShellProps {
   /** Controls that sit at the top right, next to the sound toggle. */
   controls?: ReactNode;
   children: ReactNode;
-  /** Readouts along the bottom, below the brass rule. */
+  /** Readouts along the bottom of the table. */
   footer?: ReactNode;
 }
 
 /**
- * Full-bleed 2002 game screen: felt table under a spotlight, brass rules
- * separating a header and footer from the play area.
+ * The table the album lies on, with the controls as objects on it — see the note
+ * at the top of game.css.
  *
- * Replaces the earlier Windows-window frame, which took the brief too
- * literally — the era's *games* are the reference, not its dialogs. Chrome is
- * kept dark and recessive so the album's 3D flip carries the screen.
+ * There are no dividers between the header, the play area and the footer: a rule
+ * is screen furniture, and the space between two things on a table is what
+ * separates them. Chrome is kept dark and recessive so the album's 3D flip
+ * carries the screen.
  */
 const GameShell: React.FC<GameShellProps> = ({
   title,
@@ -59,16 +59,9 @@ const GameShell: React.FC<GameShellProps> = ({
         </button>
       </div>
 
-      <div className="game-rule" />
-
       {children}
 
-      {footer ? (
-        <>
-          <div className="game-rule" />
-          <div className="game-footer">{footer}</div>
-        </>
-      ) : null}
+      {footer ? <div className="game-footer">{footer}</div> : null}
     </div>
   );
 };
