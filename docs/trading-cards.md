@@ -1,6 +1,6 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-09)
+## Where this stands (last updated 2026-08-10)
 
 **Phase 1 (frontend on mock data) is essentially complete.** Everything below the
 "Presentation layer" heading has been built and iterated on at length.
@@ -49,9 +49,12 @@ Sandra), the set is 38 cards, and everyone's per-pack rate falls ~15%. `DHigh`
 stays at 2.5 — the slower completion is accepted, not compensated. See
 "Why ≥5 games".
 
-Before that: the **icoon card** — legends no longer wear a black `legende` pill, they
-get their own colourway: monochrome photo, pale ground, shards, and deliberately no
-frame. Tier moves the metal, rarity is untouched. See "The icoon card".
+Most recently: the **icoon card was rebuilt** (2026-08-10). It keeps its premise —
+legends wear a colourway rather than a black `legende` pill — and changes almost
+everything else: **one ground for every legend instead of one per tier**, the shard
+fan removed, the grade warmed, a 1px gold rule added, the sheen cut and the ink
+lifted. Rarity is still untouched. See "The icoon card", and
+[icoon-uniform.html](icoon-uniform.html) for the comparison it was decided on.
 
 Before that: the **card viewer** — click any slot, including an empty one, and the card
 fills the screen with its full name, nickname, tier and duplicate count, browsable
@@ -142,7 +145,7 @@ sized by how well they did, and collections build toward a legends unlock.
 | Presentation | Not a screen: a **mahogany table** seen from above, with the book, the packets and the controls as objects lying on it. No OS chrome, token-driven. Chosen from ten candidates in two families — five screens, five timbers. |
 | Album | Hand-rolled stiff CSS 3D page flip. No new dependency. |
 | Card face | **Panini**: photo near-full-bleed and masked into the metal, no plates, first name only, DIN type, no stats. |
-| Icoon | The **legend** colourway, not a fifth tier: monochrome photo, pale ground, shards, **no frame**. Replaces the `legende` pill. Tier moves the metal. No effect on rarity. |
+| Icoon | The **legend** colourway, not a fifth tier: monochrome photo warmed back up, one near-white two-zone ground for **every** legend, a 1px gold rule on the edge, no shards. Replaces the `legende` pill. **The tier no longer moves anything.** No effect on rarity. |
 | Sound | Fully **synthesised** (WebAudio, no assets). Default on, persisted mute. |
 | Pacing | Two knobs — `DEFAULT_SCALE` (2) and `DEFAULT_CEREMONY_MS` (2000). Both settled by ear on the sliders and baked in. |
 | Reveal ceremony | Graduated over four levels at 75/80/85/90 overall. Identical at any timestamp `t`; only the *length* differs. |
@@ -1008,20 +1011,72 @@ all unchanged.
 Four parts and no more:
 
 1. **The photo is graded to monochrome and warmed back up** (`grayscale(1)
-   sepia(.34) contrast(1.06) brightness(1.03)`), instead of being tinted toward a
-   tier colour. This is the whole idea; the other two exist to support it. The
-   tier tint becomes the *wash* that puts the grey photo back onto the card's own
-   material, at 0.5 rather than the coloured tiers' 0.42 — a grey image takes far
-   more multiply before anything breaks.
-2. **A pale ground**, so an icoon reads from the far side of a spread.
-3. **Shards of light** from a point below the card, one `conic-gradient` in a
-   single div. They fill the two areas the portrait mask clears — the bottom strip
-   and the top-left corner — which on the coloured tiers are filled by the metal
-   and on a pale ground would otherwise be blank stock with the name hanging in
-   it. Not decoration: they are what gives the cleared area something to be.
-4. **The type is a dark olive-bronze**, `#594D2C`, where the tiers use a
-   near-black. The reference sets its number, name and rules in metal, and that
-   is most of why those cards read as pressed rather than printed.
+   sepia(.6) contrast(1) brightness(1.06)`), instead of being tinted toward a tier
+   colour. This is the whole idea; the rest exists to support it. The tier tint
+   becomes the *wash* that puts the grey photo back onto the card's own material,
+   at 0.58 rather than the coloured tiers' 0.42 — a grey image takes far more
+   multiply before anything breaks.
+2. **One near-white two-zone ground**, a warm ivory light zone in the upper right
+   over a near-neutral body shading to grey-taupe at the lower left, so an icoon
+   reads from the far side of a spread. The same ground on every legend.
+3. **A 1px gold rule** on the edge — `rgba(176,142,66,.85)` at inset 0.
+4. **The type is an olive-bronze**, `#7C6A3C`, where the tiers use a near-black.
+   The reference sets its number, name and rules in metal, and that is most of why
+   those cards read as pressed rather than printed.
+
+Plus one subtraction: **the foil sheen is cut from .17 to .05.** That band is
+calibrated for foil over a coloured ground; across a near-white card it is a white
+diagonal stripe with nothing to justify it, and this card reads as printed board.
+
+#### The 2026-08-10 rebuild
+
+Everything above except the premise is newer than the first version, and the four
+things that changed all changed for the same reason: **the design was judged on
+five cards and broke on twenty.** Worked through in
+[icoon-uniform.html](icoon-uniform.html), which renders the whole legend pool.
+
+**One colourway, not one per tier.** The three differed in exactly four values —
+the ground, the coloured ray, the white ray and the photo wash. The white ray was a
+compensation value rather than a choice. The wash was pinned warm at the top on
+every tier (a cool top cancels the sepia), so it could only differ at a bottom stop
+the portrait mask was already fading out. And the ground differed between bronze and
+gold by *saturation alone*, in the same hue family, over the ~30% of the card the
+mask clears. Only silver read as its own thing, and only because warm-versus-cool
+survives at album size. Three colourways that read as two is not a system.
+
+The old rule — the tier must follow the legend down, because a gold ground on a
+69-rated legend lies about him — held while the grounds were *coloured*. This ground
+is near-white and makes no rating claim, so the claim is left to the overall, which
+is the one hard fact on the face anyway.
+
+**The shard fan is gone.** It existed to fill the two areas the portrait mask clears,
+which would otherwise be blank stock with the name hanging in them. On the new ground
+that area is no longer blank — it is the card. Rays were also the loudest thing on a
+face whose whole point is quiet.
+
+**The grade is warmer.** Sepia .34 → .6 and the wash .5 → .58. Three lighter grades
+were rendered over the whole pool and all washed the faces out to grey-cream on the
+paler ground. A version that kept the photo in colour was tried too — that is the
+*ordinary* gold card's answer to a golden face, and it is a different card rather
+than a warmer one.
+
+**Two proposals were rejected at the last step,** both after seeing them on twenty
+cards:
+
+- **Cutting the portrait out** along the player's own outline — the reference's
+  photos are cutouts, and we already ship a per-player mask for empty slots. Two
+  masks cannot be fixed at all: Luc Geurts has a lump welded to his shoulder about
+  70 mask-pixels wide, and eroding hard enough to cut it takes his head; Quynh Pham's
+  photo is cropped so tight there is no background to remove. Across the rest it took
+  more of the picture than it gave back. The portrait keeps its rectangle and its two
+  fades.
+- **Greying the facets** to match the reference's soft grey streaks. Ours have
+  **hard** colour stops, so a grey one draws a visible seam across the top-left
+  corner; white has the same hard stop and no value difference to reveal it. Grey is
+  not available until the gradient is rewritten with soft stops.
+
+Also considered and dropped: **setting the name in caps**, which the reference does.
+The casing on the card does not change.
 
 Two things about the ink that are easy to undo by accident:
 
@@ -1030,13 +1085,12 @@ Two things about the ink that are easy to undo by accident:
   bronze number on it, and a white highlight under a bronze rule reads as a line
   lying on white paper rather than one cut into a warm card. The rule is the ink
   at 62% rather than a separately chosen brown, so the two cannot drift.
-- **It is one colour for all three colourways**, declared on `.card--icoon`. A
-  bronze per tier was tried: it made the ink a second thing the tier moves, when
-  the colourway rule is that the tier moves the metal and *nothing else* — and
-  three inks that are all nearly the same brown is a distinction nobody can make
-  while being three values to keep in step. The colourway blocks outrank
-  `.card--icoon` on specificity, so re-adding `--tier-ink` to one of them is
-  exactly how this would get quietly reversed.
+- **A bronze per tier was tried**, back when there were tiers to vary it by, and it
+  made the ink a second thing the tier moved. Moot now that there is one colourway
+  — but the specificity trap it created is not. **Every icoon rule that has to beat
+  a tier block is written `.card.card--icoon`**, doubled, because `card--icoon`
+  sits alongside `card--{tier}` on the element and a single class would only win by
+  being later in the file.
 
 Also not a saturated gold, which was the first attempt. Gold type competes with
 the metal it is printed on and loses, because the ground is already the gold; it
@@ -1044,17 +1098,12 @@ has to read as ink that happens to be metallic, not as more metal. The darker
 brown also recovers the contrast a gold ink cost the overall — which is the one
 hard fact on the face, so it is the last thing that may go quiet.
 
-**The tier moves the metal and nothing else.** Not one gold for every legend,
-because legends are rated on their all-time high and that spreads — an inactive
-player who managed ten games and peaked at 780 is an icoon at overall 69, and a
-gold card would lie about him. That is the mistake `.card--zilver` once made with
-its white tint. The icoon reading is carried by the *structure*, which stays
-constant, so a silver icoon is still obviously an icoon. Both gold tiers share one
-colourway; 85+ already differs from 75–84 exactly as much as it does on the
-ordinary cards, and restating it is not this card's job.
-
-Silver and bronze cool the **metal** only. The wash over the photo stays warm: a
-cool wash cancels the sepia and leaves a grey silver card.
+`--tier-a` and `--tier-b` **still exist on the icoon** and still feed the wash over
+the photo — they are simply no longer set per tier. Keep them warm whatever else
+moves: a cool wash cancels the sepia and leaves a grey card with no icoon reading at
+all. That is the trap the old silver colourway spent three revisions in, and it is
+still live, because the wash is the only thing standing between the grade and a
+plain greyscale photo.
 
 #### There is no frame, and that took five passes to establish
 
@@ -1086,6 +1135,16 @@ they were never weak, they were being shouted over.
 Do not add a frame back without also changing the card's outline. That is a
 separate decision: it touches the album grid, the pack opener's FLIP and every drop
 shadow in the feature.
+
+**The 1px gold rule added on 2026-08-10 is not that object, and the difference is
+the whole of why it works.** Every rejected version was a *ring inset from the edge*,
+and each one left card stock outside the gold, which reads as a margin around a frame
+however narrow it is — the failure that no width could fix. The rule sits at
+`inset: 0` on the existing 6px radius, so there is no outside: it draws the card's own
+boundary rather than hanging a frame on it. The ground is also near-white everywhere
+now, which is the other half — a boundary that needed drawing, on a card that no
+longer has a dark metal edge to draw it. Do not inset it and do not widen it; either
+one is the rejected object again.
 
 Also rejected along the way: a sepia version of the existing gold (a gold card with
 a grey photo is a gold card, and icoons lie among rare golds in the album); a

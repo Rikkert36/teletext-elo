@@ -348,6 +348,11 @@ table.k th { color: var(--dimmer); font-weight: 600; font-size: 11px; text-trans
   background: linear-gradient(160deg, var(--tier-a) 0%, var(--tier-b) 100%);
 }
 
+/* No facets at all — the neighbour of "put them back to white", for the corner
+   comparison. On a near-white ground white facets are invisible anyway, so this
+   is mostly a check that the wedges really are what draws the line. */
+.f-none .c { --facets: none; }
+
 /* ---- face grades, for the warmth comparison ---- */
 .g-a .c { --grade: grayscale(1) sepia(.30) contrast(.92) brightness(1.14); --wash: .42; }
 .g-b .c { --grade: grayscale(1) sepia(.45) contrast(.95) brightness(1.10); --wash: .50; }
@@ -650,11 +655,12 @@ table.k th { color: var(--dimmer); font-weight: 600; font-size: 11px; text-trans
     bottom of this page matter.</td></tr>
 
     <tr><td>2</td><td><strong>Grey the facets</strong></td>
-    <td>The two diagonal wedges are white at .16 and .11. On a saturated gold card they read
-    as metal; on a near-white card they read as a smudge on the print. The reference does
-    have broad diagonal streaks, but they are soft grey. Same idea, wrong colour.
-    <em>Cost:</em> none — the same values apply to the ordinary tiers unchanged, since this
-    only moves on the icoon.</td></tr>
+    <td><span class="verdict--no">Rejected.</span> The idea was right and the mechanism is not:
+    the wedges have <strong>hard</strong> colour stops, so a grey one puts a hard grey edge on a
+    near-white ground and draws a seam across the top-left corner. White has the same hard stop
+    and no value difference to reveal it. The reference streaks are soft <em>and</em> grey; ours
+    would need the gradient rewritten with soft stops before grey is even available. Reverted to
+    today’s white.</td></tr>
 
     <tr><td>3</td><td><strong>Cut the sheen to .05</strong></td>
     <td>The <code>115deg</code> white band at .17 is calibrated for foil. Across a pale card
@@ -705,6 +711,14 @@ table.k th { color: var(--dimmer); font-weight: 600; font-size: 11px; text-trans
     separating an icoon from an ordinary card. It is off the table anyway: the casing on the
     card does not change. Mixed case, as it is now, on every card in the set.
   </div>
+
+  <div class="callout">
+    <strong>Also ruled out: the cut-out (4) and the grey facets (2).</strong> Both for reasons
+    that only showed up once the design was on all twenty cards rather than five — the masks
+    do not survive the pool, and a hard grey stop draws a seam on a near-white ground. The rows
+    above still show them because the comparison is the point; the settled design is in
+    <em>The decision</em>.
+  </div>
 </section>
 
 <!-- ============================================================ -->
@@ -713,9 +727,9 @@ table.k th { color: var(--dimmer); font-weight: 600; font-size: 11px; text-trans
   <h3>All nine together — “icoon v2”</h3>
   <p class="note">
     Fixed to every proposal on, regardless of the switches above, at album size and at
-    viewer size. <strong>Superseded — this plate still has the cut-out on it.</strong> It is
-    kept because it is what the argument above builds to, but the cut-out was dropped after
-    seeing it against the whole pool; the section after this one is the live proposal.
+    viewer size. <strong>Superseded — this plate still has the cut-out and the grey facets on it.</strong>
+    Kept because it is what the argument above builds to, but both were dropped after seeing
+    them against the whole pool. The section after this one is the settled design.
   </p>
 
   <div class="plate">
@@ -737,18 +751,36 @@ table.k th { color: var(--dimmer); font-weight: 600; font-size: 11px; text-trans
 <!-- ============================================================ -->
 <section>
   <h2>The decision</h2>
-  <h3>Three-way, every legend — warmer mono, warmest mono, and today's card</h3>
+  <h3>Locked: every legend, the settled design against today's card</h3>
   <div class="callout">
-    <strong>The cut-out is dropped.</strong> Luc's lump cannot be removed without eating his
-    head, Quynh's photo has no background to cut, and across the rest of the pool it takes
-    more of the picture than it earns. So the portrait keeps its rectangle and its two fades,
-    exactly as it does today. Everything else in the proposal stays: no rays, grey facets, cut
-    sheen, warm ink, gold rule, lighter shadow, two-zone ground.
+    <strong>Settled.</strong> One uniform colourway for every legend, built from the gold
+    icoon: <em>warmest mono</em> grade (sepia .60, wash .58), no shard fan, sheen cut to .05,
+    warm ink, a 1px gold rule inside the edge, lighter drop shadow, and the two-zone ground.
+    <br><br>
+    <strong>Two things reverted to today's card.</strong> The <em>cut-out</em> — Luc's lump is
+    welded to his shoulder, Quynh's photo has no background to remove, and across the pool it
+    took more of the picture than it gave back. And the <em>grey facets</em> — see directly
+    below.
   </div>
-  <p>
-    Left and centre are that design at the two warm grades. Right is the icoon card exactly as
-    it ships today, in its real tier colourway — so this is the whole change, per player, with
-    nothing hidden.
+
+  <div class="plate">
+    <div class="plate__head"><span class="plate__tag">why</span>
+      <h4>Why the facets went back to white</h4></div>
+    <p class="note" style="margin:8px 0 0">
+      The two diagonal wedges have <strong>hard colour stops</strong>, not soft ones. Recolouring
+      them grey put a hard grey edge on a near-white ground, which reads as a seam across the
+      top-left corner — the line in the middle card below. White-on-near-white has the same
+      hard stop and you cannot see it, because there is no value difference to see. The
+      reference's streaks are soft <em>and</em> grey; ours are hard, so grey is not available to
+      us without rewriting the gradient. Reverted rather than rewritten: the corner being
+      unbroken matters more than the streak being visible.
+    </p>
+    <div id="facet-why"></div>
+  </div>
+
+  <p style="margin-top:30px">
+    Every legend, the locked design against the icoon card exactly as it ships today, in its
+    real tier colourway — the whole change, per player, with nothing hidden.
   </p>
   <div id="three-way"></div>
 </section>
@@ -927,9 +959,13 @@ table.k th { color: var(--dimmer); font-weight: 600; font-size: 11px; text-trans
     <li><strong>Settled, not open: the cut-out does not survive the whole pool.</strong> Two
       masks cannot be fixed at all — Luc's lump is welded to his shoulder and Quynh's photo has
       no background to remove — and across the rest it takes more of the picture than it gives
-      back. Dropped. The mask cleanup pass is still worth landing in
-      <code>tools/silhouette</code> on its own merits though: the empty-slot silhouettes read
-      from the same files and carry the same fringe.</li>
+      back. Dropped.</li>
+    <li><strong>Settled: the mask cleanup does not land either.</strong> It was worth measuring
+      over the whole pool — see <a href="silhouet-cleanup.html" style="color:var(--accent)">silhouet-cleanup.html</a>
+      — and the measurement argued for it, but the cleaned outlines are not the ones we want:
+      the pass ends with an erode and a feather, so every figure comes out slightly smaller and
+      softer. <code>tools/silhouette</code> is untouched and the masks in this document are only
+      used by the dead cut-out plates.</li>
   </ul>
 </section>
 
@@ -1108,13 +1144,21 @@ window.ICOON_SILHOUETTES_RAW = {"35e7cbe7-62c4-4b21-ada4-70d8ec59c780":"data:ima
    * The three-way: the proposal without the cut-out, at two warm grades,
    * against the card as it ships today.
    * ---------------------------------------------------------------- */
-  var V2_NOCUT = V2.split(' ').filter(function (c) { return c !== 'v-cutout'; }).join(' ');
+  /*
+   * The settled design. Two of the nine proposals are off:
+   *
+   *   v-cutout - the masks do not survive the pool.
+   *   v-facets - the wedges have hard colour stops, so a grey one draws a visible
+   *              seam across the near-white corner. White has the same hard stop
+   *              and no value difference to show it.
+   *
+   * Grade C is baked in here rather than left as a switch, because it is chosen.
+   */
+  var OFF = ['v-cutout', 'v-facets'];
+  var LOCKED = V2.split(' ').filter(function (c) { return OFF.indexOf(c) < 0; }).join(' ') + ' g-c';
 
-  (function () {
-    var host = document.getElementById('three-way');
+  function compare(host, set, variants, sizePx) {
     if (!host) return;
-    var set = pool.length ? pool : players;
-
     set.forEach(function (p) {
       var row = document.createElement('div');
       row.className = 'abrow';
@@ -1122,37 +1166,51 @@ window.ICOON_SILHOUETTES_RAW = {"35e7cbe7-62c4-4b21-ada4-70d8ec59c780":"data:ima
         '<small class="note">overall ' + p.overall + ' · ' +
         (p.games != null ? p.games + ' duels · ' : '') +
         'vandaag ' + TIER_LABEL[tierFor(p.overall)] + '</small></div>';
-
       var c = document.createElement('div');
       c.className = 'abrow__c';
-
-      /*
-       * The two proposals are forced to the gold colourway, because the whole
-       * point is that the tier stops moving the metal. The third is left on its
-       * real tier, because that is what it does today and hiding that would make
-       * the comparison flattering rather than honest.
-       */
-      [
-        [V2_NOCUT + ' g-b', 'goud', 'B · warmer mono', true],
-        [V2_NOCUT + ' g-c', 'goud', 'C · warmest mono', false],
-        ['', tierFor(p.overall), 'vandaag', false],
-      ].forEach(function (v) {
+      variants.forEach(function (v) {
         var box = document.createElement('div');
-        if (v[0]) box.className = v[0];
-        box.appendChild(buildCard(p, v[1], 150));
+        if (v.cls) box.className = v.cls;
+        box.appendChild(buildCard(p, v.tier === 'real' ? tierFor(p.overall) : v.tier, sizePx || 150));
         var w = document.createElement('div');
         w.className = 'cardwrap';
         w.appendChild(box);
         var s = document.createElement('small');
-        s.innerHTML = v[3] ? '<b>' + v[2] + '</b>' : v[2];
+        s.innerHTML = v.pick ? '<b>' + v.label + '</b>' : v.label;
         w.appendChild(s);
         c.appendChild(w);
       });
-
       row.appendChild(c);
       host.appendChild(row);
     });
     wireImages(host);
+  }
+
+  /* The corner question, on the card it was spotted on. */
+  (function () {
+    var host = document.getElementById('facet-why');
+    if (!host) return;
+    var set = pool.length ? pool : players;
+    var edward = set.filter(function (p) { return p.name.indexOf('Edward') === 0; });
+    compare(host, edward.length ? edward : set.slice(0, 1), [
+      { cls: LOCKED, tier: 'goud', label: 'facets white — locked', pick: true },
+      { cls: LOCKED + ' v-facets', tier: 'goud', label: 'facets grey — the seam' },
+      { cls: LOCKED + ' f-none', tier: 'goud', label: 'no facets at all' },
+      { cls: '', tier: 'real', label: 'vandaag' },
+    ]);
+  })();
+
+  /* The whole set, locked against today. */
+  (function () {
+    compare(document.getElementById('three-way'), pool.length ? pool : players, [
+      /*
+       * Forced to the gold colourway, because the point of the whole exercise is
+       * that the tier stops moving the metal. Today's card is left on its real
+       * tier: hiding that would make the comparison flattering rather than honest.
+       */
+      { cls: LOCKED, tier: 'goud', label: 'locked', pick: true },
+      { cls: '', tier: 'real', label: 'vandaag' },
+    ]);
   })();
 
   /* ---------------------------------------------------------------- *

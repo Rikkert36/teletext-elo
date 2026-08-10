@@ -196,13 +196,15 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   const cardName = display;
 
   /*
-   * Legends render as icoon cards: pale ground, monochrome photo, shards. See
-   * the `.card--icoon` block in card.css for what it is and why there is no
-   * frame on it.
+   * Legends render as icoon cards: one near-white two-zone ground, monochrome
+   * photo warmed back up, a 1px gold rule. See the `.card--icoon` block in
+   * card.css.
    *
-   * `card--icoon` sits *alongside* `card--{tier}` rather than replacing it —
-   * icoon is not a fifth tier, and the colourway selectors are written as
-   * `.card--icoon.card--zilver` so the tier still moves the metal.
+   * `card--icoon` still sits *alongside* `card--{tier}` rather than replacing
+   * it — icoon is not a fifth tier, and the tier is what the reveal ceremony
+   * reads. It no longer changes anything on the face, though: every legend
+   * wears the same colourway, and the icoon rules are written `.card.card--icoon`
+   * so they beat all four tier blocks on specificity rather than on source order.
    *
    * Not applied to empty slots. A silhouette's job is to be identically blank,
    * and legends have their own pages in the album anyway.
@@ -257,10 +259,6 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
       title={reveal ? undefined : title}
     >
       <div className="card__inner">
-        {/* Before the portrait, so the shards sit behind it and show only where
-            the mask has cleared the photo. */}
-        {icoon ? <span className="card__shards" aria-hidden="true" /> : null}
-
         <div className="card__header">
           <span className="card__overall">{empty ? '??' : card.overall}</span>
         </div>

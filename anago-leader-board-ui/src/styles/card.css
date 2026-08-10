@@ -146,61 +146,156 @@
  * every plated version of the number and the name. For the same reason nothing
  * here prints the word "icoon" either.
  *
- * Three parts and no more:
+ * Four parts and no more:
  *
  * 1. **The photo is graded to monochrome and warmed back up**, instead of
  *    being tinted toward a tier colour. This is the whole idea; everything
  *    else exists to support it.
- * 2. **A pale ground**, so an icoon reads from the far side of a spread. The
- *    tier moves this ground and nothing else — see the colourways below.
- * 3. **Shards of light** from a point below the card.
+ * 2. **A near-white two-zone ground** — a warm ivory light zone over a
+ *    near-neutral body — so an icoon reads from the far side of a spread.
+ * 3. **A 1px gold rule** on the edge.
+ * 4. **No surface incident**: the sheen is cut almost out, and there is no
+ *    shard fan.
  *
- * **There is no frame**, and that took five passes to establish rather than
- * assume. The reference card carries gold piping because its silhouette is a
- * shaped shield with a crown and shoulders, and the piping is what draws that
- * shape. Ours is a 5:7 rounded rectangle: the piping had no shape to draw, it
- * became the loudest thing on the face, and being identical on every variant
- * it flattened the differences between them. Do not add one back without also
- * changing the card's outline — which touches the album grid, the opener's
- * FLIP and every drop shadow in the feature, so it is its own decision.
+ * **The tier no longer moves anything.** Every legend wears one colourway.
+ * That reverses the old rule, and the reason it can: the old grounds were
+ * *coloured* — a gold ground on a 69-rated legend lied about him, which is why
+ * the tier had to follow him down. This ground is near-white and carries no
+ * rating claim at all, so there is nothing left for the tier to correct. What
+ * the tier used to say is said by the overall, which is the one hard fact on
+ * the face. Three colourways that were only ever a saturation apart also never
+ * read as three; see docs/icoon-uniform.html for that measured side by side.
+ *
+ * **The 1px rule is not the frame that was rejected.** Five passes went into
+ * killing a gold *ring*, at 3.4% → 2.6 → 1.7 → 0.85 inset, and every one of
+ * them left card stock outside the gold, which reads as a margin around a
+ * frame however narrow it is. This sits exactly on the edge at inset 0, so
+ * there is no outside. It is the card's boundary drawn, not a frame hung on
+ * it — and the ground is now pale enough everywhere that the boundary needs
+ * drawing. Do not widen it or inset it; that is the rejected object again.
  *
  * Empty slots are deliberately *not* marked: a silhouette's job is to be
  * identically blank, and legends have their own pages in the album anyway.
  * ---------------------------------------------------------------- */
 
-.card--icoon {
+/*
+ * `.card.card--icoon`, not `.card--icoon`, throughout this block.
+ *
+ * The tier class is still on the element — `card--icoon` sits alongside
+ * `card--{tier}`, since icoon is not a tier — so a single class here only wins
+ * by being later in the file than `.card--goud` and friends. Doubling the class
+ * makes it win on specificity instead, which is what a rule that must beat all
+ * four tiers should not have to rely on source order for.
+ */
+.card.card--icoon {
   /*
    * The tier tint stops being a tint and becomes the wash that puts the
    * monochrome photo back onto the same material as the card. Much stronger
    * than the 0.42 the coloured tiers use, because multiplying a grey image can
    * go a long way before anything is destroyed.
+   *
+   * 0.58 rather than the 0.5 it launched at: the ground went paler and the
+   * grade lighter, and at 0.5 the faces came out grey-cream rather than gold.
+   * This is the value that puts the warmth back.
    */
-  --icoon-wash: 0.5;
+  --icoon-wash: 0.58;
 
   /*
-   * The ink, and it is the same on all three colourways.
+   * The ink.
    *
-   * A dark olive-bronze rather than the tiers' near-black: the reference sets
-   * its number, name and rules in metal, and that is most of why those cards
-   * read as pressed rather than printed.
+   * An olive-bronze rather than the tiers' near-black: the reference sets its
+   * number, name and rules in metal, and that is most of why those cards read
+   * as pressed rather than printed.
+   *
+   * Warmed and lifted from `#594d2c` once the ground went near-white. The
+   * darker brown was tuned against a gold ground; on ivory it stops reading as
+   * metal and starts reading as plain black type.
    *
    * Deliberately **not** a saturated gold. Gold type competes with the metal it
-   * is printed on and loses, because the ground is already the gold — this has
-   * to read as ink that happens to be metallic, not as more metal.
-   *
-   * And deliberately **one** colour rather than a bronze per tier, which was
-   * tried. It made the ink a second thing the tier moves, when the whole
-   * colourway rule is that the tier moves the metal and nothing else — and
-   * three inks that are all nearly the same brown is a distinction nobody can
-   * make while being three values to keep in step.
+   * is printed on and loses — this has to read as ink that happens to be
+   * metallic, not as more metal.
    */
-  --tier-ink: #594d2c;
+  --tier-ink: #7c6a3c;
 
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.6);
+  /*
+   * The two-zone ground, and the whole of what makes this card.
+   *
+   * A warm ivory light zone in the upper right over a near-neutral body that
+   * shades to grey-taupe at the lower left. Neither warm-only nor cool-only:
+   * the reference is both, which is the thing three separate colourways were
+   * each getting half right.
+   *
+   * `--facets` stays white and stays first. It was tried in grey, to match the
+   * reference's soft grey streaks, and it cannot be: our wedges have **hard**
+   * colour stops, so a grey one draws a visible seam across the top-left
+   * corner. White has the same hard stop and no value difference to reveal it.
+   * Grey needs the gradient rewritten with soft stops first.
+   */
+  --tier-a: #f6f0e4;
+  --tier-b: #b8b2a4;
+
+  background-image: var(--facets),
+    radial-gradient(
+      ellipse 92% 74% at 78% 16%,
+      rgba(250, 240, 218, 0.95) 0%,
+      rgba(250, 240, 218, 0) 62%
+    ),
+    linear-gradient(154deg, #fdfcf8 0%, #eeeae1 26%, #cfcdc4 62%, #f6f4ee 100%);
+
+  /* Lighter than the tiers'. A shadow tuned for a dark card reads as grime
+     under a near-white one. */
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.34), 0 1px 3px rgba(0, 0, 0, 0.22);
 }
 
+/*
+ * The 1px gold rule. See the note above for why this is not the frame that was
+ * rejected five times: it is on the edge, not inset, so no stock sits outside it.
+ *
+ * `::before` because `::after` is the foil sheen every card carries, and above
+ * it so the sheen does not wash the gold out at the crossing.
+ */
+.card--icoon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  border: 1px solid rgba(176, 142, 66, 0.85);
+  border-radius: 6px;
+}
+
+/*
+ * The sheen, cut from 0.17 to near nothing.
+ *
+ * That band is calibrated for foil over a coloured ground. Across a near-white
+ * card it is simply a white diagonal stripe with nothing to justify it — and
+ * this card is meant to read as printed board rather than foil.
+ *
+ * Doubled class again: `.card::after` is later in the file, so a single class
+ * would lose.
+ */
+.card.card--icoon::after {
+  background: linear-gradient(
+    115deg,
+    transparent 34%,
+    rgba(255, 255, 255, 0.05) 47%,
+    rgba(255, 255, 255, 0.015) 54%,
+    transparent 68%
+  );
+}
+
+/*
+ * The grade. Warmer and flatter than the tiers' — sepia carries most of it,
+ * with contrast held at 1 and brightness lifted so the highlights go to paper
+ * white rather than to grey.
+ *
+ * Chosen against three others rendered over the whole legend pool; the two
+ * paler ones washed the faces out to grey-cream on this ground. A version that
+ * kept the photo in colour was also tried and is a different card, not a
+ * warmer one.
+ */
 .card--icoon .card__portrait img {
-  filter: grayscale(1) sepia(0.34) contrast(1.06) brightness(1.03);
+  filter: grayscale(1) sepia(0.6) contrast(1) brightness(1.06);
 }
 
 .card--icoon .card__portrait::after {
@@ -218,7 +313,7 @@
  * two cannot drift apart if the ink is ever retuned.
  */
 .card--icoon .card__name {
-  border-top: 1px solid rgba(89, 77, 44, 0.62);
+  border-top: 1px solid rgba(124, 106, 60, 0.55);
   box-shadow: inset 0 1px 0 rgba(255, 249, 232, 0.6);
   text-shadow: 0 1px 0 rgba(255, 251, 240, 0.5);
 }
@@ -228,97 +323,32 @@
 }
 
 /*
- * The colourways. The tier may move the metal and nothing else.
+ * The three per-tier colourways lived here, along with `.card__shards`.
  *
- * Not one gold for everybody, because legends are rated on their all-time high
- * and that spreads: an inactive player who managed ten games and peaked at 780
- * is an icoon at overall 69, and a gold card would lie about him — the same
- * mistake `.card--zilver` once made with its white tint. The icoon reading is
- * carried by the *structure* (pale ground, monochrome photo, shards), which
- * stays constant, so a silver icoon is still obviously an icoon.
+ * **The colourways are gone because they were never three.** Bronze, silver and
+ * gold differed in four values: the ground, the coloured ray, the white ray and
+ * the photo wash. Of those, the white ray was a compensation value rather than a
+ * choice; the wash was pinned warm at the top on every tier, so it could only
+ * differ at a bottom stop the portrait mask was already fading out; and the
+ * ground differed between bronze and gold by saturation alone, in the same hue
+ * family, over the ~30% of the card the mask clears. Only silver read as its own
+ * thing, and only because warm-versus-cool survives at album size. Measured side
+ * by side over the whole legend pool in docs/icoon-uniform.html.
  *
- * Both gold tiers share one colourway: 85+ already differs from 75–84 exactly
- * as much as it does on the ordinary cards, and that distinction is not this
- * card's job to restate.
+ * The old rule was that the tier had to follow the legend down, because a gold
+ * ground on a 69-rated legend lied about him. That held while the grounds were
+ * coloured. The ground is near-white now and makes no rating claim, so the claim
+ * is left to the overall — which is the one hard fact on the face anyway.
  *
- * None of them sets `--tier-ink`: that is one colour for every icoon, declared
- * once above. These blocks outrank it on specificity, so re-adding it here is
- * how the single-ink rule would get quietly undone.
+ * **The shard fan is gone with them.** It existed to fill the two areas the
+ * portrait mask clears, which on a coloured tier are filled by metal and on a
+ * pale ground would otherwise be blank stock with the name hanging in it. On the
+ * new ground that area is no longer blank — it is the card, and the two-zone
+ * gradient gives it something to be without radiating anything. Rays were also
+ * the loudest thing on a face whose whole point is quiet.
+ *
+ * `--shard-hi` and `--shard-lo` went with it; nothing else read them.
  */
-.card--icoon.card--goud,
-.card--icoon.card--goudZeldzaam {
-  --tier-a: #f7edd8;
-  --tier-b: #b49c69;
-  --shard-hi: rgba(255, 255, 255, 0.72);
-  --shard-lo: rgba(198, 160, 74, 0.5);
-
-  background-image: var(--facets),
-    linear-gradient(160deg, #fdfbf4 0%, #eae0ca 28%, #c3b18e 60%, #fbf7ec 100%);
-}
-
-.card--icoon.card--zilver {
-  --tier-a: #eef1f4;
-  --tier-b: #9aa4ae;
-  --shard-hi: rgba(255, 255, 255, 0.78);
-  --shard-lo: rgba(146, 160, 175, 0.5);
-
-  background-image: var(--facets),
-    linear-gradient(160deg, #fdfdfe 0%, #e4e8ec 28%, #b3bcc5 60%, #f7f9fb 100%);
-}
-
-.card--icoon.card--brons {
-  --tier-a: #f4e3d2;
-  --tier-b: #ac8055;
-  --shard-hi: rgba(255, 255, 255, 0.66);
-  --shard-lo: rgba(178, 124, 70, 0.52);
-
-  background-image: var(--facets),
-    linear-gradient(160deg, #fdf6ee 0%, #ecdcc8 28%, #c19b76 60%, #faf1e6 100%);
-}
-
-/*
- * Silver and bronze cool the **metal** only — the wash over the photo stays
- * warm. A cool wash cancels the sepia and the card stops reading as an icoon
- * at all, leaving a grey silver card.
- */
-.card--icoon.card--zilver .card__portrait::after,
-.card--icoon.card--brons .card__portrait::after {
-  background: linear-gradient(160deg, #f0e3c9 0%, var(--tier-b) 100%);
-}
-
-/*
- * The shards.
- *
- * One conic gradient from a point below the card, so they radiate up past the
- * shoulders. They fill the two areas the portrait mask clears — the bottom
- * strip and the top-left corner — which on the coloured tiers are filled by
- * the metal and on a pale ground would otherwise be blank stock with the name
- * hanging in it. So they are not decoration; they are what gives the cleared
- * area something to be.
- *
- * Below the portrait in the stack, so they only show where the mask has taken
- * the photo away. No asset, no animation, one div.
- */
-.card__shards {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: conic-gradient(
-    from 196deg at 50% 128%,
-    transparent 0 5deg,
-    var(--shard-hi) 5deg 7.4deg,
-    transparent 7.4deg 13deg,
-    var(--shard-lo) 13deg 17deg,
-    transparent 17deg 23deg,
-    var(--shard-hi) 23deg 24.6deg,
-    transparent 24.6deg 34deg,
-    var(--shard-lo) 34deg 39deg,
-    transparent 39deg 44deg,
-    var(--shard-hi) 44deg 46deg,
-    transparent 46deg
-  );
-}
 
 /* Foil sheen across the whole card. Static; only animates on a rare reveal. */
 .card::after {
