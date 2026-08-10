@@ -3,9 +3,25 @@
 ## Where this stands (last updated 2026-08-09)
 
 **Phase 1 (frontend on mock data) is essentially complete.** Everything below the
-"Presentation layer" heading has been built and iterated on at length; the
-`## Architecture` and `## Backend changes` sections are still entirely unwritten
-design.
+"Presentation layer" heading has been built and iterated on at length.
+
+**The backend has started, with one slice: `GET /api/cards/pool`.** It is
+read-only — no migration, no tables, nothing persisted — and it exists because a
+legend is rated on their all-time-high `visibleRating`, which is computable only
+inside the leaderboard's full game replay. So the icoon pages now show **20 real
+people** instead of six placeholders, spread 4/7/7/2 across the tiers. Built with
+it: `CardRatingCalculator` (the scale and the ticket weighting, in C#, configured
+from `appsettings.json`), `PeakVisibleRating` on `DynamicRatingPlayer`, and
+`CardPoolService`. The mock's **active** roster is deliberately still the frozen
+snapshot — the odds table, the seeded starting collection and every completion
+estimate here were computed against it, and live ratings have drifted.
+
+The rest of `## Architecture` and `## Backend changes` is now **settled design,
+not built**. The one substantial change since it was first written: **packs are
+derived from today's games minus a claim table, rather than granted by a hook
+inside `CreateGame`.** Read that section before writing any of it — the derivation
+closes three gaps the granting design accepted in writing, and reintroducing a
+write into `CreateGame` is how they come back.
 
 Done and signed off: the mock data module, the `cardsClient` seam, the Panini card
 face, the album's stiff 3D flip, the pack opener's five beats, the FLIP travel,
@@ -70,7 +86,8 @@ its rules into card.css / packopen.css, bring its timings back into
 `PackOpener.tsx` as constants, and delete the modules, `reveal.css` and the
 switcher.
 
-**Then:** phase 2, the backend. Nothing in `AnagoLeaderboard/` has been touched.
+**Then:** the rest of phase 2 — the migration, `PackService`, `CollectionService`
+and `CollectionController`. The pool endpoint above is the only part built.
 
 Two smaller things still open:
 - Whether first-name-only is acceptable now that two Daans and two Jeroens read
@@ -119,7 +136,7 @@ sized by how well they did, and collections build toward a legends unlock.
 | Card sub-stats | **Dropped.** Not worth it for ~15 active players. |
 | Rarity axis | Rating alone — no foils, no serials, one card per player. |
 | Card pool | **Active** players with ≥5 games. |
-| Legends | Completing the active set permanently unlocks inactive (≥5 games) players in packs, alongside actives. Rated on all-time-high. |
+| Legends | Completing the active set permanently unlocks inactive (≥5 games) players in packs, alongside actives. Rated on all-time-high, and **interleaved into the book by rating** rather than given their own pages. |
 | Cards ↔ games | `CardInstance.GameId` FK with cascade delete. |
 | Cards ↔ players | `SubjectPlayerId` FK, **also cascade**. Player deletion only ever happens for accidentally-created players, so losing their cards is correct. |
 | Presentation | Not a screen: a **mahogany table** seen from above, with the book, the packets and the controls as objects lying on it. No OS chrome, token-driven. Chosen from ten candidates in two families — five screens, five timbers. |
@@ -147,11 +164,43 @@ Legends are inactive players with ≥5 games, rated on their **all-time-high**
 set you keep legends forever, so new joiners and players crossing 5 games do
 not un-complete it.
 
+**There are 20 of them**, now that `GET /api/cards/pool` can say so, and they
+spread across every tier: 4 goud zeldzaam, 7 goud, 7 zilver, 2 brons. That spread
+is the thing to keep — it is the whole argument for the icoon carrying its tier's
+metal rather than being uniformly gold, and it is now demonstrated rather than
+asserted.
+
+### One sequence, not an annexe
+
+Legends are **shuffled in among the actives by rating**, not appended as a block of
+legends pages. The book is one ascending sequence and an icoon turns up on the
+spread its rating earns it.
+
+The original design appended them, on the reasoning that the album should *grow*
+rather than split in two. Interleaving serves that better: unlocking makes every
+spread you already knew denser instead of adding a section at the back that reads
+as a separate collection with its own completion. It also puts the rarest card in
+the album — Roel Loonen at overall 91 — on the last page, past the best active
+player, which is where the book was always building toward.
+
+Consequences, both accepted:
+
+- An empty slot no longer tells you whether it is an active or a legend. See the
+  icoon section for why that is kept.
+- The set roughly grows by half on unlock (38 → 58 at today's roster), all of it in
+  the middle of the book rather than after it.
+
+The completion meter and the unlock gate still count **actives only** — legends are
+the reward for finishing that set, so they must not dilute the thing they are
+awarded for.
+
 The legend gate is held symmetric with the card pool deliberately, but it is the
 one place where 5 is arguable: it means somebody who played five games and left
-is an icoon forever. No inactive player currently sits in the 5–9 band, so this
-costs nothing today — but it is the gate to reconsider first if the legends
-pages start filling with people nobody remembers.
+is an icoon forever. **This has stopped being hypothetical.** Two legends sit at
+exactly five games (overall 64 and 58) and three more in the 8–10 band, so the
+bottom of the legends pages is now people who passed through. Whether that reads
+as a nice piece of office history or as clutter is the first thing to judge once
+the pages are real — and the gate is the knob.
 
 ## The rating scale (FIFA-style 40–99)
 
@@ -186,10 +235,19 @@ unreachable in practice.
 
 ### Why 99 lands at 3000 and not 4000
 
-Everything up to **1851 is fixed** and must stay so. It is the highest rating ever
-recorded (Petar, over 1746 games), it is pinned to exactly 90, and every player
-sits at or below it — and since overall also feeds the ticket weighting, moving
-any anchor in that range silently re-balances rarity.
+Everything up to **1851 is fixed** and must stay so. It is pinned to exactly 90,
+every active player sits at or below it, and since overall also feeds the ticket
+weighting, moving any anchor in that range silently re-balances rarity.
+
+It was originally justified as "the highest rating ever recorded", which was
+wrong: 1851 was Petar's rating in the snapshot this was written against — his
+*current* rating, not anyone's peak. Now that the replay tracks peaks, the real
+all-time high is **1954** (Roel Loonen), with Petar at 1953 and Ton at 1931. This
+changes nothing structural, because all three land inside the 1851→2200 segment
+that was already there as headroom, and Roel comes out at overall 91. But it does
+mean the region above 1851 is **not** hypothetical the way the paragraphs below
+assume: legends are rated on peaks, and the best legend is above every active
+player on the board.
 
 The table originally ran on to `4000 → 98`, which reserved 9 of the 59 available
 points — **15% of the scale** — for ratings nobody has been near. That headroom is
@@ -635,24 +693,80 @@ is pinned in `.config/dotnet-tools.json`.
 
 ### Services
 
-- `Services/Calculators/CardRatingCalculator.cs` — the piecewise scale and the
-  ticket weighting. Pure functions, unit-testable, alongside the existing
+Done:
+
+- **`Services/Calculators/CardRatingCalculator.cs`** — the piecewise scale and the
+  ticket weighting, beside the existing
   [RatingCalculator.cs](AnagoLeaderboard/AnagoLeaderboard/Services/Calculators/RatingCalculator.cs).
-- `Services/PackService.cs` — sizing, rolling, granting, revealing, daily freebie.
+  Anchors, `DHigh`, `DLow`, `Hinge` and `MinGames` live in the `Cards` section of
+  `appsettings.json`, together because they are tuned against each other.
+- **`Services/LeaderBoardService.cs`** — a running per-player max `visibleRating`
+  inside the existing replay loop, surfaced as `DynamicRatingPlayer.PeakVisibleRating`.
+  The deduction *is* `PlayerStats.Std`, so the visible rating at any point in
+  history is `Rating − Std` and needed no new arithmetic; it is now expressed once,
+  as `PlayerStats.VisibleRating`, and used by the leaderboard rows, the per-game
+  old/new ratings and the peak alike so the three cannot drift.
+- **`Services/CardPoolService.cs`** — actives and legends. Knows nothing about
+  collections or packs; it is the set, not anyone's state over it, which is what
+  lets `CollectionService` call straight into it rather than build its own list.
+
+Still to write:
+
+- `Services/PackService.cs` — deriving, sizing, rolling, claiming, daily freebie.
 - `Services/CollectionService.cs` — a player's cards with live overalls, and the
   legends completion check.
-- `Services/GameService.cs` — duplicate guard plus the grant hook in
-  [`CreateGame`](AnagoLeaderboard/AnagoLeaderboard/Services/GameService.cs#L17).
-- `Services/LeaderBoardService.cs` — track a running per-player max
-  `visibleRating` inside the existing replay loop, for legend ratings.
+- `Services/GameService.cs` — the duplicate guard, and **only** that.
 
 Both rolling and reading a collection need current ratings via
 `GetCurrentLeaderBoard()` — an O(all games) replay, already the cost of every
 existing GET.
 
-### Controller
+### One collection endpoint, not three
 
-`Controllers/CollectionController.cs`, `[Route("api")]` to match existing style.
+`Controllers/CollectionController.cs`, `[Route("api")]` to match existing style,
+and it returns the whole page in one response — `pool`, `legends`, `owned`,
+`packs`, `legendsUnlocked`, `eligible`.
+
+**Not split into collection / pool / legends routes.** The book is one object:
+`CollectionPage` builds its sections from pool + legends + counts together and
+`albumSlotOrder` walks the result, so three routes would mean either an album that
+cannot draw until all three land, or one that draws and then *grows a section* —
+which shifts every card-viewer index behind it, underneath an open viewer. The
+same argument rules out splitting the pool into ordinary cards and icoons.
+
+Two things that shape the payload:
+
+- **It ships cards you do not own.** The album is mostly silhouettes; that is the
+  feature. So the response carries the set, not just your cards.
+- **`owned` is `{playerId, count}`**, not card objects. A card is live and wholly
+  derivable from its pool entry, and the page only builds a `Map<id, count>` from
+  it anyway — embedding the player twice would just invite the two copies to drift.
+
+`GET api/cards/pool` survives alongside it as the cheap way to look at the pool on
+its own. It calls the same service, so the two cannot disagree.
+
+### The scale lives on the server
+
+`overall` is computed in C# and sent down; `tierFor` and `ceremonyLevelFor` stay in
+TypeScript.
+
+The anchor table is a **balance** knob rather than a presentation one — it also
+feeds `ticketsFor`, and moving any anchor below 1851 silently re-balances rarity.
+Once the draw runs server-side, a browser with its own copy of the scale could
+print an overall inconsistent with the odds the card was actually drawn at, and
+nothing would ever surface it. Retuning `appsettings.json` now also needs no
+frontend deploy.
+
+The tier cutoffs and the ceremony's 75/80/85/90 do **not** follow it: they are
+thresholds the card CSS and the pack opener key off directly, `TIER_LABELS` is
+Dutch UI copy, and both are pure functions of `overall`, so there is no second
+source of truth to keep in step.
+
+One trap found while porting: **C# rounds midpoints to even and JavaScript rounds
+them up.** The 800–1000 segment runs 20 rating to the point, so 810 lands on
+exactly 70.5 — left on the default the two scales would have disagreed by a point
+on a whole family of real ratings, quietly. `CardRatingCalculator` rounds
+`AwayFromZero` and there is a test pinning it.
 
 ## Presentation layer
 
@@ -983,7 +1097,16 @@ carrying a *pattern*, which is exactly the argument that killed the striped and
 checkerboard card backs).
 
 Empty slots are deliberately **not** marked as icoons. A silhouette's job is to be
-identically blank, and legends have their own pages in the album.
+identically blank.
+
+This used to have a second half — "and legends have their own pages in the album",
+so you could tell from *where you were* what a blank slot was. That stopped being
+true when legends were interleaved by rating (see "One sequence, not an annexe"),
+and the decision is kept anyway: an unmarked silhouette now genuinely does not say
+whether it is an active or an icoon. Which is arguably better — an icoon-shaped
+hole would advertise a card you have never seen — but it is now a real gap in the
+album rather than a redundant one, and it is the thing to revisit first if the
+legends half of the book turns out to be unreadable while empty.
 
 The full comparison — five candidates, four real faces, both frame readings, and
 the live photo-grade sliders — is in
@@ -2379,11 +2502,21 @@ Order within phase 1: `XpWindow` → `PlayerCard` → `Album` with the flip →
 
 ### Phase 2 — backend
 
-1. `CardRatingCalculator` — the piecewise scale and ticket weighting as pure C#
-   functions, with unit tests against the anchors and the 2.600 sum check.
-   Port from the phase-1 TypeScript.
-2. Migration, `PackService`, `CollectionService`, `CollectionController`.
-3. Swap the mock client implementation for the HTTP one. Delete the mock.
+1. ~~`CardRatingCalculator` — the piecewise scale and ticket weighting as pure C#
+   functions. Port from the phase-1 TypeScript.~~ **Done**, with 50 unit tests: the
+   anchors, the clamp at both ends, monotonicity across the whole range, the
+   midpoint-rounding trap, ticket continuity at the hinge, and every player in the
+   published odds table landing on the overall it lists. The 2.600 sum check waits
+   for `drawPack`, since it is a property of the draw rather than of the weighting.
+2. ~~Peak tracking and `GET api/cards/pool`, so icoon cards show real people.~~
+   **Done.**
+3. Migration, `PackService`, `CollectionService`, `CollectionController`.
+4. Swap the mock client implementation for the HTTP one. Delete the mock.
+
+Splitting 2 out ahead of the migration was worth it beyond the icoon pages: it put
+the scale in front of real data early, which is what turned up the midpoint
+rounding trap, the wrong "highest rating ever recorded" claim, and the fact that
+the 5–9 games band in the legends pool is populated after all.
 
 ## Verification
 
@@ -2428,11 +2561,16 @@ Order within phase 1: `XpWindow` → `PlayerCard` → `Album` with the flip →
 
 ### Phase 2 — backend and integration
 
-1. `cd AnagoLeaderboard && dotnet test` — existing xUnit suite
-   (`GameUploadTests`, `RatingChangeTests`) must stay green; the new server-side
-   duplicate guard is the likeliest thing to break them.
-2. Unit-test `CardRatingCalculator` against the anchors: 1851→90, 1000→80,
-   800→70, 0→40, and confirm the clamp never exceeds 99.
+1. `cd AnagoLeaderboard && dotnet test` — NUnit, not xUnit. Note two things about
+   the suite as it stands: the solution file itself is broken (`MSB4051`, a stale
+   project GUID), so build the projects individually; and the whole
+   `RatingChangeTests` fixture fails at HEAD for reasons predating any of this —
+   all five tests assert on `NewRating`, which is only ever assigned inside
+   `GetUpdates`, and each of them has its only calculation call commented out. It
+   was written against a `CalculateRating()` API that no longer exists. Everything
+   else is green.
+2. ~~Unit-test `CardRatingCalculator` against the anchors.~~ **Done** — see the
+   phase-2 build order above for what is covered.
 3. Unit-test pack sizing: a win gives 3, a win beating expected margin by 3+
    gives 5, a loss beating expected margin by 3+ gives 3, a plain loss gives 1.
 4. Unit-test the opponent bonus: a qualifying pack doubles exactly the two
@@ -2448,12 +2586,38 @@ Order within phase 1: `XpWindow` → `PlayerCard` → `Album` with the flip →
    already-owned card moves from Zilver to Goud.
 9. Confirm a player under 5 games never appears in a pack and cannot open the
    collection page — and that one *on* 5 does both.
-10. Delete a game via `DELETE /api/game/{id}` and confirm both its cards and its
-    unrevealed packs vanish.
-11. Roll the clock past midnight and confirm unrevealed packs are gone.
-12. Confirm inactive ≥5-game players appear only for collectors who have
+10. Delete a game via `DELETE /api/game/{id}` and confirm its cards vanish, and
+    that it stops offering a pack to its four players.
+11. Roll the clock past midnight and confirm yesterday's packs are no longer
+    offered, claimed or not.
+12. Edit a game's score via `PUT /api/game/{id}` before anyone claims, and confirm
+    the pack resizes. Then edit one *after* a claim and confirm it does not.
+13. Claim the same pack from two tabs at once and confirm exactly one succeeds —
+    the unique index is what enforces this, so it is worth proving.
+14. Confirm inactive ≥5-game players appear only for collectors who have
     unlocked legends, rated on their all-time-high.
-13. Complete an active set on a test collector and confirm the legends latch
+15. Complete an active set on a test collector and confirm the legends latch
     survives a new player later crossing 5 games.
-14. After swapping the mock client for the HTTP one, re-run the phase-1 visual
+16. After swapping the mock client for the HTTP one, re-run the phase-1 visual
     checks — no component should have needed changing.
+
+### The pool slice — checked
+
+- Peaks are ≥ the current visible rating for all 76 players, and exactly 0 for
+  anyone who never played.
+- The endpoint returns 37 actives and 20 legends at `MinGames` 5.
+- The frontend falls back to the six placeholder legends when the route 404s, so
+  `npm start` with no backend still behaves as it did all through phase 1.
+- **Avatar and silhouette coverage is 100%** — 20/20 legends and 37/37 actives
+  have both a real photo (not the `empty-avatar.jpg` fallback) and a generated
+  mask. This was the open risk under it and it is gone: the icoon card is
+  photo-led, inactive players are exactly the ones least likely to have a portrait
+  on disk, and placeholders had been hiding the question. It also closes phase-1
+  verification step 8, which had never been run. Note it was checked against the
+  `T:\` read path; `PlayerService.SaveAvatar` writes to a `C:\` path, so a *newly
+  uploaded* avatar may still land somewhere it is not read from.
+
+Still open: judging the icoon face itself against 20 real portraits rather than
+placeholder names — in particular the 9 silver and bronze icoons, which are what
+the "tier moves the metal and nothing else" rule was written for and has never
+been tested on.

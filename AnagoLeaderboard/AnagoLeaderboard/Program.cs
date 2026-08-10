@@ -27,9 +27,12 @@ builder.Services.AddScoped<LeaderBoardService>();
 builder.Services.AddScoped<GameService>();
 builder.Services.AddScoped<PlayerService>();
 builder.Services.AddScoped<ChampionService>();
+builder.Services.AddScoped<CardPoolService>();
 
 // No state, just paths and a process invocation, so singletons.
 builder.Services.AddSingleton<AvatarStorage>();
+// Pure functions over a fixed balance table read once from configuration.
+builder.Services.AddSingleton<CardRatingCalculator>();
 builder.Services.AddSingleton<SilhouetteService>();
 
 builder.Services.AddControllers();

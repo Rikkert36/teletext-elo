@@ -1346,8 +1346,8 @@
    * Both references must use the same fallback, or a mote missing its inline cycle
    * would space itself against a length it does not run for.
    */
-  animation: opener-mote-in var(--mote-cycle, 610ms) linear infinite;
-  animation-delay: calc(var(--mote-t, 0) * var(--mote-cycle, 610ms));
+  animation: opener-mote-in var(--mote-cycle, 465ms) linear infinite;
+  animation-delay: calc(var(--mote-t, 0) * var(--mote-cycle, 465ms));
 }
 
 /*

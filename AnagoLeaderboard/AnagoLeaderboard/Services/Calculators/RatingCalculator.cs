@@ -38,8 +38,8 @@ namespace AnagoLeaderboard.Services
                 var oldStats = currentPlayers[i];
                 var newStats = result[i].Stats;
 
-                players[i].NewRating = (int)Math.Round(newStats.Rating - newStats.Std);
-                players[i].OldRating = (int)Math.Round(oldStats.Rating - oldStats.Std);
+                players[i].NewRating = newStats.VisibleRating;
+                players[i].OldRating = oldStats.VisibleRating;
                 players[i].SetStandardDeviation(oldStats.Std, newStats.Std);
             }
 

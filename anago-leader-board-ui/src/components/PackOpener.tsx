@@ -288,8 +288,13 @@ const MOTE_FLIGHT = 0.3;
  * variety. Fixing the speed and solving for the duration keeps the spread inside the
  * ±8% jitter below, while distances still differ — so cycles are still all distinct
  * and the stream still never repeats.
+ *
+ * Raising this scales the cycle down with it, so the *density* of the stream is
+ * unaffected — the same ~30% of the motes are in the air, they just cross faster
+ * and set out again sooner. That is the knob to turn for speed; `MOTE_FLIGHT` is
+ * the one that trades density for it.
  */
-const MOTE_SPEED = 4.95;
+const MOTE_SPEED = 12.4;
 
 /**
  * Where a mote's flight ends, in card widths from the centre. **Must match
@@ -348,9 +353,9 @@ const MOTES = Array.from({ length: MOTE_COUNT }, (_, i) => {
     angle: (i * 137.508 + moteHash(i + 1) * 16) % 360,
     farK,
     /*
-     * Derived, not drawn: distance and speed decide it. Lands at a mean of ~1160,
-     * which is where the cycle has always been — the motes got faster without the
-     * stream repeating any sooner, which is the entire point of the flight fraction.
+     * Derived, not drawn: distance and speed decide it. Lands at a mean of ~465 —
+     * short, because the stream is deliberately quick now; the flight fraction keeps
+     * the number in the air the same however far this moves.
      */
     cycle: Math.round(flightMs / MOTE_FLIGHT),
     /*
@@ -373,19 +378,19 @@ const MOTES = Array.from({ length: MOTE_COUNT }, (_, i) => {
  * midpoint it was still late enough to read as an afterthought.
  *
  * The reason an early drain first felt like it sped the flip up was the *contrast*
- * between a slow stream and a sudden rush, not the timing. Now that the motes fly
- * about twice as fast to begin with, the gap is narrow and the drain reads as the
- * stream tightening rather than as a jolt.
+ * between a slow stream and a sudden rush, not the timing. The motes are fast in the
+ * build now, so the gap is narrow and the drain reads as the stream tightening rather
+ * than as a jolt.
  *
  * Worst case is a mote that has only just set out on the longest flight in `MOTES`
- * (430): at ×3 that is 143, so everything visible has landed well inside the 660 a
+ * (~183): at ×3 that is 61, so everything visible has landed well inside the 660 a
  * duplicate stays up for.
  */
 const MOTE_DRAIN_RATE = 3;
 
 /**
  * When the motes' own fade starts, measured from the turn: the longest *flight*
- * remaining at the drain rate, rounded up from 143.
+ * remaining at the drain rate, rounded up from 61.
  *
  * Flight, not cycle — a mote already in the idle tail of its cycle is invisible, so
  * there is nothing to wait for. Both figures depend on `MOTE_FLIGHT` and the matching
@@ -396,7 +401,7 @@ const MOTE_DRAIN_RATE = 3;
  * there, so a drained layer empties itself. It does the real work only on the
  * fallback path, where nothing drains and the loop would otherwise run on.
  */
-const MOTE_DRAIN_MS = 180;
+const MOTE_DRAIN_MS = 70;
 
 type Phase = 'sealed' | 'tearing' | 'revealing' | 'done';
 

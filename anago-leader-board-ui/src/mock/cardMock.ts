@@ -26,10 +26,20 @@ export interface CardPlayer {
   id: string;
   /** Full name as stored, nickname and all. */
   name: string;
+  /** For a legend this is their all-time high, not their current rating. */
   visibleRating: number;
   /** Only used for the MIN_GAMES pool and eligibility gate — never on the card. */
   numberOfGames: number;
   isLegend: boolean;
+  /**
+   * The overall as the server computed it, when the player came from the API.
+   *
+   * The scale lives in C# now (`CardRatingCalculator`) because it also drives the
+   * raffle weighting, so a second copy here could print a number inconsistent with
+   * the odds a card was actually drawn at. `overallFor` below survives only for the
+   * frozen mock roster, which has no server value to pass through.
+   */
+  overall?: number;
 }
 
 /** A card as the UI renders it: player plus derived, live presentation values. */
@@ -149,17 +159,20 @@ const ACTIVE_POOL: CardPlayer[] = [
 ];
 
 /**
- * PLACEHOLDER legends. The real list is inactive players with >= MIN_GAMES games,
- * rated on their all-time-high visibleRating — which only the backend can
- * compute, since it needs the full game replay. These exist purely so the
- * legends pages have something to render; replace wholesale in phase 2.
+ * Fallback legends, used only when the pool endpoint cannot be reached.
+ *
+ * The real list now comes from `GET /api/cards/pool`: inactive players with
+ * >= MIN_GAMES games, rated on their all-time-high visibleRating, which only the
+ * backend can compute because it needs the full game replay. These six remain so
+ * that the legends pages still render with no API in front of them — phase 1's
+ * whole premise was `npm start` on its own.
  *
  * Names are kept to a plausible length on purpose. They were "Legende —
  * placeholder A", which at 23 characters is longer than any real name and
  * ellipsized on the card at every font size worth using — so the placeholders
  * were making a decision about type size look wrong that was actually fine.
  */
-const LEGEND_POOL: CardPlayer[] = [
+const FALLBACK_LEGENDS: CardPlayer[] = [
   { id: 'legend-placeholder-1', name: 'Legende A', visibleRating: 1690, numberOfGames: 520, isLegend: true },
   { id: 'legend-placeholder-2', name: 'Legende B', visibleRating: 1420, numberOfGames: 310, isLegend: true },
   { id: 'legend-placeholder-3', name: 'Legende C', visibleRating: 1180, numberOfGames: 244, isLegend: true },
@@ -167,6 +180,20 @@ const LEGEND_POOL: CardPlayer[] = [
   { id: 'legend-placeholder-5', name: 'Legende E', visibleRating: 960, numberOfGames: 122, isLegend: true },
   { id: 'legend-placeholder-6', name: 'Legende F', visibleRating: 845, numberOfGames: 88, isLegend: true },
 ];
+
+/**
+ * The legends actually in play. Replaced wholesale once the pool endpoint answers.
+ *
+ * Mutable module state rather than a parameter threaded through `drawPack` and
+ * `toCard`: the pool is a property of the world, not of a call, and every consumer
+ * of it here is throwaway phase-1 code that dies with this file.
+ */
+let legends: CardPlayer[] = FALLBACK_LEGENDS;
+
+/** Hands the real legends over once `GET /api/cards/pool` has answered. */
+export const setLegendPool = (players: CardPlayer[]): void => {
+  legends = players.length > 0 ? players : FALLBACK_LEGENDS;
+};
 
 /* ------------------------------------------------------------------ *
  * The rating scale: piecewise-linear interpolation, 40..99.
@@ -339,7 +366,9 @@ export const ceremonyMaxBuildRatio = (): number =>
   CEREMONY_STEPS.reduce((max, step) => Math.max(max, step.build), 0);
 
 export const toCard = (player: CardPlayer): Card => {
-  const overall = overallFor(player.visibleRating);
+  // The server's number wins wherever there is one. `overallFor` only still runs for
+  // the frozen mock roster, which predates the endpoint and has nothing to defer to.
+  const overall = player.overall ?? overallFor(player.visibleRating);
   return { player, overall, tier: tierFor(overall) };
 };
 
@@ -415,7 +444,7 @@ export const drawPack = (size: number, options: DrawOptions = {}): Card[] => {
     random = Math.random,
   } = options;
 
-  const pool = legendsUnlocked ? [...ACTIVE_POOL, ...LEGEND_POOL] : ACTIVE_POOL;
+  const pool = legendsUnlocked ? [...ACTIVE_POOL, ...legends] : ACTIVE_POOL;
 
   let candidates = pool.map((player) => {
     const card = toCard(player);
@@ -535,7 +564,7 @@ export const MOCK_PACKS: Pack[] = [
 ];
 
 export const activePool = (): CardPlayer[] => ACTIVE_POOL;
-export const legendPool = (): CardPlayer[] => LEGEND_POOL;
+export const legendPool = (): CardPlayer[] => legends;
 export const startingCollection = buildStartingCollection;
 
 /** Who the mock treats as "you" until the type-ahead picker is wired up. */

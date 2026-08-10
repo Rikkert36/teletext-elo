@@ -23,6 +23,7 @@ import {
   activePool,
   drawPack,
   legendPool,
+  setLegendPool,
   startingCollection,
   toCard,
 } from '../mock/cardMock';
@@ -38,6 +39,26 @@ export interface CollectionState {
   /** The full pool, so missing cards can render as silhouettes. */
   pool: CardPlayer[];
   /** Legend pool, empty until unlocked. */
+  legends: CardPlayer[];
+}
+
+/**
+ * `GET /api/cards/pool` — every player a pack can contain.
+ *
+ * The first piece of the card feature to exist server-side, and the only one so far:
+ * it is read-only, persists nothing, and needs no migration. It is here because a
+ * legend is rated on their all-time-high visible rating, which is computable only
+ * inside the leaderboard's full game replay — so icoon cards could not show a real
+ * person until this endpoint existed.
+ *
+ * `actives` is fetched too but deliberately not used yet: the mock roster is a frozen
+ * snapshot that the odds table, the seeded starting collection and every completion
+ * estimate in docs/trading-cards.md were computed against, and swapping in live
+ * ratings would move several overalls out from under all of them. Separate decision.
+ */
+export interface CardPoolResponse {
+  minGames: number;
+  actives: CardPlayer[];
   legends: CardPlayer[];
 }
 
@@ -74,6 +95,53 @@ let packSequence = 0;
 const settle = <T,>(value: T, ms = 120): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), ms));
 
+/**
+ * Fetch the real legends once, and never let a failure take the page down with it.
+ *
+ * Phase 1's premise is that `npm start` alone is enough, and that has to survive the
+ * arrival of the first endpoint: with no API reachable — or one deployed before this
+ * route existed — the placeholders stay and everything else behaves exactly as it did.
+ * Cached as a promise rather than a flag so concurrent callers share one request and a
+ * failure is not retried on every reveal.
+ */
+let poolRequest: Promise<void> | null = null;
+
+/** Where the legends on screen came from. Read by the debug panel. */
+let legendSource = 'niet geladen';
+
+export const legendPoolSource = (): string => legendSource;
+
+const loadLegends = (): Promise<void> => {
+  if (poolRequest) return poolRequest;
+
+  poolRequest = fetch(`${window.TAFELVOETBAL_SERVER_URL}/api/cards/pool`)
+    .then((response) => {
+      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+      return response.json() as Promise<CardPoolResponse>;
+    })
+    .then((pool) => {
+      setLegendPool(pool.legends ?? []);
+      legendSource = `api (${pool.legends?.length ?? 0})`;
+    })
+    .catch((error) => {
+      legendSource = 'placeholders';
+      /*
+       * Loud on purpose. A silent fall back to six invented legends is
+       * indistinguishable from the endpoint working, and that has already cost one
+       * round of confusion — the API deployed on the configured URL simply predates
+       * the route and answers 404.
+       */
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[kaarten] GET /api/cards/pool mislukt (${String(error)}). ` +
+          'De zes nep-legendes blijven staan — herstart de API met de nieuwe build ' +
+          'om de echte legendes te zien.',
+      );
+    });
+
+  return poolRequest;
+};
+
 const buildOwned = (): OwnedCard[] => {
   const byId = new Map<string, CardPlayer>();
   for (const player of [...activePool(), ...legendPool()]) byId.set(player.id, player);
@@ -90,6 +158,11 @@ const buildOwned = (): OwnedCard[] => {
 
 export const mockCardsClient: CardsClient = {
   async getCollection(playerId) {
+    // Awaited here rather than at module load so the legends are guaranteed present
+    // before the album is built from them — the book is drawn in one pass and cannot
+    // grow a section afterwards without shifting every card viewer index behind it.
+    await loadLegends();
+
     return settle({
       playerId,
       owned: buildOwned(),
@@ -101,6 +174,11 @@ export const mockCardsClient: CardsClient = {
   },
 
   async revealPack(_playerId, packId) {
+    // Also awaited here: a reveal can be the first thing that draws from the legend
+    // pool, and drawing from the placeholders and then rendering the real ones would
+    // hand you a card that is not in your book.
+    await loadLegends();
+
     const pack = state.packs.find((p) => p.id === packId);
     if (!pack) throw new Error(`Onbekend pakje: ${packId}`);
 

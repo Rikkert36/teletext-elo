@@ -106,11 +106,15 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
     const owned = section.players.filter((p) => (section.counts.get(p.id) ?? 0) > 0).length;
 
     /*
-     * The running head names the album and its owner, not the section. "Actieve
-     * spelers" on every page was a heading for a distinction the reader cannot
-     * act on — there is only one other section, it is rare, and its cards are
-     * marked "legende" anyway. So the section name survives only as a qualifier
-     * on the counter, and only where it is not the default.
+     * The running head names the album and its owner, not the section. A section
+     * name on every page was a heading for a distinction the reader cannot act on.
+     * So it survives only as a qualifier on the counter, and only where it is not
+     * the default.
+     *
+     * As of the legends interleave the collection page passes a single section, so
+     * the qualifier never renders. The machinery is kept because it costs nothing
+     * and a second section is a plausible future — a set, a season — but nothing
+     * here should be tuned for a case that does not currently occur.
      */
     const head = owner ? `Verzamelalbum · ${owner}` : 'Verzamelalbum';
     const tally =
@@ -119,11 +123,10 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
         : `${section.title} ${owned}/${section.players.length}`;
 
     /*
-     * Start each section at the left of a spread, so Legendes never shares one
-     * with the actives — a spread reading "Actieve spelers" on the left and
-     * "Legendes" on the right looks like a mistake. Whether that happens by
-     * itself depends on the pool size dividing by SLOTS_PER_PAGE, which moves as
-     * players cross MIN_GAMES.
+     * Start each section at the left of a spread, so two sections never share one —
+     * a spread with a different heading on each side looks like a mistake. Inert
+     * while there is only one section, which is the case since legends were
+     * interleaved rather than appended.
      *
      * Leaf i holds [page 2i, page 2i+1], and at `flipped = f` the spread shows
      * page 2f-1 on the left and 2f on the right — so a section must begin on an

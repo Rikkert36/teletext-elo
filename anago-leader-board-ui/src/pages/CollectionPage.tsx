@@ -5,13 +5,17 @@ import GameShell from '../components/GameShell';
 import PackOpener from '../components/PackOpener';
 import PackTile from '../components/PackTile';
 import PlayerPicker from '../components/PlayerPicker';
-import { CollectionState, mockCardsClient, mockDebug } from '../clients/cardsClient';
+import {
+  CollectionState,
+  legendPoolSource,
+  mockCardsClient,
+  mockDebug,
+} from '../clients/cardsClient';
 import {
   CardPlayer,
   MIN_GAMES,
   Pack,
   RevealedCard,
-  activePool,
   splitName,
 } from '../mock/cardMock';
 import '../styles/game.css';
@@ -142,29 +146,40 @@ const CollectionPage: React.FC = () => {
   }, [collection]);
 
   /*
-   * One book. Legends are not a separate view behind a tab — they are simply more
-   * pages, appended once unlocked, so the album grows rather than splitting in
-   * two. Before the unlock they are absent entirely; the point of the unlock is
-   * discovering there is more book than you thought.
+   * One book, one sequence. Legends are not a separate view behind a tab, and no
+   * longer a block of pages bolted onto the end either — they are **shuffled in
+   * among the actives by rating**, so an icoon turns up on the spread its rating
+   * earns it rather than in a legends annexe.
+   *
+   * That is what makes the unlock feel like the book growing rather than gaining
+   * an appendix: every spread you already knew gets denser, and the rarest card in
+   * the album is now an icoon sitting at the very end past the best active player.
+   * Before the unlock they are absent entirely.
+   *
+   * Consequence worth knowing: an empty slot no longer tells you whether it is an
+   * active or a legend, because silhouettes are deliberately identical and not
+   * marked as icoons. That used to be readable from which pages you were on.
    */
   const sections: AlbumSection[] = useMemo(() => {
     if (!collection) return [];
+
+    const unlocked = collection.legendsUnlocked ? collection.legends : [];
+
     /*
      * Ascending by rating, so the book builds toward its best page: you open on
      * the commons and the last spread is the players you are least likely to
      * hold. Sorted explicitly rather than reversed, because the source order is
      * the leaderboard's and should not be relied on here.
+     *
+     * A legend sorts on the same field as everyone else — `visibleRating` carries
+     * their all-time high rather than a current rating, which is exactly the
+     * number their card is rated on, so no special case is needed here.
      */
-    const ascending = (players: CardPlayer[]): CardPlayer[] =>
-      players.slice().sort((a, b) => a.visibleRating - b.visibleRating);
+    const players = [...collection.pool, ...unlocked].sort(
+      (a, b) => a.visibleRating - b.visibleRating,
+    );
 
-    const all: AlbumSection[] = [
-      { title: 'Actieve spelers', players: ascending(collection.pool), counts },
-    ];
-    if (collection.legendsUnlocked && collection.legends.length > 0) {
-      all.push({ title: 'Legendes', players: ascending(collection.legends), counts });
-    }
-    return all;
+    return [{ title: 'Spelers', players, counts }];
   }, [collection, counts]);
 
   const ownerName = player ? splitName(player.name).display : undefined;
@@ -395,13 +410,27 @@ const CollectionPage: React.FC = () => {
                 pakje ({size} {size === 1 ? 'kaart' : 'kaarten'})
               </button>
             ))}
-            {/* One card each, so a single ceremony level can be watched in
-                isolation. Guaranteed by level rather than tier: 75-79 and 80-84
-                are both Goud, so a tier guarantee cannot separate them. */}
+            {/*
+              One card each, so a single ceremony level can be watched in
+              isolation. Guaranteed by level rather than tier: 75-79 and 80-84
+              are both Goud, so a tier guarantee cannot separate them.
+
+              90+ is a band, not a player. It used to be a `guaranteePlayerId`
+              pinned to the top of the active pool — which was Petar and stayed
+              Petar even after he was no longer 90+, and could never reach a legend
+              at all. As a level it draws uniformly from whoever actually clears 90
+              right now, which with legends on includes the icoons — Roel Loonen at
+              91 is currently the only card above Petar in the game.
+
+              If nobody clears the level, `drawPack` silently falls through to an
+              ordinary weighted draw rather than failing. Worth knowing when a
+              button appears to do nothing.
+            */}
             {[
               { level: 1, label: '1 kaart (75+)' },
               { level: 2, label: '1 kaart (80+)' },
               { level: 3, label: '1 kaart (85+)' },
+              { level: 4, label: '1 kaart (90+)' },
             ].map(({ level, label }) => (
               <button
                 key={level}
@@ -417,26 +446,12 @@ const CollectionPage: React.FC = () => {
             <button
               type="button"
               className="game-button game-button--small"
-              onClick={() =>
-                // activePool is ordered by rating, so [0] is the top player.
-                grant({
-                  size: 1,
-                  reason: 'test — nummer 1',
-                  guaranteePlayerId: activePool()[0]?.id,
-                })
-              }
-            >
-              1 kaart (Petar)
-            </button>
-            <button
-              type="button"
-              className="game-button game-button--small"
               onClick={() => {
                 mockDebug.setLegendsUnlocked(!collection?.legendsUnlocked);
                 if (player) void refresh(player.id);
               }}
             >
-              legendes aan/uit
+              legendes aan/uit ({legendPoolSource()})
             </button>
             <button
               type="button"

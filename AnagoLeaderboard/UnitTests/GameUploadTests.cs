@@ -30,7 +30,8 @@ namespace UnitTests
             var databaseContext = new DatabaseContext(dbOption);
             _gameService = new GameService(databaseContext);
             var leaderBoardService = new LeaderBoardService(_gameService, databaseContext);
-            _playerService = new PlayerService(databaseContext, leaderBoardService, null);
+            // No avatar storage and no silhouette generation: nothing here touches disk.
+            _playerService = new PlayerService(databaseContext, leaderBoardService, null, null);
 
         }
 

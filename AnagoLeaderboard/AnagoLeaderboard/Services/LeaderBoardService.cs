@@ -60,6 +60,11 @@ namespace AnagoLeaderboard.Services
 
             var statsByPlayerId = new Dictionary<string, PlayerStats>();
 
+            // The highest visible rating each player has ever held. Only obtainable here:
+            // ratings are never stored, so a player's peak exists nowhere but inside this
+            // replay. It is what a legend's trading card is rated on.
+            var peakByPlayerId = new Dictionary<string, int>();
+
             foreach (var game in allGames)
             {
                 var gamePlayerIds = game.GetPlayerIds(); // T1P1, T1P2, T2P1, T2P2
@@ -74,7 +79,18 @@ namespace AnagoLeaderboard.Services
                 game.SecondTeam.DeltaPoints = updates[2].Delta;
 
                 for (int i = 0; i < gamePlayerIds.Count; i++)
-                    statsByPlayerId[gamePlayerIds[i]] = updates[i].Stats;
+                {
+                    var id = gamePlayerIds[i];
+                    var stats = updates[i].Stats;
+
+                    statsByPlayerId[id] = stats;
+
+                    // Only the four players of this game can have moved, so this stays O(1)
+                    // per game rather than a sweep.
+                    peakByPlayerId[id] = Math.Max(
+                        peakByPlayerId.GetValueOrDefault(id),
+                        stats.VisibleRating);
+                }
             }
 
             var rated = statsByPlayerId
@@ -86,7 +102,8 @@ namespace AnagoLeaderboard.Services
                     kvp.Value.GamesWon,
                     kvp.Value.GamesLost,
                     kvp.Value.GoalsFor,
-                    kvp.Value.GoalsAgainst
+                    kvp.Value.GoalsAgainst,
+                    peakByPlayerId.GetValueOrDefault(kvp.Key)
                 ))
                 .OrderByDescending(p => p.VisibleRating)
                 .ToList();

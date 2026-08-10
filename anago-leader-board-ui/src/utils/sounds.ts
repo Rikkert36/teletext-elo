@@ -904,6 +904,19 @@ export const playRareRise = (fullMs: number, actualMs = fullMs): void => {
 
   const source = ctx.createBufferSource();
   source.buffer = getNoise(ctx);
+  /*
+   * **Looped, because this is the one layer in the file longer than the buffer.**
+   *
+   * `getNoise` is three seconds; a level 4 build radiates for 3960ms real at the
+   * ×2 multiplier. A BufferSource that runs off the end simply stops — the later
+   * `stop()` is a no-op — so the air died a second before the card turned while
+   * the gain ramp went on climbing to a level nothing was left to play at. Only
+   * the sub survived, which on any normal speaker is silence.
+   *
+   * Looping rather than growing the buffer keeps this correct whatever the build
+   * length becomes later; white noise through a moving highpass has no seam.
+   */
+  source.loop = true;
 
   // Highpass climbing rather than a bandpass sweeping: the band stays wide open
   // above the cutoff, so it reads as air rather than as a whistle.
