@@ -1105,6 +1105,65 @@ all. That is the trap the old silver colourway spent three revisions in, and it 
 still live, because the wash is the only thing standing between the grade and a
 plain greyscale photo.
 
+#### The reveal beat is gold on an icoon
+
+The one place the green/gold split is suspended, and only here. Everywhere else
+gold means rare and cool green means new, and the reveal beat's light is green
+because it is the newness signal (see *New, not duplicate*). On an icoon that
+reading is unavailable: the card is a monochrome portrait warmed back to sepia on
+ivory, so a mint figure charging in the middle of it is the only cool thing on the
+card and lands as a colour cast rather than as light — there is nothing else in
+the palette for it to be light *of*.
+
+So `--reveal-mid` / `--reveal-hot` / `--reveal-peak` / `--reveal-halo` /
+`--reveal-halo-peak` are declared on `.card` in the green the rest of the pool
+uses, and re-declared warm in the icoon block. The ramp is unchanged in shape and
+timing: the figure still starts at `--tier-ink`, which on this card is already
+olive bronze, climbs through gold instead of through green, and still peaks on a
+near-white so the drain lands on paper. Only the hue moved.
+
+**It is a yellow-gold, and the first pass was not.** That one ran the middle of
+the ramp through the card's own bronze (`#9a7526`) and it came out orange. The
+reason is the ground: on ivory an amber ramp has nothing brighter than itself to
+be measured against, so it reads as a warm cast over the card rather than as
+something on the card lighting up. Every stop was pulled toward yellow and white,
+twice — the middle from `#9a7526` through `#c9a63c` to `#e0c273`, which is lit
+metal rather than bronze, and the top two to `#fff8d2` and `#fffefa`, which are
+white with a gold bias rather than gold. The flash field took the same correction
+both times; the two are one light and cannot be tuned apart.
+
+- **The flash field follows it, and has to.** The figure and the field it stands
+  in cannot disagree for the length of the beat. It costs the note in packopen.css
+  that the green field is the "new" rim's own colour, so light reaching the border
+  reads as being absorbed into the glow already there — a real loss, accepted,
+  because on this card the field has to agree with the card first.
+- **The field's variables live on `.opener__stage`, not on the card.**
+  `.opener__flash` is a sibling of the flip and the `card--icoon` class is several
+  levels down inside it; CSS cannot select upward. `PackOpener` publishes
+  `opener__stage--icoon` off `current.player.isLegend` on their nearest common
+  ancestor. Nothing else about the ceremony changes — icoon is still not a tier,
+  and the level, the build length and the gold ramp are still the overall's.
+- **The "new" rim goes gold with it**, which reverses the first pass here. It was
+  left green on the argument that the rim outlives the beat and has to mean one
+  thing on every card — and the beat then flared gold and handed off to a green
+  residue, which reads as a second, unexplained event. The rim *is* the residue of
+  the charge draining (`REVEAL_RIM_AT` times it to exactly that), so it cannot be
+  a different colour from the light it is left by.
+  - The cost is real and accepted: "new" is no longer one colour across the pool.
+    It is affordable because **the rim exists only inside the opener** — the
+    reveal card, the flight and the results strip, all places where an icoon is
+    one card among five and the comparison is right there. The album does not mark
+    new at all, so nothing outside the opener changes.
+  - **The rim's gold is deliberately more saturated than the beat's peak.** The
+    beat is light over metal and can run almost white; the rim has to hold an edge
+    against a near-white card, and washing it to the same value would make it
+    invisible on the one colourway it most needs to show on. This is the version
+    of the original objection that survived.
+  - Mechanically the same idiom as the beat: `--new-rim` and `--new-glow-1..3` on
+    `.card`, re-declared in the icoon block. The four stacked shadows in
+    packopen.css are on `.card` descendants and inherit them, including the
+    `--flip-scale` copy used during the flight, so the two cannot drift apart.
+
 #### There is no frame, and that took five passes to establish
 
 The reference card carries gold piping round its edge, and reproducing it went

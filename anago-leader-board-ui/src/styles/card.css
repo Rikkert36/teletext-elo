@@ -46,6 +46,29 @@
       transparent 66%
     );
 
+  /*
+   * The reveal beat's light, as five values rather than as literals inside
+   * `reveal-charge`. Cool green everywhere except on an icoon, which takes them
+   * warm — see the override in the icoon block. Keyframes read custom properties
+   * from the animated element, and `.card__silhouette` inherits these from here,
+   * so one set of stops serves both colourways.
+   */
+  --reveal-mid: #3f7f63;
+  --reveal-hot: #9dffd0;
+  --reveal-peak: #f4fffa;
+  --reveal-halo: 152, 255, 206;
+  --reveal-halo-peak: 210, 255, 236;
+
+  /*
+   * The "new" rim, same idea: the four stacked shadows in packopen.css are
+   * declared on `.card` descendants, so they inherit these from the card itself
+   * and an icoon can take the whole rim warm with the rest of its beat.
+   */
+  --new-rim: 216, 255, 234;
+  --new-glow-1: 152, 255, 206;
+  --new-glow-2: 108, 242, 182;
+  --new-glow-3: 84, 230, 164;
+
   position: relative;
   width: var(--card-width);
   aspect-ratio: 5 / 7;
@@ -241,6 +264,50 @@
       rgba(250, 240, 218, 0) 62%
     ),
     linear-gradient(154deg, #fdfcf8 0%, #eeeae1 26%, #cfcdc4 62%, #f6f4ee 100%);
+
+  /*
+   * The reveal beat goes gold on an icoon — a bright yellow-gold, not an amber
+   * one. The first version ran through the card's own bronze and came out orange:
+   * on ivory an amber ramp has nothing brighter than itself to read against, so
+   * it looks like a warm cast rather than like something lighting up. Pulled
+   * toward yellow and white at every stop, so the middle is lit metal rather than
+   * dark bronze and the top two are almost pure light.
+   *
+   * Cool green is the newness signal everywhere else and stays that everywhere
+   * else — this is not a retreat from the green/gold split, it is the one card
+   * the split cannot be read on. An icoon is monochrome warmed back to sepia on
+   * ivory, so a mint figure charging in the middle of it is the only cool thing
+   * on the card and reads as a colour cast rather than as light; the rest of the
+   * palette has nothing to answer it with. The gold stops are the ramp the same
+   * shape, run through the card's own metal: the figure starts at the olive
+   * bronze ink it is already filled with and climbs through gold to the same
+   * near-white peak, so the drain still lands on paper white and the beat's
+   * timing is untouched.
+   *
+   * **The "new" rim goes with it**, so the beat and the mark it leaves behind are
+   * one light rather than a gold flare handing off to a green residue. The rim is
+   * the residue of the charge draining — that is what `REVEAL_RIM_AT` times it to
+   * — and two colours make it a second, unexplained event. The cost is that "new"
+   * is no longer one colour across the pool; it is accepted because the rim only
+   * exists inside the opener (the reveal card, the flight and the results strip)
+   * where an icoon is one card among five, and because a green rim on ivory was
+   * the loudest cool thing left on the card.
+   *
+   * The rim's gold is held **more saturated than the beat's peak on purpose**. The
+   * beat is light over metal and can go almost white; the rim has to hold an edge
+   * against a near-white card, and washing it to the same value would leave it
+   * invisible on the one colourway it most needs to show on.
+   */
+  --reveal-mid: #e0c273;
+  --reveal-hot: #fff8d2;
+  --reveal-peak: #fffefa;
+  --reveal-halo: 255, 243, 195;
+  --reveal-halo-peak: 255, 253, 242;
+
+  --new-rim: 255, 245, 208;
+  --new-glow-1: 255, 226, 138;
+  --new-glow-2: 255, 205, 92;
+  --new-glow-3: 252, 192, 68;
 
   /* Lighter than the tiers'. A shadow tuned for a dark card reads as grime
      under a near-white one. */
@@ -763,41 +830,41 @@
   0% {
     background-color: var(--tier-ink);
     opacity: 0.8;
-    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+    filter: drop-shadow(0 0 0 rgba(var(--reveal-halo), 0));
     animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4);
   }
   /* Slow to start: for the first third it is barely more than a warm outline,
      which is what makes the top of the ramp feel earned. */
   40% {
-    background-color: #3f7f63;
+    background-color: var(--reveal-mid);
     opacity: 0.88;
-    filter: drop-shadow(0 0 3px rgba(152, 255, 206, 0.35));
+    filter: drop-shadow(0 0 3px rgba(var(--reveal-halo), 0.35));
     animation-timing-function: cubic-bezier(0.3, 0.7, 0.2, 1);
   }
   52% {
-    background-color: #9dffd0;
+    background-color: var(--reveal-hot);
     opacity: 1;
-    filter: drop-shadow(0 0 16px rgba(152, 255, 206, 0.9));
+    filter: drop-shadow(0 0 16px rgba(var(--reveal-halo), 0.9));
     animation-timing-function: linear;
   }
   /* The hold. Nothing moves — this is the beat the whole candidate is built on. */
   62% {
-    background-color: #f4fffa;
+    background-color: var(--reveal-peak);
     opacity: 1;
-    filter: drop-shadow(0 0 22px rgba(210, 255, 236, 0.95));
+    filter: drop-shadow(0 0 22px rgba(var(--reveal-halo-peak), 0.95));
     animation-timing-function: cubic-bezier(0.3, 0, 0.2, 1);
   }
   /* The drain. Faster than the charge, and the figure is gone before the photo
      is fully up so the two never read as a crossfade. */
   84% {
-    background-color: #f4fffa;
+    background-color: var(--reveal-peak);
     opacity: 0;
-    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+    filter: drop-shadow(0 0 0 rgba(var(--reveal-halo), 0));
   }
   100% {
-    background-color: #f4fffa;
+    background-color: var(--reveal-peak);
     opacity: 0;
-    filter: drop-shadow(0 0 0 rgba(152, 255, 206, 0));
+    filter: drop-shadow(0 0 0 rgba(var(--reveal-halo), 0));
   }
 }
 

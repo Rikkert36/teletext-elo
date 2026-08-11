@@ -908,6 +908,13 @@
  * The green is the "new" rim's own colour, so light reaching the border and
  * going out reads as being absorbed into the glow already sitting there.
  *
+ * **Except on an icoon, where it is gold** — the same swap the silhouette's
+ * charge makes, and it has to be the same swap or the figure and the field it
+ * is standing in disagree for the length of the beat. The absorbed-into-the-rim
+ * reading is what is traded away for it: on an ivory monochrome card the field
+ * has to agree with the card first. See the icoon block in card.css for the
+ * whole argument; the stops here are that ramp's, warmed the same way.
+ *
  * Timed in fractions of `--reveal-ms` like everything else in the beat: 52% is
  * the bright green, 62% is the white-out and the accent, 88% is gone. It has to
  * be clear of the photo before the photo is readable, which is the same
@@ -923,12 +930,24 @@
   opacity: 0;
   background: radial-gradient(
     circle at 50% 42%,
-    rgba(240, 255, 248, 0.55) 0%,
-    rgba(190, 255, 224, 0.32) 52%,
-    rgba(152, 255, 206, 0.12) 76%,
-    rgba(152, 255, 206, 0) 90%
+    rgba(var(--flash-core, 240, 255, 248), 0.55) 0%,
+    rgba(var(--flash-mid, 190, 255, 224), 0.32) 52%,
+    rgba(var(--flash-edge, 152, 255, 206), 0.12) 76%,
+    rgba(var(--flash-edge, 152, 255, 206), 0) 90%
   );
   animation: reveal-charge-light var(--reveal-ms, 560ms) linear 1 forwards;
+}
+
+/*
+ * The icoon's warm field. Set on the stage rather than on the flash because the
+ * colourway is a fact about the card, which lives several levels down inside the
+ * flip — CSS cannot reach back up from it, so `PackOpener` publishes the class on
+ * the nearest ancestor both the flash and the card sit under.
+ */
+.opener__stage--icoon {
+  --flash-core: 255, 255, 252;
+  --flash-mid: 255, 250, 224;
+  --flash-edge: 255, 240, 186;
 }
 
 @keyframes reveal-charge-light {
@@ -1447,6 +1466,11 @@
  *
  * Deliberately cool green-white, so it never reads as the same signal as the
  * warm gold rarity ceremony.
+ *
+ * The four stops come from `--new-rim` / `--new-glow-1..3` on the card rather
+ * than from literals here. Only the icoon overrides them, and it takes the whole
+ * rim gold so the beat and the mark it leaves are one light — see the icoon block
+ * in card.css for why that card is the exception and nothing else is.
  * ---------------------------------------------------------------- */
 
 .opener__slot {
@@ -1466,10 +1490,10 @@
 .opener__flip--new.opener__flip--up .opener__face--front .card {
   position: relative;
   box-shadow:
-    0 0 0 1px rgba(216, 255, 234, 0.8),
-    0 0 8px rgba(152, 255, 206, 0.5),
-    0 0 20px rgba(108, 242, 182, 0.3),
-    0 0 42px rgba(84, 230, 164, 0.16),
+    0 0 0 1px rgba(var(--new-rim), 0.8),
+    0 0 8px rgba(var(--new-glow-1), 0.5),
+    0 0 20px rgba(var(--new-glow-2), 0.3),
+    0 0 42px rgba(var(--new-glow-3), 0.16),
     0 3px 9px rgba(0, 0, 0, 0.5);
 }
 
@@ -1533,10 +1557,10 @@
 .opener__slot--flying.opener__slot--new .card {
   transition: none;
   box-shadow:
-    0 0 0 calc(1px / var(--flip-scale, 1)) rgba(216, 255, 234, 0.8),
-    0 0 calc(8px / var(--flip-scale, 1)) rgba(152, 255, 206, 0.5),
-    0 0 calc(20px / var(--flip-scale, 1)) rgba(108, 242, 182, 0.3),
-    0 0 calc(42px / var(--flip-scale, 1)) rgba(84, 230, 164, 0.16),
+    0 0 0 calc(1px / var(--flip-scale, 1)) rgba(var(--new-rim), 0.8),
+    0 0 calc(8px / var(--flip-scale, 1)) rgba(var(--new-glow-1), 0.5),
+    0 0 calc(20px / var(--flip-scale, 1)) rgba(var(--new-glow-2), 0.3),
+    0 0 calc(42px / var(--flip-scale, 1)) rgba(var(--new-glow-3), 0.16),
     0 calc(3px / var(--flip-scale, 1)) calc(9px / var(--flip-scale, 1))
       rgba(0, 0, 0, 0.5);
 }

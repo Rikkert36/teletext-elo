@@ -1026,6 +1026,14 @@ const PackOpener: React.FC<PackOpenerProps> = ({
   const isPeak = level >= 4;
 
   /*
+   * An icoon's reveal light is gold rather than green. The card carries
+   * `card--icoon` itself, but the flash field is a sibling of the flip and cannot
+   * see it, so the stage — their nearest common ancestor — carries the flag for
+   * it. Nothing about the ceremony changes: icoon is still not a tier.
+   */
+  const isIcoon = current !== undefined && current.player.isLegend;
+
+  /*
    * Published to CSS so the glow's swell and the bloom match this card's build
    * length, which differs per level.
    */
@@ -1180,7 +1188,10 @@ const PackOpener: React.FC<PackOpenerProps> = ({
 
       {phase === 'revealing' && current ? (
         <>
-          <div className="opener__stage" style={stageStyle}>
+          <div
+            className={`opener__stage${isIcoon ? ' opener__stage--icoon' : ''}`}
+            style={stageStyle}
+          >
             {/* Stays mounted for the whole reveal so the class change can transition
                 both ways — unmounting it would cut the glow dead. */}
             {/* Driven by the same three flags as the bloom, deliberately — it is
