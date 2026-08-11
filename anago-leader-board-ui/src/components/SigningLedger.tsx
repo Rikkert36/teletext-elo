@@ -1,13 +1,13 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { CardPlayer, splitName } from '../mock/cardMock';
+import { SelectablePlayer, splitName } from '../mock/cardMock';
 import '../styles/ledger.css';
 
 interface SigningLedgerProps {
   /** Every active player, gate or no gate. */
-  players: CardPlayer[];
+  players: SelectablePlayer[];
   /** How many games a player needs before they can own a collection. */
   minGames: number;
-  onChoose: (player: CardPlayer) => void;
+  onChoose: (player: SelectablePlayer) => void;
 }
 
 /**
@@ -46,7 +46,7 @@ const SigningLedger: React.FC<SigningLedgerProps> = ({ players, minGames, onChoo
     return players.filter((p) => p.name.toLowerCase().includes(needle)).slice(0, 8);
   }, [players, query]);
 
-  const choose = (player: CardPlayer) => {
+  const choose = (player: SelectablePlayer) => {
     if (player.numberOfGames < minGames) return;
     onChoose(player);
     setQuery('');

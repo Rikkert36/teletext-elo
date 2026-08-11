@@ -13,9 +13,16 @@ design, every settled decision and the reasoning behind it lives in
 [docs/trading-cards.md](docs/trading-cards.md). **Read that file before touching
 anything under `src/mock/`, `src/styles/card.css`, `album.css`, `packopen.css`,
 `viewer.css`, `game.css`, `components/PackOpener.tsx`, `Album.tsx`,
-`PlayerCard.tsx`, `CardViewer.tsx`, or `utils/sounds.ts`.** It records a great many
-decisions that were arrived at by elimination and will otherwise be re-litigated or
-silently undone.
+`PlayerCard.tsx`, `CardViewer.tsx`, `utils/sounds.ts`, or — on the API side —
+`Services/PackService.cs`, `CollectionService.cs`, `CardPoolService.cs` and
+`Calculators/CardRatingCalculator.cs`.** It records a great many decisions that were
+arrived at by elimination and will otherwise be re-litigated or silently undone.
+
+Two of them are load-bearing enough to repeat here. **Packs are derived, never
+granted** — `CreateGame` writes a game and nothing else, and reintroducing a write
+there undoes three separate guarantees. And **the rating scale lives in C# only**;
+a second copy in TypeScript could print an overall inconsistent with the odds a card
+was actually drawn at, and nothing would ever surface it.
 
 Its "Where this stands" section at the top says what is done and what is next.
 

@@ -32,13 +32,11 @@ namespace AnagoLeaderboard.Models.Results;
 /// Counts, not card objects: a card is live and wholly derivable from its pool entry, and
 /// the page only builds a lookup from this anyway, so embedding the player twice would just
 /// invite the two copies to drift.
-///
-/// Always empty for now - owned cards need the CardInstance table, which arrives with the
-/// claim endpoint.
 /// </param>
 /// <param name="Packs">
-/// Always empty for now. Packs are derived from today's games minus a claim table rather
-/// than granted, and neither half of that exists yet.
+/// Derived rather than stored - today's games this player took part in, plus the daily
+/// freebie, less whatever they have already opened. Empty until they have an album, because
+/// a pack claimed without one would have nowhere to be filed.
 /// </param>
 public sealed record CollectionState(
     string PlayerId,
@@ -69,7 +67,6 @@ public sealed record OwnedCard(string PlayerId, int Count);
 /// <summary>
 /// A pack waiting to be opened.
 ///
-/// Here so the response shape does not change when PackService starts filling the list.
 /// Ids are synthetic and stable - "game:{gameId}", "daily:{yyyy-MM-dd}" - because a derived
 /// pack has no row to take an id from, and the packet pile's tilt and sheen are seeded from
 /// the id so it must survive a refetch.

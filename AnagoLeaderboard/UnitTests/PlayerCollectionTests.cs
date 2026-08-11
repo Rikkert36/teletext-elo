@@ -170,7 +170,9 @@ namespace UnitTests
             var gameService = new GameService(_dbContext);
             var leaderBoardService = new LeaderBoardService(gameService, _dbContext);
             var poolService = new CardPoolService(leaderBoardService, calculator);
-            return new CollectionService(_dbContext, leaderBoardService, poolService, calculator);
+            var packService = new PackService(_dbContext, leaderBoardService, poolService, calculator);
+            return new CollectionService(
+                _dbContext, leaderBoardService, poolService, calculator, packService);
         }
 
         [Test]

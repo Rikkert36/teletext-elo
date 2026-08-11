@@ -17,13 +17,16 @@ namespace AnagoLeaderboard.Controllers
     public class CollectionsController : ControllerBase
     {
         private readonly CollectionService _collectionService;
+        private readonly PackService _packService;
         private readonly IWebHostEnvironment _environment;
 
         public CollectionsController(
             CollectionService collectionService,
+            PackService packService,
             IWebHostEnvironment environment)
         {
             _collectionService = collectionService;
+            _packService = packService;
             _environment = environment;
         }
 
@@ -85,6 +88,47 @@ namespace AnagoLeaderboard.Controllers
         }
 
         /// <summary>
+        /// Opens a pack: rolls it, files the cards, and hands them back with whether each one
+        /// filled an empty slot.
+        ///
+        /// The pack is named by a synthetic id - "game:{gameId}" or "daily:{yyyy-MM-dd}" -
+        /// because a derived pack has no row to take an id from. Those ids are guessable from
+        /// the public games list, where a stored grant's GUID would not have been, and that is a
+        /// deliberate trade rather than an oversight: the cards land with the player in the path
+        /// whoever asked for them, so the worst it buys is spoiling somebody's reveal.
+        /// </summary>
+        [HttpPost("collections/{playerId}/packs/{packId}/claim")]
+        public async Task<ActionResult<IReadOnlyList<RevealedCard>>> ClaimPack(
+            string playerId,
+            string packId)
+        {
+            var result = await _packService.Claim(playerId, packId);
+
+            switch (result.Outcome)
+            {
+                case ClaimOutcome.Claimed:
+                    return Ok(result.Cards);
+
+                case ClaimOutcome.PlayerNotFound:
+                case ClaimOutcome.NotAvailable:
+                    return NotFound();
+
+                case ClaimOutcome.AlreadyClaimed:
+                    return Conflict("Dit pakje is al geopend.");
+
+                case ClaimOutcome.NoAlbum:
+                    return Conflict("Deze speler heeft nog geen album.");
+
+                case ClaimOutcome.NotEligible:
+                    return Conflict(
+                        "Speler heeft nog niet genoeg wedstrijden gespeeld voor een album.");
+
+                default:
+                    return StatusCode(500);
+            }
+        }
+
+        /// <summary>
         /// Puts the album back on the table, so the opening sequence can be watched again.
         /// **Development only.**
         ///
@@ -105,6 +149,33 @@ namespace AnagoLeaderboard.Controllers
             }
 
             var state = await _collectionService.DeleteCollection(playerId);
+
+            if (state is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(state);
+        }
+
+        /// <summary>
+        /// Flips the legends latch by hand. **Development only**, and gated the same way.
+        ///
+        /// Earning it means completing the active set, which is a three-month proposition at the
+        /// published odds - so without this there is no way at all to look at an icoon sitting
+        /// in a book, which is the thing the whole legends design is judged on.
+        /// </summary>
+        [HttpPut("collections/{playerId}/legends")]
+        public async Task<ActionResult<CollectionState>> SetLegendsUnlocked(
+            string playerId,
+            [FromQuery] bool unlocked = true)
+        {
+            if (!_environment.IsDevelopment())
+            {
+                return NotFound();
+            }
+
+            var state = await _collectionService.SetLegendsUnlocked(playerId, unlocked);
 
             if (state is null)
             {

@@ -18,17 +18,20 @@ public class CollectionService
     private readonly LeaderBoardService _leaderBoardService;
     private readonly CardPoolService _cardPoolService;
     private readonly CardRatingCalculator _cardRatingCalculator;
+    private readonly PackService _packService;
 
     public CollectionService(
         DatabaseContext dbContext,
         LeaderBoardService leaderBoardService,
         CardPoolService cardPoolService,
-        CardRatingCalculator cardRatingCalculator)
+        CardRatingCalculator cardRatingCalculator,
+        PackService packService)
     {
         _dbContext = dbContext;
         _leaderBoardService = leaderBoardService;
         _cardPoolService = cardPoolService;
         _cardRatingCalculator = cardRatingCalculator;
+        _packService = packService;
     }
 
     /// <summary>
@@ -106,8 +109,12 @@ public class CollectionService
     /// because the opening sequence is the one part of this feature that can only be watched
     /// once per player, and "sign in as somebody else" is a poor substitute when the thing
     /// being judged is how it feels for *you*. Deliberately not a production endpoint: outside
-    /// development there is no reason to destroy a collection, and once cards are persisted
-    /// this takes them with it.
+    /// development there is no reason to destroy a collection.
+    ///
+    /// It takes the cards and the claims with it. Neither cascades from the album row - they
+    /// hang off the player, not off the collection - but "back to the start of the story" means
+    /// an empty book and today's packets back on the shelf, and leaving either behind would put
+    /// the player on a cover choice with a collection still underneath it.
     ///
     /// Idempotent, like create: no row is the state being asked for, so it is not an error.
     /// </summary>
@@ -121,13 +128,49 @@ public class CollectionService
         var existing = await _dbContext.PlayerCollections
             .SingleOrDefaultAsync(c => c.PlayerId == playerId);
 
+        var cards = await _dbContext.CardInstances
+            .Where(card => card.PlayerId == playerId)
+            .ToListAsync();
+
+        var claims = await _dbContext.PackClaims
+            .Where(claim => claim.PlayerId == playerId)
+            .ToListAsync();
+
+        _dbContext.CardInstances.RemoveRange(cards);
+        _dbContext.PackClaims.RemoveRange(claims);
+
         if (existing is not null)
         {
             _dbContext.PlayerCollections.Remove(existing);
-            await _dbContext.SaveChangesAsync();
         }
 
+        await _dbContext.SaveChangesAsync();
+
         return await Build(playerId, null);
+    }
+
+    /// <summary>
+    /// Sets or clears the legends latch by hand. **Development only** - see
+    /// <see cref="Controllers.CollectionsController"/>.
+    ///
+    /// The latch is real now: it is written by the claim endpoint when the active set is
+    /// completed, which at the published odds is a three-month proposition. There is no other
+    /// way to look at an icoon in a book, so there is a switch.
+    /// </summary>
+    public async Task<CollectionState?> SetLegendsUnlocked(string playerId, bool unlocked)
+    {
+        var collection = await _dbContext.PlayerCollections
+            .SingleOrDefaultAsync(c => c.PlayerId == playerId);
+
+        if (collection is null)
+        {
+            return null;
+        }
+
+        collection.LegendsUnlockedAt = unlocked ? collection.LegendsUnlockedAt ?? DateTime.Now : null;
+        await _dbContext.SaveChangesAsync();
+
+        return await Build(playerId, collection);
     }
 
     /// <summary>
@@ -141,7 +184,7 @@ public class CollectionService
     /// </summary>
     private async Task<CollectionState?> Build(string playerId, PlayerCollection? collection)
     {
-        var (players, _) = await _leaderBoardService.GetLeaderBoard();
+        var (players, allGames) = await _leaderBoardService.GetLeaderBoard();
         var pool = _cardPoolService.GetPool(players);
 
         // Absent from the replay means no games at all: it is built up per game, so a player
@@ -151,17 +194,28 @@ public class CollectionService
 
         var legendsUnlocked = collection?.LegendsUnlockedAt is not null;
 
+        var owned = (await _packService.CountsBySubject(playerId))
+            .Select(count => new OwnedCard(count.Key, count.Value))
+            .ToList();
+
+        // No book, no packets. They would have nowhere to be filed - the claim endpoint refuses
+        // for the same reason - and the shelf would otherwise appear beside the five shut
+        // albums, before the player has started a collection at all.
+        //
+        // The replayed games are handed over rather than re-queried: PackService sizes packs
+        // from the old ratings that only exist inside a replay.
+        var packs = collection is null
+            ? Array.Empty<AvailablePack>()
+            : await _packService.GetAvailable(playerId, allGames);
+
         return new CollectionState(
             playerId,
             collection is null ? null : new AlbumBinding(collection.Cover, collection.CreatedAt),
             numberOfGames >= _cardRatingCalculator.MinGames,
             numberOfGames,
             _cardRatingCalculator.MinGames,
-            // Owned cards need the CardInstance table and packs need PackService; neither
-            // exists yet. Empty rather than absent, so the response shape does not change
-            // when they arrive.
-            Array.Empty<OwnedCard>(),
-            Array.Empty<AvailablePack>(),
+            owned,
+            packs,
             legendsUnlocked,
             pool.Actives,
             // The legends set is not a secret - what unlocking changes is whether they turn up

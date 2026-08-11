@@ -7,17 +7,12 @@ import PackOpener from '../components/PackOpener';
 import LedgerCorner from '../components/LedgerCorner';
 import PackTile from '../components/PackTile';
 import SigningLedger from '../components/SigningLedger';
+import { CollectionState, GrantOptions, httpCardsClient } from '../clients/cardsClient';
 import {
-  CollectionState,
-  httpCardsClient,
-  legendPoolSource,
-  mockDebug,
-} from '../clients/cardsClient';
-import {
-  CardPlayer,
   MIN_GAMES,
   Pack,
   RevealedCard,
+  SelectablePlayer,
   splitName,
 } from '../mock/cardMock';
 import { CoverId } from '../utils/albumLeather';
@@ -28,16 +23,19 @@ const FAST_KEY = 'tafelvoetbal.cards.fastOpen';
 const METER_CHUNKS = 24;
 
 /**
- * The test panel. Still on, because packs and cards are not persisted yet — the panel is
- * the only way to get a pack at all, and every reveal check in the verification list runs
- * through it. It goes when `POST …/packs/{packId}/claim` lands.
+ * The test panel. Still on, and still carrying its pack buttons — but those are stubs
+ * until the gift endpoint exists, because a pack cannot be invented in the browser any
+ * more. See `grant`.
+ *
+ * What does work is what is a row on the server: emptying a collection and the legends
+ * latch. Plus `snel openen`, which was always client-side.
+ *
+ * It wants to go behind a debug flag rather than a constant, and the pack buttons want
+ * wiring to the grant endpoint. Both are the next slice.
  */
 const SHOW_DEBUG = true;
 
-/**
- * The seam. `mockCardsClient` is the other implementation and still works with no backend
- * running, which is how the ceremony and the reveal are iterated on.
- */
+/** The seam. Everything behind it is a real call now. */
 const client = httpCardsClient;
 
 const forget = (key: string): void => {
@@ -65,8 +63,8 @@ const write = (key: string, value: string): void => {
 };
 
 const CollectionPage: React.FC = () => {
-  const [players, setPlayers] = useState<CardPlayer[]>([]);
-  const [player, setPlayer] = useState<CardPlayer | null>(null);
+  const [players, setPlayers] = useState<SelectablePlayer[]>([]);
+  const [player, setPlayer] = useState<SelectablePlayer | null>(null);
   const [collection, setCollection] = useState<CollectionState | null>(null);
   const [openingPack, setOpeningPack] = useState<Pack | null>(null);
   /**
@@ -188,7 +186,7 @@ const CollectionPage: React.FC = () => {
     if (player) void refresh(player.id);
   }, [player, refresh]);
 
-  const choosePlayer = (next: CardPlayer) => {
+  const choosePlayer = (next: SelectablePlayer) => {
     setPlayer(next);
     write(PLAYER_KEY, next.id);
     setOpeningPack(null);
@@ -274,7 +272,7 @@ const CollectionPage: React.FC = () => {
 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
-    collection?.owned.forEach((card) => map.set(card.player.id, card.count));
+    collection?.owned.forEach((owned) => map.set(owned.playerId, owned.count));
     return map;
   }, [collection]);
 
@@ -391,9 +389,48 @@ const CollectionPage: React.FC = () => {
     [collection, openingPack],
   );
 
-  const grant = (options: Parameters<typeof mockDebug.grantPack>[0]) => {
-    mockDebug.grantPack(options);
-    if (player) void refresh(player.id);
+  /**
+   * Hand this player a pack. **Not wired yet, deliberately.**
+   *
+   * It used to push a pack into a session-local sandbox inside the client. Packs are
+   * derived from real games on the server now, so a pack cannot be invented in the
+   * browser at all — the endpoint that hands somebody a specific one is the next slice,
+   * and these options are the shape it has to take.
+   *
+   * Kept as a stub rather than deleted along with its buttons: the buttons carry the
+   * reasoning for each ceremony level, and this is the one place that slice has to fill
+   * in.
+   *
+   * The console rather than `setError`, which would replace the whole page with a notice
+   * and need a reload to get out of — far too much for a scaffolding button.
+   */
+  const grant = (options: GrantOptions) => {
+    // eslint-disable-next-line no-console
+    console.warn(
+      '[kaarten] Pakjes uitdelen bestaat nog niet. Pakjes komen sinds het claim-eindpunt ' +
+        'van de server (wedstrijden van vandaag plus het dagelijkse pakje), dus dit wacht ' +
+        'op het cadeau-eindpunt.',
+      options,
+    );
+  };
+
+  /**
+   * The legends latch, flipped by hand. Development only, and a real row rather than a
+   * client-side flag — the alternative is completing a 37-card set to see one icoon.
+   */
+  const toggleLegends = () => {
+    if (!player) return;
+
+    void client
+      .setLegendsUnlocked(player.id, !collection?.legendsUnlocked)
+      .then(setCollection)
+      .catch((reason) => {
+        // eslint-disable-next-line no-console
+        console.warn('[kaarten] PUT /api/collections/legends mislukt', reason);
+        setError(
+          'De legendes omzetten lukt niet. Dit werkt alleen als de API in Development draait.',
+        );
+      });
   };
 
   /**
@@ -673,14 +710,18 @@ const CollectionPage: React.FC = () => {
       */}
       {SHOW_DEBUG ? (
         <div className="game-plate game-plate--debug" style={{ marginTop: 18 }}>
-          <span className="game-plate__label">Testpaneel — fase 1</span>
+          <span className="game-plate__label">Testpaneel</span>
           <div className="game-row">
             {/*
-              Only the three real pack sizes. There are no tier-guaranteed packs:
-              every card in every pack is drawn on the agreed odds. (A forced
-              draw is still reachable from the console via
-              `cardDebug.grantPack({ size, reason, guaranteeTier })` for
-              exercising the 85+ ceremony without waiting on a ~3% roll.)
+              The pack buttons are **kept and not yet wired**. They used to write into a
+              session-local sandbox; packs are derived from real games on the server now,
+              so there is no client-side way to conjure one and `grant` below says so
+              rather than pretending.
+
+              They are the obvious first caller for the grant endpoint — handing a named
+              player, or everybody, a specific pack is the one grant-shaped thing left in
+              the design — so they stay put and that slice wires them up. Deleting and
+              re-adding them would only lose the copy and the reasoning attached to each.
             */}
             {[1, 3, 5].map((size) => (
               <button
@@ -688,6 +729,7 @@ const CollectionPage: React.FC = () => {
                 type="button"
                 className="game-button game-button--small"
                 onClick={() => grant({ size, reason: 'testpakje' })}
+                title="Wacht op het cadeau-eindpunt — zie de console"
               >
                 pakje ({size} {size === 1 ? 'kaart' : 'kaarten'})
               </button>
@@ -704,9 +746,10 @@ const CollectionPage: React.FC = () => {
               right now, which with legends on includes the icoons — Roel Loonen at
               91 is currently the only card above Petar in the game.
 
-              If nobody clears the level, `drawPack` silently falls through to an
-              ordinary weighted draw rather than failing. Worth knowing when a
-              button appears to do nothing.
+              The draw is server-side now, so a level guarantee is something the grant
+              endpoint will have to implement in `PackService.Roll`. Worth knowing that
+              the fall-through is the same either way: if nobody clears the level, an
+              ordinary weighted draw happens rather than a failure.
             */}
             {[
               { level: 1, label: '1 kaart (75+)' },
@@ -721,6 +764,7 @@ const CollectionPage: React.FC = () => {
                 onClick={() =>
                   grant({ size: 1, reason: `test — niveau ${level}`, guaranteeLevel: level })
                 }
+                title="Wacht op het cadeau-eindpunt — zie de console"
               >
                 {label}
               </button>
@@ -728,12 +772,11 @@ const CollectionPage: React.FC = () => {
             <button
               type="button"
               className="game-button game-button--small"
-              onClick={() => {
-                mockDebug.setLegendsUnlocked(!collection?.legendsUnlocked);
-                if (player) void refresh(player.id);
-              }}
+              onClick={toggleLegends}
+              disabled={!player || !hasAlbum}
+              title="Zet de legendes-latch om, zonder de hele actieve set te verzamelen"
             >
-              legendes aan/uit ({legendPoolSource()})
+              legendes {collection?.legendsUnlocked ? 'uit' : 'aan'}
             </button>
             {/*
               The two buttons that put the page back to a state you cannot otherwise
@@ -761,14 +804,13 @@ const CollectionPage: React.FC = () => {
               the book, which is a real part of the page rather than scaffolding — and a
               second way to do it, on a panel that is going to be deleted, would be one more
               thing to remember to remove.
+
+              No "kansen" either: it drew a few thousand packs in the browser to check the
+              observed frequencies against the odds table, and the browser cannot draw a
+              pack any more. That check is `InclusionProbabilitiesSumToThePackSize` in
+              UnitTests/PackTests.cs, where it runs on every build rather than when
+              somebody remembers to press a button.
             */}
-            <button
-              type="button"
-              className="game-button game-button--small"
-              onClick={() => mockDebug.sampleOdds()}
-            >
-              kansen (console)
-            </button>
             {/*
               Here rather than in the header, because it skips the reveal — which is the part
               of this feature everybody is actually here for. That makes it a development

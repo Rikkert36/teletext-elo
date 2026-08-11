@@ -14,11 +14,54 @@ a signing-in ledger where the searchbar was, and five shut albums in five leathe
 stains that you pick one of before the shelf and the empty book appear. See "Getting
 in: the ledger and the five books".
 
-**Packs and cards are still not persisted**, deliberately: there is no `PackClaim`
-or `CardInstance` table, so the endpoint answers `owned: []` and `packs: []` and
-`httpCardsClient` keeps a clearly-marked session-local sandbox over the top so the
-opener and the test panel stay exercisable. **Cards revealed today do not survive a
-reload.** That is the next slice and the last big one.
+**Packs and cards are persisted, and the last big slice is done.** `PackClaim` and
+`CardInstance` exist, `PackService` derives / sizes / rolls / claims, and
+`POST api/collections/{playerId}/packs/{packId}/claim` is the endpoint. Playing a
+game today puts real packets on the shelf, everybody gets one free single a day, and
+**cards survive a reload**. The derivation is the one written up under "Packs are
+derived, not granted" — nothing was invented at implementation time — and the two
+unique indexes on `PackClaim` are the double-claim guard, exactly as specified.
+
+Four things worth knowing about how it landed:
+
+- **`Derive` narrows to the day itself** rather than trusting its caller to have
+  queried only today's claims. The window is the whole of the expiry rule, so it
+  belongs with the rule. A test caught this.
+- **`GameWithAnalytics` must be fed replayed games.** `PlayerPerformance.OldRating`
+  is assigned inside `GetUpdates` during the leaderboard replay, *not* read off the
+  row — so a game fetched straight from the table reports every old rating as 0 and
+  sizes every pack wrongly. `CollectionService.Build` hands `PackService` the games
+  the replay already returned; it used to discard them.
+- **The dev-only `DELETE` now takes the cards and the claims with it.** Neither
+  cascades from the album row — both hang off the player — so "back to the start of
+  the story" had to say so explicitly.
+- **`PUT api/collections/{playerId}/legends`**, development only, exists because the
+  latch is real now and earning it is a three-month proposition. Without it there is
+  no way to look at an icoon in a book at all.
+
+**With it, the phase-1 mock is gone.** `mockCardsClient`, `packSandbox`,
+`MOCK_PACKS`, `ACTIVE_POOL_SNAPSHOT`, `FALLBACK_LEGENDS`, the seeded starting
+collection, `drawPack`, `ticketsFor` and `overallFor` are all deleted;
+`mock/cardMock.ts` survives as the types, the tier cutoffs, the ceremony arithmetic
+and the name and URL helpers, which is everything in it that was ever presentation.
+`CardPlayer.overall` is now required, and signing in takes a `SelectablePlayer` —
+the ledger lists players under the games gate, who have no overall for the same
+reason they have no card. **`npm start` with no API behind it no longer renders a
+collection**, which is the honest state of a feature whose pool, odds, draw and cards
+all live on the server.
+
+**The test panel stays**, against what this document used to say, and its pack
+buttons stay with it — as stubs. A pack cannot be invented in the browser any more,
+so `grant` logs and does nothing; the buttons and their per-level copy are kept
+because **granting a named player (or everybody) a specific pack is the next
+feature**, and they are its first caller. `GrantOptions` in `cardsClient.ts` is the
+contract it has to honour, and `PackService.Roll` is where the guarantees have to
+land. The panel itself wants a debug flag rather than `SHOW_DEBUG = true`.
+
+Gone with the mock: the `kansen (console)` button, which drew a few thousand packs in
+the browser to check the observed frequencies. That check is now
+`InclusionProbabilitiesSumToThePackSize` in `UnitTests/PackTests.cs`, where it runs on
+every build rather than when somebody remembers to press a button.
 
 **The first backend slice was `GET /api/cards/pool`.** Read-only — no migration, no
 tables, nothing persisted — and it existed because a legend is rated on their
@@ -28,17 +71,16 @@ spread 4/7/7/2 across the tiers. Built with it: `CardRatingCalculator` (the scal
 the ticket weighting, in C#, configured from `appsettings.json`),
 `PeakVisibleRating` on `DynamicRatingPlayer`, and `CardPoolService`.
 
-The mock's frozen **active** roster survives as `ACTIVE_POOL_SNAPSHOT` — the odds
-table, the seeded starting collection and every completion estimate here were
-computed against it — but it is no longer what the draw uses when the API is up:
-`setActivePool` hands the server's list to `drawPack` the way `setLegendPool` already
-did, because the album's slots are built from that list and a reveal drawing from the
-snapshot could produce a card with no slot to land in.
+The mock's frozen **active** roster, `ACTIVE_POOL_SNAPSHOT`, is gone with the rest of
+the mock. It is worth knowing it existed, because **the odds table below, and every
+completion estimate here, were computed against it** — 38 players at their ratings on
+2026-08-05 — so those numbers describe that roster rather than whatever the
+leaderboard says today.
 
-The rest of `## Architecture` and `## Backend changes` is now **settled design,
-not built**. The one substantial change since it was first written: **packs are
+`## Architecture` and `## Backend changes` are now **built**, with the exception of
+the gift table. The one substantial change since they were first written: **packs are
 derived from today's games minus a claim table, rather than granted by a hook
-inside `CreateGame`.** Read that section before writing any of it — the derivation
+inside `CreateGame`.** Read that section before touching any of it — the derivation
 closes three gaps the granting design accepted in writing, and reintroducing a
 write into `CreateGame` is how they come back.
 
@@ -108,9 +150,9 @@ its rules into card.css / packopen.css, bring its timings back into
 `PackOpener.tsx` as constants, and delete the modules, `reveal.css` and the
 switcher.
 
-**Then:** the rest of phase 2 — `PackClaim`, `CardInstance`, `PackService` and the
-claim endpoint. The collection read, the create and the first migration are done;
-packs are what is left.
+**Then:** `PackGift` and `POST api/collections/gifts` — present a pack to a named
+player or to everybody, and wire the test panel's pack buttons to it. Everything else
+in phase 2 is done.
 
 Two smaller things still open:
 - Whether first-name-only is acceptable now that two Daans and two Jeroens read
@@ -118,8 +160,14 @@ Two smaller things still open:
 - Whether the ceremony should enter at 80+ rather than 75+ (18% of cards rather
   than 28%).
 
-A `mock/` directory, the `guarantee*` debug options, and `window.cardDebug` all
-exist only for phase 1 and are deleted in phase 2.
+The `src/mock/` directory now holds no mocks — `cardMock.ts` is the card domain the
+UI needs and nothing else. Renaming it is ten import sites of churn for no behaviour,
+so it is worth doing on its own rather than smuggled into a slice.
+
+The `guarantee*` options survive on `Pack` with nothing setting them: they are how a
+ceremony level is reached on demand instead of on a ~3% roll, and the gift endpoint is
+what will set them. `window.cardDebug` is down to the animation speed and the mute
+setting, both of which are genuinely client-side.
 
 ## Context
 
@@ -548,11 +596,17 @@ Four production endpoints, one development-only, one hook, and no background job
 | `GET` | `api/cards/pool` | **Built.** Every player a pack can contain: actives on their current rating, legends on their all-time high. |
 | `GET` | `api/collections/{playerId}` | **Built.** The whole page in one response — pool, legends, owned counts, available packs, unlock state, eligibility, and the album's binding. |
 | `POST` | `api/collections/{playerId}/create` | **Built.** Fetches the player an album in the leather they picked. Idempotent; returns the same payload as the `GET`. |
-| `POST` | `api/collections/{playerId}/packs/{packId}/claim` | Rolls, files the cards, returns them with `isNew` and `copies`. |
-| `DELETE` | `api/collections/{playerId}` | **Built, development only.** Puts the album back on the table so the opening sequence can be watched again. Idempotent; 404s outside Development rather than 403, because a route that is not meant to exist should not announce that it does. |
+| `POST` | `api/collections/{playerId}/packs/{packId}/claim` | **Built.** Rolls, files the cards, returns them with `isNew` and `copies`. 409 for an already-claimed pack, for a player with no album and for one under the gate; 404 for an unknown player and for a pack that is not currently derived — which covers an invented id, somebody else's game and yesterday's packet alike. |
+| `DELETE` | `api/collections/{playerId}` | **Built, development only.** Puts the album back on the table so the opening sequence can be watched again, and takes the cards and the claims with it. Idempotent; 404s outside Development rather than 403, because a route that is not meant to exist should not announce that it does. |
+| `PUT` | `api/collections/{playerId}/legends` | **Built, development only**, gated the same way. Flips the latch by hand, because earning it is a three-month proposition and it is the only way to see an icoon in a book. |
 | `PUT` | `api/collections/{playerId}/cover` | Later, and only if wanted. A re-bind. Reserved rather than built — see "The album is chosen once". |
-| `POST` | `api/collections/{playerId}/packs/debug` | Development only. Same options as `mockDebug.grantPack`. |
-| `POST` | `api/collections/gifts` | Later. Present packs, the one grant-shaped thing left. |
+| `POST` | `api/collections/gifts` | **Next.** Present packs to a named player or to everybody — the one grant-shaped thing left, and what the test panel's pack buttons are waiting on. |
+
+The development-only `api/collections/{playerId}/packs/debug` that used to sit in this
+table was never built and is not going to be. A debug pack and a present are the same
+object — a pack somebody was handed rather than earned — so `api/collections/gifts`
+covers both, and a second grant-shaped route would only be a second thing to keep in
+step with `PackService.Roll`.
 
 **The routes are plural, and there is no `api/collection/players`.** Both were
 singular in this document and in `cardsClient.ts`'s header comment for as long as
@@ -699,14 +753,30 @@ New entities in `Models/Results/`, registered in
 The existing `OwnsOne` flattening and absent Game→Player FKs are legacy shape;
 new tables should use real FKs.
 
-- **`PackClaim`** — `Id`, `PlayerId`, `Source` (`Game` | `Daily` | `Gift`),
-  `GameId` (nullable, cascade), `ClaimDate`, `ClaimedAt`. Unique on
-  `(PlayerId, Source, GameId)` and on `(PlayerId, Source, ClaimDate)` for dailies.
-  **Those indexes are the double-claim guard** — two tabs racing means one insert
-  fails, and that failure is the 409. There is no separate check to forget.
-- **`CardInstance`** — `Id`, `PlayerId` (owner), `SubjectPlayerId` (who's on the
-  card, cascade delete), `PackClaimId`, `GameId` (cascade delete), `IsLegend`,
-  `MintedAt`.
+- **`PackClaim`** — **built.** `Id`, `PlayerId`, `Source` (`Game` | `Daily`; `Gift`
+  arrives with the gift table), `GameId` (nullable, cascade), `ClaimDate`,
+  `ClaimedAt`. Unique on `(PlayerId, Source, GameId)` and on `(PlayerId, ClaimDate)`
+  for dailies. **Those indexes are the double-claim guard** — two tabs racing means
+  one insert fails, and that failure is the 409. There is no separate check to forget.
+  - The daily index **must be filtered** (`WHERE "Source" = 'Daily'`). As written
+    here it was `(PlayerId, Source, ClaimDate)`, which is fine, but the obvious
+    unfiltered `(PlayerId, ClaimDate)` forbids a player claiming two *game* packs on
+    one day — the normal case for anyone who plays twice in an afternoon. There is a
+    test for exactly that.
+  - SQLite treats NULLs as distinct in a unique index, so the first index does not
+    accidentally cover the dailies either. The two are genuinely separate rules.
+  - `Source` is stored as a **string**, via `HasConversion<string>()`. EF maps enums
+    to `int`, and an added source would then silently renumber the existing ones.
+- **`CardInstance`** — **built.** `Id`, `PlayerId` (owner), `SubjectPlayerId` (who's
+  on the card, cascade delete), `PackClaimId` (cascade), `GameId` (cascade delete),
+  `IsLegend`, `MintedAt`, indexed on `(PlayerId, SubjectPlayerId)` because every read
+  of a collection is "how many of each subject".
+  - Deleting a game therefore reaches its cards **two ways** — directly, and through
+    the claim — which SQLite is happy to have. The direct one is kept because it is
+    the one that states the rule.
+  - `IsLegend` is frozen at mint time rather than derived from the subject's `Active`
+    flag: the two answer different questions, and somebody going inactive next month
+    did not retroactively hand you an icoon.
 - **`PlayerCollection`** — **built**, and the only table so far. `PlayerId` (PK
   *and* FK to `Players`, cascade), `Cover`, `CreatedAt`, `LegendsUnlockedAt`
   (nullable — a permanent latch, so new joiners and players crossing 5 games don't
@@ -739,8 +809,10 @@ scheduled job, which is a moving part in a design whose main virtue is having
 none. A few thousand rows a year is nothing in SQLite, and they are a free record
 of where a card came from.
 
-Generate with `dotnet ef migrations add AddCardCollection` — `dotnet-ef 8.0.0`
-is pinned in `.config/dotnet-tools.json`.
+Generated as `20260811121556_AddPackClaimAndCardInstance` — `dotnet-ef 8.0.0` is
+pinned in `.config/dotnet-tools.json`. Note that `dotnet ef` builds the project, so a
+running dev API locks `bin\Debug` and the build fails on the exe copy;
+`--configuration Release` sidesteps it without stopping the API.
 
 ### Services
 
@@ -761,11 +833,18 @@ Done:
   collections or packs; it is the set, not anyone's state over it, which is what
   lets `CollectionService` call straight into it rather than build its own list.
 
+- **`Services/PackService.cs`** — deriving, sizing, rolling, claiming, the daily
+  freebie. `Derive`, `PackForGame`, `DailyPack` and `Roll` are all **static**: they
+  are pure functions of the arguments handed to them, which is what lets the tests
+  drive them without a database, and `Roll` takes an injectable `Random` for the same
+  reason.
+- **`Services/CollectionService.cs`** — now also fills `Owned` from `CardInstance` and
+  `Packs` from `PackService`, and hands over the games the replay already returned
+  rather than letting anything re-query them. See the `OldRating` note at the top of
+  this document.
+
 Still to write:
 
-- `Services/PackService.cs` — deriving, sizing, rolling, claiming, daily freebie.
-- `Services/CollectionService.cs` — a player's cards with live overalls, and the
-  legends completion check.
 - `Services/GameService.cs` — the duplicate guard, and **only** that.
 
 Both rolling and reading a collection need current ratings via
@@ -1255,8 +1334,8 @@ the same reason nothing on the card prints the word "icoon" either. The word sti
 appears in the viewer (`viewer__flag`), which is an off-face surface.
 
 Rarity is **completely untouched**: no separate draw, no extra tickets, no new
-threshold. `tierFor()`, `ticketsFor()`, `DHigh`, `drawPack()` and the ceremony are
-all unchanged.
+threshold. `tierFor()`, `TicketsFor()`, `DHigh`, `PackService.Roll()` and the
+ceremony are all unchanged.
 
 Four parts and no more:
 
@@ -2887,6 +2966,11 @@ interface, never the mock, so switching to the real API is a one-file change and
 no component is touched. The TS scale/weighting is throwaway once the C# version
 exists; only the display code survives.
 
+**That bet paid, and is now settled.** The claim endpoint deleted the mock
+implementation, the sandbox and every fixture in one go, and **not one component
+changed** — the whole of it was `cardsClient.ts`, the fixture half of `cardMock.ts`,
+and two lines in `CollectionPage` where `owned` went from cards to counts.
+
 Avatars need no mock. `public/config.js` already points at the deployed API, so
 `/api/player/{id}/avatar` serves real photos while everything else is fake.
 
@@ -2899,22 +2983,27 @@ Order within phase 1: `XpWindow` → `PlayerCard` → `Album` with the flip →
    functions. Port from the phase-1 TypeScript.~~ **Done**, with 50 unit tests: the
    anchors, the clamp at both ends, monotonicity across the whole range, the
    midpoint-rounding trap, ticket continuity at the hinge, and every player in the
-   published odds table landing on the overall it lists. The 2.600 sum check waits
-   for `drawPack`, since it is a property of the draw rather than of the weighting.
+   published odds table landing on the overall it lists. The 2.600 sum check waited
+   for the draw, since it is a property of that rather than of the weighting, and
+   lands in `PackTests` with step 5.
 2. ~~Peak tracking and `GET api/cards/pool`, so icoon cards show real people.~~
    **Done.**
 3. ~~The first migration, `CollectionService`, `CollectionsController`.~~ **Done** —
    `PlayerCollection`, the collection read and the create, plus the opening sequence
    that hangs off `album: null`.
-4. ~~Swap the mock client implementation for the HTTP one.~~ **Done**, except that
-   `revealPack` and the pack shelf are still a session-local sandbox inside
-   `httpCardsClient`, and `mock/cardMock.ts` is therefore not deleted: the scale, the
-   tiers, the ceremony maths, `drawPack` and the display helpers all still live there
-   and are all still used. What dies with the claim endpoint is the sandbox,
-   `ACTIVE_POOL_SNAPSHOT`, `MOCK_PACKS`, the seeded collection, `mockCardsClient` and
-   the test panel — not the file.
-5. `PackClaim`, `CardInstance`, `PackService`, and
-   `POST api/collections/{playerId}/packs/{packId}/claim`.
+4. ~~Swap the mock client implementation for the HTTP one.~~ **Done.**
+5. ~~`PackClaim`, `CardInstance`, `PackService`, and
+   `POST api/collections/{playerId}/packs/{packId}/claim`.~~ **Done**, and with it the
+   whole of the sandbox, `mockCardsClient` and `cardMock`'s fixture half. The file
+   survives as presentation only — see "Where this stands". The **test panel does not
+   die with it**, against what step 5 originally assumed: its pack buttons are the
+   first caller for the gift endpoint, so they stay as stubs rather than being deleted
+   and rewritten.
+6. `PackGift` and `POST api/collections/gifts` — present a pack to a named player or
+   to everybody, and wire the test panel's buttons to it. The guarantees in
+   `GrantOptions` need a home in `PackService.Roll`. This is the only grant-shaped
+   table in the design, because a present cannot be derived from anything that
+   happened.
 
 Note what the collection slice cost that was not foreseen: `CardPoolService` needed a
 second `GetPool` overload taking an already-replayed roster. `GetLeaderBoard()` is not
@@ -2930,7 +3019,12 @@ the 5–9 games band in the legends pool is populated after all.
 
 ## Verification
 
-### Phase 1 — `npm start` only, no backend running
+### Phase 1 — the visual checks
+
+Written when `npm start` on its own was enough. It no longer is: the mock client is
+gone, so all of these now need the API running and a signed-in player with an album.
+The checks themselves are unchanged and are still the regression list for the
+presentation layer.
 
 1. `/collectie` renders full-bleed with no OS chrome and no width cap; nav,
    leaderboard, games and player pages are untouched teletext.
@@ -3025,16 +3119,48 @@ the 5–9 games band in the legends pool is populated after all.
       leather; the pages stay paper-brown; the inside covers stay the stage's green.
     - Stop the API and reload → the error branch, a loud Dutch console warning, and
       **no** invitation to pick a cover.
-    - Grant a pack, open it, watch the cards land — then reload and confirm they are
-      gone. Expected until the claim endpoint lands.
-3. Unit-test pack sizing: a win gives 3, a win beating expected margin by 3+
-   gives 5, a loss beating expected margin by 3+ gives 3, a plain loss gives 1.
-4. Unit-test the opponent bonus: a qualifying pack doubles exactly the two
+2b. **The pack slice.** `dotnet ef database update` by hand against both databases
+    again, or every collection GET throws *no such table* on `PackClaims`. Then:
+    - Sign in as a ≥5-game player with an album on a day they have not played: exactly
+      one packet on the shelf, the green single. Open it, then **reload and confirm the
+      card is still in the book** — the whole point of the slice.
+    - Reload again: no second daily.
+    - Enter a game with that player in it → all four participants gain a packet, sized
+      1 / 3 / 5 by the rule. A 10-3 win against the odds is a five.
+    - The wrapper's `title` carries the reason and the score from *your* seat, not the
+      row's — the losing side of a 10-3 reads `gespeeld — 3-10`.
+    - `PUT /api/game/{id}` to change the score before anyone claims → the pack resizes.
+      Edit one after a claim → it does not, and the cards already minted stand.
+    - `DELETE /api/game/{id}` → the packet stops being offered and its cards vanish.
+    - Two tabs on the same packet → one reveal, one 409, one set of cards.
+    - Past midnight, yesterday's unclaimed packets are gone whether opened or not.
+    - The test panel's pack buttons log a warning and do nothing. Expected until the
+      gift endpoint lands.
+3. ~~Unit-test pack sizing: a win gives 3, a win beating expected margin by 3+
+   gives 5, a loss beating expected margin by 3+ gives 3, a plain loss gives 1.~~
+   **Done**, from both teams' seats — `UnitTests/PackTests.cs`.
+4. ~~Unit-test the opponent bonus: a qualifying pack doubles exactly the two
    opponents' tickets and no one else's, and a win *plus* margin bonus still
-   doubles only 2×.
-5. Unit-test the draw: no player appears twice in a 5-card pack, and summed
-   inclusion probabilities over the pack mix equal the average pack size (2.600
-   for the current roster).
+   doubles only 2×.~~ **Done.**
+5. ~~Unit-test the draw: no player appears twice in a 5-card pack, and summed
+   inclusion probabilities over the pack mix equal the average pack size.~~
+   **Done** — the sum is asserted to equal the pack size exactly for 1, 3 and 5 over
+   40k packs, which is the check that catches "draw k independently and dedupe"
+   masquerading as successive sampling. A pool smaller than the pack is also covered,
+   because it is the one input that could loop forever.
+
+5a. **The claim slice**, in `UnitTests/PackClaimTests.cs`, against real SQLite over a
+    held-open in-memory connection — the in-memory provider enforces neither the unique
+    indexes nor the cascades, and here those *are* the implementation. Covered: the
+    daily can only be claimed once a day and comes back tomorrow; two game packs on one
+    day do not collide (the filtered index); a claim cannot outlive its player; claiming
+    mints a card that a fresh read of the collection has; a second copy reports
+    `isNew: false` and `copies: 2`; completing the active set latches the legends;
+    deleting the game takes its cards; emptying a collection takes the cards and the
+    claims; and packs are only offered once there is a book.
+    - The one-player-pool helper is what makes any of the draw-dependent assertions
+      possible: one player over the gate and nine under it means the roll has exactly
+      one card it can produce.
 6. `dotnet run` the API, `npm start` the UI (proxy via `public/config.js`).
 7. Submit a game → all four participants each have a pack of the right size →
    reveal → cards persist across a hard reload.

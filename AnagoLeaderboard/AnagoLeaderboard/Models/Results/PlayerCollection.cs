@@ -39,8 +39,8 @@ public class PlayerCollection
     ///
     /// A permanent latch rather than a recomputed flag: once you have finished the set you
     /// keep the legends, so a new joiner or somebody crossing the games gate afterwards
-    /// cannot un-complete it. Nothing writes this yet - it needs owned cards to count, and
-    /// those arrive with the claim endpoint.
+    /// cannot un-complete it. Written by <see cref="Services.PackService.Claim"/> when a
+    /// claim completes the active set, and by hand from the development-only legends route.
     /// </summary>
     public DateTime? LegendsUnlockedAt { get; set; }
 
