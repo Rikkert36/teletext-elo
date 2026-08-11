@@ -760,6 +760,31 @@ export const playSlot = (): void => {
   playBoom(130, 0.08, 0.05, 0.085);
 };
 
+/**
+ * One letter taking the gold block, in the album's opening sequence.
+ *
+ * Deliberately **not** `playSlot`, which was the first thing tried. That is eleven grains
+ * over 100ms plus a 130Hz boom — at roughly 90ms a letter the grains smear into a
+ * continuous wash and the booms turn into a pitched pulse train around 11Hz, so a name
+ * being blocked sounded like a machine running. It is also the card-into-slot sound and
+ * already means something else.
+ *
+ * So: a handful of grains, brief, high, no low end at all, and quiet enough that eleven
+ * of them in a row stay under the leather landing on the table afterwards. A hot foil
+ * press is a small dry tick, not an impact — the weight in that sequence belongs to the
+ * book, not to the letter G.
+ */
+export const playFoilStamp = (): void => {
+  playGrains({
+    count: 4,
+    spread: 0.022,
+    grainMs: [3, 9],
+    hz: [2600, 6200],
+    gain: 0.028,
+    q: 3.2,
+  });
+};
+
 /* ------------------------------------------------------------------ *
  * The reveal
  *

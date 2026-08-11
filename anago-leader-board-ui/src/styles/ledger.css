@@ -1,0 +1,449 @@
+/* ================================================================ *
+ * The signing-in ledger
+ *
+ * An open ruled ledger lying flat on the mahogany. It is the front door to the
+ * collection, and it is a book rather than a form because the table's rule is that
+ * everything on it is either an object or engraved into the surface — a search field
+ * floating in the middle of the wood is the one thing that admits to being a UI.
+ *
+ * Three things make it read as paper rather than as a panel:
+ *
+ * 1. **It is warm off-white and it is the brightest thing on the table.** Paper under a
+ *    lamp is lighter than polished mahogany, so this is the one element allowed to be
+ *    pale. Everything else on the stage is dark with light type.
+ * 2. **The light comes from the same place as everywhere else** — top left, per
+ *    `--drop`. Objects disagreeing about the lamp is what kills the table instantly.
+ * 3. **The gutter is real.** A flat rectangle of cream reads as a card; two pages with a
+ *    shadowed valley between them reads as a bound book seen from above, which is the
+ *    same trick `.album__binding` plays.
+ *
+ * Deliberately NOT reusing `.album__cover`'s leather: this is the register, not another
+ * album, and two leather books on one table would look like the wrong one was open.
+ * ================================================================ */
+
+.ledger-stage {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  /* Roughly where the book sits, so signing in does not move the eye. */
+  padding: clamp(12px, 4vh, 54px) 0 clamp(20px, 5vh, 70px);
+}
+
+/*
+ * The paper itself, shared by the full-size register and the small one that stays on the
+ * table beside the album.
+ *
+ * Shared rather than written twice because they are the same object seen at two sizes — if
+ * the cream, the edge or the light drifted between them, the little one would stop reading
+ * as the book you signed and start reading as a note.
+ *
+ * A warm cream with the faintest wash across it, a hairline darker edge so the sheet has a
+ * thickness rather than being a fill, and the same one lamp everything on this table is lit
+ * by. Paper does not take the stage's light type, so it sets its own ink.
+ */
+.ledger-paper {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 22%),
+    linear-gradient(100deg, #efe6d2 0%, #e6dbc2 48%, #efe6d2 100%);
+  border: 1px solid #cdbf9f;
+  color: #3a3222;
+  font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
+}
+
+.ledger {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(860px, 94%);
+  min-height: clamp(260px, 42vh, 400px);
+  box-sizing: border-box;
+  border-radius: 2px;
+
+  /* Lifted off the wood, lit from the top left, with the page block under it. */
+  box-shadow:
+    0 1px 0 #fdf8ea inset,
+    0 18px 34px rgba(14, 5, 2, 0.55),
+    0 3px 8px rgba(14, 5, 2, 0.45);
+}
+
+/* The valley at the spine. Narrow, and darkest exactly on the fold. */
+.ledger__gutter {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 46px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(90, 70, 38, 0) 0%,
+    rgba(90, 70, 38, 0.16) 42%,
+    rgba(60, 46, 22, 0.28) 50%,
+    rgba(90, 70, 38, 0.16) 58%,
+    rgba(90, 70, 38, 0) 100%
+  );
+}
+
+.ledger__page {
+  padding: clamp(18px, 2.6vw, 34px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ledger__page--left {
+  padding-right: clamp(26px, 3.4vw, 44px);
+}
+
+.ledger__page--right {
+  padding-left: clamp(26px, 3.4vw, 44px);
+}
+
+/* ---------------------------------------------------------------- *
+ * The left page: what this book is for
+ * ---------------------------------------------------------------- */
+
+.ledger__heading {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(15px, 1.7vw, 21px);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #4a3a22;
+}
+
+.ledger__blurb {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #6a5c42;
+  max-width: 34ch;
+}
+
+.ledger__blurb--fine {
+  font-size: 11px;
+  color: #85765a;
+}
+
+.ledger__rule {
+  margin: 16px 0 4px;
+  height: 1px;
+  background: linear-gradient(90deg, #bfae8b, rgba(191, 174, 139, 0));
+}
+
+/* ---------------------------------------------------------------- *
+ * The right page: the line you write on
+ * ---------------------------------------------------------------- */
+
+.ledger__label {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: #8b7c5f;
+}
+
+/*
+ * The rule is on the wrapper and not on the input, because the nib sits at the left of
+ * the line and a border on the field would run underneath it. The line also has to keep
+ * its box when the field is focused — a rule that thickens on focus moves the baseline
+ * and the whole page twitches — so the active state is a colour change and a glow, never
+ * a width change.
+ */
+.ledger__line {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 2px;
+  border-bottom: 2px solid #bdae89;
+  transition: border-color calc(120ms * var(--anim, 1)) ease;
+}
+
+.ledger__line--active {
+  border-bottom-color: #7a6132;
+}
+
+/* The pen resting on the line. Ink-blue, so it is the one non-paper colour here. */
+.ledger__nib {
+  flex: none;
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 9px solid #2c3d63;
+  opacity: 0.55;
+  transition: opacity calc(120ms * var(--anim, 1)) ease;
+}
+
+.ledger__line--active .ledger__nib {
+  opacity: 1;
+}
+
+/*
+ * Handwriting, as far as a system font stack will go: a humanist italic at a size
+ * noticeably larger than the printed copy around it, in ink blue. The point is that what
+ * you type looks *added to* the page rather than typed into a field.
+ */
+.ledger__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: "Segoe Script", "Bradley Hand", "Lucida Handwriting", Georgia, serif;
+  font-style: italic;
+  font-size: clamp(16px, 1.9vw, 23px);
+  color: #22315a;
+  padding: 0;
+}
+
+/* ---------------------------------------------------------------- *
+ * The names written underneath
+ *
+ * Entries on the same page rather than a dropdown over it — which is why there is no
+ * panel, no border and no shadow. The header picker needed a floating menu because it
+ * had nowhere to put the list; here the page is the list.
+ * ---------------------------------------------------------------- */
+
+.ledger__names {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  min-height: 0;
+}
+
+.ledger__name {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 5px 2px;
+  border: none;
+  border-bottom: 1px solid rgba(191, 174, 139, 0.55);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: #22315a;
+  transition: background-color calc(90ms * var(--anim, 1)) ease;
+}
+
+.ledger__name:hover:not(:disabled),
+.ledger__name:focus-visible:not(:disabled) {
+  /* A pencil tick beside the line, not a filled row: paper does not highlight. */
+  background: rgba(122, 97, 50, 0.12);
+  outline: none;
+}
+
+.ledger__name-text {
+  font-family: "Segoe Script", "Bradley Hand", "Lucida Handwriting", Georgia, serif;
+  font-style: italic;
+  font-size: clamp(14px, 1.5vw, 18px);
+}
+
+.ledger__name-note {
+  flex: none;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: #8b7c5f;
+}
+
+/*
+ * Under the games gate: listed, struck through, and told how far off they are.
+ *
+ * Listed rather than filtered out, deliberately. A name that is simply absent cannot
+ * explain itself, and the players this affects are exactly the newest colleagues — the
+ * ones with the least reason to assume the page is working correctly.
+ */
+.ledger__name--short {
+  cursor: not-allowed;
+  color: #9a8f78;
+}
+
+.ledger__name--short .ledger__name-text {
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  text-decoration-color: rgba(154, 143, 120, 0.8);
+}
+
+.ledger__empty {
+  padding: 8px 2px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #8b7c5f;
+  max-width: 34ch;
+}
+
+/* ================================================================ *
+ * The register, still on the table
+ *
+ * The way out of a collection: the same ledger, small, lying in the right margin opposite
+ * the packet shelf, open at the line you signed. Clicking it crosses your name out.
+ *
+ * A `<button>` that does not look like one — no plate, no bevel, no travel. It is a piece
+ * of paper on wood, and the affordance is the paper lifting under the cursor plus the
+ * caption at the bottom of it.
+ * ================================================================ */
+
+.ledger-corner {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px 8px;
+  border-radius: 2px;
+  text-align: left;
+  cursor: pointer;
+
+  /* Sitting flatter on the table than the full-size book: it is one leaf, not a volume. */
+  box-shadow:
+    0 1px 0 #fdf8ea inset,
+    0 6px 14px rgba(14, 5, 2, 0.5),
+    0 2px 4px rgba(14, 5, 2, 0.4);
+
+  transition:
+    transform calc(140ms * var(--anim, 1)) ease,
+    box-shadow calc(140ms * var(--anim, 1)) ease;
+}
+
+/* Picked up an inch, like the books on the choosing table. Same light, same lift. */
+.ledger-corner:hover:not(:disabled),
+.ledger-corner:focus-visible:not(:disabled) {
+  transform: translateY(-3px);
+  box-shadow:
+    0 1px 0 #fdf8ea inset,
+    0 12px 22px rgba(14, 5, 2, 0.55),
+    0 3px 7px rgba(14, 5, 2, 0.45);
+  outline: none;
+}
+
+.ledger-corner:focus-visible {
+  border-color: #7a6132;
+}
+
+.ledger-corner__label {
+  display: block;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 9px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #8b7c5f;
+}
+
+.ledger-corner__line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #bdae89;
+}
+
+/*
+ * Your own handwriting, carried over from the line you wrote it on. That is the whole
+ * reason this reads as "you signed in" rather than as a label saying who you are.
+ */
+.ledger-corner__name {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  font-family: "Segoe Script", "Bradley Hand", "Lucida Handwriting", Georgia, serif;
+  font-style: italic;
+  font-size: 15px;
+  color: #22315a;
+  /* One line, ellipsised: "Daan van der Beek" in a 150px margin would otherwise wrap and
+     grow the sheet, and a ledger that changes shape per name looks like a bug. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * The strike, drawn rather than switched on.
+ *
+ * A pen crossing a name out is a stroke with a direction and a duration; `text-decoration:
+ * line-through` appearing all at once is a state change, and the difference is the whole
+ * beat. Scaled from the left on a transform so it costs no layout.
+ */
+.ledger-corner__name::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 52%;
+  height: 1.5px;
+  background: #22315a;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform calc(220ms * var(--anim, 1)) cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.ledger-corner--striking .ledger-corner__name::after {
+  transform: scaleX(1);
+}
+
+/*
+ * What clicking does, said in words.
+ *
+ * The page-turn strips get away with no caption because a page edge under a cursor can only
+ * mean one thing. A ledger with your name on it is genuinely ambiguous — it could as easily
+ * mean "look at this" — and guessing wrong costs you the page you were on. So it is named,
+ * quietly, and it comes up on hover.
+ */
+.ledger-corner__action {
+  display: block;
+  margin-top: 6px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: #9a8f78;
+  transition: color calc(140ms * var(--anim, 1)) ease;
+}
+
+.ledger-corner:hover:not(:disabled) .ledger-corner__action,
+.ledger-corner:focus-visible:not(:disabled) .ledger-corner__action {
+  color: #6a5c42;
+}
+
+/* Mid-strike: no longer offering anything, and it must not lift back up. */
+.ledger-corner:disabled {
+  cursor: default;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * Phone: one page, not two
+ *
+ * The same breakpoint as `useIsMobile` and the mobile album. Two pages side by side on a
+ * 375px screen gives each of them about 150px, which is narrower than the names written
+ * on them — so the book is shown as a single page and the gutter goes with the fold.
+ * ---------------------------------------------------------------- */
+
+@media (max-width: 599.95px) {
+  .ledger {
+    grid-template-columns: 1fr;
+    width: 96%;
+  }
+
+  .ledger__gutter {
+    display: none;
+  }
+
+  .ledger__page--left,
+  .ledger__page--right {
+    padding: clamp(14px, 4vw, 22px);
+  }
+
+  /* The heading and the blurb keep their place; only the fine print goes, since the
+     same fact is repeated on the struck-through lines anyway. */
+  .ledger__blurb--fine,
+  .ledger__rule {
+    display: none;
+  }
+
+  .ledger__page--right {
+    border-top: 1px solid rgba(191, 174, 139, 0.6);
+  }
+}

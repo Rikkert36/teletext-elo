@@ -650,6 +650,40 @@
   max-height: min(56vh, var(--page-h));
 }
 
+/*
+ * The register, in the right margin — opposite the packet shelf.
+ *
+ * Symmetric with `.album-side` on purpose, and out of flow for the same reason: the book
+ * centres on the table whether either margin has anything in it or not, so neither of them
+ * can move it. The two things lying beside the album are what you came for and how you
+ * leave.
+ *
+ * Narrower than the shelf because it holds one leaf rather than a pile two packets wide,
+ * and capped by `--shelf-room` all the same so it can never reach the book.
+ */
+.album-register {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: min(clamp(132px, 15vw, 210px), var(--shelf-room));
+
+  /* Matches the shelf's return, so both margins light at the same moment. */
+  transition: opacity 420ms ease 320ms;
+}
+
+/*
+ * Hands full: during a reveal, and during the binding ceremony.
+ *
+ * Same treatment as the shelf, and the same argument — you cannot sign yourself out while a
+ * card is in the air, and offering it mid-ceremony would put a way to abandon a book at the
+ * exact moment it is being stamped with your name.
+ */
+.album-register--set-aside {
+  opacity: 0.34;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
 .album-main {
   min-width: 0;
   display: flex;
@@ -679,6 +713,18 @@
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
+  }
+
+  /*
+   * No margin left to lie in, so the register joins the stack — but last, below the book
+   * rather than above it. The shelf goes above because the next packet should be under your
+   * hand; the way out should not be.
+   */
+  .album-register {
+    position: static;
+    width: min(210px, 60%);
+    margin: 0 auto;
+    order: 3;
   }
 
   /* Back to the packopen.css defaults — there is no narrow margin to fit now. */

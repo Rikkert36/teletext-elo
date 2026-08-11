@@ -1,5 +1,4 @@
-import React, { ReactNode, useState } from 'react';
-import { isMuted, setMuted } from '../utils/sounds';
+import React, { ReactNode } from 'react';
 import '../styles/game.css';
 
 interface GameShellProps {
@@ -25,6 +24,17 @@ interface GameShellProps {
  * is screen furniture, and the space between two things on a table is what
  * separates them. Chrome is kept dark and recessive so the album's 3D flip
  * carries the screen.
+ *
+ * **The header is rendered only if there is something to put in it**, and on the
+ * collection page there no longer is: the player picker became the ledger, and the mute
+ * button is gone (see below). An empty header still contributed its bottom margin, which
+ * pushed the whole table down by ~22px for nothing.
+ *
+ * **There is no mute button.** Sound is on, and anyone who does not want it has a volume
+ * control on their computer and a mute button on their tab. A speaker icon in the corner
+ * of a mahogany table was the last piece of OS chrome on this page, and it was there to
+ * solve a problem the browser already solves. `setMuted` survives for the console — see
+ * `cardDebug` — so a silent development session is still one call away.
  */
 const GameShell: React.FC<GameShellProps> = ({
   title,
@@ -33,31 +43,18 @@ const GameShell: React.FC<GameShellProps> = ({
   children,
   footer,
 }) => {
-  const [muted, setMutedState] = useState(isMuted);
-
-  const toggleMute = () => {
-    const next = !muted;
-    setMuted(next);
-    setMutedState(next);
-  };
+  const header = title || subtitle || controls;
 
   return (
     <div className="game-stage">
-      <div className="game-header">
-        {title ? <h1 className="game-title">{title}</h1> : null}
-        {subtitle ? <span className="game-subtitle">{subtitle}</span> : null}
-        <span className="game-spacer" />
-        {controls}
-        <button
-          type="button"
-          className="game-button game-button--small"
-          onClick={toggleMute}
-          title={muted ? 'Geluid aan' : 'Geluid uit'}
-          aria-label={muted ? 'Geluid aan' : 'Geluid uit'}
-        >
-          {muted ? '🔇' : '🔊'}
-        </button>
-      </div>
+      {header ? (
+        <div className="game-header">
+          {title ? <h1 className="game-title">{title}</h1> : null}
+          {subtitle ? <span className="game-subtitle">{subtitle}</span> : null}
+          <span className="game-spacer" />
+          {controls}
+        </div>
+      ) : null}
 
       {children}
 

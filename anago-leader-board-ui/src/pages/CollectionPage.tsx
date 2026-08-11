@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Album, { AlbumSection, albumSlotOrder } from '../components/Album';
+import AlbumChoice from '../components/AlbumChoice';
 import CardViewer from '../components/CardViewer';
 import GameShell from '../components/GameShell';
 import PackOpener from '../components/PackOpener';
+import LedgerCorner from '../components/LedgerCorner';
 import PackTile from '../components/PackTile';
-import PlayerPicker from '../components/PlayerPicker';
+import SigningLedger from '../components/SigningLedger';
 import {
   CollectionState,
+  httpCardsClient,
   legendPoolSource,
-  mockCardsClient,
   mockDebug,
 } from '../clients/cardsClient';
 import {
@@ -18,16 +20,33 @@ import {
   RevealedCard,
   splitName,
 } from '../mock/cardMock';
+import { CoverId } from '../utils/albumLeather';
 import '../styles/game.css';
 
 const PLAYER_KEY = 'tafelvoetbal.cards.playerId';
 const FAST_KEY = 'tafelvoetbal.cards.fastOpen';
 const METER_CHUNKS = 24;
 
-/** Phase 1 only. Delete along with mock/cardMock.ts when the backend lands. */
+/**
+ * The test panel. Still on, because packs and cards are not persisted yet — the panel is
+ * the only way to get a pack at all, and every reveal check in the verification list runs
+ * through it. It goes when `POST …/packs/{packId}/claim` lands.
+ */
 const SHOW_DEBUG = true;
 
-const client = mockCardsClient;
+/**
+ * The seam. `mockCardsClient` is the other implementation and still works with no backend
+ * running, which is how the ceremony and the reveal are iterated on.
+ */
+const client = httpCardsClient;
+
+const forget = (key: string): void => {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    /* private browsing — there was nothing stored to forget */
+  }
+};
 
 const read = (key: string): string | null => {
   try {
@@ -66,18 +85,69 @@ const CollectionPage: React.FC = () => {
   /** Index into `slotOrder` of the card being looked at, or null for none. */
   const [viewing, setViewing] = useState<number | null>(null);
   const [fastMode, setFastMode] = useState(() => read(FAST_KEY) === 'true');
+  /**
+   * Whatever went wrong, in Dutch. Branched on before anything else.
+   *
+   * Without it a failed read leaves `collection` null forever, and the state machine reads
+   * null as "no album yet" — so an unreachable API would invite you to choose a leather
+   * and then fail the write too. An error has to be its own state, not the absence of one.
+   */
+  const [error, setError] = useState<string | null>(null);
+  /**
+   * True from the moment a leather is picked until the ceremony reports itself finished.
+   *
+   * This is what keeps `AlbumChoice` mounted across the write: the response arrives with
+   * `album` set, and branching on that alone would swap the component out mid-stamp on a
+   * fast server. The sequence decides when it is over, not the network.
+   */
+  const [creating, setCreating] = useState(false);
+  /**
+   * True while the remembered name is still being turned back into a player.
+   *
+   * The pick is stored as an id, and an id alone is not a player — the games gate and the
+   * cover both need the record — so it cannot be restored until the player list lands.
+   * That one round trip is long enough to see, and without this flag it renders as the
+   * ledger: a returning visitor was shown the front door for a moment and then had it
+   * replaced by their own album, which also made the collection request that follows look
+   * like it was fired with no name set.
+   *
+   * Seeded from localStorage synchronously, so it is only ever true when there is in fact
+   * something to restore. Nobody with no remembered name waits for anything.
+   */
+  const [restoring, setRestoring] = useState(() => read(PLAYER_KEY) !== null);
+  /**
+   * The album was bound a moment ago, in this session.
+   *
+   * Only the book's invitation line uses it. Session state rather than something derived
+   * from `album.createdAt`, because the question is not "is this album new" but "did you
+   * just watch this book being made" — somebody returning tomorrow to a book they never
+   * opened is a different case, and the album answers that one itself off its saved
+   * position.
+   */
+  const [justBound, setJustBound] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
-    void client.getSelectablePlayers().then((list) => {
-      if (cancelled) return;
-      setPlayers(list);
+    void client
+      .getSelectablePlayers()
+      .then((list) => {
+        if (cancelled) return;
+        setPlayers(list);
 
-      const remembered = read(PLAYER_KEY);
-      const found = list.find((p) => p.id === remembered);
-      if (found) setPlayer(found);
-    });
+        const remembered = read(PLAYER_KEY);
+        const found = list.find((p) => p.id === remembered);
+        if (found) setPlayer(found);
+      })
+      .catch((reason) => {
+        if (cancelled) return;
+        // eslint-disable-next-line no-console
+        console.warn('[kaarten] GET /api/players mislukt', reason);
+        setError('De spelerslijst is niet op te halen. Draait de API?');
+      })
+      .finally(() => {
+        if (!cancelled) setRestoring(false);
+      });
 
     return () => {
       cancelled = true;
@@ -85,7 +155,33 @@ const CollectionPage: React.FC = () => {
   }, []);
 
   const refresh = useCallback(async (playerId: string) => {
-    setCollection(await client.getCollection(playerId));
+    try {
+      setCollection(await client.getCollection(playerId));
+      setError(null);
+    } catch (reason) {
+      /*
+       * Loud, for the same reason the pool fetch is: a card page that quietly degrades to
+       * something plausible is indistinguishable from a working one.
+       *
+       * A 404 gets its own message, because it has two very different causes that the
+       * status code alone cannot separate — the player genuinely not existing, or the
+       * *route* not existing because the API is an older build than this page. The second
+       * is overwhelmingly the likelier one during development, and it cost a round of
+       * confusion the first time: the endpoint returns 404 only for an unknown player by
+       * design, so a 404 for a player you just picked off the list looks impossible.
+       */
+      const missing = reason instanceof Error && reason.message.startsWith('404');
+
+      // eslint-disable-next-line no-console
+      console.warn('[kaarten] GET /api/collections mislukt', reason);
+
+      setError(
+        missing
+          ? 'Deze speler bestaat niet — of de API is een oudere build zonder ' +
+              '/api/collections. Herstart de API en probeer het opnieuw.'
+          : 'Je collectie is niet op te halen. Draait de API, en is de migratie uitgevoerd?',
+      );
+    }
   }, []);
 
   useEffect(() => {
@@ -98,6 +194,43 @@ const CollectionPage: React.FC = () => {
     setOpeningPack(null);
     setRevealing(false);
     setViewing(null);
+    setCreating(false);
+    // Somebody else's book, which you did not watch being bound.
+    setJustBound(false);
+    /*
+     * Cleared, not left to be replaced.
+     *
+     * Two things go wrong otherwise, and both are visible. The stale collection's `album`
+     * belongs to the *previous* player, so switching to someone who has not started yet
+     * shows their predecessor's book with the new owner's name on the cover for a tick;
+     * and on the way back, a null collection is indistinguishable from "no album", so a
+     * returning visitor with a remembered name flashes the cover-choice table before their
+     * own album. The loading branch below is what covers the gap.
+     */
+    setCollection(null);
+  };
+
+  /**
+   * A leather was picked. Fires at the *start* of the ceremony, so the write happens while
+   * the book travels and the name goes on rather than after it.
+   *
+   * The response is applied straight away — it is the whole page, so no refetch is needed
+   * and a second one would be another full leaderboard replay — but `creating` keeps the
+   * ceremony on screen until it says it is done.
+   */
+  const chooseCover = (cover: CoverId) => {
+    if (!player) return;
+    setCreating(true);
+
+    void client
+      .createAlbum(player.id, cover)
+      .then(setCollection)
+      .catch((reason) => {
+        // eslint-disable-next-line no-console
+        console.warn('[kaarten] POST /api/collections/create mislukt', reason);
+        setError('Je album is niet aan te maken. Probeer het nog eens.');
+        setCreating(false);
+      });
   };
 
   /**
@@ -217,7 +350,25 @@ const CollectionPage: React.FC = () => {
   const filledChunks =
     totalActive > 0 ? Math.round((ownedActive / totalActive) * METER_CHUNKS) : 0;
 
+  /**
+   * The games gate, derived from the **picked player** rather than from the response.
+   *
+   * `collection.eligible` says the same thing authoritatively, and the create endpoint
+   * enforces it — but it is undefined for the whole fetch window, so branching on it would
+   * flash the gate notice on every pick and again after every reveal. The picker already
+   * carries the game count, so the check costs nothing here and is stable.
+   */
   const eligible = !player || player.numberOfGames >= MIN_GAMES;
+
+  /** The server's gate, for copy only, so the number quoted cannot drift from the rule. */
+  const minGames = collection?.minGames ?? MIN_GAMES;
+
+  /**
+   * Whether there is an album to draw at all. Distinct from `collection === null`, which
+   * means the read has not landed — see `choosePlayer`.
+   */
+  const hasAlbum = collection?.album != null;
+  const showChoice = collection !== null && (creating || collection.album == null);
 
   const handleOpen = useCallback(
     async (pack: Pack): Promise<RevealedCard[]> =>
@@ -245,19 +396,80 @@ const CollectionPage: React.FC = () => {
     if (player) void refresh(player.id);
   };
 
+  /**
+   * Back to the front door: forget who this browser is.
+   *
+   * The stored id is the *only* thing that makes this browser "you", so removing it is the
+   * whole of signing out. Nothing on the server is touched — the album survives, which is
+   * the point: this is for checking that a returning visitor lands on their own book
+   * without a flash of the ledger, which needs the album to still be there.
+   */
+  const forgetPlayer = () => {
+    forget(PLAYER_KEY);
+    setPlayer(null);
+    setCollection(null);
+    setOpeningPack(null);
+    setRevealing(false);
+    setViewing(null);
+    setCreating(false);
+    setRestoring(false);
+    setJustBound(false);
+    setError(null);
+  };
+
+  /**
+   * Back to the start of the story: no album, no cards, no packs.
+   *
+   * Server-side, because the album is a row — `mockDebug` writing to module state would
+   * leave the real one in place and the two silently disagreeing, which is exactly the class
+   * of bug the test panel is supposed to help find. Lands on the cover choice.
+   */
+  const emptyCollection = () => {
+    if (!player) return;
+    setCreating(false);
+    // The ceremony is about to run again, and it sets this itself when it finishes.
+    setJustBound(false);
+    setViewing(null);
+    setOpeningPack(null);
+    setRevealing(false);
+
+    void client
+      .emptyCollection(player.id)
+      .then(setCollection)
+      .catch((reason) => {
+        // eslint-disable-next-line no-console
+        console.warn('[kaarten] DELETE /api/collections mislukt', reason);
+        setError(
+          'Leegmaken lukt niet. Dit werkt alleen als de API in Development draait.',
+        );
+      });
+  };
+
   /* ---------------------------------------------------------------- */
 
-  const controls = (
-    <div className="game-row">
-      <PlayerPicker players={players} value={player} onChange={choosePlayer} />
-      <label className="game-check">
-        <input type="checkbox" checked={fastMode} onChange={toggleFast} />
-        snel openen
-      </label>
-    </div>
-  );
+  /*
+   * **There is no header.** It held a type-ahead and a mute button, and both are gone.
+   *
+   * The picker was the last undisguised control on the table, and it was also the thing that
+   * made reading a colleague's collection a matter of typing a different name into a box
+   * that was already open. The design has always accepted that as *possible* — there is no
+   * authentication and never will be — while not wanting to invite it, and an open text
+   * field pointed at everybody's albums is an invitation. Signing out and back in through
+   * the register is the same number of clicks and reads as a deliberate act.
+   *
+   * `snel openen` moved to the test panel, where it belongs: it skips the reveal, which is
+   * the part of this feature people are here for, so it is a development convenience rather
+   * than a setting.
+   *
+   * The mute button went for a different reason — see GameShell.
+   */
 
-  const footer = player && eligible && (
+  /*
+   * Readouts belong to a book that exists. Gated on `hasAlbum` as well as the games gate,
+   * or the cover-choice table gets "0/38 actieve spelers", an empty meter and "verzamel
+   * alles voor de legendes" underneath it — counters for a collection nobody has started.
+   */
+  const footer = player && eligible && hasAlbum && (
     <>
       <span className="game-readout">
         <strong>
@@ -284,27 +496,57 @@ const CollectionPage: React.FC = () => {
     </>
   );
 
+  /*
+   * Seven states, and **the order is the design**. Four of the orderings are bugs:
+   *
+   *   error       first, or a failed read looks like "no album" and invites a cover pick
+   *               whose write then fails too.
+   *   restoring   before the ledger, or a returning visitor is shown the front door for a
+   *               round trip and then has it swapped for their own album.
+   *   no player   the ledger. The front door.
+   *   loading     render nothing. Without it a returning visitor flashes the cover-choice
+   *               table before their own album, because a null collection and a null
+   *               `album` are indistinguishable.
+   *   under gate  before the album check, or an under-gate player spends the whole
+   *               ceremony and lands on the notice with it used up. (The server refuses
+   *               the write as well; this is what stops them being offered it.)
+   *   no album    the opening sequence, held on screen by `creating` rather than by the
+   *               response.
+   *   otherwise   the book.
+   */
   // No title or subtitle: the book's own cover says whose album it is.
   return (
-    <GameShell controls={controls} footer={footer || undefined}>
-      {!player ? (
-        <div className="game-notice">
-          Typ je naam hierboven om je album te openen.
-        </div>
+    <GameShell footer={footer || undefined}>
+      {error ? (
+        <div className="game-notice">{error}</div>
+      ) : restoring ? (
+        /* A name is remembered but not yet resolved. Blank, not the ledger — see
+           `restoring`. This is the only reason the front door is ever withheld. */
+        null
+      ) : !player ? (
+        <SigningLedger players={players} minGames={minGames} onChoose={choosePlayer} />
+      ) : collection === null ? (
+        /* The read is in flight. Deliberately blank rather than a spinner: it is one
+           request against a local API, and a spinner that flashes for 80ms is noise. */
+        null
       ) : !eligible ? (
         <div className="game-notice">
           {splitName(player.name).display} heeft {player.numberOfGames} wedstrijden
           gespeeld.
           <br />
-          Vanaf {MIN_GAMES} wedstrijden gaat je album open.
+          Vanaf {minGames} wedstrijden gaat je album open.
         </div>
       ) : (
         /*
-          One layout for both states. The opener takes the book's place inside
-          `.album-main`; the shelf never unmounts and never moves, because
-          `--shelf-room` is worked out from the viewport rather than measured off
-          whatever is currently in the middle. So the packet you open next is a click
-          in the place you just clicked, with no return trip through the album.
+          One layout for **every** signed-in state — the cover choice, the book and the
+          opener all take the middle of it in turn.
+
+          The choice used to sit outside this container, and folding it in is what gives the
+          register a single home: it is a thing lying on the table, so it has to be on the
+          table for as long as you are at it, including before there is a book. The margins
+          are out of flow and `--shelf-room` is worked out from the viewport rather than
+          measured off whatever is currently in the middle, so nothing in either margin can
+          move what is between them.
 
           The book being replaced rather than dimmed is deliberate: this is the one
           screen where it genuinely is not the subject, and leaving it under the
@@ -322,7 +564,7 @@ const CollectionPage: React.FC = () => {
             out of flow now, and the book is centred on the stage whether the aside
             is there or not. See `.album-layout` in game.css.
           */}
-          {shelfPacks.length > 0 ? (
+          {shelfPacks.length > 0 && !showChoice ? (
             <aside className={`album-side${revealing ? ' album-side--set-aside' : ''}`}>
               <div className="pack-shelf">
                 {shelfPacks.map((pack) => (
@@ -332,8 +574,31 @@ const CollectionPage: React.FC = () => {
             </aside>
           ) : null}
 
+          {/*
+            The register, in the opposite margin: how you leave, lying next to what you came
+            for. Stood down while a reveal is running and while a book is being stamped —
+            you cannot sign yourself out with a card in the air, and a way to abandon a book
+            halfway through having your name blocked into it is not a thing to offer.
+          */}
+          <aside
+            className={`album-register${
+              revealing || creating ? ' album-register--set-aside' : ''
+            }`}
+          >
+            <LedgerCorner name={ownerName ?? player.name} onSignOut={forgetPlayer} />
+          </aside>
+
           <div className="album-main">
-            {openingPack ? (
+            {showChoice ? (
+              <AlbumChoice
+                stampName={ownerName}
+                onChoose={chooseCover}
+                onDone={() => {
+                  setCreating(false);
+                  setJustBound(true);
+                }}
+              />
+            ) : openingPack ? (
               <>
                 <PackOpener
                   key={openingPack.id}
@@ -370,8 +635,25 @@ const CollectionPage: React.FC = () => {
               </>
             ) : (
               <Album
+                /*
+                  Keyed on the owner, so switching player is a different book rather than
+                  the same book showing something else. The album reads its saved reading
+                  position once, at mount, from a per-owner key — without the remount it
+                  would keep the previous person's page and then save it under the new
+                  person's name.
+                */
+                key={player.id}
                 sections={sections}
                 owner={ownerName}
+                ownerId={player.id}
+                cover={collection.album?.cover}
+                /*
+                  The last beat of the opening sequence, and the only one that is words.
+                  Both actions, because both are undiscoverable: the cover is the button,
+                  and the page edges are the only other control on the book. The album drops
+                  it the moment the cover is turned.
+                */
+                hint={justBound ? 'Je album ligt klaar! Open het en begin je verzameling!' : undefined}
                 onCardOpen={(id) => {
                   const found = slotOrder.findIndex((s) => s.card.player.id === id);
                   if (found >= 0) setViewing(found);
@@ -453,26 +735,33 @@ const CollectionPage: React.FC = () => {
             >
               legendes aan/uit ({legendPoolSource()})
             </button>
+            {/*
+              The two buttons that put the page back to a state you cannot otherwise
+              reach twice. They undo different things on purpose, and the pairing is the
+              useful part:
+
+                leegmaken  destroys the album on the server  -> the cover choice
+                resetten   forgets who this browser is       -> the ledger
+
+              So `leegmaken` is how the opening ceremony gets watched again, and
+              `resetten` is how the *returning visitor* path gets tested — that one needs
+              the album to still exist, which is exactly why it does not touch it.
+            */}
             <button
               type="button"
               className="game-button game-button--small"
-              onClick={() => {
-                mockDebug.clearCollection();
-                if (player) void refresh(player.id);
-              }}
+              onClick={emptyCollection}
+              disabled={!player}
+              title="Album weg, kaarten weg — terug naar het kiezen van een kaft"
             >
               leegmaken
             </button>
-            <button
-              type="button"
-              className="game-button game-button--small"
-              onClick={() => {
-                mockDebug.resetCollection();
-                if (player) void refresh(player.id);
-              }}
-            >
-              resetten
-            </button>
+            {/*
+              No "resetten" any more. Signing out is the register lying on the table beside
+              the book, which is a real part of the page rather than scaffolding — and a
+              second way to do it, on a panel that is going to be deleted, would be one more
+              thing to remember to remove.
+            */}
             <button
               type="button"
               className="game-button game-button--small"
@@ -480,6 +769,15 @@ const CollectionPage: React.FC = () => {
             >
               kansen (console)
             </button>
+            {/*
+              Here rather than in the header, because it skips the reveal — which is the part
+              of this feature everybody is actually here for. That makes it a development
+              convenience, not a setting somebody should be nudged toward.
+            */}
+            <label className="game-check">
+              <input type="checkbox" checked={fastMode} onChange={toggleFast} />
+              snel openen
+            </label>
           </div>
         </div>
       ) : null}

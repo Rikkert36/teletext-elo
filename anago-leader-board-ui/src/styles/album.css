@@ -112,9 +112,13 @@
   inset: 0;
   z-index: 0;
   border-radius: 4px;
-  background: linear-gradient(180deg, #4a3a22 0%, #33270f 100%);
+  background: linear-gradient(
+    180deg,
+    var(--leather-hi, #4a3a22) 0%,
+    var(--leather-mid, #33270f) 100%
+  );
   box-shadow:
-    0 0 0 2px #6b5325,
+    0 0 0 2px var(--board-edge, #6b5325),
     0 26px 50px rgba(0, 0, 0, 0.65),
     0 6px 14px rgba(0, 0, 0, 0.5);
 }
@@ -207,7 +211,7 @@
    shadowing all of them stacks a dozen copies into a black halo. */
 .album--closed .album__leaf--cover {
   box-shadow:
-    0 0 0 2px #6b5325,
+    0 0 0 2px var(--board-edge, #6b5325),
     0 26px 50px rgba(0, 0, 0, 0.65),
     0 6px 14px rgba(0, 0, 0, 0.5);
 }
@@ -479,7 +483,23 @@
   padding-top: 8px;
 }
 
-/* Cover: the page you land on before the collection proper. */
+/*
+ * Cover: the page you land on before the collection proper.
+ *
+ * The leather is tokenised because the owner chooses it — five stains, one product
+ * line, all of them brass-edged and gold-blocked. `utils/albumLeather.ts` is the only
+ * place the actual colours live; every `var()` here falls back to bordeaux, which is
+ * what the book was bound in before there was a choice, so a cover rendered with no
+ * stain set is the original book rather than a transparent one.
+ *
+ * Four rules share these tokens and have to agree or the book comes apart at the
+ * spine: this one, `.album__binding`, `.album--closed .album__leaf--cover`'s board
+ * edge, and the two foil rules below.
+ *
+ * **The paper is not leather.** The browns further up — the page grounds, the slot
+ * wells, the page numbers — stay literal on purpose. Staining those too would turn the
+ * pages navy inside a navy book.
+ */
 .album__cover {
   height: 100%;
   box-sizing: border-box;
@@ -488,8 +508,14 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: linear-gradient(150deg, #5a4526 0%, #35270f 55%, #4a3820 100%);
-  color: #e6c98a;
+  background: linear-gradient(
+    150deg,
+    var(--leather-hi, #5a4526) 0%,
+    var(--leather-mid, #35270f) 55%,
+    var(--leather-lo, #4a3820) 100%
+  );
+  /* Inherited by the kicker, the title and the sub, which only set opacity. */
+  color: var(--foil, #e6c98a);
   text-align: center;
   padding: 24px;
   border-radius: 0 3px 3px 0;
@@ -512,13 +538,18 @@
   font-weight: bold;
   letter-spacing: 2px;
   text-transform: uppercase;
-  text-shadow: 0 2px 0 #241a05, 0 3px 8px rgba(0, 0, 0, 0.7);
+  /* The emboss is the leather taking the block, so it moves with the stain — left
+     literal, gold letters on cognac get a cold black-brown edge that reads as a drop
+     shadow rather than as pressed in. */
+  text-shadow: 0 2px 0 var(--foil-emboss, #241a05), 0 3px 8px rgba(0, 0, 0, 0.7);
 }
 
 .album__cover-rule {
   width: 60%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, #a9853c 50%, transparent);
+  /* Its own token rather than `--foil`: the rule is a shade down from the blocking on
+     every book, and sharing one value flattens the two together. */
+  background: linear-gradient(90deg, transparent, var(--foil-rule, #a9853c) 50%, transparent);
 }
 
 .album__cover-sub {
@@ -645,12 +676,22 @@
   pointer-events: none;
 }
 
+/*
+ * The one piece of chrome the album has, and so the only place that can carry an
+ * invitation — there are no arrows beside the book and nothing is drawn on the turn
+ * strips. It says where you are, or, on a book that has never been opened, how to open it.
+ *
+ * `min-height` is reserved rather than left to the content: the label sits above the book,
+ * so a line that grows pushes the whole book down, and the invitation is a good deal longer
+ * than "gesloten".
+ */
 .album__nav-label {
   font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
   text-align: center;
   color: var(--accent-light, #e6c98a);
   padding-bottom: 6px;
+  min-height: calc(1.35em + 6px);
 }
 
 /* ---------------------------------------------------------------- *

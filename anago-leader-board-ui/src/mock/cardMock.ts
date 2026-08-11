@@ -117,7 +117,7 @@ const active = (
   numberOfGames: number,
 ): CardPlayer => ({ id, name, visibleRating, numberOfGames, isLegend: false });
 
-const ACTIVE_POOL: CardPlayer[] = [
+const ACTIVE_POOL_SNAPSHOT: CardPlayer[] = [
   active('27d01eda-dc90-4a81-891a-6d00f91ef79d', 'Petar "beetje gepiel" Drandarov', 1851, 1210),
   active('2724f764-4837-4623-a48f-b204014b8769', 'Ton "ooit eerste gestaan" Pastoor', 1578, 846),
   active('08548a49-477a-405c-b742-40e6de5bb7af', 'Mark "heeft ooit tweede gestaan" Razenberg', 1551, 684),
@@ -193,6 +193,22 @@ let legends: CardPlayer[] = FALLBACK_LEGENDS;
 /** Hands the real legends over once `GET /api/cards/pool` has answered. */
 export const setLegendPool = (players: CardPlayer[]): void => {
   legends = players.length > 0 ? players : FALLBACK_LEGENDS;
+};
+
+/**
+ * The actives actually in play, same deal.
+ *
+ * `ACTIVE_POOL` below is a frozen snapshot, kept because the odds table, the seeded
+ * starting collection and every completion estimate in docs/trading-cards.md were
+ * computed against it. Once the collection endpoint is the source of the pool, the book
+ * is built from the server's list — so the draw has to be too, or a reveal can hand you
+ * a card that has no slot in your album. That is the same trap the legends fell into
+ * before `setLegendPool` existed.
+ */
+let actives: CardPlayer[] = ACTIVE_POOL_SNAPSHOT;
+
+export const setActivePool = (players: CardPlayer[]): void => {
+  actives = players.length > 0 ? players : ACTIVE_POOL_SNAPSHOT;
 };
 
 /* ------------------------------------------------------------------ *
@@ -444,7 +460,7 @@ export const drawPack = (size: number, options: DrawOptions = {}): Card[] => {
     random = Math.random,
   } = options;
 
-  const pool = legendsUnlocked ? [...ACTIVE_POOL, ...legends] : ACTIVE_POOL;
+  const pool = legendsUnlocked ? [...actives, ...legends] : actives;
 
   let candidates = pool.map((player) => {
     const card = toCard(player);
@@ -530,8 +546,9 @@ const buildStartingCollection = (): Map<string, number> => {
     }
   }
 
-  // ACTIVE_POOL is ordered by rating, so this removes the top of the board.
-  ACTIVE_POOL.slice(0, MISSING_AT_START).forEach((player) => counts.delete(player.id));
+  // The snapshot is ordered by rating, so this removes the top of the board. Against the
+  // snapshot deliberately, not the live pool: this whole collection is a fixture.
+  ACTIVE_POOL_SNAPSHOT.slice(0, MISSING_AT_START).forEach((player) => counts.delete(player.id));
 
   return counts;
 };
@@ -541,13 +558,13 @@ export const MOCK_PACKS: Pack[] = [
     id: 'pack-1',
     size: 5,
     reason: 'gewonnen — 10-3 tegen de verwachting in',
-    doubledPlayerIds: [ACTIVE_POOL[0].id, ACTIVE_POOL[4].id],
+    doubledPlayerIds: [ACTIVE_POOL_SNAPSHOT[0].id, ACTIVE_POOL_SNAPSHOT[4].id],
   },
   {
     id: 'pack-2',
     size: 3,
     reason: 'gewonnen',
-    doubledPlayerIds: [ACTIVE_POOL[7].id, ACTIVE_POOL[18].id],
+    doubledPlayerIds: [ACTIVE_POOL_SNAPSHOT[7].id, ACTIVE_POOL_SNAPSHOT[18].id],
   },
   {
     id: 'pack-3',
@@ -563,7 +580,7 @@ export const MOCK_PACKS: Pack[] = [
   },
 ];
 
-export const activePool = (): CardPlayer[] => ACTIVE_POOL;
+export const activePool = (): CardPlayer[] => actives;
 export const legendPool = (): CardPlayer[] => legends;
 export const startingCollection = buildStartingCollection;
 

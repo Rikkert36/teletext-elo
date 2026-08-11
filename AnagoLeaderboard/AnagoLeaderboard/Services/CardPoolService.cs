@@ -23,11 +23,24 @@ public class CardPoolService
 
     public async Task<CardPool> GetPool()
     {
-        var minGames = _cardRatingCalculator.MinGames;
-
         // One replay for both lists. It is O(all games), but that is already the cost of
         // every existing GET on this API.
         var (players, _) = await _leaderBoardService.GetLeaderBoard();
+
+        return GetPool(players);
+    }
+
+    /// <summary>
+    /// The pool from a roster that has already been replayed.
+    ///
+    /// The replay is not cached and costs O(all games), so a caller that needs the pool
+    /// <em>and</em> something else off the leaderboard - the collection endpoint needs the
+    /// picked player's game count, which is filtered out of the pool by definition - would
+    /// otherwise pay for it twice on one request.
+    /// </summary>
+    public CardPool GetPool(IReadOnlyList<DynamicRatingPlayer> players)
+    {
+        var minGames = _cardRatingCalculator.MinGames;
 
         var eligible = players.Where(player => player.NumberOfGames >= minGames).ToList();
 

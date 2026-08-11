@@ -1,20 +1,39 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-10)
+## Where this stands (last updated 2026-08-11)
 
 **Phase 1 (frontend on mock data) is essentially complete.** Everything below the
 "Presentation layer" heading has been built and iterated on at length.
 
-**The backend has started, with one slice: `GET /api/cards/pool`.** It is
-read-only — no migration, no tables, nothing persisted — and it exists because a
-legend is rated on their all-time-high `visibleRating`, which is computable only
-inside the leaderboard's full game replay. So the icoon pages now show **20 real
-people** instead of six placeholders, spread 4/7/7/2 across the tiers. Built with
-it: `CardRatingCalculator` (the scale and the ticket weighting, in C#, configured
-from `appsettings.json`), `PeakVisibleRating` on `DynamicRatingPlayer`, and
-`CardPoolService`. The mock's **active** roster is deliberately still the frozen
-snapshot — the odds table, the seeded starting collection and every completion
-estimate here were computed against it, and live ratings have drifted.
+**A collection is now a persisted thing, and the page has a beginning.** The second
+backend slice is in: `PlayerCollection` (the first card table, and the first
+migration), `CollectionService`, `CollectionsController` with
+`GET api/collections/{playerId}` and `POST api/collections/{playerId}/create`, and
+the frontend swapped onto `httpCardsClient`. With it came the **opening sequence** —
+a signing-in ledger where the searchbar was, and five shut albums in five leather
+stains that you pick one of before the shelf and the empty book appear. See "Getting
+in: the ledger and the five books".
+
+**Packs and cards are still not persisted**, deliberately: there is no `PackClaim`
+or `CardInstance` table, so the endpoint answers `owned: []` and `packs: []` and
+`httpCardsClient` keeps a clearly-marked session-local sandbox over the top so the
+opener and the test panel stay exercisable. **Cards revealed today do not survive a
+reload.** That is the next slice and the last big one.
+
+**The first backend slice was `GET /api/cards/pool`.** Read-only — no migration, no
+tables, nothing persisted — and it existed because a legend is rated on their
+all-time-high `visibleRating`, which is computable only inside the leaderboard's full
+game replay. So the icoon pages show **20 real people** instead of six placeholders,
+spread 4/7/7/2 across the tiers. Built with it: `CardRatingCalculator` (the scale and
+the ticket weighting, in C#, configured from `appsettings.json`),
+`PeakVisibleRating` on `DynamicRatingPlayer`, and `CardPoolService`.
+
+The mock's frozen **active** roster survives as `ACTIVE_POOL_SNAPSHOT` — the odds
+table, the seeded starting collection and every completion estimate here were
+computed against it — but it is no longer what the draw uses when the API is up:
+`setActivePool` hands the server's list to `drawPack` the way `setLegendPool` already
+did, because the album's slots are built from that list and a reveal drawing from the
+snapshot could produce a card with no slot to land in.
 
 The rest of `## Architecture` and `## Backend changes` is now **settled design,
 not built**. The one substantial change since it was first written: **packs are
@@ -89,8 +108,9 @@ its rules into card.css / packopen.css, bring its timings back into
 `PackOpener.tsx` as constants, and delete the modules, `reveal.css` and the
 switcher.
 
-**Then:** the rest of phase 2 — the migration, `PackService`, `CollectionService`
-and `CollectionController`. The pool endpoint above is the only part built.
+**Then:** the rest of phase 2 — `PackClaim`, `CardInstance`, `PackService` and the
+claim endpoint. The collection read, the create and the first migration are done;
+packs are what is left.
 
 Two smaller things still open:
 - Whether first-name-only is acceptable now that two Daans and two Jeroens read
@@ -126,6 +146,11 @@ sized by how well they did, and collections build toward a legends unlock.
 | --- | --- |
 | Storage | Server-side (SQLite/EF Core). Sole source of truth. |
 | Identity | `PlayerId`, entered via type-ahead (not a dropdown). Browser remembers the last pick. |
+| Signing in | A **ruled ledger** lying open on the table, not a searchbar. Still a type-ahead — you write your name on the line. |
+| Signing out | The **register stays on the table**, small, in the margin opposite the packet shelf. Clicking it crosses your name out. There is no player picker anywhere. |
+| Sound | Synthesised, **on, and no mute button** — the browser and the OS both already have one. Reachable from `cardDebug`. |
+| Starting a collection | A **ceremony, not an absence**. Five shut albums lie on the table, you pick one up, and your name is blocked into the cover in gold foil before the shelf and the empty book appear. |
+| Album cover | Five leather stains — bordeaux, cognac, bosgroen, marineblauw, antraciet — brass edge and gold foil on all five. **Chosen once**, with no preview. |
 | Access gate | Collection page unlocks once that player has **≥5 games** — symmetric with the card pool. |
 | Pack recipients | **All four participants** of a game. |
 | Pack size | 1 for playing, **+2** for winning, **+2** for beating expected margin by ≥3. So 1, 3 or 5. |
@@ -146,7 +171,7 @@ sized by how well they did, and collections build toward a legends unlock.
 | Album | Hand-rolled stiff CSS 3D page flip. No new dependency. |
 | Card face | **Panini**: photo near-full-bleed and masked into the metal, no plates, first name only, DIN type, no stats. |
 | Icoon | The **legend** colourway, not a fifth tier: monochrome photo warmed back up, one near-white two-zone ground for **every** legend, a 1px gold rule on the edge, no shards. Replaces the `legende` pill. **The tier no longer moves anything.** No effect on rarity. |
-| Sound | Fully **synthesised** (WebAudio, no assets). Default on, persisted mute. |
+| Sound | Fully **synthesised** (WebAudio, no assets). On, with no in-page toggle. |
 | Pacing | Two knobs — `DEFAULT_SCALE` (2) and `DEFAULT_CEREMONY_MS` (2000). Both settled by ear on the sliders and baked in. |
 | Reveal ceremony | Graduated over four levels at 75/80/85/90 overall. Identical at any timestamp `t`; only the *length* differs. |
 
@@ -521,11 +546,21 @@ Four production endpoints, one development-only, one hook, and no background job
 | | | |
 | --- | --- | --- |
 | `GET` | `api/cards/pool` | **Built.** Every player a pack can contain: actives on their current rating, legends on their all-time high. |
-| `GET` | `api/collection/{playerId}` | The whole page in one response — pool, legends, owned counts, available packs, unlock state, eligibility. |
-| `POST` | `api/collection/{playerId}/packs/{packId}/claim` | Rolls, files the cards, returns them with `isNew` and `copies`. |
-| `GET` | `api/collection/players` | The type-ahead: active, ≥ `MinGames`. |
-| `POST` | `api/collection/{playerId}/packs/debug` | Development only. Same options as `mockDebug.grantPack`. |
-| `POST` | `api/collection/gifts` | Later. Present packs, the one grant-shaped thing left. |
+| `GET` | `api/collections/{playerId}` | **Built.** The whole page in one response — pool, legends, owned counts, available packs, unlock state, eligibility, and the album's binding. |
+| `POST` | `api/collections/{playerId}/create` | **Built.** Fetches the player an album in the leather they picked. Idempotent; returns the same payload as the `GET`. |
+| `POST` | `api/collections/{playerId}/packs/{packId}/claim` | Rolls, files the cards, returns them with `isNew` and `copies`. |
+| `DELETE` | `api/collections/{playerId}` | **Built, development only.** Puts the album back on the table so the opening sequence can be watched again. Idempotent; 404s outside Development rather than 403, because a route that is not meant to exist should not announce that it does. |
+| `PUT` | `api/collections/{playerId}/cover` | Later, and only if wanted. A re-bind. Reserved rather than built — see "The album is chosen once". |
+| `POST` | `api/collections/{playerId}/packs/debug` | Development only. Same options as `mockDebug.grantPack`. |
+| `POST` | `api/collections/gifts` | Later. Present packs, the one grant-shaped thing left. |
+
+**The routes are plural, and there is no `api/collection/players`.** Both were
+singular in this document and in `cardsClient.ts`'s header comment for as long as
+they were hypothetical; `collections` is what got built. The type-ahead endpoint was
+dropped entirely rather than renamed: `GET api/players?activeOnly=true` already
+returns exactly what the ledger needs, so a card-specific route could only have
+disagreed with it. See "The ledger lists everybody" for why it wants the *unfiltered*
+list.
 
 **The seam has been carrying this contract, not this document.**
 [cardsClient.ts](anago-leader-board-ui/src/clients/cardsClient.ts) defines
@@ -672,9 +707,22 @@ new tables should use real FKs.
 - **`CardInstance`** — `Id`, `PlayerId` (owner), `SubjectPlayerId` (who's on the
   card, cascade delete), `PackClaimId`, `GameId` (cascade delete), `IsLegend`,
   `MintedAt`.
-- **`PlayerCollectionState`** — `PlayerId`, `LegendsUnlockedAt` (nullable). A
-  permanent latch, so new joiners and players crossing 5 games don't
-  un-complete an existing unlock.
+- **`PlayerCollection`** — **built**, and the only table so far. `PlayerId` (PK
+  *and* FK to `Players`, cascade), `Cover`, `CreatedAt`, `LegendsUnlockedAt`
+  (nullable — a permanent latch, so new joiners and players crossing 5 games don't
+  un-complete an existing unlock; nothing writes it until the claim endpoint can
+  count owned cards).
+  - Named `PlayerCollectionState` here originally. It gained the binding and stopped
+    being only a state bag, so it is `PlayerCollection` — it *is* the collection row.
+  - **The row's existence is load-bearing.** No row means the collection has never
+    been started, which is what puts a player through the opening sequence rather
+    than dropping them onto an album that was simply always there. So it is
+    deliberately **not** created lazily on first read.
+  - `Cover` is a `string` validated against `AlbumCovers.All`, not a C# enum: EF maps
+    enums to `int` and the JSON contract would quietly become a number.
+  - The cascade is required rather than tidy — `PlayerService.DeletePlayer` never
+    loads a collection, so without it deleting a player fails on a FK violation the
+    moment that player owns an album.
 - **`PackGift`**, later — `Id`, `PlayerId` (nullable: null means everyone), `Size`,
   `Reason`, `CreatedAt`, `ExpiresAt` (nullable). The only grant-shaped table in
   the design, because a present cannot be derived from anything that happened.
@@ -873,6 +921,208 @@ you (see "The shelf stays up"). This is not tabletop-only; it is better
 under all ten stages. What makes it work is that the packet is shaped like a packet
 and scaled like the album — see the wrapper bullets under
 [Pack opening](#pack-opening).
+
+### Getting in: the ledger and the five books
+
+The page used to have one entrance and no beginning. A bare type-ahead sat in the
+header, and picking a name dropped you straight onto a fully-formed album. Both
+halves of that were wrong.
+
+**The searchbar was the one piece of undisguised UI on the table.** The stage's rule
+is that everything on it is either a physical object or engraved into the surface, and
+a text field floating in the middle of the mahogany is neither. So signing in is a
+**ruled ledger lying open on the wood**, one blank line, and you write your name on
+it. It is the right object rather than merely a themed one — a book you sign to say
+you were here is exactly what the control is doing — and it sits beside the album
+without arguing with it, because two books on one table is a normal thing to see.
+
+It is **still a type-ahead**, and that is load-bearing rather than incidental: it is
+the entire impersonation mitigation (see above), and a roster of clickable names would
+throw it away for nothing.
+
+Three details that took a pass each:
+
+- **The paper is the brightest thing on the stage.** Everything else is dark with light
+  type; paper under a lamp is lighter than polished mahogany, so the ledger is the one
+  element allowed to be pale. Its light comes from the top left like everything else's.
+- **The gutter is real.** A flat cream rectangle reads as a card. Two pages with a
+  shadowed valley between them reads as a bound book seen from above — the same trick
+  `.album__binding` plays.
+- **The names appear as further lines on the same page**, not in a dropdown. No panel,
+  no border, no shadow. The header picker needed a floating menu because it had nowhere
+  to put the list; here the page *is* the list.
+
+#### Signing out is the same object, reversed
+
+The register **stays on the table**. Once you are signed in it lies in the right margin,
+small, open at the line you signed, with your name on it in the handwriting you wrote it
+in. Clicking it draws a stroke through the name and returns you to the full-size ledger.
+
+You got in by writing your name in a book, so you get out by crossing it out — the same
+object and the same gesture reversed. Nothing had to be invented for it, which is the test
+this table applies to every control.
+
+- **In the margin opposite the packet shelf**, and out of flow for the same reason: the
+  book is centred on the table and neither margin can move it. The two things lying beside
+  the album are what you came for and how you leave.
+- **The strike is drawn, not switched on.** A pen crossing out a name is a stroke with a
+  direction and a duration; `line-through` appearing all at once is a state change, and the
+  difference is the whole beat. A `scaleX` on a pseudo-element, so it costs no layout.
+- **It is captioned** (`uitschrijven`), which the page-turn strips deliberately are not.
+  A page edge under a cursor can only mean one thing; a ledger with your name on it could
+  as easily mean "look at this", and guessing wrong costs you the page you were on.
+- **Stood down during a reveal and during the binding ceremony**, exactly as the shelf is:
+  you cannot sign yourself out with a card in the air, and a way to abandon a book halfway
+  through having your name blocked into it is not a thing to offer.
+- It reuses `playPageTurn` rather than getting its own sound. Closing a register is paper
+  moving, at the same weight as turning a leaf.
+
+**The player picker is gone entirely**, and so is the header it lived in. It was doing two
+jobs badly: it was the last undisguised control on the table, and it made reading a
+colleague's collection a matter of typing another name into a box that was already open.
+Impersonation has always been *accepted* here — there is no authentication and never will
+be, and the harm is bounded — but accepted is not the same as invited, and an open text
+field pointed at everybody's albums is an invitation. Signing out and back in through the
+register costs the same number of clicks and reads as a deliberate act.
+
+Two things moved out of the header with it:
+
+- `snel openen` went to the test panel. It skips the reveal, which is the part of this
+  feature people are here for, so it is a development convenience and not a setting.
+- **The mute button was deleted rather than moved.** This reverses "persisted mute" as a
+  settled decision. A speaker icon in the corner of a mahogany table was the last piece of
+  OS chrome on the page, and it existed to solve a problem the browser's tab mute and the
+  computer's volume knob both already solve. `isMuted`/`setMuted` and the persisted key all
+  still work and are exposed on `cardDebug`, so a silent development session is one console
+  call away — what went is the icon, not the capability.
+
+`GameShell` now renders its header only when something is in it. An empty one still
+contributed its bottom margin and pushed the whole table down for nothing.
+
+#### The ledger lists everybody
+
+Including players under the games gate, struck through, with how far off they are.
+
+Filtering them out was the first version and it is worse: a name that is simply not
+there cannot explain itself, and the players this affects are exactly the newest
+colleagues — the ones with least reason to assume the page is working. This is also
+why the type-ahead is backed by `GET api/players?activeOnly=true` rather than by the
+card pool, which excludes them by definition.
+
+One hole, accepted: `LeaderBoardService` builds its stats map per game, so a player
+with **no games at all** is absent from that route entirely — they exist in `Players`
+and nowhere else. The ledger's empty state says as much rather than us reshaping
+`PlayerService` for somebody's first week.
+
+#### Choosing the album
+
+Five shut albums lying side by side, blank covers, one per stain. Click one: the other
+four are taken off the table, the survivor slides to the middle, comes up to full size,
+and the owner's name is blocked into the cover a letter at a time. Then the shelf and
+the book appear.
+
+- **Five books, not a swatch row, and no preview.** Choosing is picking an object up off
+  a table; a control that restains a book in place is a settings widget with leather
+  printed on it. The cost is committing before you see your name on it, which is the
+  deal a real shop gives you.
+- **The books are scaled with a transform, never resized.** `--page-w` is not overridden
+  anywhere in the ceremony. It is viewport-derived and two other things read it at *use*
+  time — `--album-card-w` and `--book-w` — so an override would silently resize the pack
+  shelf as well. A transform also scales the cover's clamped type along with the box,
+  which a width override does not: a rebuilt-narrow book gets full-size type and the name
+  visibly shrinks at the handover.
+- **Five across must fit without clipping.** `.game-stage` is `overflow: hidden`, so a
+  sixth of a book past the edge is unreachable rather than scrollable. At 0.55 that is
+  5×273px against 1592px of usable table at 1920×1080, and 5×194px against 1271px at
+  1366×768. On a phone they wrap to three and two at 0.36 — one row of five leaves about
+  62px each, which is tappable but a mean-looking shelf.
+- **Nothing on the shelf has to be legible at the book's own scale.** The stain's name is
+  set on the wood *under* the book rather than printed on it, and the covers are blocked
+  blind — a series name and a rule, no owner. That is the whole reason a 36% book works.
+- **The finished book is its own element**, at exactly `--page-w × --page-h` and centred in
+  a well that reserves the album's footprint including the nav-label row. The shelf book
+  is a small flat approximation; the handover has to land on the real geometry or the
+  book jumps at the swap. The two crossfade.
+- **The name is stamped with `playFoilStamp`, which is new.** `playSlot` per letter was
+  tried and is audibly wrong: eleven grains over 100ms plus a 130Hz boom, so at ~45ms a
+  letter (base) the grains smear into a wash and the booms become a pitched pulse train.
+  A hot foil press is a small dry tick. The one heavy sound is `playCoverTurn`, and it
+  lands *after* the name rather than under it. Spaces take no block and make no sound.
+
+#### The sequence ends on an invitation, not an open book
+
+The ceremony hands over a **shut** book, and then the line above it says *"Klik op de
+kaft en blader langs de randen"* until you open it.
+
+Opening it automatically was tried first and is wrong, even though it looks better for
+two seconds. The album's whole navigation is undiscoverable by design — no arrows beside
+the book, and deliberately nothing drawn on the page-turn strips — so the first thing a
+new owner does has to *teach* that, and a book that opens itself teaches nothing. It also
+spends the cover-turn flip at a moment when the reader did not ask for it, which is the
+one gesture the album most needs them to learn.
+
+So the invitation goes in the one place the design has already assigned to
+discoverability: the single line above the book. It names **both** controls, because both
+are invisible — the cover is the button, and the page edges are the only other one.
+
+- It replaces `gesloten`, which was fine for a returning reader and useless for a new one:
+  it names the state instead of offering the way out of it.
+- It clears itself **the moment the book is opened, by any route** — cover click, turn
+  strip, arrow key, swipe, or the card viewer turning to a card. Watched off the book's
+  position rather than hooked into `turn()`, so "any route" stays true without a list
+  somebody has to remember to extend.
+- It does **not** come back when the book is shut again. "You have not worked out how to
+  open this" cannot become true a second time.
+- `.album__nav-label` now reserves a line's height. The label sits above the book, so a
+  string longer than `gesloten` would otherwise push the whole book down.
+
+Whether it should be a *first visit* hint rather than a *first book* hint is open: it is
+keyed on having just watched the binding, so somebody who returns tomorrow to a book they
+never opened gets `gesloten` and no help. The album already knows that from its saved
+position, so the fix is one condition if it turns out to matter.
+
+#### Getting back to the start of the story
+
+Two different undos, and they must stay different — the two states they produce are what
+the ordering bugs live between:
+
+| | destroys | lands on | where |
+| --- | --- | --- | --- |
+| `leegmaken` | the album, on the server, plus cards and packs | the cover choice | test panel |
+| the register | the remembered id in this browser, and nothing else | the ledger | on the table |
+
+The register deliberately **leaves the album alone**. That is the whole point of it: the
+returning-visitor path is the one that flashed the ledger and then the cover choice, and
+testing it needs an album that already exists. A single "reset everything" control would
+have made that bug untestable.
+
+There was briefly a `resetten` button on the test panel doing the register's job. It went
+when the register arrived: signing out is a real part of the page rather than scaffolding,
+and a duplicate on a panel that is going to be deleted is one more thing to remember to
+remove.
+
+`leegmaken` goes through the server (`DELETE api/collections/{playerId}`) rather than
+`mockDebug`, because the album is a row — clearing it client-side would leave the real one
+in place and the two silently disagreeing, which is exactly the class of bug a test panel
+is supposed to surface rather than create.
+
+#### The album is chosen once
+
+There is no re-bind, and no `PATCH`. Choosing your leather is a one-time ceremony; a
+swappable cover turns it into a settings dropdown.
+
+But **nothing is written in a way that blocks one**, and five things are deliberate
+about that: `Cover` is an ordinary mutable column with no write-once guard; validation
+lives once in `AlbumCovers.IsKnown` so a later `PUT .../cover` cannot drift from it;
+`AlbumChoice` makes no network call of its own and takes an `onChoose` callback, so the
+page decides whether a pick means create or re-bind; the name-stamping beat is a prop
+(`stampName`) because a re-bind must not re-stamp a name that is already yours; and
+`Album` reads `cover` from a prop on every render rather than freezing it at mount.
+
+One thing a re-bind will have to solve rather than inherit: **a `background` built from
+custom properties cannot be transitioned** — which is exactly why `.album__binding` is
+its own element rather than a background on `.album__book`. So changing a cover cuts
+unless two stacked layers are crossfaded on opacity.
 
 ### The album: stiff CSS 3D flip
 
@@ -2487,6 +2737,20 @@ swells overlap and would otherwise clip.
 
 #### Writing the name: `playNameTick` and `playNameSettle`
 
+> **Neither of these exists, and neither does the per-character write on the card.**
+> `utils/sounds.ts` has no `playNameTick` and no `playNameSettle`; the reveal is a
+> single keyframed text node (`PlayerCard.tsx` — *"One text node, everywhere,
+> including the reveal"* — driven by `reveal-charge`/`reveal-cool` in `card.css`), and
+> the per-word spans it briefly had were reverted. This section describes a version of
+> the silhouette beat that was rolled back and the rollback was never written down
+> here, which cost a round of confusion when the album's foil stamping went looking
+> for something to reuse. It found nothing, and `playFoilStamp` was written instead —
+> to the constraints below, which are the part of this section that is still good.
+>
+> Left in place rather than deleted because the reasoning is exactly right and will be
+> wanted again if the per-character write comes back. **Read it as a specification, not
+> as a description of the code.**
+
 The beat was silent in its first version, and that is most of why it read as a
 glitch: nothing was happening and nothing said anything was about to. It now has
 one tick per character and a settle on the last, and the constraints on those two
@@ -2528,14 +2792,25 @@ All under `anago-leader-board-ui/src/`.
 ### Styles in plain CSS, not JSS
 
 `src/styles/game.css` (game-screen shell), `card.css`, `album.css` (book and
-flip), `packopen.css` (the five beats), `viewer.css` (the enlarged card).
+flip), `packopen.css` (the five beats), `viewer.css` (the enlarged card),
+`ledger.css` (the signing-in book), `albumchoice.css` (the five shut albums).
 Deliberately **not** `@mui/styles` — JSS is deprecated and unpleasant for
 multi-step keyframe sequences, and plain CSS is already an established pattern via
 `App.css`.
 
 New components: `components/GameShell.tsx`, `Album.tsx`, `PlayerCard.tsx`,
-`PackOpener.tsx`, `PackTile.tsx`, `PackFace.tsx`, `PlayerPicker.tsx`,
-`CardViewer.tsx`.
+`PackOpener.tsx`, `PackTile.tsx`, `PackFace.tsx`, `CardViewer.tsx`,
+`SigningLedger.tsx`, `LedgerCorner.tsx`, `AlbumChoice.tsx`.
+
+`PlayerPicker.tsx` **is deleted.** It was the header's type-ahead; the ledger took over
+signing in and the register took over signing out, so there was nothing left for it to do.
+Its matching logic — substring over the whole stored name, eight results, Enter takes the
+first — lives on in `SigningLedger`, which is the part worth keeping.
+
+`utils/albumLeather.ts` holds the five stains and the custom properties the book's
+outside is painted with, following `utils/packFoil.ts` exactly. It is the only place
+the leather colours live; `album.css` reads them with bordeaux fallbacks, so a cover
+rendered with no stain set is the book as it was before there was a choice.
 
 **One binary asset**, and only one: `src/assets/rik-dev-logo.png`, the mark printed on
 the wrapper. Imported through webpack rather than dropped in `public/`, so it is
@@ -2628,8 +2903,25 @@ Order within phase 1: `XpWindow` → `PlayerCard` → `Album` with the flip →
    for `drawPack`, since it is a property of the draw rather than of the weighting.
 2. ~~Peak tracking and `GET api/cards/pool`, so icoon cards show real people.~~
    **Done.**
-3. Migration, `PackService`, `CollectionService`, `CollectionController`.
-4. Swap the mock client implementation for the HTTP one. Delete the mock.
+3. ~~The first migration, `CollectionService`, `CollectionsController`.~~ **Done** —
+   `PlayerCollection`, the collection read and the create, plus the opening sequence
+   that hangs off `album: null`.
+4. ~~Swap the mock client implementation for the HTTP one.~~ **Done**, except that
+   `revealPack` and the pack shelf are still a session-local sandbox inside
+   `httpCardsClient`, and `mock/cardMock.ts` is therefore not deleted: the scale, the
+   tiers, the ceremony maths, `drawPack` and the display helpers all still live there
+   and are all still used. What dies with the claim endpoint is the sandbox,
+   `ACTIVE_POOL_SNAPSHOT`, `MOCK_PACKS`, the seeded collection, `mockCardsClient` and
+   the test panel — not the file.
+5. `PackClaim`, `CardInstance`, `PackService`, and
+   `POST api/collections/{playerId}/packs/{packId}/claim`.
+
+Note what the collection slice cost that was not foreseen: `CardPoolService` needed a
+second `GetPool` overload taking an already-replayed roster. `GetLeaderBoard()` is not
+cached, and the collection endpoint needs the pool *and* the picked player's game
+count — which cannot come from the pool, because the pool filters out exactly the
+under-gate player the games gate has to describe. Without the overload every
+collection read paid for two full replays.
 
 Splitting 2 out ahead of the migration was worth it beyond the icoon pages: it put
 the scale in front of real data early, which is what turned up the midpoint
@@ -2689,6 +2981,52 @@ the 5–9 games band in the legends pool is populated after all.
    else is green.
 2. ~~Unit-test `CardRatingCalculator` against the anchors.~~ **Done** — see the
    phase-2 build order above for what is covered.
+
+2a. **The collection slice.** `dotnet ef database update` has to be run by hand
+    against every database — there is no auto-migrate, `Program.cs` builds the app and
+    calls `Run()` — so Development (`C:\tafelvoetbal-data\`) and production
+    (`T:\tafelvoetbal-server\data\`, over a share) are separate steps, and skipping one
+    makes every collection GET throw *no such table*. Then:
+    - `GET api/collections/{id}` for a ≥5-game active → `album: null`,
+      `eligible: true`, 37 actives in `pool`, `owned`/`packs` empty. For an under-gate
+      player → `eligible: false` with the right `numberOfGames`. Unknown id → 404.
+    - `POST .../create` with `{"cover":"navy"}` → 200. **Post it again** → 200, same
+      row, no 500. An unknown colour → 400. An under-gate player → refused.
+    - `DELETE api/player/{id}` for a throwaway player who owns an album → no FK
+      violation, and the row goes with them. That is what the cascade is for.
+    - Clear `tafelvoetbal.cards.playerId` → the ledger fills the stage, with **no header at
+      all** and no footer. An under-gate name is listed struck through.
+    - The register lies in the right margin once signed in, opposite the packet shelf, and
+      is present during the cover choice too — signing in as the wrong person and getting
+      out again before binding a book has to work. Click it: the name is crossed through,
+      then the ledger. It dims and goes inert during a reveal and during the stamping.
+    - Below 1150px wide the margins collapse and the register stacks **below** the book
+      while the shelf stacks above it.
+    - Pick a leather → four books leave, one centres, the name foils in, the book lands
+      **shut** on page one. Watch the handover frame as the footer appears.
+    - **Reload → straight to the album, with no flash of the ledger and no flash of the
+      cover-choice table.** Two separate ordering bugs, both of which happened, and the
+      pair of regressions to watch:
+      - The ledger flash is what `restoring` exists for. The pick is stored as an *id*,
+        and an id is not a player — the games gate and the cover both need the record —
+        so it cannot be restored until `GET api/players` lands. Without the flag that one
+        round trip renders as the front door, and it also makes the collection request
+        that follows look as though it fired with no name set.
+      - The cover-choice flash is what the loading branch exists for: `collection === null`
+        and `album === null` are otherwise indistinguishable.
+    - **A 404 here has two causes and the message says both.** By design the endpoint 404s
+      only for an unknown player — so a 404 for a name just picked off the list looks
+      impossible, and the actual cause is almost always an API binary older than the page,
+      where `/api/collections` is not a route at all. That cost a round of confusion the
+      first time. Restart the API before believing anything else about a 404.
+    - Switch player and come back: no cover flash, no other player's page position, no
+      other player's album under the new name.
+    - All five stains: brass edge, gold foil, cover rule and title emboss move with the
+      leather; the pages stay paper-brown; the inside covers stay the stage's green.
+    - Stop the API and reload → the error branch, a loud Dutch console warning, and
+      **no** invitation to pick a cover.
+    - Grant a pack, open it, watch the cards land — then reload and confirm they are
+      gone. Expected until the claim endpoint lands.
 3. Unit-test pack sizing: a win gives 3, a win beating expected margin by 3+
    gives 5, a loss beating expected margin by 3+ gives 3, a plain loss gives 1.
 4. Unit-test the opponent bonus: a qualifying pack doubles exactly the two

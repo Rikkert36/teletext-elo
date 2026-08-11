@@ -12,6 +12,7 @@ namespace AnagoLeaderboard.Database
 
         public DbSet<Player> Players => Set<Player>();
         public DbSet<Game> Games => Set<Game>();
+        public DbSet<PlayerCollection> PlayerCollections => Set<PlayerCollection>();
 
         public async Task Clear()
         {
@@ -54,6 +55,23 @@ namespace AnagoLeaderboard.Database
                         tp.OwnsOne(tp => tp.FirstPlayer);
                         tp.OwnsOne(tp => tp.SecondPlayer);
                     });
+
+            // Spelled out rather than left to convention, which cannot infer either half of
+            // this: Player.Id has a private setter, and a shared primary key one-to-one is
+            // not something EF guesses.
+            //
+            // The cascade is required, not tidiness. PlayerService.DeletePlayer never loads
+            // a collection, so without it deleting a player fails on a foreign key
+            // violation the moment that player happens to own an album.
+            modelBuilder.Entity<PlayerCollection>(collection =>
+            {
+                collection.HasKey(c => c.PlayerId);
+
+                collection.HasOne<Player>()
+                    .WithOne()
+                    .HasForeignKey<PlayerCollection>(c => c.PlayerId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
 
             base.OnModelCreating(modelBuilder);
         }

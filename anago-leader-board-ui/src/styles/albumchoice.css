@@ -1,0 +1,344 @@
+/* ================================================================ *
+ * Getting your album
+ *
+ * Five shut albums lying side by side on the mahogany, and you pick one up. Five beats:
+ * the others are taken off the table, the survivor slides to the middle, it comes up to
+ * full size, its owner's name is blocked into the cover a letter at a time, and it rests.
+ *
+ * Three rules this file follows, each one arrived at by getting it wrong:
+ *
+ * 1. **The books are scaled, never resized.** `--page-w` is not overridden anywhere here.
+ *    It is viewport-derived and two other things read it at *use* time — `--album-card-w`
+ *    and `--book-w` — so an override on this container would silently resize the pack
+ *    shelf as well. A transform also scales the cover's clamped type along with the box,
+ *    which a width override does not: a rebuilt-narrow book gets full-size type and the
+ *    name visibly shrinks at the handover.
+ * 2. **The well keeps the album's exact footprint.** Label row plus `--page-h`, so nothing
+ *    moves vertically when this component is swapped for the book.
+ * 3. **Every duration multiplies by `var(--anim, 1)`**, which is 2. So every number below
+ *    is half its real length, matching `ms()` in the component. Miss it on one rule and
+ *    that one beat runs at double speed.
+ * ================================================================ */
+
+.choice {
+  /*
+   * How much of a real book one on the shelf is. Five across have to fit the table
+   * without clipping — `.game-stage` is `overflow: hidden`, so a sixth of a book off the
+   * edge is unreachable rather than scrollable.
+   *
+   * At 1920x1080 that is 5 x 273px plus gaps against 1592px of usable table; at 1366x768
+   * it is 5 x 194px against 1271px. Both comfortable.
+   */
+  --choice-scale: 0.55;
+  --choice-w: calc(var(--page-w) * var(--choice-scale));
+  --choice-h: calc(var(--page-h) * var(--choice-scale));
+  --choice-gap: clamp(8px, 1.4vw, 28px);
+  /* Set by the component: how many slots left (+) or right (-) the row must slide to put
+     the chosen book where the middle one was. */
+  --picked-offset: 0;
+}
+
+/* Same metrics as `.album__nav-label`, and it keeps its box while the ceremony runs —
+   the component renders a space rather than nothing for exactly that reason. */
+.choice__label {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 14px;
+  text-align: center;
+  color: var(--accent-light, #e6c98a);
+  padding-bottom: 6px;
+  min-height: 1.2em;
+}
+
+/*
+ * The album's own footprint, reserved. `.album` is `padding: 4px 0` around a book of
+ * `--page-h`, so this matches it and the handover is motionless.
+ */
+.choice__well {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(var(--page-h) + 8px);
+  padding: 4px 0;
+}
+
+/* ---------------------------------------------------------------- *
+ * The shelf of five
+ * ---------------------------------------------------------------- */
+
+.choice__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: var(--choice-gap);
+  /*
+   * Slides so the chosen book lands where the middle one was. The whole row moves rather
+   * than the single book, so the survivor travels in a straight line at a constant speed
+   * instead of appearing to be dragged by a container that is also collapsing.
+   */
+  transform: translateX(calc(var(--picked-offset) * (var(--choice-w) + var(--choice-gap))));
+  transition: transform calc(300ms * var(--anim, 1)) cubic-bezier(0.3, 0.8, 0.3, 1);
+}
+
+/* Nothing has been picked yet, so nothing should be mid-transition either. */
+.choice--choosing .choice__row {
+  transition: none;
+}
+
+/* The row fades out under the full-size book coming up in front of it. */
+.choice--lifting .choice__row,
+.choice--stamping .choice__row,
+.choice--resting .choice__row {
+  opacity: 0;
+  transition:
+    transform calc(300ms * var(--anim, 1)) cubic-bezier(0.3, 0.8, 0.3, 1),
+    opacity calc(240ms * var(--anim, 1)) ease;
+}
+
+.choice__slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+/*
+ * One shut album, small. Not `.album__cover` scaled: that is a page face inside a 3D
+ * scene with a spine shadow on one edge, and out here there is no spine — this is a
+ * closed book seen from above, so it takes the board edge all the way round.
+ */
+.choice__book {
+  position: relative;
+  width: var(--choice-w);
+  height: var(--choice-h);
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  background: linear-gradient(
+    150deg,
+    var(--leather-hi) 0%,
+    var(--leather-mid) 55%,
+    var(--leather-lo) 100%
+  );
+  /* The brass edge, then the same one lamp everything else on the table is lit by. */
+  box-shadow:
+    0 0 0 2px var(--board-edge),
+    var(--drop, 3px 8px 18px rgba(14, 5, 2, 0.6));
+  transition:
+    transform calc(140ms * var(--anim, 1)) ease,
+    box-shadow calc(140ms * var(--anim, 1)) ease;
+}
+
+/* Picked up an inch off the table. The only hover state; there is nothing to preview. */
+.choice__book:hover:not(:disabled) {
+  transform: translateY(-4px);
+  box-shadow:
+    0 0 0 2px var(--board-edge),
+    0 16px 30px rgba(14, 5, 2, 0.6),
+    0 4px 10px rgba(14, 5, 2, 0.5);
+}
+
+.choice__book:focus-visible {
+  outline: 2px solid var(--accent-light, #eec18a);
+  outline-offset: 3px;
+}
+
+/* Disabled the moment one is picked, but it must not grey out — these are objects being
+   cleared from a table, not controls going inactive. */
+.choice__book:disabled {
+  cursor: default;
+}
+
+/* The blind blocking on a blank cover: the series name and its rule, no owner. */
+.choice__face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--choice-scale) * 14px);
+  pointer-events: none;
+}
+
+.choice__face-kicker {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  /* Scales with the book, so it stays in proportion rather than dominating at 33%. */
+  font-size: calc(var(--choice-scale) * 15px);
+  letter-spacing: 1px;
+  color: var(--foil);
+  /* Blind, not gilt: pressed into the leather with no foil, which is what an unnamed
+     stock cover looks like. The owner's name is the only gold on the book. */
+  opacity: 0.34;
+}
+
+.choice__face-rule {
+  width: 54%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--foil-rule) 50%, transparent);
+  opacity: 0.5;
+}
+
+/*
+ * The stain's name, set on the wood under the book rather than printed on it.
+ *
+ * This is what makes a single row of five work on a phone: nothing on the shelf has to be
+ * legible at the book's own scale, so the books can go as small as they need to.
+ */
+.choice__caption {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(9px, 1vw, 12px);
+  letter-spacing: 1px;
+  color: var(--ink-dim, #c3a281);
+  text-align: center;
+}
+
+.choice__book--gone {
+  /* Taken off the table: away from the light and down, not faded in place. */
+  transform: translateY(34px) rotate(-2deg);
+  opacity: 0;
+  transition:
+    transform calc(240ms * var(--anim, 1)) ease-in var(--leave-delay, 0ms),
+    opacity calc(240ms * var(--anim, 1)) ease-in var(--leave-delay, 0ms);
+  pointer-events: none;
+}
+
+/*
+ * Every caption goes the moment one book is picked — the ones leaving because their book
+ * is leaving, and the survivor's because the book is about to say its own name.
+ *
+ * A sibling selector rather than `:has()` on the slot: the caption is the button's next
+ * sibling, so `~` already reaches it, and this file has no need to be the first place in
+ * the codebase that depends on `:has`.
+ */
+.choice__book--gone ~ .choice__caption,
+.choice__book--chosen ~ .choice__caption {
+  opacity: 0;
+  transition: opacity calc(160ms * var(--anim, 1)) ease-in var(--leave-delay, 0ms);
+}
+
+/* ---------------------------------------------------------------- *
+ * The finished book
+ *
+ * At exactly `--page-w` by `--page-h`, centred in the same well, so what the album mounts
+ * next occupies the identical box. Absolutely positioned rather than in flow: it overlaps
+ * the row it replaces, which is what lets the two crossfade instead of one pushing the
+ * other aside.
+ * ---------------------------------------------------------------- */
+
+.choice__stage {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: var(--page-w);
+  height: var(--page-h);
+  margin-left: calc(var(--page-w) / -2);
+  border-radius: 3px;
+  overflow: hidden;
+  /* The shut album's own edge and shadow, from `.album--closed .album__leaf--cover`. */
+  box-shadow:
+    0 0 0 2px var(--board-edge),
+    0 26px 50px rgba(0, 0, 0, 0.65),
+    0 6px 14px rgba(0, 0, 0, 0.5);
+
+  /* Held back until the row has finished sliding. */
+  opacity: 0;
+  transform: scale(0.86);
+  transition:
+    opacity calc(380ms * var(--anim, 1)) ease,
+    transform calc(380ms * var(--anim, 1)) cubic-bezier(0.2, 0.9, 0.3, 1);
+  pointer-events: none;
+}
+
+.choice--lifting .choice__stage,
+.choice--stamping .choice__stage,
+.choice--resting .choice__stage {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/*
+ * The cover face inside it is the album's own `.album__cover`, reused rather than
+ * reimplemented — it is literally the page the book will open from, so a second copy of
+ * those rules would be two things to keep in step. It carries a right-hand page's radius
+ * and spine shadow, which is correct: this is that page.
+ */
+.choice__stage .album__cover {
+  /* Per-letter spans, so kerning pairs must not shift as each one arrives. */
+  font-kerning: none;
+}
+
+.choice__letter {
+  display: inline-block;
+  /* Blocked, not faded in: it arrives slightly large and settles, the way a press lifts
+     off leather. */
+  opacity: 0;
+  transform: translateY(-3px) scale(1.14);
+  transition:
+    opacity calc(90ms * var(--anim, 1)) ease-out,
+    transform calc(110ms * var(--anim, 1)) cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.choice__letter--set {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * Phone
+ *
+ * Same breakpoint as `useIsMobile` and the mobile album. Five books in one row at 375px
+ * leaves about 62px each, which is a tappable target but a mean-looking shelf — so they
+ * wrap to three and two, which buys back a third of the width.
+ *
+ * The row's centring slide is dropped here rather than corrected: it is derived from a
+ * single row of equal slots and means nothing across two. The full-size book still comes
+ * up in the middle of the well, which is the beat that was carrying it anyway.
+ * ---------------------------------------------------------------- */
+
+@media (max-width: 599.95px) {
+  .choice {
+    --choice-scale: 0.36;
+    --choice-gap: 10px;
+  }
+
+  .choice__row {
+    flex-wrap: wrap;
+    max-width: calc(var(--choice-w) * 3 + var(--choice-gap) * 2);
+    row-gap: 14px;
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Reduced motion
+ *
+ * The sequence still runs and still ends in the same place — the timings are in JS and
+ * are not shortened — but nothing slides or scales. Losing the movement costs the
+ * ceremony its flourish; losing the sequence would leave a book with no name on it.
+ * ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .choice__row,
+  .choice__book,
+  .choice__stage,
+  .choice__letter,
+  .choice__caption {
+    transition-duration: 1ms !important;
+  }
+
+  .choice__book--gone {
+    transform: none;
+  }
+
+  .choice__stage {
+    transform: none;
+  }
+
+  .choice__letter {
+    transform: none;
+  }
+}

@@ -1,11 +1,14 @@
 /**
  * The seam between the card UI and its data.
  *
- * Phase 1 ships `mockCardsClient`. Phase 2 adds an HTTP implementation of the
- * same interface hitting `GET /api/collection/{playerId}` and
- * `POST /api/collection/packs/{id}/reveal`, and `mock/cardMock.ts` is deleted.
- * Components import `CardsClient` and never the mock, so that swap touches this
- * file only.
+ * Two implementations of one interface. `httpCardsClient` is what the page uses:
+ * `GET api/collections/{playerId}` and `POST api/collections/{playerId}/create` are
+ * real, and the pack half is still a session-local sandbox because the claim endpoint
+ * does not exist yet — see `packSandbox` below. `mockCardsClient` is kept beside it as
+ * the no-backend fallback the whole of phase 1 was built against.
+ *
+ * Components import `CardsClient` and never either implementation, so finishing the
+ * backend touches this file only.
  *
  * Deliberately hand-written rather than regenerated: `server.generated.ts` is
  * 1727 NSwag lines and its .nswag config embeds a stale swagger snapshot, so
@@ -23,14 +26,37 @@ import {
   activePool,
   drawPack,
   legendPool,
+  setActivePool,
   setLegendPool,
   startingCollection,
   toCard,
 } from '../mock/cardMock';
+import { CoverId } from '../utils/albumLeather';
 import { getSpeed, setSpeed } from '../utils/animationSpeed';
+import { isMuted, setMuted } from '../utils/sounds';
+
+/** The album as an object: which leather, and since when. Null until one is chosen. */
+export interface AlbumBinding {
+  cover: CoverId;
+  createdAt: string;
+}
 
 export interface CollectionState {
   playerId: string;
+  /**
+   * Null when this player has never started a collection.
+   *
+   * The single flag the page branches on to decide between the opening sequence and the
+   * book, and it is server truth rather than a guess from localStorage — so clearing
+   * the browser does not offer you a second album, and a colleague's laptop shows your
+   * real one.
+   */
+  album: AlbumBinding | null;
+  /** Whether this player is over the games gate. */
+  eligible: boolean;
+  numberOfGames: number;
+  /** From `Cards:MinGames` on the server, so the gate copy cannot drift from the gate. */
+  minGames: number;
   /** Only players you hold at least one of. */
   owned: OwnedCard[];
   /** Unrevealed packs, newest first. Expire at end of day. */
@@ -65,11 +91,34 @@ export interface CardPoolResponse {
 export interface CardsClient {
   getCollection(playerId: string): Promise<CollectionState>;
   /**
+   * Fetches this player an album in the given leather, and returns the page as it now
+   * stands so the caller needs no follow-up read.
+   *
+   * Idempotent on the server: calling it for a player who already has an album returns
+   * their existing one rather than failing, so a double click is harmless.
+   */
+  createAlbum(playerId: string, cover: CoverId): Promise<CollectionState>;
+  /**
+   * Puts the album back on the table and empties the collection, so the opening sequence
+   * can be watched again. **Development only**, and the test panel is its only caller.
+   *
+   * Here rather than in `mockDebug` because it is the one debug action that cannot be done
+   * client-side: the album is a row on the server, and `mockDebug` writing to module state
+   * would leave the real one in place and the two disagreeing. Idempotent.
+   */
+  emptyCollection(playerId: string): Promise<CollectionState>;
+  /**
    * Rolls the pack, files the cards into the collection, and reports for each
    * one whether it filled an empty slot.
    */
   revealPack(playerId: string, packId: string): Promise<RevealedCard[]>;
-  /** Players eligible to own a collection (>= MIN_GAMES games). */
+  /**
+   * Everyone who can be signed in as.
+   *
+   * Deliberately **not** filtered to the games gate: a name that simply is not there
+   * cannot explain itself, whereas one that appears and says "nog 2 wedstrijden" can.
+   * The gate is applied by the page, off `eligible`.
+   */
   getSelectablePlayers(): Promise<CardPlayer[]>;
 }
 
@@ -82,12 +131,19 @@ interface MockState {
   counts: Map<string, number>;
   packs: Pack[];
   legendsUnlocked: boolean;
+  album: AlbumBinding | null;
 }
 
 const state: MockState = {
   counts: startingCollection(),
   packs: [...MOCK_PACKS],
   legendsUnlocked: false,
+  /*
+   * Starts null so `npm start` with no backend still walks the opening sequence — that
+   * is the state the ledger and the cover choice exist for, and having to reach for a
+   * debug button to see them would mean they were never looked at.
+   */
+  album: null,
 };
 
 let packSequence = 0;
@@ -165,12 +221,29 @@ export const mockCardsClient: CardsClient = {
 
     return settle({
       playerId,
+      album: state.album,
+      eligible: true,
+      numberOfGames: MIN_GAMES,
+      minGames: MIN_GAMES,
       owned: buildOwned(),
       packs: [...state.packs],
       legendsUnlocked: state.legendsUnlocked,
       pool: activePool(),
       legends: state.legendsUnlocked ? legendPool() : [],
     });
+  },
+
+  async createAlbum(playerId, cover) {
+    state.album = { cover, createdAt: new Date().toISOString() };
+    return this.getCollection(playerId);
+  },
+
+  async emptyCollection(playerId) {
+    state.album = null;
+    state.counts = new Map();
+    state.packs = [];
+    state.legendsUnlocked = false;
+    return this.getCollection(playerId);
   },
 
   async revealPack(_playerId, packId) {
@@ -205,17 +278,202 @@ export const mockCardsClient: CardsClient = {
   },
 
   async getSelectablePlayers() {
-    return settle(activePool().filter((p) => p.numberOfGames >= MIN_GAMES));
+    return settle(activePool());
   },
 };
 
 /* ------------------------------------------------------------------ *
- * Debug controls, phase 1 only.
+ * HTTP implementation.
+ * ------------------------------------------------------------------ */
+
+const api = (path: string): string => `${window.TAFELVOETBAL_SERVER_URL}${path}`;
+
+/**
+ * Every card request goes through here so a failure is one shape and one message.
+ *
+ * Loud rather than silent, for the reason `loadLegends` is: a card page that quietly
+ * degrades to something plausible is indistinguishable from a working one, and that has
+ * already cost a round of confusion. The page has an error state, and this is what feeds
+ * it — a rejected promise, never a half-built collection.
+ */
+const request = async <T,>(path: string, init?: RequestInit): Promise<T> => {
+  const response = await fetch(api(path), init);
+
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`${response.status} ${response.statusText}${body ? ` — ${body}` : ''}`);
+  }
+
+  return (await response.json()) as T;
+};
+
+/**
+ * A player, as the leaderboard hands them over.
+ *
+ * `GET api/players?activeOnly=true` is reused rather than a new card-specific route:
+ * the type-ahead wants every active player including the ones under the gate, which is
+ * exactly what that already returns, and a second endpoint could only disagree with it.
+ *
+ * Note that a player with **no games at all** is absent from it — the leaderboard builds
+ * its stats per game, so someone who has never played exists in the Players table and
+ * nowhere else. Accepted: the ledger's empty state says as much rather than us reshaping
+ * PlayerService for the newest colleague's first week.
+ */
+interface LeaderboardPlayer {
+  id: string;
+  name: string;
+  visibleRating: number;
+  numberOfGames: number;
+}
+
+/**
+ * Cards revealed this session, and packs granted by the test panel.
+ *
+ * **Temporary, and the whole of it goes when `POST …/packs/{packId}/claim` lands.** The
+ * server has no CardInstance or PackClaim table yet, so it answers `owned: []` and
+ * `packs: []` and there is nothing to persist into. Without this the opener, the shelf
+ * and every button on the test panel would be dead on arrival — a grant would write to
+ * state that nothing reads back — and none of the reveal work could be exercised against
+ * the real pool.
+ *
+ * So: packs live here, counts accumulate here, and they are merged over whatever the
+ * server says. The consequence is honest and visible — a reload loses them.
+ */
+const packSandbox = {
+  packs: [] as Pack[],
+  counts: new Map<string, number>(),
+  legendsUnlocked: false,
+
+  reset() {
+    this.packs = [];
+    this.counts = new Map();
+    this.legendsUnlocked = false;
+  },
+};
+
+/** Merges the sandbox's session-local cards over the server's (currently empty) list. */
+const withSandbox = (state: CollectionState): CollectionState => {
+  const byId = new Map<string, CardPlayer>();
+  for (const player of [...state.pool, ...state.legends]) byId.set(player.id, player);
+
+  const counts = new Map<string, number>();
+  state.owned.forEach((card) => counts.set(card.player.id, card.count));
+  packSandbox.counts.forEach((count, id) => counts.set(id, (counts.get(id) ?? 0) + count));
+
+  const owned: OwnedCard[] = [];
+  counts.forEach((count, id) => {
+    const player = byId.get(id);
+    if (player) owned.push({ ...toCard(player), count });
+  });
+
+  const legendsUnlocked = state.legendsUnlocked || packSandbox.legendsUnlocked;
+
+  return {
+    ...state,
+    owned: owned.sort((a, b) => b.overall - a.overall),
+    packs: [...packSandbox.packs, ...state.packs],
+    legendsUnlocked,
+    legends: legendsUnlocked ? state.legends : [],
+  };
+};
+
+/**
+ * Hands the server's pool to the draw.
+ *
+ * Not cosmetic: the album's slots are built from `pool` and `legends`, so a reveal that
+ * drew from the frozen mock snapshot could produce a card with no slot to land in. The
+ * two lists have to be the same list.
+ */
+const adoptPool = (state: CollectionState): CollectionState => {
+  setActivePool(state.pool);
+  if (state.legends.length > 0) setLegendPool(state.legends);
+  return state;
+};
+
+export const httpCardsClient: CardsClient = {
+  async getCollection(playerId) {
+    return withSandbox(
+      adoptPool(await request<CollectionState>(`/api/collections/${playerId}`)),
+    );
+  },
+
+  async createAlbum(playerId, cover) {
+    return withSandbox(
+      adoptPool(
+        await request<CollectionState>(`/api/collections/${playerId}/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cover }),
+        }),
+      ),
+    );
+  },
+
+  async emptyCollection(playerId) {
+    // The sandbox first, so a failed DELETE cannot leave session cards layered over a
+    // collection the server still thinks exists.
+    packSandbox.reset();
+
+    return withSandbox(
+      adoptPool(
+        await request<CollectionState>(`/api/collections/${playerId}`, { method: 'DELETE' }),
+      ),
+    );
+  },
+
+  async revealPack(_playerId, packId) {
+    const pack = packSandbox.packs.find((p) => p.id === packId);
+    if (!pack) throw new Error(`Onbekend pakje: ${packId}`);
+
+    const drawn = drawPack(pack.size, {
+      doubledPlayerIds: pack.doubledPlayerIds,
+      legendsUnlocked: packSandbox.legendsUnlocked,
+      guaranteeTier: pack.guaranteeTier,
+      guaranteePlayerId: pack.guaranteePlayerId,
+      guaranteeLevel: pack.guaranteeLevel,
+    });
+
+    // Read the count before incrementing — that is the only point at which
+    // "did this fill an empty slot" can still be answered.
+    const revealed: RevealedCard[] = drawn.map((card) => {
+      const id = card.player.id;
+      const before = packSandbox.counts.get(id) ?? 0;
+      packSandbox.counts.set(id, before + 1);
+      return { ...card, isNew: before === 0, copies: before + 1 };
+    });
+
+    packSandbox.packs = packSandbox.packs.filter((p) => p.id !== packId);
+
+    return revealed;
+  },
+
+  async getSelectablePlayers() {
+    const players = await request<LeaderboardPlayer[]>('/api/players?activeOnly=true');
+
+    return players
+      .map((player) => ({
+        id: player.id,
+        name: player.name,
+        visibleRating: player.visibleRating,
+        numberOfGames: player.numberOfGames,
+        isLegend: false,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'nl'));
+  },
+};
+
+/* ------------------------------------------------------------------ *
+ * Debug controls, until the claim endpoint lands.
  *
  * These back the on-screen dev panel and cover verification steps that are
  * otherwise unreachable: forcing an Icoon pull to see the ceremony, forcing an
  * 84 to confirm the ceremony does NOT fire, and unlocking legends without
  * grinding a full set.
+ *
+ * Each one writes to **both** stores — the mock's and the HTTP client's sandbox —
+ * rather than branching on which client is in use. Only one of them is ever read, and
+ * a debug button that silently does nothing because the seam was swapped underneath it
+ * is worse than a redundant write.
  * ------------------------------------------------------------------ */
 
 export interface GrantOptions {
@@ -248,24 +506,52 @@ export const mockDebug = {
     };
 
     state.packs = [pack, ...state.packs];
+    packSandbox.packs = [pack, ...packSandbox.packs];
     return pack;
   },
 
   setLegendsUnlocked(unlocked: boolean) {
     state.legendsUnlocked = unlocked;
+    packSandbox.legendsUnlocked = unlocked;
   },
 
+  /**
+   * Console-only now: the panel's "leegmaken" goes through `client.emptyCollection`, which
+   * also destroys the album on the server. This clears the cards and leaves the album, which
+   * is occasionally what you want and has no button because it is a state the real app can
+   * never be in.
+   */
   clearCollection() {
     state.counts = new Map();
+    packSandbox.counts = new Map();
   },
 
+  /**
+   * Back to the seeded, lived-in collection.
+   *
+   * Only meaningful against the mock: the seeded fixture is a hundred packs drawn from
+   * the frozen snapshot, and the HTTP client has no such thing to return to — there it
+   * clears, which is the truthful answer while nothing is persisted.
+   */
   resetCollection() {
     state.counts = startingCollection();
+    packSandbox.counts = new Map();
   },
 
   /** Animation pacing multiplier: 1 as designed, higher is slower. */
   setSpeed,
   getSpeed,
+
+  /**
+   * Silence, for a development session in an open-plan office.
+   *
+   * The header's speaker button is gone — the browser already has a tab mute and the
+   * computer already has a volume knob, and a speaker icon on a mahogany table was the last
+   * piece of OS chrome on the page. The persisted setting still works, so this keeps it
+   * reachable from `cardDebug` rather than deleting the only way to set it.
+   */
+  isMuted,
+  setMuted,
 
   /**
    * Draws `packs` packs and logs observed frequencies against the odds table.

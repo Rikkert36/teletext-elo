@@ -2,6 +2,7 @@ import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } f
 import { Card, CardPlayer, toCard } from '../mock/cardMock';
 import PlayerCard, { ownedLabel } from './PlayerCard';
 import useIsMobile from '../hooks/useIsMobile';
+import { albumLeather } from '../utils/albumLeather';
 import { playCoverTurn, playPageTurn } from '../utils/sounds';
 import '../styles/album.css';
 
@@ -15,12 +16,19 @@ const SLOTS_PER_PAGE = 6;
  * the same spread instead of resetting.
  *
  * Absent means a first visit, which is deliberately the closed book (leaf 0).
+ *
+ * **Keyed per owner.** It used to be one global key, which meant two things: opening a
+ * colleague's album landed you on *your* page in it, and — worse — an album that had
+ * just been bound in the opening sequence opened halfway through, at the one moment the
+ * shut cover is the entire point. A fresh owner has no entry and so starts closed,
+ * which is exactly what the ceremony hands over to.
  */
-const LEAF_KEY = 'tafelvoetbal.cards.albumLeaf';
+const leafKey = (owner?: string): string =>
+  `tafelvoetbal.cards.albumLeaf${owner ? `.${owner}` : ''}`;
 
-const readLeaf = (): number => {
+const readLeaf = (owner?: string): number => {
   try {
-    const stored = window.localStorage.getItem(LEAF_KEY);
+    const stored = window.localStorage.getItem(leafKey(owner));
     if (stored === null) return 0;
     const leaf = parseInt(stored, 10);
     return Number.isFinite(leaf) && leaf >= 0 ? leaf : 0;
@@ -29,9 +37,9 @@ const readLeaf = (): number => {
   }
 };
 
-const writeLeaf = (leaf: number): void => {
+const writeLeaf = (leaf: number, owner?: string): void => {
   try {
-    window.localStorage.setItem(LEAF_KEY, String(leaf));
+    window.localStorage.setItem(leafKey(owner), String(leaf));
   } catch {
     /* private browsing — the position just will not survive the session */
   }
@@ -279,6 +287,39 @@ interface AlbumProps {
   sections: AlbumSection[];
   /** Whose album this is. Printed on the cover. */
   owner?: string;
+  /**
+   * The owner's player id, used only to key the saved reading position.
+   *
+   * Separate from `owner` because that is a display name and display names are not
+   * unique — there are two Daans and two Jeroens on the board, and they would share a
+   * page position.
+   *
+   * The component does not re-read the position when this changes, so the collection
+   * page mounts the album with `key={playerId}`; switching owner is a different book,
+   * not the same book showing something else.
+   */
+  ownerId?: string;
+  /**
+   * Which leather the book is bound in — one of `utils/albumLeather.ts`'s ids.
+   *
+   * Read on every render rather than resolved once, so a cover that changes re-stains
+   * in place. Undefined falls back to bordeaux, the binding the album had before there
+   * was a choice.
+   */
+  cover?: string;
+  /**
+   * Replaces the label above the book while it is shut and has not been opened yet.
+   *
+   * For the end of the opening ceremony. The sequence hands over a shut book — which is
+   * right, a book being bound is a closed object — but that leaves a new owner looking at
+   * something with no visible way in, and this album deliberately has **no chrome**: no
+   * arrows beside it, and nothing drawn on the page-turn strips. The line above the book is
+   * the one place that carries discoverability, so it is where the invitation goes.
+   *
+   * Clears itself the moment the book is opened, rather than on a timer or a flag from
+   * above: the hint exists to get you in, and once you are in it is answered.
+   */
+  hint?: string;
   /** Rendered under the book, e.g. the page controls' surroundings. */
   footer?: ReactNode;
   /** A card was clicked. Opens it in the viewer. */
@@ -296,6 +337,9 @@ interface AlbumProps {
 const Album: React.FC<AlbumProps> = ({
   sections,
   owner,
+  ownerId,
+  cover,
+  hint,
   footer,
   onCardOpen,
   focusPlayerId,
@@ -320,12 +364,22 @@ const Album: React.FC<AlbumProps> = ({
    * than a page: it is the thing the desktop book is actually in terms of. A
    * first-time visitor has nothing stored and so starts at 0 — closed.
    */
-  const [flipped, setFlipped] = useState(readLeaf);
+  const [flipped, setFlipped] = useState(() => readLeaf(ownerId));
   /** The leaf mid-rotation, which must sit above both stacks. */
   const [moving, setMoving] = useState<number | null>(null);
 
   /** Mobile page index and the direction it arrived from. */
-  const [mobilePage, setMobilePage] = useState(() => readLeaf() * 2);
+  const [mobilePage, setMobilePage] = useState(() => readLeaf(ownerId) * 2);
+
+  /**
+   * Whether this book has been open at any point since it was mounted.
+   *
+   * Only the `hint` uses it, and only to stop the invitation coming back when a reader
+   * shuts the book again. A one-way latch rather than a check on the current position,
+   * because "you have not worked out how to open this" is not a thing that can become true
+   * again once it has been false.
+   */
+  const [everOpened, setEverOpened] = useState(() => readLeaf(ownerId) > 0);
   const touchStartX = useRef<number | null>(null);
 
   /*
@@ -340,7 +394,17 @@ const Album: React.FC<AlbumProps> = ({
   }, [maxFlipped, pages.length]);
 
   useEffect(() => {
-    writeLeaf(isMobile ? Math.floor(mobilePage / 2) : flipped);
+    writeLeaf(isMobile ? Math.floor(mobilePage / 2) : flipped, ownerId);
+  }, [isMobile, flipped, mobilePage, ownerId]);
+
+  /*
+   * Latch the hint off as soon as the book is open, by any route — the cover click, a turn
+   * strip, an arrow key, a swipe, or the card viewer turning to a card. Watching the
+   * position rather than hooking `turn()` is what makes that "any route" rather than a list
+   * of routes somebody has to remember to extend.
+   */
+  useEffect(() => {
+    if (isMobile ? mobilePage > 0 : flipped > 0) setEverOpened(true);
   }, [isMobile, flipped, mobilePage]);
 
   /*
@@ -461,7 +525,7 @@ const Album: React.FC<AlbumProps> = ({
    * the spread shows pages 2f-1 and 2f, and the last one can be a single page.
    */
   const spreadLabel = (): string => {
-    if (flipped === 0) return 'gesloten';
+    if (flipped === 0) return '';
     const low = flipped * 2 - 1;
     const high = Math.min(flipped * 2, sheetCount);
     return low === high
@@ -469,14 +533,31 @@ const Album: React.FC<AlbumProps> = ({
       : `pagina ${low}–${high} / ${sheetCount}`;
   };
 
-  const label = isMobile
+  /** Shut, showing only the front cover. Where a first visit starts. */
+  const closed = isMobile ? mobilePage === 0 : flipped === 0;
+
+  /*
+   * The line above the book, and the only chrome the album has.
+   *
+   * Three things can be there, in order of precedence:
+   *
+   *   hint      an invitation, while a book that has never been opened is shut
+   *   gesloten  the shut book, once it has been opened at least once
+   *   pagina …  where you are
+   *
+   * `gesloten` on its own was fine for a returning reader and useless for a new one: it
+   * names the state instead of offering the way out of it, in front of an album that
+   * deliberately has no arrows and nothing drawn on its turn strips. The hint is answered
+   * by opening the book, which is the only thing it asks for — so it cannot linger, and a
+   * reader who shuts the book again gets the plain label rather than being told twice.
+   */
+  const pageLabel = isMobile
     ? mobilePage === 0
       ? 'gesloten'
       : `pagina ${mobilePage} / ${sheetCount}`
     : spreadLabel();
 
-  /** Shut, showing only the front cover. Where a first visit starts. */
-  const closed = isMobile ? mobilePage === 0 : flipped === 0;
+  const label = hint && closed && !everOpened ? hint : pageLabel;
 
   return (
     <>
@@ -491,6 +572,12 @@ const Album: React.FC<AlbumProps> = ({
           ]
             .filter(Boolean)
             .join(' ')}
+          /*
+            The binding, the cover face and the board edge all read their colours from
+            here, so the outside of the book agrees with itself. The pages inside do
+            not — paper is paper in every stain.
+          */
+          style={albumLeather(cover)}
           onTouchStart={isMobile ? onTouchStart : undefined}
           onTouchEnd={isMobile ? onTouchEnd : undefined}
           /* Clicking the cover opens it, which is what one does to a book. */
