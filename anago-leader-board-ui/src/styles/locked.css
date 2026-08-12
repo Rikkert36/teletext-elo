@@ -1,0 +1,235 @@
+/* ================================================================ *
+ * The album that is not open yet
+ *
+ * A shut, strapped book lying on the same mahogany as everything else, with a brass
+ * padlock on the clasp and the number of games still to play set underneath it.
+ *
+ * It obeys the table's rules rather than inventing a "locked" look: one lamp from the
+ * top left, the leather and the brass come from `albumLeather`'s tokens so the book is
+ * the same product as the five on the choosing table, and there is no panel, no plate
+ * and no border anywhere — a notice box is the one thing on this page that would admit
+ * to being a screen.
+ *
+ * Deliberately smaller than `--page-w`: the shut book at full page height leaves no room
+ * under it for the number, the pips and the register, and the number is the reason
+ * somebody is on this screen. So it has its own size, wide enough to read as the same
+ * object and short enough that all four things fit on one screen without scrolling.
+ * ================================================================ */
+
+.locked {
+  --locked-w: min(46vw, calc(34vh * 0.78), 260px);
+  --locked-h: calc(var(--locked-w) / 0.78);
+
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: clamp(6px, 2vh, 20px) 16px clamp(16px, 4vh, 40px);
+}
+
+/* The album's nav-label row, in the same place and the same type, so arriving at the
+   gate does not move the book relative to where an open one sits. */
+.locked__label {
+  font-family: var(--title-font);
+  font-size: 11px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  margin-bottom: 12px;
+}
+
+/*
+ * The book. Shut, so it is the cover face and the board edge and nothing else — the same
+ * shadow stack as `.album__binding` and `.choice__stage`, because it is the same book seen
+ * closed and the three must not disagree about how high off the table it sits.
+ */
+.locked__book {
+  position: relative;
+  width: var(--locked-w);
+  height: var(--locked-h);
+  border-radius: 3px;
+  overflow: hidden;
+  background: linear-gradient(
+    150deg,
+    var(--leather-hi, #5a4526) 0%,
+    var(--leather-mid, #35270f) 55%,
+    var(--leather-lo, #4a3820) 100%
+  );
+  box-shadow:
+    0 0 0 2px var(--board-edge, #6b5325),
+    0 26px 50px rgba(0, 0, 0, 0.65),
+    0 6px 14px rgba(0, 0, 0, 0.5);
+}
+
+/*
+ * Blocked blind: a kicker and a rule, no name. Exactly what the five books on the
+ * choosing table carry, and for the same reason — the owner's name going onto the leather
+ * is the payoff of the binding ceremony, which is on the far side of this gate.
+ *
+ * Inset from the strap on the right, or the blocking runs under the brass.
+ */
+.locked__face {
+  position: absolute;
+  inset: 0 22% 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px 10px;
+  color: var(--foil, #e6c98a);
+  text-align: center;
+  /* The spine shadow of a right-hand page, which is what a shut cover is. */
+  box-shadow: inset 12px 0 24px -12px rgba(0, 0, 0, 0.7);
+}
+
+.locked__kicker {
+  font-family: var(--title-font);
+  font-size: 10px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  opacity: 0.75;
+  text-shadow: 0 1px 0 var(--foil-emboss, #241a05);
+}
+
+.locked__rule {
+  width: 54%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--foil-rule, #a9853c) 50%, transparent);
+}
+
+/*
+ * The clasp, down the opening edge where a diary's actually is. A band across the middle
+ * of the face reads as a ribbon on a present, which is the opposite of what this says.
+ *
+ * Brass with the light on its left side, so it is lit by the same lamp as the leather it
+ * lies on, and darkest along the seam where it turns over the fore-edge.
+ */
+.locked__strap {
+  position: absolute;
+  top: -4%;
+  bottom: -4%;
+  right: 8%;
+  width: 20%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.35) 0%,
+    #8a6c30 12%,
+    #d8b96e 28%,
+    #b9963f 46%,
+    #7d6029 88%,
+    rgba(0, 0, 0, 0.4) 100%
+  );
+  box-shadow:
+    -6px 0 12px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(40, 28, 8, 0.5);
+}
+
+/*
+ * The lock itself, in the leather's own dark so it reads as iron on the brass rather than
+ * a third metal. Sized off the strap, so it cannot outgrow the band on a narrow screen.
+ */
+.locked__lock {
+  width: 62%;
+  max-width: 34px;
+  height: auto;
+  color: #2a1d08;
+  filter: drop-shadow(0 1px 0 rgba(255, 236, 190, 0.35));
+}
+
+/* ---------------------------------------------------------------- *
+ * What is missing, said in a number
+ * ---------------------------------------------------------------- */
+
+.locked__note {
+  margin-top: clamp(14px, 2.6vh, 24px);
+  text-align: center;
+  max-width: 40ch;
+}
+
+.locked__togo {
+  margin: 0;
+  font-family: var(--title-font);
+  font-size: clamp(15px, 2vw, 20px);
+  letter-spacing: 1px;
+  color: var(--ink);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+/* The one number on the screen that matters, so it is the one thing set in the light ink
+   at weight. Everything around it is context for it. */
+.locked__togo strong {
+  font-size: 1.35em;
+  color: var(--foil, #e6c98a);
+}
+
+/*
+ * One mark per game the gate asks for, filled in for the ones already played — the same
+ * fact as the number, countable at a glance. Not `.game-meter`: that is a completion
+ * readout for a collection, and reusing it here would say the album is partly full.
+ */
+.locked__pips {
+  display: flex;
+  justify-content: center;
+  gap: 7px;
+  margin: 12px 0 0;
+}
+
+.locked__pip {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  /* Cut into the timber: dark well, one lit edge along the top. */
+  background: rgba(0, 0, 0, 0.42);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.7),
+    0 1px 0 rgba(255, 226, 175, 0.14);
+}
+
+.locked__pip--played {
+  background: var(--foil-rule, #a9853c);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 236, 190, 0.5),
+    0 0 6px rgba(198, 158, 84, 0.35);
+}
+
+.locked__lines {
+  margin: 14px 0 0;
+  font-family: var(--title-font);
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-dim);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+/*
+ * The register, under the book instead of out in the right margin. There is no packet
+ * shelf opposite it on this screen, and the margins are the pair "what you came for /
+ * how you leave" — one sheet alone in one of them looks mislaid rather than placed.
+ */
+.locked__register {
+  width: min(190px, 70%);
+  margin-top: clamp(18px, 3.4vh, 32px);
+}
+
+/* ---------------------------------------------------------------- *
+ * Phone
+ *
+ * The same breakpoint as the mobile album. Only the book shrinks — the number and the
+ * lines are the content here and stay at their size.
+ * ---------------------------------------------------------------- */
+
+@media (max-width: 599.95px) {
+  .locked {
+    --locked-w: min(56vw, calc(30vh * 0.78), 200px);
+  }
+
+  .locked__lines {
+    font-size: 12px;
+  }
+}

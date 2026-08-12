@@ -60,6 +60,24 @@ export const setSpeed = (value: number): number => {
  */
 export const ms = (base: number): number => Math.round(base * scale);
 
+/**
+ * Whether the reader has asked for less motion.
+ *
+ * Lives here with the other pacing controls because it is the third knob, and because
+ * every sequence on this page has to agree about it: the pack opener, the album's
+ * re-binding and anything after them.
+ *
+ * **What it means here is "land on the finished state", never "play it stilled".** A
+ * ceremony held at a mid-point is worse than no ceremony — it reads as a hang. So callers
+ * check this and jump to the end, and the CSS kills the transitions to match.
+ *
+ * Read at animation time rather than once at module load, so toggling it in the OS takes
+ * effect on the next sequence instead of on the next reload. The `?.` is for jsdom and
+ * older browsers, where the absence of the API is not a preference for less motion.
+ */
+export const prefersReducedMotion = (): boolean =>
+  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+
 /* ------------------------------------------------------------------ *
  * Build-up length
  *

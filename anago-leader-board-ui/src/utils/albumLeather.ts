@@ -62,10 +62,11 @@ export const coverLabel = (cover: string | null | undefined): string =>
  * The gold is deliberately *not* derived from the stain. `--foil` is the printing, and
  * a book's blocking does not change colour with its leather.
  *
- * Worth knowing before adding a re-bind: a `background` built out of custom properties
- * cannot be transitioned — which is exactly why `.album__binding` is its own element
- * rather than a background on `.album__book`. Changing the cover therefore cuts rather
- * than fades unless two stacked layers are crossfaded on opacity.
+ * A `background` built out of custom properties cannot be transitioned — which is exactly
+ * why `.album__binding` is its own element rather than a background on `.album__book`.
+ * Changing the cover therefore cuts rather than fades. The icon re-bind works around it
+ * with a second cover element that is revealed by a transitioned `clip-path` instead; see
+ * `.album__cover-icons` in album.css.
  */
 export const albumLeather = (cover: string | null | undefined): CSSProperties => {
   const stain = (cover ? BY_ID.get(cover) : undefined) ?? COVERS[0];
@@ -81,5 +82,35 @@ export const albumLeather = (cover: string | null | undefined): CSSProperties =>
     /* The emboss under the blocked title. Dark and warm, so it reads as pressed into
        the leather rather than as a drop shadow floating over it. */
     '--foil-emboss': '#241a05',
+    /*
+     * The boards of the icon binding — a half-bound book, so these are the paper-covered
+     * boards and the stain above stays on as its spine and corners.
+     *
+     * Warm rather than white. A true white next to brass reads as paper stock, and the
+     * object has to stay a book; ivory keeps it bound in something. Identical on all five
+     * stains for the same reason `--board-edge` is: five upgraded books have to read as
+     * five of the same thing, and a green book with green-tinted boards leaves the series.
+     *
+     * Emitted unconditionally rather than behind a flag. There is no second code path to
+     * fall out of step, and an unused custom property costs nothing — the half-binding is
+     * composed in CSS out of tokens that are always here.
+     */
+    '--board-hi': '#f4efe2',
+    '--board-mid': '#e6dfcd',
+    '--board-lo': '#d8cfb8',
+    /*
+     * The ink the boards are lettered in — and it is ink, not foil.
+     *
+     * `--foil` is `#e6c98a`, picked to glow on near-black leather, and on an ivory board it
+     * has almost no contrast at all: it is what made "Verzamelalbum van" nearly invisible
+     * on the first re-bound cover. The answer is not a brighter gold but the right medium.
+     * A half-bound book's boards are paper, paper takes printed ink, and the hot foil stays
+     * where it belongs — on the leather spine, which still reads `--foil`.
+     *
+     * Deep bronze rather than black, so it still belongs to the same warm family as the
+     * brass; and identical on all five stains, for the same reason `--board-edge` is.
+     */
+    '--board-ink': '#6a5124',
+    '--board-rule': '#a98b4c',
   } as CSSProperties;
 };

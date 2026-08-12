@@ -62,7 +62,7 @@ namespace AnagoLeaderboard.Services
 
             // The highest visible rating each player has ever held. Only obtainable here:
             // ratings are never stored, so a player's peak exists nowhere but inside this
-            // replay. It is what a legend's trading card is rated on.
+            // replay. It is what an icoon's trading card is rated on.
             var peakByPlayerId = new Dictionary<string, int>();
 
             foreach (var game in allGames)

@@ -1,0 +1,473 @@
+/* ================================================================ *
+ * Waiting: a small brass hourglass standing on the wood
+ *
+ * The one thing the table was missing. Both waiting states rendered nothing at all —
+ * see the "seven states" note in CollectionPage — on the grounds that a spinner
+ * flashing for 80ms against a local API is noise. That argument is right about the
+ * *spinner* and wrong about the *blank*: a page that shows nothing while a share, a
+ * cold API or somebody else's lunchtime holds the request up is indistinguishable
+ * from a broken one, and the collection GET is a full leaderboard replay.
+ *
+ * So: an object, not a widget. The stage's rule is that everything on it is either a
+ * physical thing lying on the timber or type cut into the surface, and a spinning ring
+ * or a progress bar is neither — an hourglass is the same class of object as the book,
+ * the packets and the ledger, and it is the one instrument whose entire purpose is
+ * "this takes as long as it takes". It says nothing about how far along the request is,
+ * which is honest: nothing here knows that.
+ *
+ * Four rules this file follows:
+ *
+ * 1. **Nothing shows for the first `--wait-in`.** Every animation here, including the
+ *    fade in, is delayed by it with `both` fill — so a request that lands inside 420ms
+ *    paints an empty stage and the hourglass is never seen. That is the original
+ *    decision kept rather than reversed: it only appears once waiting is a real thing
+ *    that is happening to you. The delay is on the children as well as the root, so the
+ *    sand starts full at the moment you first see it rather than a fifth drained.
+ * 2. **Durations do NOT read `var(--anim)`**, which every other animation on this page
+ *    does. `--anim` paces the *reveal* — it is a dramatic control, exposed on
+ *    `cardDebug` for tuning the ceremony — and a waiting cadence is not a beat in that
+ *    sequence. Doubling it would also double `--wait-in`, which decides whether the
+ *    thing appears at all.
+ * 3. **The percentages bake in the split.** One `--cycle` is two half-turns of
+ *    `--run` draining plus `--turn` turning, at 2000/500 — so a drain is 40% and a
+ *    turn is 10%, hard-coded in the keyframes below. Change `--cycle` and those
+ *    percentages together or the sand runs out mid-turn.
+ * 4. **The brass is lit symmetrically, and only the brass.** The object rotates a full
+ *    180° twice a cycle, so anything on it with a top-lit gradient would be lit from
+ *    underneath for half of every cycle — which breaks the one rule the table has
+ *    least slack on (see `--drop` in game.css). The caps and posts therefore take
+ *    their highlight down the middle instead of along the top edge, which reads as
+ *    turned brass and survives being upside down. The glass sheen is the one
+ *    exception, and it is at 0.1 alpha for exactly that reason.
+ *
+ * Why it turns at all, rather than draining and resetting: a reset is a teleport, and
+ * the only way to hide one is to make the two halves of the cycle physically identical.
+ * A turn does that for free — after 180° the empty bulb is the full one — so the whole
+ * loop is seamless with no fade covering a jump. It is also what somebody does with an
+ * hourglass that has run out.
+ * ================================================================ */
+
+.hourglass {
+  /*
+   * One drain, one turn, and the cycle they add up to. The keyframe percentages below
+   * depend on the ratio — see rule 3.
+   */
+  --run: 2000ms;
+  --turn: 500ms;
+  --cycle: 5000ms;
+
+  /* How long the table stays empty before an object is put on it. */
+  --wait-in: 420ms;
+
+  --glass-w: 54px;
+  --glass-h: 82px;
+
+  /* Warm ochre, a shade off the foil so it is sand and not gold. */
+  --sand-hi: #e0b268;
+  --sand-lo: #a3701f;
+
+  /*
+   * The album's own footprint, reserved — the same trick and the same reason as
+   * `.choice__well`: this is replaced by the book, and the book must not arrive by
+   * pushing the whole table down. `--page-h` plus `.album`'s `padding: 4px 0`.
+   */
+  min-height: calc(var(--page-h) + 8px);
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+
+  /* Rule 1. `both`, so the backwards fill holds it invisible through the delay. */
+  animation: hourglass-arrive 320ms ease var(--wait-in) both;
+}
+
+/* Holds the shadow on the wood while the glass above it turns. */
+.hourglass__stand {
+  position: relative;
+}
+
+/*
+ * The shadow is cast by the *table's* lamp, so it stays where it is while the object
+ * turns — hence a separate element outside the rotation rather than a `box-shadow` on
+ * the glass, which would swing round with it twice a cycle.
+ *
+ * It shrinks and softens as the hourglass is lifted to be turned, which is the only
+ * reason the lift in `hourglass-turn` reads as a hand picking it up.
+ */
+.hourglass__shadow {
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 150%;
+  height: 12px;
+  margin-left: -75%;
+  background: radial-gradient(ellipse at 50% 50%, rgba(12, 4, 1, 0.62) 0%, transparent 72%);
+  animation: hourglass-shadow var(--cycle) ease-in-out var(--wait-in) infinite both;
+}
+
+.hourglass__glass {
+  position: relative;
+  width: var(--glass-w);
+  height: var(--glass-h);
+  animation: hourglass-turn var(--cycle) ease-in-out var(--wait-in) infinite both;
+}
+
+/*
+ * The two bulbs. Funnels rather than triangles — the clip leaves a 4%-wide throat at
+ * the waist, because a true apex has no hole for the sand to go through and reads as
+ * two pyramids touching.
+ *
+ * The clip is what contains the sand: the sand blocks below are full-size children
+ * that slide, and the bulb's shape is the only thing that makes a sliding rectangle
+ * look like a level falling.
+ */
+.hourglass__bulb {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  overflow: hidden;
+  /* Cold, faint and mostly transparent: glass on a dark table is what it lets through. */
+  background: linear-gradient(
+    118deg,
+    rgba(255, 244, 222, 0.13) 0%,
+    rgba(255, 244, 222, 0.04) 46%,
+    rgba(255, 244, 222, 0.1) 100%
+  );
+}
+
+.hourglass__bulb--top {
+  top: 0;
+  clip-path: polygon(0 0, 100% 0, 52% 100%, 48% 100%);
+}
+
+.hourglass__bulb--bottom {
+  bottom: 0;
+  clip-path: polygon(48% 0, 52% 0, 100% 100%, 0 100%);
+}
+
+/*
+ * The sand in one bulb: a full-height block that slides, clipped to the funnel.
+ *
+ * Which end it is anchored to changes at the turn, and it has to: draining and filling
+ * both keep the sand *at the neck end* of their bulb, and after 180° the neck end is
+ * the other end of the box. So each block jumps between `+102%` and `-102%` — both of
+ * which are entirely outside the clip, and therefore invisible — at the instant the
+ * bulb is empty. The two keyframes 0.001% apart below are that jump; interpolating it
+ * would sweep a block of sand across the glass.
+ *
+ * `linear`, because sand falls at a constant rate. That is the whole visual claim an
+ * hourglass makes.
+ */
+.hourglass__sand {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--sand-hi) 0%, var(--sand-lo) 100%);
+}
+
+.hourglass__sand--top {
+  animation: hourglass-drain var(--cycle) linear var(--wait-in) infinite both;
+}
+
+.hourglass__sand--bottom {
+  animation: hourglass-fill var(--cycle) linear var(--wait-in) infinite both;
+}
+
+/*
+ * The stream through the throat, and there are two of them — one on each side of the
+ * waist, each lit for the half of the cycle in which its side is the *lower* one.
+ *
+ * A single element cannot do it. The stream falls away from the neck into whichever
+ * bulb is underneath, and after the turn that is the opposite direction in the
+ * object's own coordinates; one element would pour upwards for half the cycle.
+ *
+ * The grains are a repeating gradient scrolled by `background-position`, which is why
+ * this costs nothing: no elements are created and the paint is one layer.
+ */
+.hourglass__pour {
+  position: absolute;
+  left: 50%;
+  width: 2px;
+  height: 36%;
+  margin-left: -1px;
+  background-image: repeating-linear-gradient(
+    180deg,
+    var(--sand-hi) 0 2px,
+    transparent 2px 6px
+  );
+  background-size: 2px 6px;
+  opacity: 0;
+}
+
+.hourglass__pour--down {
+  top: 50%;
+  animation:
+    hourglass-pour-down var(--cycle) steps(1, end) var(--wait-in) infinite both,
+    hourglass-grain-down 280ms linear var(--wait-in) infinite;
+}
+
+.hourglass__pour--up {
+  bottom: 50%;
+  animation:
+    hourglass-pour-up var(--cycle) steps(1, end) var(--wait-in) infinite both,
+    hourglass-grain-up 280ms linear var(--wait-in) infinite;
+}
+
+/* ---------------------------------------------------------------- *
+ * The brass
+ *
+ * Caps top and bottom, two posts between them. Lit down the middle rather than along
+ * the top edge — see rule 4.
+ * ---------------------------------------------------------------- */
+
+.hourglass__cap {
+  position: absolute;
+  left: -11%;
+  width: 122%;
+  height: 7px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #6f5420 0%, #cda75f 48%, #6f5420 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 2px 5px rgba(14, 5, 2, 0.55);
+}
+
+.hourglass__cap--top {
+  top: -6px;
+}
+
+.hourglass__cap--bottom {
+  bottom: -6px;
+}
+
+.hourglass__post {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #5f4718 0%, #c69f57 50%, #5f4718 100%);
+}
+
+.hourglass__post--left {
+  left: -8%;
+}
+
+.hourglass__post--right {
+  right: -8%;
+}
+
+/* ---------------------------------------------------------------- *
+ * The line under it
+ *
+ * The one piece of type, and it is engraved into the wood like every other readout on
+ * this table — `.game-stage .hourglass__caption` in game.css carries the relief, along
+ * with the rest of them.
+ * ---------------------------------------------------------------- */
+
+.hourglass__caption {
+  font-family: var(--title-font, Georgia, "Times New Roman", serif);
+  font-size: 13px;
+  font-style: italic;
+  letter-spacing: 0.4px;
+  color: var(--ink-dim, #c3a281);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- *
+ * Keyframes
+ * ---------------------------------------------------------------- */
+
+@keyframes hourglass-arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/*
+ * Two half-turns per cycle, ending on 360° — which is the same picture as 0° and lets
+ * the iteration boundary do the resetting invisibly. Ending on 180° instead would snap
+ * the object back upright with the wrong bulb full.
+ *
+ * `translateY` before `rotate`, always: the other order lifts the object along its own
+ * rotated axis, so the lift becomes a sideways lurch halfway through the turn.
+ */
+@keyframes hourglass-turn {
+  0%,
+  40% {
+    transform: translateY(0) rotate(0deg);
+  }
+  45% {
+    transform: translateY(-5px) rotate(90deg);
+  }
+  50%,
+  90% {
+    transform: translateY(0) rotate(180deg);
+  }
+  95% {
+    transform: translateY(-5px) rotate(270deg);
+  }
+  100% {
+    transform: translateY(0) rotate(360deg);
+  }
+}
+
+/* Off the wood while it is turned, back down after. */
+@keyframes hourglass-shadow {
+  0%,
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  45% {
+    opacity: 0.5;
+    transform: scale(0.82);
+  }
+  50%,
+  90% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  95% {
+    opacity: 0.5;
+    transform: scale(0.82);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Full, runs out, holds empty through the turn, then fills as the lower bulb. */
+@keyframes hourglass-drain {
+  0% {
+    transform: translateY(0);
+  }
+  40%,
+  50% {
+    transform: translateY(102%);
+  }
+  50.001% {
+    transform: translateY(-102%);
+  }
+  90%,
+  100% {
+    transform: translateY(0);
+  }
+}
+
+/* The same, half a cycle out of phase. The jump lives on the iteration boundary here,
+   which CSS gives for nothing — an animation restarting does not interpolate. */
+@keyframes hourglass-fill {
+  0% {
+    transform: translateY(102%);
+  }
+  40%,
+  50% {
+    transform: translateY(0);
+  }
+  90%,
+  100% {
+    transform: translateY(-102%);
+  }
+}
+
+/*
+ * `steps(1, end)` on both: a stream is running or it is not, and fading one out over
+ * 200ms reads as the sand thinning rather than as the last grain landing.
+ */
+@keyframes hourglass-pour-down {
+  0% {
+    opacity: 1;
+  }
+  38%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes hourglass-pour-up {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  88%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Scrolled away from the neck, which is a different direction for each stream. */
+@keyframes hourglass-grain-down {
+  from {
+    background-position-y: 0;
+  }
+  to {
+    background-position-y: 6px;
+  }
+}
+
+@keyframes hourglass-grain-up {
+  from {
+    background-position-y: 0;
+  }
+  to {
+    background-position-y: -6px;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Reduced motion
+ *
+ * The turning goes and the falling goes: a small object rotating a full circle is
+ * precisely what this query is asked to switch off. What replaces it is not nothing —
+ * a still hourglass with no line under it is indistinguishable from a broken page — so
+ * the glass is held half run and the caption breathes instead. Opacity is not motion.
+ *
+ * The arrival fade is deliberately kept for the same reason: it is what stops this
+ * appearing at all on a fast request, and dropping it would make the reduced-motion
+ * path the only one that flashes.
+ * ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .hourglass__glass,
+  .hourglass__shadow,
+  .hourglass__sand,
+  .hourglass__pour {
+    animation: none;
+  }
+
+  .hourglass__sand--top {
+    transform: translateY(46%);
+  }
+
+  .hourglass__sand--bottom {
+    transform: translateY(54%);
+  }
+
+  /* A thread of sand standing in the throat, since nothing is falling through it. */
+  .hourglass__pour--down {
+    opacity: 0.7;
+  }
+
+  .hourglass__caption {
+    animation: hourglass-breathe 2600ms ease-in-out var(--wait-in) infinite both;
+  }
+}
+
+@keyframes hourglass-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.42;
+  }
+}

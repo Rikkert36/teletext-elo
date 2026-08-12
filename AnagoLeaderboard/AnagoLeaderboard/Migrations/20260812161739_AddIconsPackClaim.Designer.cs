@@ -3,6 +3,7 @@ using System;
 using AnagoLeaderboard.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AnagoLeaderboard.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DatabaseContextModelSnapshot : ModelSnapshot
+    [Migration("20260812161739_AddIconsPackClaim")]
+    partial class AddIconsPackClaim
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.10");
@@ -132,7 +135,6 @@ namespace AnagoLeaderboard.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("PlayerId")
-                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Reason")
@@ -417,8 +419,7 @@ namespace AnagoLeaderboard.Migrations
                     b.HasOne("AnagoLeaderboard.Models.Results.Player", null)
                         .WithMany()
                         .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("AnagoLeaderboard.Models.Results.PlayerCollection", b =>

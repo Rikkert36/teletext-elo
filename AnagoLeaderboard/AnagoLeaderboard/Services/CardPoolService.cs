@@ -46,29 +46,48 @@ public class CardPoolService
 
         var actives = eligible
             .Where(player => player.Active)
-            .Select(player => ToSubject(player, player.VisibleRating, isLegend: false))
+            .Select(player => ToSubject(player, player.VisibleRating, isIcon: false))
             .ToList();
 
         // Rated on the all-time high, which is the whole point of an icoon: it says who
         // someone was, not what their form decayed to before they stopped playing. It also
         // spreads them across the tiers - somebody who managed ten games and peaked at 780
         // is an icoon in silver, and a gold card would lie about them.
-        var legends = eligible
+        var icons = eligible
             .Where(player => !player.Active)
-            .Select(player => ToSubject(player, player.PeakVisibleRating, isLegend: true))
+            .Select(player => ToSubject(player, player.PeakVisibleRating, isIcon: true))
             .ToList();
 
-        return new CardPool(minGames, Ordered(actives), Ordered(legends));
+        return new CardPool(minGames, Ordered(actives), Ordered(icons));
     }
 
-    private CardSubject ToSubject(DynamicRatingPlayer player, int visibleRating, bool isLegend) =>
+    /// <summary>
+    /// Whether a collector holds the whole active set - the thing that earns the icons.
+    ///
+    /// <strong>Actives only.</strong> The icons are the reward for finishing that set, so
+    /// counting them here would let the reward dilute the thing it is awarded for, and a set
+    /// that grows every time you win would never close.
+    ///
+    /// An empty roster is deliberately <em>not</em> complete. Vacuous truth would hand the
+    /// icons to the first person to open a packet on a database with nobody over the games
+    /// gate, which is exactly the state a fresh install and every test fixture start in.
+    ///
+    /// Lives here, next to the code that decides who is an active and who is an icoon,
+    /// rather than inside the claim that used to apply it. Its old home is what made the
+    /// unlock a side effect of opening a pack.
+    /// </summary>
+    public static bool ActiveSetComplete(CardPool pool, IReadOnlyDictionary<string, int> counts) =>
+        pool.Actives.Count > 0
+        && pool.Actives.All(active => counts.GetValueOrDefault(active.Id) > 0);
+
+    private CardSubject ToSubject(DynamicRatingPlayer player, int visibleRating, bool isIcon) =>
         new(
             player.Id,
             player.Name,
             visibleRating,
             _cardRatingCalculator.OverallFor(visibleRating),
             player.NumberOfGames,
-            isLegend);
+            isIcon);
 
     /// <summary>
     /// Best first. The album sorts into its own printed order regardless, but an unordered

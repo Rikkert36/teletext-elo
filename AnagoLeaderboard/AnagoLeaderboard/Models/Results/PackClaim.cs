@@ -1,10 +1,28 @@
 namespace AnagoLeaderboard.Models.Results;
 
-/// <summary>Where a pack came from. Gifts arrive later and are the only granted kind.</summary>
+/// <summary>Where a pack came from. <see cref="Gift"/> is the only granted kind.</summary>
 public enum PackSource
 {
     Game,
-    Daily
+    Daily,
+
+    /// <summary>
+    /// A <see cref="PackGift"/> - the one source that is a row rather than a derivation, because
+    /// nothing happened to entitle anybody to a present.
+    /// </summary>
+    Gift,
+
+    /// <summary>
+    /// The packet that comes with finishing the active set: one guaranteed icoon, once ever.
+    ///
+    /// **Derived, like the daily freebie, and deliberately not a <see cref="Gift"/>.** It would
+    /// have been easy to write a gift row when the last active card landed, and that is the
+    /// `CreateGame` mistake again - a grant bolted onto whichever transaction happened to be
+    /// passing. Nothing entitles you to this except the state of your collection, and that state
+    /// is readable, so it is a derivation: offered while the set is complete and this claim does
+    /// not exist, and gone the moment it does.
+    /// </summary>
+    Icons
 }
 
 /// <summary>
@@ -39,11 +57,24 @@ public class PackClaim
     public string? GameId { get; set; }
 
     /// <summary>
+    /// The present that was opened, or null for the other two sources.
+    ///
+    /// Cascades too, for the same reason: withdrawing a gift takes the cards it paid out with it.
+    /// </summary>
+    public string? GiftId { get; set; }
+
+    /// <summary>
     /// The day the pack belonged to, at midnight. Server-local, like every other date in this
     /// codebase.
     ///
-    /// Only the daily freebie is keyed on it - a game pack is identified by its game - but it
-    /// is stored for both, because it is the only thing that makes an old row readable.
+    /// Only the daily freebie is keyed on it - a game pack is identified by its game and a gift
+    /// by its row - but it is stored for all three, because it is the only thing that makes an
+    /// old row readable.
+    ///
+    /// **A gift claim is deliberately not keyed on it.** A present stands open for days, so the
+    /// derivation has to see a gift claim from last Tuesday or the packet comes back every
+    /// morning. See <see cref="Services.PackService.Derive"/>, which narrows the other two
+    /// sources to the day and leaves this one alone.
     /// </summary>
     public DateTime ClaimDate { get; set; }
 
@@ -66,6 +97,37 @@ public class PackClaim
             Id = Guid.NewGuid().ToString(),
             PlayerId = playerId,
             Source = PackSource.Daily,
+            GameId = null,
+            ClaimDate = day.Date,
+            ClaimedAt = DateTime.Now
+        };
+
+    public static PackClaim ForGift(string playerId, string giftId, DateTime day) =>
+        new()
+        {
+            Id = Guid.NewGuid().ToString(),
+            PlayerId = playerId,
+            Source = PackSource.Gift,
+            GameId = null,
+            GiftId = giftId,
+            ClaimDate = day.Date,
+            ClaimedAt = DateTime.Now
+        };
+
+    /// <summary>
+    /// The set-completion packet, claimed. One per player, ever.
+    ///
+    /// The day is stored because every row stores it, and read by nothing: this claim is keyed on
+    /// the player alone. Keying it on the day would offer the packet again tomorrow, which is the
+    /// same trap a gift claim avoids - and here it would hand out an unlimited supply of
+    /// guaranteed icoons, one a night.
+    /// </summary>
+    public static PackClaim ForIcons(string playerId, DateTime day) =>
+        new()
+        {
+            Id = Guid.NewGuid().ToString(),
+            PlayerId = playerId,
+            Source = PackSource.Icons,
             GameId = null,
             ClaimDate = day.Date,
             ClaimedAt = DateTime.Now

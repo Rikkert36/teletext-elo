@@ -27,7 +27,23 @@
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  min-height: 62vh;
+  /*
+   * The book's box, less the ~30px row under it that carries "terug naar het album" —
+   * so the middle of the table is the same height whether it holds the book or a packet
+   * being torn open, and the panel hanging off `bottom: 0` in the margin does not move
+   * between the two. See `--album-room` in game.css.
+   *
+   * It was a bare `62vh`, which is what it still resolves to on the common case (a
+   * 960-tall window leaves the book 690px and 62vh is 595) — the `min()` is what stops
+   * it overshooting the reserved room on a window tall enough for 62vh to exceed it, or
+   * on one wide and tall enough that the book is width-limited.
+   *
+   * Safe to move at all only because the ceremony's vignette and bloom centre on the
+   * card's *measured* position (`--card-cx` / `--card-cy`, published by `PackOpener`),
+   * not on a fraction of the viewport. Were they still on the `50% 45%` fallback this
+   * would slide the card out of its own spotlight.
+   */
+  min-height: min(62vh, calc(var(--album-room, 62vh) - 30px));
   justify-content: center;
   position: relative;
   font-family: Tahoma, Verdana, sans-serif;
@@ -138,6 +154,20 @@
    *
    * Two passes: the packet's own colour bleeding out of the foil, the way the badge
    * glows in the logo, and then the shadow it casts on the table.
+   *
+   * **An outline cannot go here, and it was tried.** Four zero-blur drop-shadows at one
+   * pixel in each direction is the standard way to trace a silhouette, and on this element
+   * it renders nothing at all — at *any* offset. On a single element `filter` is applied
+   * **before** `mask`, so a hard-edged shadow sitting entirely outside the shape is drawn
+   * and then masked straight back off. Raising the offset only moves it further outside.
+   *
+   * That is also why the focus ring below works: it is a *blurred* glow, and blur bleeds
+   * inward as well as outward, so the part that lands inside the silhouette survives. A
+   * zero-blur offset has no inside part to keep.
+   *
+   * So a gold edge on this packet is drawn from the inside instead — `--pack-edge` for the
+   * straight sides, and `--seal-image` for the serrated ends, which are the crimp
+   * pseudo-elements and are painted within the mask.
    */
   filter: drop-shadow(0 0 7px var(--glow, transparent))
     drop-shadow(0 7px 12px rgba(0, 0, 0, 0.6));
@@ -206,14 +236,21 @@
       var(--foil-hi, #2b3444) 0%,
       rgba(0, 0, 0, 0) 100%
     ),
+    /*
+     * The bulge. Its two dark values are tokens because they are near-black — 0.55 and 0.58
+     * — which is right over a dark foil and wrong over a white one: the set-completion
+     * packet would have come out white in the middle with almost-black sides, which is not
+     * a white packet. `packFoil` hands that one a warm, faint pair instead, so it keeps the
+     * *shape* of foil stretched over a few cards without the shading of a dark wrapper.
+     */
     linear-gradient(
       90deg,
-      rgba(0, 0, 0, 0.55) 0%,
-      rgba(0, 0, 0, 0.12) 12%,
+      var(--bulge-strong, rgba(0, 0, 0, 0.55)) 0%,
+      var(--bulge-soft, rgba(0, 0, 0, 0.12)) 12%,
       rgba(255, 255, 255, 0.1) 34%,
       rgba(255, 255, 255, 0.02) 52%,
-      rgba(0, 0, 0, 0.16) 82%,
-      rgba(0, 0, 0, 0.58) 100%
+      var(--bulge-soft, rgba(0, 0, 0, 0.16)) 82%,
+      var(--bulge-strong, rgba(0, 0, 0, 0.58)) 100%
     ),
     linear-gradient(
       165deg,
@@ -239,8 +276,14 @@
    * red/green/blue outline stuck to the packet, not as a printed rim. The line is a
    * highlight on a curved surface, so it wants to be light, not coloured; the hue
    * still carries on the foil, the glow and the numeral.
+   *
+   * **The one exception is the set-completion packet**, where it goes gold — and the
+   * argument above is exactly why that works rather than contradicting it. There the line
+   * is not a highlight on dark foil, it is *the printed gold rule off the icoon card*, on
+   * a white board, which is a rim and is meant to read as one. `--pack-edge` is set by
+   * `packFoil` for that packet alone.
    */
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1px var(--pack-edge, rgba(255, 255, 255, 0.14));
 }
 
 /**
@@ -253,6 +296,14 @@
  * The gradient is the whole trick: a bright top lip, a hard dark line where the
  * metal turns, and a second highlight below it. Four stops read as a rolled edge;
  * the ribbing that used to be here read as corduroy.
+ *
+ * **These strips are also the packet's serrated ends** — `--crimp` includes the teeth — so
+ * they are the only place a top-and-bottom edge colour can live. An outline around the
+ * silhouette is not available: `filter` is applied before `mask` on the same element, so
+ * anything drawn outside the shape is masked straight back off. See `.pack`'s filter.
+ *
+ * Hence `--seal-image`: the chrome is the default and the set-completion packet swaps in the
+ * same rolled-edge form struck in gold, so its ends match the rule down its sides.
  */
 .pack::before,
 .pack::after,
@@ -264,14 +315,17 @@
   right: 0;
   height: var(--crimp);
   pointer-events: none;
-  background-image: linear-gradient(
-    to bottom,
-    #e8edf2 0%,
-    #b3bcc6 22%,
-    #6f7982 46%,
-    #4b545c 52%,
-    #9aa4ae 74%,
-    #dfe6ec 100%
+  background-image: var(
+    --seal-image,
+    linear-gradient(
+      to bottom,
+      #e8edf2 0%,
+      #b3bcc6 22%,
+      #6f7982 46%,
+      #4b545c 52%,
+      #9aa4ae 74%,
+      #dfe6ec 100%
+    )
   );
 }
 
@@ -374,6 +428,36 @@
     0 2px 5px rgba(0, 0, 0, 0.85);
 }
 
+/**
+ * The set-completion packet's mark: a gold hexagon with a gold ball in it.
+ *
+ * **In the numeral's slot, at the numeral's size**, because it is the same statement — what
+ * is in the packet — and the shelf reads the two against each other. `inset: auto 0 20%`
+ * and a width tied to `--pack-w` are lifted from `.pack__size` for that reason, so the
+ * hexagon sits where a `3` would and is the same share of the front at every packet size.
+ *
+ * Drawn rather than printed. Nothing else on a wrapper spells out its contents, and the
+ * word `icoon` was tried in this slot first — see `packPrint` for why it went.
+ *
+ * The shadow is shallow and warm-black: enough to seat the mark on the film, not enough to
+ * lift it off as a sticker. The coloured packets' numerals get a halo of their own hue here;
+ * this one deliberately does not, because a glow behind gold on white is a smudge.
+ */
+.pack__icoon {
+  position: absolute;
+  inset: auto 0 20%;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.pack__icoon svg {
+  width: calc(var(--pack-w) * 0.34);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 1px 2px rgba(40, 28, 6, 0.4));
+}
+
 /* ---------------------------------------------------------------- *
  * The unopened packets, waiting beside the album
  *
@@ -404,6 +488,15 @@
  * A knock-on: at this size the packet needs no separate type or tooth sizes, so the
  * whole `.pack--mini` face-scaling block is gone. What is left is that it is a
  * `<button>` and that it lies at an angle.
+ *
+ * **This is now the only rule that sizes a packet on the table.** `.album-side
+ * .pack-shelf` in game.css used to override it with a three-way `min()` that fitted
+ * two packets into whatever margin the book had left, which meant the parity above
+ * held only when the margin happened to be generous — 114px against a 153px card on a
+ * 1080-tall window, 100px against 163px on a 1440-tall one. The book is solved against
+ * the shelf's width instead now (see `--page-w` in album.css), so there is nothing left
+ * to negotiate: the packet is a card, two of them fit, and the parity is exact at every
+ * size and every zoom rather than only where the margin happened to allow it.
  */
 .pack-shelf {
   --pack-w: var(--album-card-w, 96px);
@@ -414,10 +507,15 @@
 
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 12px;
+  /* The column gap is a token because the shelf's width — and through it the book's —
+     is derived from it; see `--pack-gap` in game.css. */
+  gap: 10px var(--pack-gap, 12px);
   justify-content: center;
-  /* Two rows of card-sized packets. It was 46vh, from when they were quarter-size
-     tiles and four of them fitted in one. */
+  /* Rows do not spread: the shelf can be given a taller box than the pile needs — see
+     `.album-side .pack-shelf`, where it is a flex child that shares with the seal. */
+  align-content: flex-start;
+  /* The stacked layout's cap, where the shelf is a wrapping row above the book. Beside
+     the book it gets the book's own height instead (game.css). */
   max-height: 56vh;
   overflow-y: auto;
   /*
@@ -426,20 +524,18 @@
    * A scroll container clips at its padding box, so at the old 4px the top row's hover
    * — 4px of lift, ~5px of growth from `scale(1.04)`, and a 7px glow — was cut off
    * against an edge with nothing visible at it. Padding is the fix rather than
-   * `overflow: visible`, which would drop the scrolling this needs once there are more
-   * than four packets.
+   * `overflow: visible`, which would drop the scrolling this needs once the pile is
+   * deeper than the book is tall.
    *
-   * The 11px at the sides is also what absorbs the *lean*, and it is only just
-   * enough. `.pack--mini` rotates up to 4.1° and a packet is ~1.7× as tall as it is
-   * wide, so the rotated silhouette overhangs its own box by
-   * `(w/2)(cosθ−1) + (h/2)sinθ` ≈ 6% of the width per side — 8.9px at the largest a
-   * packet gets, and ~11.2px under the hover `scale(1.04)`. Anything that raises the
-   * tilts or the packet size has to raise this with it, and it cannot simply be made
-   * generous: it is subtracted twice in `--pack-w` (see `.album-side .pack-shelf` in
-   * game.css), and past ~11px two packets stop fitting the shelf's 352px cap and the
-   * pile drops to a single column.
+   * The sides are what absorb the *lean*. `.pack--mini` rotates up to 4.1° and a packet
+   * is ~1.7× as tall as it is wide, so the rotated silhouette overhangs its own box by
+   * `(w/2)(cosθ−1) + (h/2)sinθ` ≈ 6% of the width per side — ~9px at the largest a
+   * packet now gets, and ~9.5px under the hover `scale(1.04)`. That is why the figure is
+   * a token: `--shelf-pad` is a term in the book's own width (album.css), so raising it
+   * costs a couple of px of spread, which is a thing that can be read off the formula
+   * rather than found by noticing the pile has dropped to one column.
    */
-  padding: 16px 11px 18px;
+  padding: 16px var(--shelf-pad, 13px) 18px;
 }
 
 .pack--mini {

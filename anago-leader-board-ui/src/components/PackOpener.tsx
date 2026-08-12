@@ -28,7 +28,7 @@ import {
   playSlot,
   playTear,
 } from '../utils/sounds';
-import { getCeremonyMs, ms } from '../utils/animationSpeed';
+import { getCeremonyMs, ms, prefersReducedMotion } from '../utils/animationSpeed';
 import '../styles/packopen.css';
 
 /*
@@ -403,11 +403,24 @@ const MOTE_DRAIN_RATE = 3;
  */
 const MOTE_DRAIN_MS = 70;
 
-type Phase = 'sealed' | 'tearing' | 'revealing' | 'done';
+/**
+ * `waiting` is the tear having finished with the roll still out — the first card
+ * standing on the stage, face down, because face down is the one thing that is true
+ * about it whatever the server eventually says. See `start`.
+ *
+ * It shares the whole of `revealing`'s markup rather than getting a branch of its
+ * own, and that is load-bearing: a separate branch is a separate element, so the
+ * riser would unmount and remount at the moment the cards landed and play its 180ms
+ * entrance a second time — the card rising out of a wrapper it is already out of.
+ */
+type Phase = 'sealed' | 'tearing' | 'waiting' | 'revealing' | 'done';
 
 interface PackOpenerProps {
   pack: Pack;
-  /** Rolls the cards. Called once, when the wrapper is clicked. */
+  /**
+   * Rolls the cards. Called once, when the wrapper is clicked — and **not awaited
+   * before anything moves**. See `start`.
+   */
   onOpen: () => Promise<RevealedCard[]>;
   /**
    * Fired the moment the wrapper is clicked, before the roll is even awaited.
@@ -421,17 +434,24 @@ interface PackOpenerProps {
   onStart?: () => void;
   /** Fired after the last card has settled. */
   onFinished: (cards: RevealedCard[]) => void;
+  /**
+   * The roll was refused, and there is nothing to reveal.
+   *
+   * Required rather than optional, unlike `onStart`: the wrapper is torn by the time
+   * this can fire, so an opener whose caller ignores it is an opener stuck on a card
+   * back that never turns over. `onFinished` cannot stand in for it — that one means
+   * "here is what you got", and an empty pack is a different statement from a refusal.
+   */
+  onFailed: (reason: unknown) => void;
   fastMode: boolean;
 }
-
-const prefersReducedMotion = (): boolean =>
-  window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 const PackOpener: React.FC<PackOpenerProps> = ({
   pack,
   onOpen,
   onStart,
   onFinished,
+  onFailed,
   fastMode,
 }) => {
   const [phase, setPhase] = useState<Phase>('sealed');
@@ -503,6 +523,26 @@ const PackOpener: React.FC<PackOpenerProps> = ({
 
   const timers = useRef<number[]>([]);
   const cardsRef = useRef<RevealedCard[]>([]);
+  /**
+   * The wrapper has been clicked. Not derivable from `phase`, which stays `sealed`
+   * across the whole roll on the fast path — so without this a second click there
+   * fires a second claim, and the endpoint answers the second one with a 409.
+   */
+  const started = useRef(false);
+  /**
+   * The tear finished before the roll did, so the card back is standing on the stage
+   * waiting to be told what it is. The half of the rendezvous `rollLanded` reads; the
+   * other half is `cardsRef`, which the tear timer reads. See `start`.
+   */
+  const stalled = useRef(false);
+  /**
+   * A skip that arrived while there was still nothing to skip *to*.
+   *
+   * Remembered rather than swallowed: the click means "I do not want to watch this",
+   * and that is just as true of a reveal that has not started yet. Honoured by
+   * `rollLanded`, which then goes straight to the results.
+   */
+  const skipped = useRef(false);
   /**
    * Where the card is on screen, in viewport pixels, for the stage bloom and
    * vignette to centre themselves on.
@@ -754,8 +794,17 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    */
   const stepRef = useRef<(index: number) => void>(() => {});
 
-  /** Brings card `index` on and plays it through to its hold. */
-  const playCard = (index: number) => {
+  /**
+   * Brings card `index` on and plays it through to its hold.
+   *
+   * `standing` means the card is already on the stage face down, having waited there
+   * for the roll — which spends **both** leads before either is asked for. The
+   * entrance `FLIP_LEAD_MS` exists to wait out is long over, and `CEREMONY_LEAD_MS`
+   * — the beat where a rare card sits looking like any other — has just been held for
+   * longer than it asks for, by the network. So the turn is what happens next, and
+   * that is the point: the flip is the moment the answer arrives.
+   */
+  const playCard = (index: number, standing = false) => {
     const card = cardsRef.current[index];
     if (!card) return;
 
@@ -830,7 +879,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
 
     if (level > 0) {
       // Arrives as an ordinary card, then the glow creeps in.
-      after(CEREMONY_LEAD_MS, () => {
+      after(standing ? 0 : CEREMONY_LEAD_MS, () => {
         /*
          * The gold bloom and vignette are fixed layers too, so they need the
          * card's position for the same reason the reveal's pair does — and they
@@ -894,7 +943,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       return;
     }
 
-    after(FLIP_LEAD_MS, () => {
+    after(standing ? 0 : FLIP_LEAD_MS, () => {
       setFaceUp(true);
       /*
        * **The flip only. `playSlot()` used to double it on a new card, and it
@@ -970,14 +1019,11 @@ const PackOpener: React.FC<PackOpenerProps> = ({
 
   stepRef.current = revealFrom;
 
-  const start = async () => {
-    if (phase !== 'sealed') return;
-
-    // Before the await, not after: the roll is a network call in phase 2, and the
-    // pile must not stay clickable across it.
-    onStart?.();
-
-    const drawn = await onOpen();
+  /**
+   * The roll landed. Where it goes from here is whatever the tear did while it was
+   * out — see `start`.
+   */
+  const rollLanded = (drawn: RevealedCard[]) => {
     cardsRef.current = drawn;
     setCards(drawn);
 
@@ -997,23 +1043,98 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       }
     });
 
-    if (fastMode || prefersReducedMotion()) {
+    if (fastMode || prefersReducedMotion() || skipped.current) {
       setLanded(drawn.length);
       finish();
       return;
     }
 
+    /*
+     * Only the stalled case has anything to do here. Otherwise the tear is still
+     * running and its own timer brings the first card on, exactly as it always did —
+     * the cards simply happen to be sitting in `cardsRef` by the time it fires.
+     */
+    if (stalled.current) playCard(0, true);
+  };
+
+  /**
+   * The roll was refused. Nothing to reveal, and no ending to invent.
+   *
+   * Reachable in a way it was not before: the roll used to be awaited before anything
+   * moved, so a refusal left the packet sealed and the page stuck behind an exit
+   * button that hides itself for the reveal — wrong, but quietly. Something has
+   * visibly begun now, so it has to visibly end, and the page is the only thing that
+   * can put the packet away.
+   */
+  const failed = (reason: unknown) => {
+    clearTimers();
+    onFailed(reason);
+  };
+
+  /**
+   * The claim and the tear, deliberately in that order and deliberately not awaited
+   * in it.
+   *
+   * `onOpen` is a network call — one full leaderboard replay — and awaiting it before
+   * playing anything meant the packet lay in your hand doing nothing for as long as
+   * the server took. The click had no consequence until the response landed, which
+   * reads as a click that was dropped rather than as a wait. So the tear plays on the
+   * click and the roll runs underneath it.
+   *
+   * The two then meet in `rollLanded`, whichever way round they finish:
+   *
+   * - **Cards first** — the ordinary case, since the tear is 840ms real at the
+   *   settled pacing. Nothing waits, and nothing about the reveal changes at all.
+   * - **Tear first** — the first card still rises out of the wrapper and stands there
+   *   face down until there is something to turn it into. Only the *flip* is
+   *   withheld, because the flip is the only beat that needs to know what the card is.
+   *
+   * That split is what makes the wait legible: a face-down card is a card you are
+   * waiting on, where a torn wrapper with nothing under it is a page that has hung.
+   *
+   * No longer `async`, because there is nothing left in it to await.
+   */
+  const start = () => {
+    if (phase !== 'sealed' || started.current) return;
+    started.current = true;
+
+    // Before the roll, not after: the pile must not stay clickable across it.
+    onStart?.();
+
+    void onOpen().then(rollLanded, failed);
+
+    // Nothing to tear through — `rollLanded` takes these straight to the results.
+    if (fastMode || prefersReducedMotion()) return;
+
     playTear();
     setPhase('tearing');
-    after(TEAR_MS, () => revealFrom(0));
+    after(TEAR_MS, () => {
+      if (cardsRef.current.length > 0) {
+        revealFrom(0);
+        return;
+      }
+
+      stalled.current = true;
+      setPhase('waiting');
+    });
   };
 
   /** Clicking anywhere mid-animation lands immediately on the end state. */
   const skip = () => {
-    if (phase === 'tearing' || phase === 'revealing') {
-      setLanded(cardsRef.current.length);
-      finish();
+    if (phase !== 'tearing' && phase !== 'waiting' && phase !== 'revealing') return;
+
+    /*
+     * The roll is still out, so there is no end state to land on yet — and finishing
+     * on an empty hand would report a pack of nothing while the server was still
+     * filling it. Held instead, and honoured the moment the cards arrive.
+     */
+    if (cardsRef.current.length === 0) {
+      skipped.current = true;
+      return;
     }
+
+    setLanded(cardsRef.current.length);
+    finish();
   };
 
   /** This packet's colourway. Derived from the pack id, so it matches its tile. */
@@ -1031,7 +1152,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    * see it, so the stage — their nearest common ancestor — carries the flag for
    * it. Nothing about the ceremony changes: icoon is still not a tier.
    */
-  const isIcoon = current !== undefined && current.player.isLegend;
+  const isIcoon = current !== undefined && current.player.isIcon;
 
   /*
    * Published to CSS so the glow's swell and the bloom match this card's build
@@ -1155,7 +1276,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') void start();
+                if (e.key === 'Enter' || e.key === ' ') start();
               }}
             >
               <PackFace pack={pack} />
@@ -1186,7 +1307,14 @@ const PackOpener: React.FC<PackOpenerProps> = ({
         </>
       ) : null}
 
-      {phase === 'revealing' && current ? (
+      {/*
+        One branch for both, and not for brevity: see the `Phase` union. `waiting` is
+        this same stage with `current` undefined — every light layer off, the flip not
+        yet turned, and a card back that is simply the front face not knowing what it
+        is yet. Splitting them would remount the riser at the moment the cards landed
+        and replay its entrance.
+      */}
+      {phase === 'revealing' || phase === 'waiting' ? (
         <>
           <div
             className={`opener__stage${isIcoon ? ' opener__stage--icoon' : ''}`}
@@ -1291,7 +1419,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
                 className={[
                   'opener__flip',
                   faceUp ? 'opener__flip--up' : '',
-                  flagged && current.isNew ? 'opener__flip--new' : '',
+                  flagged && current?.isNew ? 'opener__flip--new' : '',
                 ]
                   .filter(Boolean)
                   .join(' ')}
@@ -1324,17 +1452,24 @@ const PackOpener: React.FC<PackOpenerProps> = ({
                     their own outline until the name is written on them. A
                     duplicate is passed nothing and renders as it always did.
                   */}
-                  <PlayerCard
-                    card={current}
-                    eager
-                    reveal={
-                      current.isNew
-                        ? {
-                            revealed: portraitIn,
-                          }
-                        : undefined
-                    }
-                  />
+                  {/*
+                    Absent for the whole of `waiting`, which costs nothing: the front
+                    face is turned away and back-face culled, so there is nothing to
+                    render there until the roll says what it is.
+                  */}
+                  {current ? (
+                    <PlayerCard
+                      card={current}
+                      eager
+                      reveal={
+                        current.isNew
+                          ? {
+                              revealed: portraitIn,
+                            }
+                          : undefined
+                      }
+                    />
+                  ) : null}
                   {isPeak && faceUp ? <div className="opener__sweep" /> : null}
                 </div>
               </div>
@@ -1372,8 +1507,18 @@ const PackOpener: React.FC<PackOpenerProps> = ({
             ))}
           </div>
 
+          {/*
+            Blank while waiting, like the tear's, rather than "1 / 0". The counter is
+            a fact about a pack that has been rolled, and there is not one yet.
+          */}
           <div className="opener__hint">
-            {cursor + 1} / {cards.length} — klik om over te slaan
+            {cards.length > 0 ? (
+              <>
+                {cursor + 1} / {cards.length} — klik om over te slaan
+              </>
+            ) : (
+              <>&nbsp;</>
+            )}
           </div>
         </>
       ) : null}

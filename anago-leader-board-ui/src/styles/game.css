@@ -62,32 +62,124 @@
  * Anything that changes the stage's box must change these, not `.game-stage`'s own
  * `width`/`padding` — which read from here, so the two cannot disagree again.
  *
- * **1520 was stale, and it cost the second column.** It was set when the packets
- * were quarter-size tiles; they are card-sized now, and the shelf needs
- * `2 × 96 + 12 gap + 22 padding = 226px` to hold two of them at the 96px floor.
- * The table has to clear the book plus that margin on *both* sides, because the
- * book is centred and only one of the two holds packets:
+ * **The table is settled and the book is derived from it, not the other way round.**
+ * This used to run backwards: the book took whatever `min(40vw, 63vh·0.78, 560px)`
+ * said, and the table was then sized to clear it plus a margin big enough for two
+ * 96px packets a side — with the packets shrinking to whatever two of them could fit
+ * in what was actually left. That is what made a packet 61–100% of a card depending
+ * on how tall the window was. Two columns was the fixed requirement and card parity
+ * was what gave way.
  *
- *     --stage-w  ≥  --book-w + 2 × (--shelf-gap + 226px + 16px) + 2 × --stage-pad
+ * Both are fixed requirements now, and the *book* is what gives way:
  *
- * At 1920×1080 that is 994 + 2×268 + 68 = 1598; at the same width on a taller
- * window the book caps at 1040 and it becomes 1644. Hence 1660, which covers any
- * 1920-wide window and leaves the shelf 257px — two columns of 111px packets. At
- * 1520 it was 187px, which is under the 226 and dropped the pile to a single
- * column of 96px.
+ *   - a packet is exactly as wide as a card in the book, at every viewport and
+ *     every zoom, so its coloured panel is exactly a card tall (see `--pack-h`);
+ *   - the margin holds **two** of them side by side, which is what makes the shelf
+ *     read as a pile rather than a list;
+ *   - `--page-w` takes a third term for the widest page that still leaves room for
+ *     that — see the `:root` block in album.css, where the algebra lives.
  *
- * Full card parity would want ~1781 (93vw at 1920), and that is the line this is
- * deliberately staying behind: two columns is what makes the packets read as a
- * pile, and 79% of a card is the cheaper price. If the packets or the tilts grow,
- * re-derive from the formula rather than nudging the number.
+ * So the formula this number comes from reads:
+ *
+ *     --stage-w  ≥  --book-w
+ *                 + 2 × (--shelf-gap + shelf column + 16px)
+ *                 + 2 × --stage-pad
+ *
+ *     shelf column = 2 × --album-card-w + --pack-gap + 2 × --shelf-pad + --shelf-bar
+ *
+ * and album.css solves it for the book instead of for the table. Deriving one from
+ * the other is the point: the two sides meet within a few px at every width, so
+ * neither the shelf nor the book is sized by a number somebody measured once.
+ *
+ * **1740 → 1860 is the price of the two things above being simultaneous.** At 1740
+ * the solve gives a 474px page, which is what the book already had — two card-width
+ * columns and the old book, and no growth for the album at all. At 1860 it gives 507
+ * and the album is ~8% wider than before. That costs the slab its surround: 90px of
+ * black each side at 1920 becomes 30px. It is the one line the sizing notes said to
+ * stay behind — the slab is meant to read as a table in a dark room rather than a
+ * wooden wall — and it is being crossed deliberately, because a pile of two and cards
+ * that match are worth more than the black. `98vw` is what keeps a surround at all on
+ * a narrower window.
  *
  * The padding is tighter than a full-bleed stage would take: the spread is a fixed
  * size and the slab is narrower than the viewport, so the padding is what it can
  * least afford.
  */
 :root {
-  --stage-w: min(1660px, 97vw);
+  --stage-w: min(1860px, 98vw);
   --stage-pad: clamp(12px, 2vw, 34px);
+  --stage-pad-t: clamp(18px, 2.4vw, 36px);
+  --stage-pad-b: clamp(22px, 2.8vw, 40px);
+
+  /*
+   * **The table is one size, whatever is lying on it.**
+   *
+   * It used to be `min-height: 78vh` and then whatever the content came to, so the slab
+   * grew and shrank as the page moved between its seven states: the ledger, the
+   * hourglass, the padlock, the five shut albums, the book and the opener were each a
+   * different-sized piece of furniture. A table is an object with a size — the whole
+   * premise of this stage — and an object that changes shape depending on what you put
+   * on it is a panel with wood painted on it.
+   *
+   * So the room is reserved once, by **the album**, and everything else lies inside it:
+   * `--page-h` plus 40px for the nav-label row and `.album`'s own 4px a side. The five
+   * shut albums come to the same figure within a pixel, deliberately
+   * (`.choice__label` + `.choice__well`, see albumchoice.css), which used to be two
+   * components agreeing and is now one box they both sit in.
+   *
+   * The opener is the one occupant that had a mind of its own — `min-height: 62vh`,
+   * which on a tall window is well past the book. It reads this instead, and the ~30px
+   * "terug naar het album" row is the difference; see `.opener` in packopen.css. That
+   * was only safe to do because the ceremony's vignette and bloom are centred on
+   * `--card-cx` / `--card-cy`, the card's *measured* position, so moving the opener's
+   * box moves the spotlight with it. The `45%` in those gradients is a fallback, not
+   * the alignment.
+   *
+   * Everything else — ledger, hourglass, padlock, notice — is comfortably shorter and
+   * simply sits at the top of the box, as it already did inside the 78vh.
+   *
+   * `.game-stage` is `overflow: hidden`, so this is a real ceiling and not a suggestion:
+   * anything new on this page has to fit `--album-room`, or this has to become a
+   * `max()` over it and whatever else. The stacked layout below 1450px is the one place
+   * it is lifted — see the media query at the bottom of this file, where the shelf is
+   * above the book and there is no fixed footprint left to reserve.
+   */
+  --album-room: calc(var(--page-h) + 40px);
+  --stage-h: calc(var(--stage-pad-t) + var(--album-room) + var(--stage-pad-b));
+
+  /*
+   * The table left between the book and whatever lies in the margin beside it —
+   * packets on one side, the register and the test panel on the other.
+   *
+   * On `:root` rather than on `.album-layout`, because `--page-w` in album.css is now
+   * solved *against* it: the book is the widest one that still leaves a packet column
+   * in the margin, so the gap between the two is a term in the book's own size. Every
+   * other token in that solve was already here for the same reason.
+   */
+  --shelf-gap: clamp(10px, 1.6vw, 26px);
+
+  /*
+   * The three other terms in the shelf column: the gap between two packets side by
+   * side, the shelf's own side padding, and a gutter for the scrollbar a pile deeper
+   * than the book is tall will grow.
+   *
+   * All three are here because the column's width is a term in `--page-w`, and all
+   * three are read by `.pack-shelf` in packopen.css rather than written twice.
+   *
+   * The padding is not slack: a packet leans up to 4.1° and is ~1.7× as tall as it is
+   * wide, so the rotated silhouette overhangs its box by ~6% of the width per side —
+   * ~9px at the largest a packet now gets, and ~9.5px under the hover `scale(1.04)`.
+   *
+   * The gutter is reserved whether or not the shelf is scrolling: `.pack` is a fixed
+   * width, so a scrollbar appearing inside the shelf cannot narrow the packets — it can
+   * only push the second column onto a row of its own, and it would do it exactly when
+   * the pile is deepest. **So it has to be wider than a scrollbar, not equal to one**:
+   * Windows' classic bar is 15–17px, hence 18. `justify-content: center` on the shelf
+   * is what keeps the pile looking placed rather than left-hung when it goes unused.
+   */
+  --pack-gap: 12px;
+  --shelf-pad: 13px;
+  --shelf-bar: 18px;
 }
 
 /* ================================================================ *
@@ -168,10 +260,12 @@
   --book-inside: linear-gradient(150deg, #2f5a39 0%, #1c3a24 60%, #26482d 100%);
 
   position: relative;
-  min-height: 78vh;
+  /* One size, in every state — see `--stage-h`. Was `min-height: 78vh` plus whatever
+     the content came to, which made the slab a different object on every screen. */
+  height: var(--stage-h);
   width: var(--stage-w);
   margin: clamp(8px, 1.6vh, 22px) auto;
-  padding: clamp(18px, 2.4vw, 36px) var(--stage-pad) clamp(22px, 2.8vw, 40px);
+  padding: var(--stage-pad-t) var(--stage-pad) var(--stage-pad-b);
   border-radius: 5px;
   box-sizing: border-box;
   font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
@@ -492,7 +586,8 @@
 .game-stage .game-muted,
 .game-stage .game-check,
 .game-stage .album__nav-label,
-.game-stage .opener__hint {
+.game-stage .opener__hint,
+.game-stage .hourglass__caption {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
 }
 
@@ -516,8 +611,6 @@
  * lie in.
  */
 .album-layout {
-  --shelf-gap: clamp(10px, 1.6vw, 26px);
-
   /*
    * How much table is left beside the book, per side. Every term is
    * viewport-relative (`--book-w` is `--page-w × 2`, `--page-w` is vw/vh, and
@@ -537,21 +630,35 @@
     (var(--stage-w) - 2 * var(--stage-pad) - var(--book-w)) / 2 - var(--shelf-gap) - 16px
   );
 
-  /* Containing block for the aside. */
+  /* Containing block for the asides. */
   position: relative;
+
+  /*
+   * The album's footprint, reserved whether or not the album is what is in it.
+   *
+   * Three things depend on it. The table above is one size in every state
+   * (`--stage-h` is this plus its padding). The panel in the right margin hangs off
+   * `bottom: 0`, so without a reserved box it would ride up and down as the middle of
+   * the layout changed — including between the book and the opener, which are within
+   * ~15px of each other and would have moved it by exactly that. And the cover choice
+   * hands over to the book without either of them moving, which was already the intent
+   * (see albumchoice.css) but was two components agreeing rather than one box.
+   */
+  min-height: var(--album-room);
 }
 
 /*
- * Wide enough for two packets side by side.
+ * Exactly two packets wide, and a packet is exactly one card wide.
  *
- * It was 14vw / 216px max, from when the packets were quarter-size tiles. They are
- * now the size of a card in the book (see `.pack-shelf`), so that column fitted one
- * per row and cut the second one off at `max-height` — a scrolling strip of one and a
- * half packets. Two columns of four is the pile; one column of 1.4 is a list.
+ * It used to ask for `clamp(148px, 24vw, 352px)` and the *packets* then shrank to
+ * whatever two of them could fit in the margin the book had left over — which is how
+ * they ended up at 61–100% of a card. The width is stated rather than guessed now: it
+ * is two card-width packets, their gap, the padding and the scrollbar gutter, and
+ * `--page-w` is solved so the margin holds exactly that.
  *
- * Capped by `--shelf-room` so it can never reach the book: on a 1600-wide window
- * the margin is ~320px and the full 352 is unreachable anyway. Below that the
- * shelf narrows rather than overlapping, and the packets step down with it.
+ * Still capped by `--shelf-room`, which by construction it now sits a few px under.
+ * It is kept as the guard rather than the mechanism: if the derivation in album.css
+ * is ever broken the shelf narrows instead of running onto the book.
  *
  * `max-height` keeps it inside the book's own height. Out of flow it contributes
  * nothing to the layout box, so a shelf taller than the book would otherwise run
@@ -565,7 +672,30 @@
   position: absolute;
   left: 0;
   top: 0;
-  width: min(clamp(148px, 24vw, 352px), var(--shelf-room));
+  /*
+   * No `var(--album-card-w, 96px)` fallback here, deliberately, even though the rest of
+   * this file uses one. cssnano resolves what it can inside a `calc()` and emits a
+   * literal declaration in front of the var-based one — and `--album-card-w` is itself a
+   * calc over a `min()`, which it cannot parse, so the fallback is what it would use:
+   * a `width: min(244px, …)` sitting above the real rule, one cascade slip away from
+   * being a shelf built for 96px packets. With no fallback there is nothing to resolve
+   * and only the real declaration is emitted. album.css and game.css are always in the
+   * same bundle, so the fallback was never protecting anything anyway.
+   */
+  /*
+   * The trailing 2px is not decoration. Two packets and their gap come to *exactly* the
+   * content box without it, and `flex-wrap` deciding whether 242.827px fits in
+   * 242.827px is a floating-point coin toss — at 1600×780 it came down tails and the
+   * pile silently became a column of one. The solve in album.css leaves the margin a few
+   * px of room for this; see its `+ 14px`.
+   */
+  width: min(
+    calc(
+      2 * var(--album-card-w) + var(--pack-gap) + 2 * var(--shelf-pad) +
+        var(--shelf-bar) + 2px
+    ),
+    var(--shelf-room)
+  );
   max-height: var(--page-h);
   display: flex;
   flex-direction: column;
@@ -626,40 +756,50 @@
 }
 
 /*
- * The packets themselves live in packopen.css — see `.pack-shelf`. Card-sized is
- * the target, but the margin is not always that generous, so the size is the
- * smallest of three things:
+ * The packets themselves live in packopen.css — see `.pack-shelf`, which sets
+ * `--pack-w: var(--album-card-w)` and is now the *only* thing that sizes them.
  *
- *   1. a card in the book, which is as large as a packet ever wants to be;
- *   2. what one column can hold — the shelf less its 22px of side padding;
- *   3. what two columns can hold — the shelf less that padding and its 12px
- *      column gap, halved — but never under 96px.
+ * **There is no override here any more, and that is the change.** It read
  *
- * Two columns is what makes the packets read as a pile rather than a list, so
- * (3) is what usually binds and the packets give up a few percent to keep it. The
- * 96px floor is where that stops being worth it: below it (2) takes over and the
- * shelf becomes one centred column at whatever size does fit.
+ *     --pack-w: min(
+ *       var(--album-card-w),                                  a card in the book
+ *       calc(var(--shelf-room) - 22px),                       what one column holds
+ *       max(96px, calc((var(--shelf-room) - 34px) / 2))       what two columns hold
+ *     );
+ *
+ * — a packet was as wide as a card only when the margin happened to be generous
+ * enough for two of them at that size, which on a 1080-tall window it was not (114px
+ * against a 153px card) and on a 1440-tall one it really was not (100px against 163px).
+ * The packet's width and the card's were free to disagree by 40%, and by a different
+ * 40% at every zoom level, which is exactly what the sizing rule says they may not do.
+ *
+ * The dependency runs the other way now: the packet is the card, the shelf is two of
+ * them plus their gap and padding, and the *book* is solved to leave room for it
+ * (album.css). So the only rule left is the one in packopen.css, and the parity is
+ * structural — there is nowhere for a `min()` to shave a few percent off it.
+ *
+ * The pile gets the whole height of the book rather than 56vh, which is two rows and
+ * change, and `flex` lets it give way to the seal when both are on the table.
  */
 .album-side .pack-shelf {
-  --pack-w: min(
-    var(--album-card-w, 96px),
-    calc(var(--shelf-room) - 22px),
-    max(96px, calc((var(--shelf-room) - 34px) / 2))
-  );
-
-  max-height: min(56vh, var(--page-h));
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: var(--page-h);
 }
 
 /*
- * The register, in the right margin — opposite the packet shelf.
+ * The register, at the top of the right margin — opposite the packet shelf.
  *
  * Symmetric with `.album-side` on purpose, and out of flow for the same reason: the book
  * centres on the table whether either margin has anything in it or not, so neither of them
  * can move it. The two things lying beside the album are what you came for and how you
  * leave.
  *
- * Narrower than the shelf because it holds one leaf rather than a pile two packets wide,
- * and capped by `--shelf-room` all the same so it can never reach the book.
+ * Narrower than the margin it lies in, because it holds one leaf rather than a pile two
+ * packets wide, and capped by `--shelf-room` all the same so it can never reach the
+ * book. It no longer has the margin to itself — the test panel lies at the foot of the
+ * same column (see `.album-panel`) — but a ledger stretched to a 340px slab to match the
+ * plate under it would stop reading as one sheet of the book you signed.
  */
 .album-register {
   position: absolute;
@@ -669,6 +809,44 @@
 
   /* Matches the shelf's return, so both margins light at the same moment. */
   transition: opacity 420ms ease 320ms;
+}
+
+/*
+ * The test panel, at the foot of the right margin.
+ *
+ * **It used to be a full-width plate under the table**, and moving it here is worth
+ * about 7vh of book: the album is sized off viewport *height* first, so anything in a
+ * row below it comes straight out of the spread. The panel's row was ~83px — the last
+ * horizontal band left down there — and the album's height term went 63vh → 70vh on
+ * the strength of it. See the `--page-w` note in album.css.
+ *
+ * `bottom: 0` rather than a top offset under the register, so it needs to know nothing
+ * about the register's height and cannot collide with it: the register is a ~70px leaf
+ * at the top of a ~750px column and the panel is ~230px at the bottom. Both are out of
+ * flow, so neither can move the book — same rule as the shelf.
+ *
+ * `--debug` is what exempts it from the table's "nothing gets a panel" rule, and it is
+ * the one thing in either margin that is not in character. It is scaffolding; it has to
+ * stay readable.
+ *
+ * The plate is a child rather than this element itself, deliberately: `.game-plate--debug`
+ * is in the `position: relative; z-index: 1` list at the top of this file, and a single
+ * element carrying both classes would have two `position` declarations at equal
+ * specificity settling on source order. It does not need the z-index either — its
+ * `.album-layout` ancestor already establishes the stacking context that lifts everything
+ * inside it over the polish streak.
+ */
+.album-panel {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: var(--shelf-room);
+}
+
+/* A margin this narrow means the buttons wrap; the plate has to stay inside it. */
+.album-panel .game-plate {
+  box-sizing: border-box;
+  width: 100%;
 }
 
 /*
@@ -692,18 +870,45 @@
 }
 
 /*
- * Below this the margin cannot hold even one packet and the shelf goes back above
- * the book, in flow. Two triggers, because the book grows with viewport *height*:
- * a 1300×1400 window is wide by the first test but its book is 1040px and leaves
- * 90px a side. Both cases stack, and stacking is symmetric, so the book stays
- * centred there too.
+ * Below this the margins stop being worth what they cost the book, and the shelf goes
+ * back above it in flow.
+ *
+ * **1150 → 1450, and the two triggers collapse into one.** The old rule was "the margin
+ * cannot hold even one packet", with a second `(max-width: 1400px) and
+ * (min-height: 1000px)` for tall windows whose book was big enough to squeeze the
+ * margin out. Neither test can be written that way now: the margin holds two card-width
+ * packets *by construction* at every width, because the book is solved against it. What
+ * gives instead is the book, and below ~1450px it gives too much — at 1200×800 the solve
+ * comes out at a 309px page against the 393px the stacked layout allows, a fifth of the
+ * spread spent on a margin.
+ *
+ * 1450 is where the two are level. Above it the side margins cost the book a few percent
+ * and are worth it — the book centred on the table with the packets lying beside it is
+ * the design, and the shelf surviving into the opener depends on it. Below it, stacking
+ * gives a visibly bigger book and loses only the margin. The tall-window trigger is
+ * subsumed: 1400 is inside 1450, and above 1450 a tall window is width-limited anyway.
+ *
+ * Stacking is symmetric, so the book stays centred here too.
  */
-@media (max-width: 1150px), (max-width: 1400px) and (min-height: 1000px) {
+@media (max-width: 1450px) {
+  /*
+   * The one place the table stops being a fixed-size object. Stacked, the content is a
+   * column of shelf + book + register + panel with no reserved footprint to speak of, so
+   * `--stage-h` becomes a floor rather than the height — and `.album-layout` gives up
+   * the album's footprint for the same reason. Keeping the fixed height here would clip
+   * the register and the panel off the bottom of the slab, which is `overflow: hidden`.
+   */
+  .game-stage {
+    height: auto;
+    min-height: var(--stage-h);
+  }
+
   .album-layout {
     display: flex;
     flex-direction: column;
     align-items: stretch;
     gap: var(--shelf-gap);
+    min-height: 0;
   }
 
   .album-side {
@@ -727,10 +932,24 @@
     order: 3;
   }
 
-  /* Back to the packopen.css defaults — there is no narrow margin to fit now. */
-  .album-side .pack-shelf {
-    --pack-w: var(--album-card-w, 96px);
+  /*
+   * The panel joins the stack too, last of all — the same full-width plate under the
+   * table it was before it moved into the margin. It goes below the register rather
+   * than above it because the order down here is book, packets, way out, scaffolding.
+   */
+  .album-panel {
+    position: static;
+    width: auto;
+    order: 4;
+  }
 
+  /*
+   * Back to the packopen.css default height: the shelf is a wrapping row now, not a
+   * column, so it wants a viewport cap rather than the book's height. `--pack-w` is
+   * untouched here and everywhere else — it comes from `.pack-shelf` alone.
+   */
+  .album-side .pack-shelf {
+    flex: none;
     max-height: 56vh;
   }
 

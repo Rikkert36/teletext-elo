@@ -33,13 +33,21 @@ public class CardInstance
     public string? GameId { get; set; }
 
     /// <summary>
-    /// Whether it was drawn as an icoon.
+    /// Whether it was drawn as an icoon. A mint-time historical record, and nothing more.
     ///
-    /// Frozen at mint time rather than derived from the subject's <c>Active</c> flag, because
-    /// the two answer different questions: this says what was pulled out of the packet, and
-    /// somebody who goes inactive next month did not retroactively hand you an icoon.
+    /// <strong>Nothing reads this to decide what a card looks like, and nothing should
+    /// start to.</strong> What a card shows follows its subject's <em>current</em> standing,
+    /// icoon-ness included: the album builds its slots from the live pool and reads the
+    /// colourway off the pool entry, so a player going inactive turns the card already in
+    /// your book into an icoon. That is the same rule as a zilver card becoming goud when
+    /// their form improves, and it is deliberate - a collection tracks the office as it is,
+    /// not as it was on the day each packet was torn open.
+    ///
+    /// What this column is for is answering "what came out of the packet", which is a
+    /// question about history rather than about presentation. Wiring it into rendering would
+    /// freeze a card's face at mint and quietly contradict the live-card rule.
     /// </summary>
-    public bool IsLegend { get; set; }
+    public bool IsIcon { get; set; }
 
     public DateTime MintedAt { get; set; }
 
@@ -48,7 +56,7 @@ public class CardInstance
         string subjectPlayerId,
         string packClaimId,
         string? gameId,
-        bool isLegend) =>
+        bool isIcon) =>
         new()
         {
             Id = Guid.NewGuid().ToString(),
@@ -56,7 +64,7 @@ public class CardInstance
             SubjectPlayerId = subjectPlayerId,
             PackClaimId = packClaimId,
             GameId = gameId,
-            IsLegend = isLegend,
+            IsIcon = isIcon,
             MintedAt = DateTime.Now
         };
 }

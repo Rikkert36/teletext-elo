@@ -156,13 +156,13 @@
 }
 
 /* ---------------------------------------------------------------- *
- * Icoon — the legend colourway
+ * Icoon — the out-of-service colourway
  *
- * **Icoon is not a fifth tier, it is the legend.** Same axis FIFA uses for its
- * Icons: not *better than gold* but *a different kind of card* — who someone
- * is rather than how good they are now. We already have that axis, so this is
- * the existing `isLegend` flag finally doing something on the face. Nothing in
- * `tierFor()`, `drawPack()`, the ticket weighting or the ceremony changes.
+ * **Icoon is not a fifth tier.** Same axis FIFA uses for its Icons: not *better
+ * than gold* but *a different kind of card* — who someone is rather than how
+ * good they are now. We already have that axis, so this is the existing
+ * `isIcon` flag doing something on the face. Nothing in `tierFor()`, the ticket
+ * weighting or the ceremony changes.
  *
  * It replaces the black `legende` pill, which was the only element on the card
  * that was a *label* rather than material — the same objection that removed
@@ -180,9 +180,9 @@
  * 4. **No surface incident**: the sheen is cut almost out, and there is no
  *    shard fan.
  *
- * **The tier no longer moves anything.** Every legend wears one colourway.
+ * **The tier no longer moves anything.** Every icoon wears one colourway.
  * That reverses the old rule, and the reason it can: the old grounds were
- * *coloured* — a gold ground on a 69-rated legend lied about him, which is why
+ * *coloured* — a gold ground on a 69-rated icoon lied about him, which is why
  * the tier had to follow him down. This ground is near-white and carries no
  * rating claim at all, so there is nothing left for the tier to correct. What
  * the tier used to say is said by the overall, which is the one hard fact on
@@ -198,7 +198,9 @@
  * drawing. Do not widen it or inset it; that is the rejected object again.
  *
  * Empty slots are deliberately *not* marked: a silhouette's job is to be
- * identically blank, and legends have their own pages in the album anyway.
+ * identically blank. That used to be belt-and-braces, because icons had their
+ * own pages — now that they are interleaved by rating it is the only thing
+ * stopping an uncollected slot from announcing which of the two it is.
  * ---------------------------------------------------------------- */
 
 /*
@@ -356,7 +358,7 @@
  * with contrast held at 1 and brightness lifted so the highlights go to paper
  * white rather than to grey.
  *
- * Chosen against three others rendered over the whole legend pool; the two
+ * Chosen against three others rendered over the whole icon pool; the two
  * paler ones washed the faces out to grey-cream on this ground. A version that
  * kept the photo in colour was also tried and is a different card, not a
  * warmer one.
@@ -400,10 +402,10 @@
  * ground differed between bronze and gold by saturation alone, in the same hue
  * family, over the ~30% of the card the mask clears. Only silver read as its own
  * thing, and only because warm-versus-cool survives at album size. Measured side
- * by side over the whole legend pool in docs/icoon-uniform.html.
+ * by side over the whole icon pool in docs/icoon-uniform.html.
  *
- * The old rule was that the tier had to follow the legend down, because a gold
- * ground on a 69-rated legend lied about him. That held while the grounds were
+ * The old rule was that the tier had to follow the icoon down, because a gold
+ * ground on a 69-rated icoon lied about him. That held while the grounds were
  * coloured. The ground is near-white now and makes no rating claim, so the claim
  * is left to the overall — which is the one hard fact on the face anyway.
  *
@@ -629,7 +631,7 @@
  * which is the same objection that removed every plated version of the number
  * and the name; it simply never got put through it. The name and nickname still
  * reach the tooltip and the viewer, which are off-face surfaces — `viewer__flag`
- * in viewer.css still says "legende" in words, and that is the right place for it.
+ * in viewer.css still says "icoon" in words, and that is the right place for it.
  */
 
 /* ---------------------------------------------------------------- *

@@ -9,7 +9,7 @@
         /// every game in the replay. Equal to <see cref="VisibleRating"/> for a player
         /// currently at their best, and 0 for anyone who has never played.
         ///
-        /// This is the number a legend's trading card is rated on: an icoon says who
+        /// This is the number an icoon's trading card is rated on: an icoon says who
         /// someone was, not what their form has decayed to. Note it is the peak of the
         /// *visible* rating rather than the raw one - the inexperience deduction shrinks as
         /// you play, so the two peak at different moments and only this one is what a card

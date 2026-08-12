@@ -196,20 +196,22 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   const cardName = display;
 
   /*
-   * Legends render as icoon cards: one near-white two-zone ground, monochrome
-   * photo warmed back up, a 1px gold rule. See the `.card--icoon` block in
-   * card.css.
+   * Out-of-service players render as icoon cards: one near-white two-zone
+   * ground, monochrome photo warmed back up, a 1px gold rule. See the
+   * `.card--icoon` block in card.css.
    *
    * `card--icoon` still sits *alongside* `card--{tier}` rather than replacing
    * it — icoon is not a fifth tier, and the tier is what the reveal ceremony
-   * reads. It no longer changes anything on the face, though: every legend
+   * reads. It no longer changes anything on the face, though: every icoon
    * wears the same colourway, and the icoon rules are written `.card.card--icoon`
    * so they beat all four tier blocks on specificity rather than on source order.
    *
-   * Not applied to empty slots. A silhouette's job is to be identically blank,
-   * and legends have their own pages in the album anyway.
+   * Not applied to empty slots: a silhouette's job is to be identically blank,
+   * and now that icons are interleaved by rating rather than given their own
+   * pages, an empty slot marked as an icoon would say which of the two it is
+   * before you have collected it.
    */
-  const icoon = !empty && card.player.isLegend;
+  const icoon = !empty && card.player.isIcon;
 
   /*
    * Two classes rather than one, because the dissolve has to be declared on a

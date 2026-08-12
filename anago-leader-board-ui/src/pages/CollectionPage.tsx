@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Album, { AlbumSection, albumSlotOrder } from '../components/Album';
 import AlbumChoice from '../components/AlbumChoice';
 import CardViewer from '../components/CardViewer';
 import GameShell from '../components/GameShell';
+import Hourglass from '../components/Hourglass';
 import PackOpener from '../components/PackOpener';
 import LedgerCorner from '../components/LedgerCorner';
+import LockedAlbum from '../components/LockedAlbum';
 import PackTile from '../components/PackTile';
 import SigningLedger from '../components/SigningLedger';
 import { CollectionState, GrantOptions, httpCardsClient } from '../clients/cardsClient';
@@ -13,25 +15,22 @@ import {
   Pack,
   RevealedCard,
   SelectablePlayer,
+  isIconPack,
   splitName,
 } from '../mock/cardMock';
 import { CoverId } from '../utils/albumLeather';
+import { CURRENT_PLAYER_KEY as PLAYER_KEY } from '../utils/currentPlayer';
 import '../styles/game.css';
 
-const PLAYER_KEY = 'tafelvoetbal.cards.playerId';
 const FAST_KEY = 'tafelvoetbal.cards.fastOpen';
-const METER_CHUNKS = 24;
 
 /**
- * The test panel. Still on, and still carrying its pack buttons — but those are stubs
- * until the gift endpoint exists, because a pack cannot be invented in the browser any
- * more. See `grant`.
+ * The test panel. Everything on it is real now: the pack buttons hand the signed-in
+ * player a present through `POST api/collections/gifts`, which is a row like the
+ * collection and the icons latch, so nothing here fakes state the server does not
+ * have. Plus `snel openen`, which was always client-side.
  *
- * What does work is what is a row on the server: emptying a collection and the legends
- * latch. Plus `snel openen`, which was always client-side.
- *
- * It wants to go behind a debug flag rather than a constant, and the pack buttons want
- * wiring to the grant endpoint. Both are the next slice.
+ * It still wants to go behind a debug flag rather than a constant.
  */
 const SHOW_DEBUG = true;
 
@@ -123,6 +122,53 @@ const CollectionPage: React.FC = () => {
    * position.
    */
   const [justBound, setJustBound] = useState(false);
+  /**
+   * True from the press of the seal until the album says the re-binding is over.
+   *
+   * The same shape as `creating`, and for the same reason: the response arrives with the
+   * latch set, and branching on that alone would re-bind the cover in one frame on a fast
+   * server. The sequence decides when it is over, not the network.
+   */
+  const [rebinding, setRebinding] = useState(false);
+  /**
+   * The collection as the claim left it, held until the reveal is over.
+   *
+   * Opening a pack answers with the cards *and* the new collection, so nothing is refetched
+   * — but it must not be applied straight away: the book is behind the opener and would
+   * quietly gain its new cards while you are still watching them come out of the packet,
+   * and the reveal's whole job is to be the moment you learn what you got.
+   *
+   * A ref rather than state, so parking it here cannot re-render anything mid-reveal.
+   *
+   * It carries the id it belongs to. Signing out and back in as somebody else while a claim
+   * is in flight would otherwise leave one person's collection parked and apply it under the
+   * next person's name — the same class of bug `choosePlayer` clears `collection` for.
+   */
+  const pendingCollection = useRef<{ playerId: string; state: CollectionState } | null>(null);
+  /**
+   * The set-completion packet, held from the click until the re-binding is over.
+   *
+   * A ref rather than state for the same reason `pendingCollection` is one: it is a note to
+   * the callback that ends the ceremony, and re-rendering on it would do nothing but risk
+   * restarting the ceremony that is reading it.
+   */
+  const pendingIconPack = useRef<Pack | null>(null);
+  /**
+   * The re-binding is being played from the test panel, with no packet and no write.
+   *
+   * A ref rather than state because only `handleRebound` reads it, and it has to be readable
+   * from the callback the ceremony ends on without that callback's identity changing — the
+   * same reason `pendingIconPack` is one.
+   */
+  const rebindDemo = useRef(false);
+  /**
+   * Whether the pack opener takes over when the ceremony ends.
+   *
+   * State rather than a ref, unlike its two neighbours, because `Album` reads it *during*
+   * the ceremony to decide whether to play the closing fade — a ref would not re-render it
+   * in time. False only for the test panel's replay, which has nothing to hand over to.
+   */
+  const [rebindHandsOver, setRebindHandsOver] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,6 +237,9 @@ const CollectionPage: React.FC = () => {
     write(PLAYER_KEY, next.id);
     setOpeningPack(null);
     setRevealing(false);
+    // Somebody else's, now. The guard in `applyPendingCollection` would catch it anyway;
+    // dropping it here means it never has to.
+    pendingCollection.current = null;
     setViewing(null);
     setCreating(false);
     // Somebody else's book, which you did not watch being bound.
@@ -244,8 +293,55 @@ const CollectionPage: React.FC = () => {
        but the opener would be layered under a viewer left mounted over it. */
     setViewing(null);
     setRevealing(false);
+
+    /*
+     * The set-completion packet has a ceremony in front of it.
+     *
+     * **The album has to be able to hold an icoon before one can come out of a packet**, and
+     * that ordering is not a preference — the draw reads the icons latch, so a packet claimed
+     * before the unlock would roll an ordinary card. So this fires the unlock, plays the
+     * re-binding while it is in flight, and hands the packet to the opener when the book is
+     * back. `handleRebound` is the join.
+     *
+     * Skipped when the book is already bound, which is the test panel's path: the latch was
+     * forced by hand, the cover is already half-bound, and re-binding a book that is already
+     * in its icon binding is a ceremony with nothing to show.
+     */
+    if (isIconPack(next) && !collection?.album?.iconsUnlocked) {
+      pendingIconPack.current = next;
+      setRebindHandsOver(true);
+      claimIcons();
+      return;
+    }
+
     setOpeningPack(next);
   };
+
+  /**
+   * Applies whatever collection came back with the last claim, if it has not been yet.
+   *
+   * The claim answers with the cards *and* the collection they landed in, so there is no
+   * refetch — but that state then has to be applied on **every** path that ends a reveal,
+   * not just the one where the animation runs to the end. Leaving mid-reveal never fires
+   * `onFinished`, and before this the page would have gone on showing a packet the server
+   * had already consumed, 404ing when you clicked it.
+   *
+   * Idempotent, because two of those paths can run for the same reveal, and it drops a state
+   * belonging to anybody but the player now signed in.
+   *
+   * `useCallback` because `PackOpener`'s `finish` closes over `onFinished` and lists it as a
+   * dependency — an identity that changed every render would rebuild the callback the
+   * reveal's timers are hung off, mid-reveal.
+   */
+  const applyPendingCollection = useCallback((forPlayerId?: string) => {
+    const pending = pendingCollection.current;
+    pendingCollection.current = null;
+
+    if (!pending) return;
+    if (forPlayerId !== undefined && pending.playerId !== forPlayerId) return;
+
+    setCollection(pending.state);
+  }, []);
 
   /**
    * Putting the opener away. The only way out of it.
@@ -260,6 +356,7 @@ const CollectionPage: React.FC = () => {
    * property of the page, not of a callback that may never arrive.
    */
   const closeOpener = () => {
+    applyPendingCollection(player?.id);
     setOpeningPack(null);
     setRevealing(false);
   };
@@ -277,10 +374,10 @@ const CollectionPage: React.FC = () => {
   }, [collection]);
 
   /*
-   * One book, one sequence. Legends are not a separate view behind a tab, and no
+   * One book, one sequence. Icons are not a separate view behind a tab, and no
    * longer a block of pages bolted onto the end either — they are **shuffled in
    * among the actives by rating**, so an icoon turns up on the spread its rating
-   * earns it rather than in a legends annexe.
+   * earns it rather than in an icons annexe.
    *
    * That is what makes the unlock feel like the book growing rather than gaining
    * an appendix: every spread you already knew gets denser, and the rarest card in
@@ -288,13 +385,18 @@ const CollectionPage: React.FC = () => {
    * Before the unlock they are absent entirely.
    *
    * Consequence worth knowing: an empty slot no longer tells you whether it is an
-   * active or a legend, because silhouettes are deliberately identical and not
+   * active or an icoon, because silhouettes are deliberately identical and not
    * marked as icoons. That used to be readable from which pages you were on.
+   *
+   * This is also what makes a card turn into an icoon under you. Slots come from
+   * the live pool, so somebody going out of service moves their card from `pool`
+   * to `icons` — you keep it either way, but while the icons are locked it has no
+   * slot to sit in and quietly leaves the book until you claim them.
    */
   const sections: AlbumSection[] = useMemo(() => {
     if (!collection) return [];
 
-    const unlocked = collection.legendsUnlocked ? collection.legends : [];
+    const unlocked = collection.album?.iconsUnlocked ? collection.icons : [];
 
     /*
      * Ascending by rating, so the book builds toward its best page: you open on
@@ -302,7 +404,7 @@ const CollectionPage: React.FC = () => {
      * hold. Sorted explicitly rather than reversed, because the source order is
      * the leaderboard's and should not be relied on here.
      *
-     * A legend sorts on the same field as everyone else — `visibleRating` carries
+     * An icoon sorts on the same field as everyone else — `visibleRating` carries
      * their all-time high rather than a current rating, which is exactly the
      * number their card is rated on, so no special case is needed here.
      */
@@ -340,14 +442,6 @@ const CollectionPage: React.FC = () => {
     );
   }, [slotOrder.length]);
 
-  const ownedActive = collection
-    ? collection.pool.filter((p) => (counts.get(p.id) ?? 0) > 0).length
-    : 0;
-  const totalActive = collection?.pool.length ?? 0;
-  const totalCards = collection?.owned.reduce((sum, c) => sum + c.count, 0) ?? 0;
-  const filledChunks =
-    totalActive > 0 ? Math.round((ownedActive / totalActive) * METER_CHUNKS) : 0;
-
   /**
    * The games gate, derived from the **picked player** rather than from the response.
    *
@@ -358,7 +452,11 @@ const CollectionPage: React.FC = () => {
    */
   const eligible = !player || player.numberOfGames >= MIN_GAMES;
 
-  /** The server's gate, for copy only, so the number quoted cannot drift from the rule. */
+  /**
+   * The server's gate, for the locked album's copy, so the number quoted cannot drift from
+   * the rule that is actually enforced. The ledger no longer quotes it at all — the gate is
+   * not that page's business any more.
+   */
   const minGames = collection?.minGames ?? MIN_GAMES;
 
   /**
@@ -368,16 +466,73 @@ const CollectionPage: React.FC = () => {
   const hasAlbum = collection?.album != null;
   const showChoice = collection !== null && (creating || collection.album == null);
 
+  /*
+   * There is no "the icons are claimable" flag on this page, and deliberately none.
+   *
+   * Completing the set puts a **packet** on the shelf, and that packet being there is the
+   * whole of the offer — it arrives through `collection.packs` like every other one, and it
+   * is recognised by `isIconPack`. A second boolean saying the same thing would be a second
+   * thing to keep in step with the server's derivation, and the two would eventually
+   * disagree about whether the affordance should be on screen.
+   */
+
+  /**
+   * The claim, and the only place it happens.
+   *
+   * It answers with the cards *and* the collection they landed in, and this splits the two:
+   * the cards go to the opener, which is what its `onOpen` contract is, and the collection
+   * is parked until the reveal is over. That is why the claim gaining a second half needed
+   * no change to `PackOpener` at all.
+   */
   const handleOpen = useCallback(
-    async (pack: Pack): Promise<RevealedCard[]> =>
-      player ? client.revealPack(player.id, pack.id) : [],
+    async (pack: Pack): Promise<RevealedCard[]> => {
+      if (!player) return [];
+
+      const { cards, state } = await client.revealPack(player.id, pack.id);
+      pendingCollection.current = { playerId: player.id, state };
+      return cards;
+    },
     [player],
   );
 
+  /**
+   * The reveal is over. Apply what the claim already told us, rather than asking again.
+   *
+   * This used to be `refresh(player.id)` — a second `GET /api/collections`, and so a second
+   * full leaderboard replay for one pack. It also left a window where the reveal had ended
+   * but the shelf and the book were still the pre-claim ones.
+   */
   const handleFinished = useCallback(() => {
     setRevealing(false);
-    if (player) void refresh(player.id);
-  }, [player, refresh]);
+    applyPendingCollection(player?.id);
+  }, [applyPendingCollection, player]);
+
+  /**
+   * The claim was refused, and the wrapper is already torn.
+   *
+   * This only became reachable when the opener stopped awaiting the roll before playing
+   * the tear. Before that a refusal left the packet sealed and the page stranded behind
+   * an exit button that hides itself for the length of a reveal — wrong, but invisibly
+   * so. Now the tear has visibly happened, so the failure has to be visible too.
+   *
+   * Back to the album and a refetch, rather than `setError`, which replaces the whole
+   * page with a notice you can only leave by reloading. The refetch is the substance of
+   * it: **every** refusal this endpoint issues means the shelf is out of date — 409 for
+   * a packet already opened in another tab, 404 for one that expired at midnight or for
+   * a game that has since been deleted — so asking again both explains the packet
+   * disappearing and is the fix.
+   */
+  const handleFailed = useCallback(
+    (reason: unknown) => {
+      // eslint-disable-next-line no-console
+      console.warn('[kaarten] POST /api/collections/packs/claim mislukt', reason);
+      pendingCollection.current = null;
+      setOpeningPack(null);
+      setRevealing(false);
+      if (player) void refresh(player.id);
+    },
+    [player, refresh],
+  );
 
   /**
    * The pile, less the packet currently on the stage — that one is in your hands, not
@@ -390,45 +545,138 @@ const CollectionPage: React.FC = () => {
   );
 
   /**
-   * Hand this player a pack. **Not wired yet, deliberately.**
+   * Hand the signed-in player a pack, as a present.
    *
-   * It used to push a pack into a session-local sandbox inside the client. Packs are
-   * derived from real games on the server now, so a pack cannot be invented in the
-   * browser at all — the endpoint that hands somebody a specific one is the next slice,
-   * and these options are the shape it has to take.
+   * The panel always addresses the packet to whoever is signed in. The endpoint takes a
+   * list of players or nobody at all (meaning everybody), but a button that quietly gave
+   * the whole office a packet is not a thing to have one click away from a button that
+   * gives you one — so the other two shapes are reachable from the API and not from here.
    *
-   * Kept as a stub rather than deleted along with its buttons: the buttons carry the
-   * reasoning for each ceremony level, and this is the one place that slice has to fill
-   * in.
+   * **Then a refetch, and that one is deliberate too.** Giving answers with the gift ids
+   * rather than a collection, because a present to everybody has no single collection to
+   * answer with. So this pays the leaderboard replay that the claim route works so hard to
+   * avoid — which is the right trade for something clicked by hand rather than a thousand
+   * times a year, and the reason the shelf takes a beat to show the packet.
    *
-   * The console rather than `setError`, which would replace the whole page with a notice
-   * and need a reload to get out of — far too much for a scaffolding button.
+   * The console rather than `setError` on failure, which would replace the whole page with
+   * a notice and need a reload to get out of — far too much for a scaffolding button.
    */
   const grant = (options: GrantOptions) => {
-    // eslint-disable-next-line no-console
-    console.warn(
-      '[kaarten] Pakjes uitdelen bestaat nog niet. Pakjes komen sinds het claim-eindpunt ' +
-        'van de server (wedstrijden van vandaag plus het dagelijkse pakje), dus dit wacht ' +
-        'op het cadeau-eindpunt.',
-      options,
-    );
-  };
-
-  /**
-   * The legends latch, flipped by hand. Development only, and a real row rather than a
-   * client-side flag — the alternative is completing a 37-card set to see one icoon.
-   */
-  const toggleLegends = () => {
     if (!player) return;
 
     void client
-      .setLegendsUnlocked(player.id, !collection?.legendsUnlocked)
+      .giftPack({ ...options, playerIds: [player.id] })
+      .then(() => refresh(player.id))
+      .catch((reason) => {
+        // eslint-disable-next-line no-console
+        console.warn('[kaarten] POST /api/collections/gifts mislukt', reason);
+      });
+  };
+
+  /**
+   * The set-completion packet was picked up: unlock the icons and start the re-binding.
+   *
+   * The write goes out **at the start** of the ceremony, the same contract `AlbumChoice`
+   * has with `onChoose`, so it is in flight while the book shuts — and it has to land
+   * before the packet itself is claimed, or the draw would have no icons to choose from.
+   * That ordering is the whole reason this is two calls rather than one.
+   *
+   * The response is applied straight away rather than parked. That is the opposite of the
+   * pack-reveal rule, and deliberately: what it carries is the *unlock*, which the claim
+   * about to follow depends on. It grows the album by roughly half at the same time, and
+   * that is free here because the book is shut — nothing on screen shifts.
+   */
+  const claimIcons = () => {
+    if (!player) return;
+
+    setRebinding(true);
+
+    void client
+      .claimIcons(player.id)
+      .then(setCollection)
+      .catch((reason) => {
+        /*
+         * Deliberately **not** aborting the ceremony. It has already started, and a book
+         * that stops halfway through being re-bound is a worse artefact than one that
+         * finishes and then reports a problem — `handleRebound` finds no unlock and puts
+         * things back.
+         */
+        // eslint-disable-next-line no-console
+        console.warn('[kaarten] PUT /api/collections/icons mislukt', reason);
+        pendingIconPack.current = null;
+      });
+  };
+
+  /**
+   * The re-binding is over, so hand the packet to the opener.
+   *
+   * This is the join between the two ceremonies: the book has closed and been re-bound, and
+   * the card that goes in it comes out of the packet next. `PackOpener` needs no knowledge
+   * of any of it — it is handed a pack like any other.
+   *
+   * If there is no packet waiting the unlock failed, and the recovery is a refetch rather
+   * than a retry: the only refusal this endpoint issues is a 409 saying the set is not in
+   * fact complete, which means this page's view of it was stale. Asking again both explains
+   * the packet disappearing and is the fix. Same reasoning as `handleFailed`.
+   */
+  const handleRebound = useCallback(() => {
+    const packet = pendingIconPack.current;
+    const demo = rebindDemo.current;
+    pendingIconPack.current = null;
+    rebindDemo.current = false;
+    setRebinding(false);
+
+    /* Played from the test panel: nothing was claimed and nothing is owed. The book keeps its
+       icon binding until the next read, which is the point of watching it. */
+    if (demo) return;
+
+    if (packet) {
+      setOpeningPack(packet);
+      return;
+    }
+
+    if (player) {
+      setError('Het ontgrendelen van de iconen is niet gelukt. Probeer het zo nog eens.');
+      void refresh(player.id);
+    }
+  }, [player, refresh]);
+
+  /**
+   * Play the re-binding on its own, from the test panel.
+   *
+   * **No server call and no packet**, which is the whole point: the ceremony is six beats
+   * long and happens once in a collection's life, so tuning it against the real thing would
+   * mean rebuilding a completed set for every look at it.
+   *
+   * It leaves the book bound until the next read of the collection, because nothing was
+   * written — reload and it is leather again.
+   */
+  const playRebindDemo = () => {
+    if (!player || !hasAlbum) return;
+    rebindDemo.current = true;
+    setRebindHandsOver(false);
+    setRebinding(true);
+  };
+
+  /**
+   * The icons latch, forced by hand. Development only, and a real row rather than a
+   * client-side flag — the alternative is completing a 37-card set to see one icoon.
+   *
+   * Deliberately **not** `claimIcons`, and deliberately not the ceremony either. This is
+   * the bypass: it skips the completeness check the real claim enforces, and it sets the
+   * book's binding without the moment that earns it. Pressing the seal is the feature.
+   */
+  const forceIcons = () => {
+    if (!player) return;
+
+    void client
+      .forceIcons(player.id, !collection?.album?.iconsUnlocked)
       .then(setCollection)
       .catch((reason) => {
         // eslint-disable-next-line no-console
-        console.warn('[kaarten] PUT /api/collections/legends mislukt', reason);
+        console.warn('[kaarten] PUT /api/collections/icons mislukt', reason);
         setError(
-          'De legendes omzetten lukt niet. Dit werkt alleen als de API in Development draait.',
+          'De iconen omzetten lukt niet. Dit werkt alleen als de API in Development draait.',
         );
       });
   };
@@ -447,6 +695,7 @@ const CollectionPage: React.FC = () => {
     setCollection(null);
     setOpeningPack(null);
     setRevealing(false);
+    pendingCollection.current = null;
     setViewing(null);
     setCreating(false);
     setRestoring(false);
@@ -469,6 +718,8 @@ const CollectionPage: React.FC = () => {
     setViewing(null);
     setOpeningPack(null);
     setRevealing(false);
+    // The collection this describes is about to stop existing.
+    pendingCollection.current = null;
 
     void client
       .emptyCollection(player.id)
@@ -502,36 +753,11 @@ const CollectionPage: React.FC = () => {
    */
 
   /*
-   * Readouts belong to a book that exists. Gated on `hasAlbum` as well as the games gate,
-   * or the cover-choice table gets "0/38 actieve spelers", an empty meter and "verzamel
-   * alles voor de legendes" underneath it — counters for a collection nobody has started.
+   * **There is no footer.** It carried "n/m actieve spelers", a completion meter, a card
+   * count and a line about the iconen — four readouts of state the album itself already
+   * shows, pinned under the table where nothing else lives. The book is the readout: an
+   * empty slot is a missing player, and the seal beside it says when the set is done.
    */
-  const footer = player && eligible && hasAlbum && (
-    <>
-      <span className="game-readout">
-        <strong>
-          {ownedActive}/{totalActive}
-        </strong>{' '}
-        actieve spelers
-      </span>
-      <div className="game-meter" style={{ flex: 1, minWidth: 160, maxWidth: 460 }}>
-        {Array.from({ length: METER_CHUNKS }, (_, i) => (
-          <span
-            key={i}
-            className={`game-meter__chunk${i < filledChunks ? '' : ' game-meter__chunk--empty'}`}
-          />
-        ))}
-      </div>
-      <span className="game-readout">
-        <strong>{totalCards}</strong> kaarten
-      </span>
-      <span className="game-muted">
-        {collection?.legendsUnlocked
-          ? 'legendes ontgrendeld'
-          : 'verzamel alles voor de legendes'}
-      </span>
-    </>
-  );
 
   /*
    * Seven states, and **the order is the design**. Four of the orderings are bugs:
@@ -541,38 +767,61 @@ const CollectionPage: React.FC = () => {
    *   restoring   before the ledger, or a returning visitor is shown the front door for a
    *               round trip and then has it swapped for their own album.
    *   no player   the ledger. The front door.
-   *   loading     render nothing. Without it a returning visitor flashes the cover-choice
-   *               table before their own album, because a null collection and a null
-   *               `album` are indistinguishable.
-   *   under gate  before the album check, or an under-gate player spends the whole
-   *               ceremony and lands on the notice with it used up. (The server refuses
-   *               the write as well; this is what stops them being offered it.)
+   *   loading     the hourglass — and, for the first 420ms of it, nothing. Without this
+   *               branch a returning visitor flashes the cover-choice table before their
+   *               own album, because a null collection and a null `album` are
+   *               indistinguishable.
+   *   under gate  the locked album, and before the album check — or an under-gate player
+   *               spends the whole binding ceremony and lands on the padlock with it used
+   *               up. (The server refuses the write as well; this is what stops them being
+   *               offered it.)
    *   no album    the opening sequence, held on screen by `creating` rather than by the
    *               response.
    *   otherwise   the book.
    */
   // No title or subtitle: the book's own cover says whose album it is.
   return (
-    <GameShell footer={footer || undefined}>
+    <GameShell>
       {error ? (
         <div className="game-notice">{error}</div>
       ) : restoring ? (
-        /* A name is remembered but not yet resolved. Blank, not the ledger — see
-           `restoring`. This is the only reason the front door is ever withheld. */
-        null
+        /* A name is remembered but not yet resolved — see `restoring`. Not the ledger:
+           this is the only reason the front door is ever withheld. */
+        <Hourglass caption="Even kijken wie je bent…" />
       ) : !player ? (
-        <SigningLedger players={players} minGames={minGames} onChoose={choosePlayer} />
+        <SigningLedger players={players} onChoose={choosePlayer} />
       ) : collection === null ? (
-        /* The read is in flight. Deliberately blank rather than a spinner: it is one
-           request against a local API, and a spinner that flashes for 80ms is noise. */
-        null
+        /*
+          The read is in flight.
+
+          This used to be blank, on the grounds that a spinner flashing for 80ms against a
+          local API is noise — which is right about the spinner and wrong about the blank.
+          The hourglass keeps both halves: it is an object on the table rather than a
+          widget, and **it does not appear for the first 420ms**, so the fast case still
+          renders nothing at all. See the header of hourglass.css.
+
+          Same element type in the same child position as the `restoring` branch above,
+          deliberately: React reconciles the two into one DOM node, so a returning
+          visitor's two round trips are one unbroken wait rather than two hourglasses
+          each starting their delay again. Only the caption changes.
+        */
+        <Hourglass caption="Je collectie wordt opgehaald…" />
       ) : !eligible ? (
-        <div className="game-notice">
-          {splitName(player.name).display} heeft {player.numberOfGames} wedstrijden
-          gespeeld.
-          <br />
-          Vanaf {minGames} wedstrijden gaat je album open.
-        </div>
+        /*
+          The gate, and it is a screen rather than a line of type now. The ledger used to
+          refuse an under-gate name at the signature — struck through, with how far off
+          they are beside it — which put the gate on the page that only asks who you are
+          and left the newest colleagues with nothing to click. They sign in like everybody
+          else and land here, at their own shut album with their own number on it.
+        */
+        <LockedAlbum
+          name={splitName(player.name).display}
+          games={player.numberOfGames}
+          minGames={minGames}
+          /* The way back out. Without it a mistyped name is remembered in this browser
+             and pins the page to somebody else's gate. */
+          onSignOut={forgetPlayer}
+        />
       ) : (
         /*
           One layout for **every** signed-in state — the cover choice, the book and the
@@ -616,6 +865,16 @@ const CollectionPage: React.FC = () => {
             for. Stood down while a reveal is running and while a book is being stamped —
             you cannot sign yourself out with a card in the air, and a way to abandon a book
             halfway through having your name blocked into it is not a thing to offer.
+
+            **The seal lies in this margin too, under the register.** The left margin is
+            where the packets are, and it is a busy column — a pile that grows and shrinks
+            all day. The seal turns up once in a collection's life, and putting it opposite
+            gives it a clear piece of table of its own instead of a slot at the bottom of a
+            stack of things that look nothing like it.
+
+            It shares the register's stand-down rather than carrying its own copy, and it is
+            hidden for the length of the re-binding: by then it has been used, and the
+            response that clears `iconsClaimable` is parked until the book is shut.
           */}
           <aside
             className={`album-register${
@@ -624,6 +883,173 @@ const CollectionPage: React.FC = () => {
           >
             <LedgerCorner name={ownerName ?? player.name} onSignOut={forgetPlayer} />
           </aside>
+
+          {/*
+            The test panel, at the foot of the same margin as the register.
+
+            **It used to be a full-width plate under the table**, and it is here for the
+            album's sake rather than its own: the book is sized off viewport *height*
+            first, so a row below it comes straight out of the spread. That row was the
+            last horizontal band left down there, and moving it into a margin that was
+            already reserved bought the page 7vh of book — see the `--page-w` note in
+            album.css.
+
+            It is inside the layout, so it is gone on the four states that are not the
+            album: the error notice, the ledger, the hourglass and the padlock. Nothing is
+            lost — every button on it needs a player *and* an album, so on all four of
+            them the whole panel was disabled anyway.
+
+            `--debug` is what exempts it from the table's rule that nothing on it gets a
+            panel — see game.css. It is scaffolding, and it has to stay readable rather
+            than in character, which makes it the one thing in either margin that is not
+            an object lying on the wood.
+          */}
+          {SHOW_DEBUG ? (
+            <aside className="album-panel">
+              <div className="game-plate game-plate--debug">
+                <span className="game-plate__label">Testpaneel</span>
+                <div className="game-row">
+                  {/*
+                    An ordinary packet of n cards, drawn on the real odds. It is a
+                    *present* — a `PackGift` row — because that is the only way a pack
+                    comes into existence that nobody played a game for, and it then lands
+                    on the shelf and is opened by the ordinary claim. So these buttons
+                    exercise the real draw and the real claim rather than a debug path
+                    beside them, which is the whole reason there is no separate
+                    `packs/debug` route.
+
+                    An album is required, not just a player: the shelf is suppressed until
+                    there is a book to file cards into, so a packet given before that
+                    would be written and then be invisible.
+                  */}
+                  {[1, 3, 5].map((size) => (
+                    <button
+                      key={size}
+                      type="button"
+                      className="game-button game-button--small"
+                      onClick={() => grant({ size, reason: 'testpakje' })}
+                      disabled={!player || !hasAlbum}
+                      title="Geeft jezelf een pakje — het komt op de plank te liggen"
+                    >
+                      pakje ({size} {size === 1 ? 'kaart' : 'kaarten'})
+                    </button>
+                  ))}
+                  {/*
+                    One card each, so a single ceremony level can be watched in isolation.
+
+                    Guaranteed by a **floor on the overall** rather than by a tier or a
+                    level. A tier cannot separate 75-79 from 80-84 — both are Goud — and
+                    the four numbers below are the ceremony's own steps, so the floor is
+                    the form both of those reduce to. It is also what the wrapper prints,
+                    which means the print is the number the draw was actually made
+                    against.
+
+                    90+ is a band, not a player. It used to be a guaranteed player pinned
+                    to the top of the active pool — which was Petar and stayed Petar even
+                    after he was no longer 90+, and could never reach an icoon at all. As
+                    a floor it draws from whoever actually clears 90 right now, which with
+                    the icons on includes them — Roel Loonen at 91 is currently the only
+                    card above Petar in the game.
+
+                    Two things worth knowing about what a floor does and does not buy. The
+                    weighting still applies *inside* the band, so 75+ hands out far more
+                    75s than 90s. And if nobody clears it, an ordinary weighted draw
+                    happens rather than a failure — an empty packet would be worse than a
+                    broken promise.
+                  */}
+                  {[75, 80, 85, 90].map((floor) => (
+                    <button
+                      key={floor}
+                      type="button"
+                      className="game-button game-button--small"
+                      onClick={() =>
+                        grant({ minimumOverall: floor, reason: `test — ${floor}+` })
+                      }
+                      disabled={!player || !hasAlbum}
+                      title={`Geeft jezelf een pakje met een kaart van ${floor} of hoger`}
+                    >
+                      1 kaart ({floor}+)
+                    </button>
+                  ))}
+                  {/*
+                    The bypass, not the feature. Pressing the seal beside the book is how
+                    the icons are earned; this forces the latch without the set and
+                    without the ceremony, because earning it legitimately is a three-month
+                    proposition and there would otherwise be no way to look at an icoon in
+                    a book at all.
+                  */}
+                  <button
+                    type="button"
+                    className="game-button game-button--small"
+                    onClick={forceIcons}
+                    disabled={!player || !hasAlbum}
+                    title="Zet de iconen-latch om, zonder de hele actieve set te verzamelen"
+                  >
+                    iconen {collection?.album?.iconsUnlocked ? 'uit' : 'aan'}
+                  </button>
+                  {/*
+                    The ceremony on its own, with no write behind it. It is six beats long
+                    and happens once in a collection's life, so without this every look at
+                    it costs a rebuilt set.
+                  */}
+                  <button
+                    type="button"
+                    className="game-button game-button--small"
+                    onClick={playRebindDemo}
+                    disabled={!player || !hasAlbum || rebinding}
+                    title="Speelt alleen de bind-animatie af — er wordt niets opgeslagen"
+                  >
+                    bind-animatie
+                  </button>
+                  {/*
+                    The two buttons that put the page back to a state you cannot otherwise
+                    reach twice. They undo different things on purpose, and the pairing is
+                    the useful part:
+
+                      leegmaken  destroys the album on the server  -> the cover choice
+                      resetten   forgets who this browser is       -> the ledger
+
+                    So `leegmaken` is how the opening ceremony gets watched again, and
+                    `resetten` is how the *returning visitor* path gets tested — that one
+                    needs the album to still exist, which is exactly why it does not touch
+                    it.
+                  */}
+                  <button
+                    type="button"
+                    className="game-button game-button--small"
+                    onClick={emptyCollection}
+                    disabled={!player}
+                    title="Album weg, kaarten weg — terug naar het kiezen van een kaft"
+                  >
+                    leegmaken
+                  </button>
+                  {/*
+                    No "resetten" any more. Signing out is the register lying on the table
+                    beside the book, which is a real part of the page rather than
+                    scaffolding — and a second way to do it, on a panel that is going to
+                    be deleted, would be one more thing to remember to remove.
+
+                    No "kansen" either: it drew a few thousand packs in the browser to
+                    check the observed frequencies against the odds table, and the browser
+                    cannot draw a pack any more. That check is
+                    `InclusionProbabilitiesSumToThePackSize` in UnitTests/PackTests.cs,
+                    where it runs on every build rather than when somebody remembers to
+                    press a button.
+                  */}
+                  {/*
+                    Here rather than in the header, because it skips the reveal — which is
+                    the part of this feature everybody is actually here for. That makes it
+                    a development convenience, not a setting somebody should be nudged
+                    toward.
+                  */}
+                  <label className="game-check">
+                    <input type="checkbox" checked={fastMode} onChange={toggleFast} />
+                    snel openen
+                  </label>
+                </div>
+              </div>
+            </aside>
+          ) : null}
 
           <div className="album-main">
             {showChoice ? (
@@ -643,6 +1069,7 @@ const CollectionPage: React.FC = () => {
                   onOpen={() => handleOpen(openingPack)}
                   onStart={() => setRevealing(true)}
                   onFinished={handleFinished}
+                  onFailed={handleFailed}
                   fastMode={fastMode}
                 />
                 {/*
@@ -685,6 +1112,15 @@ const CollectionPage: React.FC = () => {
                 ownerId={player.id}
                 cover={collection.album?.cover}
                 /*
+                  Half-bound once the icons are in, and read on every render like `cover` —
+                  so a book re-bound in a previous session simply draws that way, with no
+                  ceremony and nothing persisted on this side.
+                */
+                icons={collection.album?.iconsUnlocked}
+                rebinding={rebinding}
+                handsOver={rebindHandsOver}
+                onRebound={handleRebound}
+                /*
                   The last beat of the opening sequence, and the only one that is words.
                   Both actions, because both are undiscoverable: the cover is the button,
                   and the page edges are the only other control on the book. The album drops
@@ -702,127 +1138,6 @@ const CollectionPage: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/*
-        `--debug` is what exempts this panel from the table's rule that nothing on
-        it gets a panel — see game.css. It is scaffolding, and it has to stay
-        readable rather than in character.
-      */}
-      {SHOW_DEBUG ? (
-        <div className="game-plate game-plate--debug" style={{ marginTop: 18 }}>
-          <span className="game-plate__label">Testpaneel</span>
-          <div className="game-row">
-            {/*
-              The pack buttons are **kept and not yet wired**. They used to write into a
-              session-local sandbox; packs are derived from real games on the server now,
-              so there is no client-side way to conjure one and `grant` below says so
-              rather than pretending.
-
-              They are the obvious first caller for the grant endpoint — handing a named
-              player, or everybody, a specific pack is the one grant-shaped thing left in
-              the design — so they stay put and that slice wires them up. Deleting and
-              re-adding them would only lose the copy and the reasoning attached to each.
-            */}
-            {[1, 3, 5].map((size) => (
-              <button
-                key={size}
-                type="button"
-                className="game-button game-button--small"
-                onClick={() => grant({ size, reason: 'testpakje' })}
-                title="Wacht op het cadeau-eindpunt — zie de console"
-              >
-                pakje ({size} {size === 1 ? 'kaart' : 'kaarten'})
-              </button>
-            ))}
-            {/*
-              One card each, so a single ceremony level can be watched in
-              isolation. Guaranteed by level rather than tier: 75-79 and 80-84
-              are both Goud, so a tier guarantee cannot separate them.
-
-              90+ is a band, not a player. It used to be a `guaranteePlayerId`
-              pinned to the top of the active pool — which was Petar and stayed
-              Petar even after he was no longer 90+, and could never reach a legend
-              at all. As a level it draws uniformly from whoever actually clears 90
-              right now, which with legends on includes the icoons — Roel Loonen at
-              91 is currently the only card above Petar in the game.
-
-              The draw is server-side now, so a level guarantee is something the grant
-              endpoint will have to implement in `PackService.Roll`. Worth knowing that
-              the fall-through is the same either way: if nobody clears the level, an
-              ordinary weighted draw happens rather than a failure.
-            */}
-            {[
-              { level: 1, label: '1 kaart (75+)' },
-              { level: 2, label: '1 kaart (80+)' },
-              { level: 3, label: '1 kaart (85+)' },
-              { level: 4, label: '1 kaart (90+)' },
-            ].map(({ level, label }) => (
-              <button
-                key={level}
-                type="button"
-                className="game-button game-button--small"
-                onClick={() =>
-                  grant({ size: 1, reason: `test — niveau ${level}`, guaranteeLevel: level })
-                }
-                title="Wacht op het cadeau-eindpunt — zie de console"
-              >
-                {label}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="game-button game-button--small"
-              onClick={toggleLegends}
-              disabled={!player || !hasAlbum}
-              title="Zet de legendes-latch om, zonder de hele actieve set te verzamelen"
-            >
-              legendes {collection?.legendsUnlocked ? 'uit' : 'aan'}
-            </button>
-            {/*
-              The two buttons that put the page back to a state you cannot otherwise
-              reach twice. They undo different things on purpose, and the pairing is the
-              useful part:
-
-                leegmaken  destroys the album on the server  -> the cover choice
-                resetten   forgets who this browser is       -> the ledger
-
-              So `leegmaken` is how the opening ceremony gets watched again, and
-              `resetten` is how the *returning visitor* path gets tested — that one needs
-              the album to still exist, which is exactly why it does not touch it.
-            */}
-            <button
-              type="button"
-              className="game-button game-button--small"
-              onClick={emptyCollection}
-              disabled={!player}
-              title="Album weg, kaarten weg — terug naar het kiezen van een kaft"
-            >
-              leegmaken
-            </button>
-            {/*
-              No "resetten" any more. Signing out is the register lying on the table beside
-              the book, which is a real part of the page rather than scaffolding — and a
-              second way to do it, on a panel that is going to be deleted, would be one more
-              thing to remember to remove.
-
-              No "kansen" either: it drew a few thousand packs in the browser to check the
-              observed frequencies against the odds table, and the browser cannot draw a
-              pack any more. That check is `InclusionProbabilitiesSumToThePackSize` in
-              UnitTests/PackTests.cs, where it runs on every build rather than when
-              somebody remembers to press a button.
-            */}
-            {/*
-              Here rather than in the header, because it skips the reveal — which is the part
-              of this feature everybody is actually here for. That makes it a development
-              convenience, not a setting somebody should be nudged toward.
-            */}
-            <label className="game-check">
-              <input type="checkbox" checked={fastMode} onChange={toggleFast} />
-              snel openen
-            </label>
-          </div>
-        </div>
-      ) : null}
 
       {/*
         The viewer mounts here, as the last child of the shell — the same place

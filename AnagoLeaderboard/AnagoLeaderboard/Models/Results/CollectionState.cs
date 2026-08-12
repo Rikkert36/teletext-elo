@@ -3,8 +3,8 @@ namespace AnagoLeaderboard.Models.Results;
 /// <summary>
 /// The whole collection page in one response.
 ///
-/// Deliberately not split into collection / pool / legends routes. The book is one object -
-/// the album builds its sections from the pool, the legends and the owned counts together
+/// Deliberately not split into collection / pool / icons routes. The book is one object -
+/// the album builds its sections from the pool, the icons and the owned counts together
 /// and then walks the result in printed order, so three routes would mean either a book
 /// that cannot draw until all three land, or one that draws and then grows a section,
 /// shifting every card index behind it underneath an open card viewer.
@@ -46,20 +46,39 @@ public sealed record CollectionState(
     int MinGames,
     IReadOnlyList<OwnedCard> Owned,
     IReadOnlyList<AvailablePack> Packs,
-    bool LegendsUnlocked,
     IReadOnlyList<CardSubject> Pool,
-    IReadOnlyList<CardSubject> Legends);
+    IReadOnlyList<CardSubject> Icons);
 
 /// <summary>
-/// The album as a physical object, and nothing else.
+/// The album as a physical object: how it is bound, and what it is bound to hold.
 ///
-/// Only the binding lives here. The collection's contents - owned, packs, the legends latch
-/// - stay on the root of <see cref="CollectionState"/>, so a non-null Album means exactly
-/// one thing ("this player has an album") rather than becoming a second nested bag of state
-/// that can drift from the root.
+/// The icons latch lives here rather than on the root of <see cref="CollectionState"/>
+/// because it is a property of <em>this binding</em> - the book you are holding either has
+/// the icons in it or it does not, and a half-bound book is the visible record of that. Two
+/// things follow, both wanted. Emptying the collection deletes the row, so the unlock leaves
+/// with the binding and <c>Album: null</c> cannot carry a stale one. And the flag is
+/// unreachable without an album, which is correct: there is nothing for an unlock to be a
+/// property of until there is a book.
+///
+/// The collection's <em>contents</em> - owned, packs, the pool - stay on the root, because
+/// those are things you have rather than facts about the object they are kept in.
 /// </summary>
 /// <param name="Cover">One of <see cref="AlbumCovers.All"/>.</param>
-public sealed record AlbumBinding(string Cover, DateTime CreatedAt);
+/// <param name="IconsUnlocked">
+/// Whether this book holds the icons. Drives the half-binding, and whether
+/// <see cref="CollectionState.Icons"/> ships at all.
+/// </param>
+/// <remarks>
+/// There is deliberately no "you may claim the icons" flag here. Completing the set puts a
+/// **packet** on the shelf - see <see cref="Services.PackService.IconsPack"/> - and that packet
+/// existing is the whole of the offer. A second flag saying the same thing is a second thing to
+/// keep in step with the derivation, and the two would eventually disagree about whether the
+/// affordance should be on screen.
+/// </remarks>
+public sealed record AlbumBinding(
+    string Cover,
+    DateTime CreatedAt,
+    bool IconsUnlocked);
 
 /// <summary>How many copies of one player's card the collector holds.</summary>
 public sealed record OwnedCard(string PlayerId, int Count);
@@ -67,12 +86,29 @@ public sealed record OwnedCard(string PlayerId, int Count);
 /// <summary>
 /// A pack waiting to be opened.
 ///
-/// Ids are synthetic and stable - "game:{gameId}", "daily:{yyyy-MM-dd}" - because a derived
-/// pack has no row to take an id from, and the packet pile's tilt and sheen are seeded from
-/// the id so it must survive a refetch.
+/// Ids are synthetic and stable - "game:{gameId}", "daily:{yyyy-MM-dd}", "gift:{giftId}" -
+/// because a derived pack has no row to take an id from, and the packet pile's tilt and sheen
+/// are seeded from the id so it must survive a refetch.
 /// </summary>
+/// <param name="MinimumOverall">
+/// The floor on every card in it, or null for an ordinary draw - which is every earned pack,
+/// since the only choice a game makes is the size. Only a <see cref="PackGift"/> ever sets it.
+///
+/// It reaches the wire because the wrapper prints it instead of a count ("80+") and is foiled
+/// orange rather than by size: a packet that is lying to you about the odds should look like it.
+/// </param>
+/// <param name="GuaranteesIcon">
+/// The single card in it is drawn from the icons rather than from the actives. True only for the
+/// set-completion packet.
+///
+/// It reaches the wire for the same reason <see cref="MinimumOverall"/> does: the wrapper prints
+/// what it is promising, and a packet making a promise this large should not look like the daily
+/// freebie. It is also what tells the page to run the re-binding before opening it.
+/// </param>
 public sealed record AvailablePack(
     string Id,
     int Size,
     string Reason,
-    IReadOnlyList<string> DoubledPlayerIds);
+    IReadOnlyList<string> DoubledPlayerIds,
+    int? MinimumOverall = null,
+    bool GuaranteesIcon = false);

@@ -20,6 +20,13 @@ namespace AnagoLeaderboard.Controllers
         private readonly PackService _packService;
         private readonly IWebHostEnvironment _environment;
 
+        /// <summary>
+        /// <see cref="PackService"/> is here for the gift route alone, and deliberately not reached
+        /// through <see cref="CollectionService"/> like everything else on this controller. A
+        /// present is not a state over the card pool - it touches no collection, needs no
+        /// leaderboard replay and returns no page - so routing it through the service that owns
+        /// the replay would add a pass-through and invite somebody to have it build a state.
+        /// </summary>
         public CollectionsController(
             CollectionService collectionService,
             PackService packService,
@@ -89,7 +96,11 @@ namespace AnagoLeaderboard.Controllers
 
         /// <summary>
         /// Opens a pack: rolls it, files the cards, and hands them back with whether each one
-        /// filled an empty slot.
+        /// filled an empty slot - together with the collection they landed in.
+        ///
+        /// The state comes back for the same reason the create endpoint's does: the alternative
+        /// is the client refetching, and that is a second full leaderboard replay inside one
+        /// user action.
         ///
         /// The pack is named by a synthetic id - "game:{gameId}" or "daily:{yyyy-MM-dd}" -
         /// because a derived pack has no row to take an id from. Those ids are guessable from
@@ -98,16 +109,14 @@ namespace AnagoLeaderboard.Controllers
         /// whoever asked for them, so the worst it buys is spoiling somebody's reveal.
         /// </summary>
         [HttpPost("collections/{playerId}/packs/{packId}/claim")]
-        public async Task<ActionResult<IReadOnlyList<RevealedCard>>> ClaimPack(
-            string playerId,
-            string packId)
+        public async Task<ActionResult<PackReveal>> ClaimPack(string playerId, string packId)
         {
-            var result = await _packService.Claim(playerId, packId);
+            var result = await _collectionService.ClaimPack(playerId, packId);
 
             switch (result.Outcome)
             {
                 case ClaimOutcome.Claimed:
-                    return Ok(result.Cards);
+                    return Ok(new PackReveal(result.Cards!, result.State!));
 
                 case ClaimOutcome.PlayerNotFound:
                 case ClaimOutcome.NotAvailable:
@@ -122,6 +131,60 @@ namespace AnagoLeaderboard.Controllers
                 case ClaimOutcome.NotEligible:
                     return Conflict(
                         "Speler heeft nog niet genoeg wedstrijden gespeeld voor een album.");
+
+                default:
+                    return StatusCode(500);
+            }
+        }
+
+        /// <summary>
+        /// Presents a pack to a named player, to several, or to everybody.
+        ///
+        /// The one grant-shaped route in the design, and the only one that brings a pack into
+        /// existence rather than deriving one. That is allowed here because a present is the one
+        /// pack nothing can be derived from - nobody played a game to earn it - and it is kept
+        /// honest by how little it does: it writes a gift row, the packet then appears on the
+        /// shelf, and the ordinary claim endpoint opens it. There is no second draw and no second
+        /// mint to keep in step.
+        ///
+        /// It answers with the gift ids rather than a collection, because for "everybody" there is
+        /// no single collection to answer with - and because the caller is usually not the
+        /// recipient. A page that has just given itself a packet refetches, which costs the
+        /// leaderboard replay the claim route works so hard to avoid; that is the right trade for
+        /// something done by hand a few times a month rather than a thousand times a year.
+        ///
+        /// **Not development only**, unlike the two routes below it. Handing out packs is a real
+        /// thing to want to do in an office - a tournament prize, a birthday, a welcome - and this
+        /// app has no authentication anywhere by design, so gating it on the environment would
+        /// protect nothing while removing the feature.
+        /// </summary>
+        [HttpPost("collections/gifts")]
+        public async Task<ActionResult<GiftReceipt>> GiveGift([FromBody] GiftForm form)
+        {
+            var result = await _packService.GiveGift(
+                form?.PlayerIds,
+                form?.Size,
+                form?.MinimumOverall,
+                form?.Reason);
+
+            switch (result.Outcome)
+            {
+                case GiftOutcome.Given:
+                    return Ok(new GiftReceipt(result.GiftIds, result.Everybody));
+
+                case GiftOutcome.NotOneChoice:
+                    return BadRequest(
+                        "Geef of een aantal kaarten, of een minimale overall - niet beide en niet "
+                        + "geen van beide. Een pakje met een garantie is altijd een enkele kaart.");
+
+                case GiftOutcome.SizeOutOfRange:
+                    return BadRequest("Een pakje bevat tussen 1 en 10 kaarten.");
+
+                case GiftOutcome.FloorOutOfRange:
+                    return BadRequest("De minimale overall valt buiten de schaal.");
+
+                case GiftOutcome.UnknownPlayer:
+                    return NotFound("Minstens een van de genoemde spelers bestaat niet.");
 
                 default:
                     return StatusCode(500);
@@ -159,30 +222,43 @@ namespace AnagoLeaderboard.Controllers
         }
 
         /// <summary>
-        /// Flips the legends latch by hand. **Development only**, and gated the same way.
+        /// Claims the icons. The collector has the whole active set and is pressing the seal.
         ///
-        /// Earning it means completing the active set, which is a three-month proposition at the
-        /// published odds - so without this there is no way at all to look at an icoon sitting
-        /// in a book, which is the thing the whole legends design is judged on.
+        /// **The plain call is a real endpoint in every environment** — it is how the unlock is
+        /// earned, and the only thing that latches it. The server checks the set itself rather
+        /// than trusting the caller: the seal decides whether to *offer* the press from the same
+        /// predicate, but a page that has gone stale could offer one that is no longer earned.
+        ///
+        /// The two bypasses stay **development only**, and 404 rather than 403 outside it for the
+        /// same reason as the delete — a route that is not meant to exist should not announce that
+        /// it does. `force` skips the check, because earning this legitimately is a three-month
+        /// proposition and there would otherwise be no way to look at an icoon in a book at all.
+        /// `unlocked=false` puts it back, which a collector may never do to their own album.
         /// </summary>
-        [HttpPut("collections/{playerId}/legends")]
-        public async Task<ActionResult<CollectionState>> SetLegendsUnlocked(
+        [HttpPut("collections/{playerId}/icons")]
+        public async Task<ActionResult<CollectionState>> SetIconsUnlocked(
             string playerId,
-            [FromQuery] bool unlocked = true)
+            [FromQuery] bool unlocked = true,
+            [FromQuery] bool force = false)
         {
-            if (!_environment.IsDevelopment())
+            if ((force || !unlocked) && !_environment.IsDevelopment())
             {
                 return NotFound();
             }
 
-            var state = await _collectionService.SetLegendsUnlocked(playerId, unlocked);
+            var result = await _collectionService.SetIconsUnlocked(playerId, unlocked, force);
 
-            if (state is null)
+            return result.Outcome switch
             {
-                return NotFound();
-            }
+                IconsOutcome.PlayerNotFound or IconsOutcome.NoAlbum => NotFound(),
 
-            return Ok(state);
+                // The one refusal worth a body: the client thought the set was finished and it is
+                // not, so it needs to refetch rather than retry.
+                IconsOutcome.SetIncomplete => Conflict(
+                    "De actieve set is nog niet compleet, dus er is nog niets te ontgrendelen."),
+
+                _ => Ok(result.State)
+            };
         }
     }
 }

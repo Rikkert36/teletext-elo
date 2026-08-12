@@ -256,6 +256,124 @@ namespace UnitTests
         }
 
         /* ----------------------------------------------------------------- *
+         * Gifts - the one pack that is a row rather than a derivation.
+         * ----------------------------------------------------------------- */
+
+        [Test]
+        public void AGiftSitsOnTopOfThePile()
+        {
+            var gift = PackGift.Create("t1p1", 3, null, "cadeautje");
+
+            var packs = PackService.Derive(
+                "t1p1", new[] { GameBetween(10, 7) }, Array.Empty<PackClaim>(), Today, new[] { gift });
+
+            // Above the game packs and the daily. It is the unusual thing on the shelf and the
+            // only one nobody played for.
+            Assert.That(packs[0].Id, Is.EqualTo("gift:" + gift.Id));
+            Assert.That(packs[0].Size, Is.EqualTo(3));
+            Assert.That(packs[0].Reason, Is.EqualTo("cadeautje"));
+            Assert.That(packs.Last().Id, Is.EqualTo("daily:2026-08-11"));
+        }
+
+        /// <summary>
+        /// A present reaches its recipient and nobody else.
+        ///
+        /// This replaces <c>AGiftToEverybodyReachesSomebodyItDoesNotName</c>, which pinned the
+        /// opposite: a gift with a null recipient used to mean "everybody" and so reached people it
+        /// did not name. That case no longer exists — <see cref="PackService.GiveGift"/> expands
+        /// "everybody" into one addressed row per player when the gift is given — so the derivation
+        /// now has exactly one rule to apply, and this is it.
+        /// </summary>
+        [Test]
+        public void AGiftReachesTheRecipientAndNobodyElse()
+        {
+            var mine = PackGift.Create("t1p1", 1, null, "alleen voor mij");
+            var theirs = PackGift.Create("t2p1", 1, null, "alleen voor hen");
+
+            var forMe = PackService.Derive(
+                "t1p1", Array.Empty<Game>(), Array.Empty<PackClaim>(), Today,
+                new[] { mine, theirs });
+
+            Assert.That(forMe.Any(pack => pack.Id == "gift:" + mine.Id));
+            Assert.That(forMe.Any(pack => pack.Id == "gift:" + theirs.Id), Is.False);
+
+            // And a stranger, who was addressed by neither, gets neither.
+            var forStranger = PackService.Derive(
+                "stranger", Array.Empty<Game>(), Array.Empty<PackClaim>(), Today,
+                new[] { mine, theirs });
+
+            Assert.That(forStranger.Any(pack => pack.Id.StartsWith("gift:")), Is.False);
+        }
+
+        [Test]
+        public void AClaimedGiftStaysClaimedTomorrow()
+        {
+            var gift = PackGift.Create("t1p1", 1, null, "cadeautje");
+            var claimed = new[] { PackClaim.ForGift("t1p1", gift.Id, Today) };
+
+            // The property that separates a gift claim from a daily one. A present stands open for
+            // days, so if the derivation narrowed gift claims to the day the way it narrows the
+            // other two, the same packet would be handed over again every morning.
+            foreach (var day in new[] { Today, Today.AddDays(1), Today.AddDays(5) })
+            {
+                var packs = PackService.Derive(
+                    "t1p1", Array.Empty<Game>(), claimed, day, new[] { gift });
+
+                Assert.That(
+                    packs.Any(pack => pack.Id == "gift:" + gift.Id),
+                    Is.False,
+                    $"the present came back on {day:yyyy-MM-dd}");
+            }
+        }
+
+        /// <summary>
+        /// One recipient opening their present does not take anybody else's.
+        ///
+        /// It used to be a claim against one shared unaddressed row, which is what made this worth
+        /// pinning. Expanding "everybody" at gift time makes it structural instead: each recipient
+        /// has their own row and their own claim, so there is nothing left to get wrong. Kept
+        /// because it is the property that mattered, and it should stay true however it is achieved.
+        /// </summary>
+        [Test]
+        public void OneRecipientOpeningTheirsLeavesTheRestAlone()
+        {
+            // What `GiveGift(null, ...)` now writes for a two-person office.
+            var mine = PackGift.Create("t1p1", 1, null, "voor iedereen");
+            var theirs = PackGift.Create("t2p1", 1, null, "voor iedereen");
+            var everyone = new[] { mine, theirs };
+
+            var claimed = new[] { PackClaim.ForGift("t1p1", mine.Id, Today) };
+
+            Assert.That(
+                PackService.Derive("t1p1", Array.Empty<Game>(), claimed, Today, everyone)
+                    .Any(pack => pack.Id.StartsWith("gift:")),
+                Is.False,
+                "they opened theirs");
+
+            Assert.That(
+                PackService.Derive("t2p1", Array.Empty<Game>(), claimed, Today, everyone)
+                    .Any(pack => pack.Id == "gift:" + theirs.Id),
+                "somebody else opening theirs is none of their business");
+        }
+
+        [Test]
+        public void AGuaranteedGiftIsASingleCardAndCarriesItsFloor()
+        {
+            // Size is ignored when a floor is given: a packet is either n ordinary cards or one
+            // card at a floor, never both.
+            var gift = PackGift.Create("t1p1", 5, 85, "test");
+
+            var pack = PackService.GiftPack(gift);
+
+            Assert.That(pack.Size, Is.EqualTo(1));
+            Assert.That(pack.MinimumOverall, Is.EqualTo(85));
+
+            // And nothing earned ever carries one - the only choice a game makes is the size.
+            Assert.That(PackService.PackForGame(GameBetween(10, 3), "t1p1").MinimumOverall, Is.Null);
+            Assert.That(PackService.DailyPack(Today).MinimumOverall, Is.Null);
+        }
+
+        /* ----------------------------------------------------------------- *
          * The draw.
          * ----------------------------------------------------------------- */
 
@@ -268,7 +386,7 @@ namespace UnitTests
             for (var attempt = 0; attempt < 500; attempt++)
             {
                 var drawn = PackService.Roll(
-                    _cardRatingCalculator, pool, 5, Array.Empty<string>(), false, random);
+                    _cardRatingCalculator, pool, 5, Array.Empty<string>(), false, random: random);
 
                 Assert.That(drawn.Count, Is.EqualTo(5));
                 Assert.That(drawn.Select(card => card.Id).Distinct().Count(), Is.EqualTo(5));
@@ -280,26 +398,104 @@ namespace UnitTests
         {
             var drawn = PackService.Roll(
                 _cardRatingCalculator, PoolOf(("a", 1000), ("b", 900)), 5,
-                Array.Empty<string>(), false, new Random(1));
+                Array.Empty<string>(), false, random: new Random(1));
 
             Assert.That(drawn.Count, Is.EqualTo(2));
         }
 
         [Test]
-        public void LegendsAreOnlyDrawnOnceUnlocked()
+        public void IconsAreOnlyDrawnOnceUnlocked()
         {
             var pool = new CardPool(
                 5,
                 new[] { Subject("active", 1000, false) },
-                new[] { Subject("legend", 1000, true) });
+                new[] { Subject("icon",1000, true) });
 
             var locked = PackService.Roll(
-                _cardRatingCalculator, pool, 2, Array.Empty<string>(), false, new Random(1));
+                _cardRatingCalculator, pool, 2, Array.Empty<string>(), false, random: new Random(1));
             Assert.That(locked.Select(card => card.Id), Is.EqualTo(new[] { "active" }));
 
             var unlocked = PackService.Roll(
-                _cardRatingCalculator, pool, 2, Array.Empty<string>(), true, new Random(1));
-            Assert.That(unlocked.Select(card => card.Id), Is.EquivalentTo(new[] { "active", "legend" }));
+                _cardRatingCalculator, pool, 2, Array.Empty<string>(), true, random: new Random(1));
+            Assert.That(unlocked.Select(card => card.Id), Is.EquivalentTo(new[] { "active", "icon" }));
+        }
+
+        [Test]
+        public void AFloorNarrowsTheDrawToWhoClearsIt()
+        {
+            // 1851 -> 90 and 1362 -> 85 clear an 85 floor; the other three do not.
+            var pool = PoolOf(("top", 1851), ("rare", 1362), ("gold", 1035), ("silver", 919), ("bronze", 342));
+            var random = new Random(20260811);
+
+            var seen = new HashSet<string>();
+            for (var i = 0; i < 2000; i++)
+            {
+                seen.Add(PackService.Roll(
+                        _cardRatingCalculator, pool, 1, Array.Empty<string>(), false, 85, random)
+                    .Single().Id);
+            }
+
+            Assert.That(seen, Is.EquivalentTo(new[] { "top", "rare" }));
+        }
+
+        [Test]
+        public void AFloorStillWeightsInsideItself()
+        {
+            var pool = PoolOf(("top", 1851), ("rare", 1362), ("bronze", 342));
+            var random = new Random(20260811);
+
+            var seen = new Dictionary<string, int>();
+            for (var i = 0; i < 20000; i++)
+            {
+                var card = PackService.Roll(
+                    _cardRatingCalculator, pool, 1, Array.Empty<string>(), false, 85, random).Single();
+                seen[card.Id] = seen.GetValueOrDefault(card.Id) + 1;
+            }
+
+            // A floor narrows the candidates and changes nothing else, so an 85+ packet still hands
+            // out far more 85s than 90s. It buys you the band, not the best card in it.
+            Assert.That(seen["rare"], Is.GreaterThan(seen["top"]));
+            Assert.That(seen.ContainsKey("bronze"), Is.False);
+        }
+
+        [Test]
+        public void AFloorNobodyClearsIsIgnoredRatherThanRefused()
+        {
+            var pool = PoolOf(("top", 1851), ("bottom", 342));
+
+            var drawn = PackService.Roll(
+                _cardRatingCalculator, pool, 1, Array.Empty<string>(), false, 99,
+                random: new Random(1));
+
+            // Nobody is a 99. A guarantee is about the odds, and a pool that cannot honour one is
+            // not a reason to hand somebody an empty packet.
+            Assert.That(drawn.Count, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AFloorCanReachAnIconOnceUnlocked()
+        {
+            var pool = new CardPool(
+                5,
+                new[] { Subject("active", 1000, false) },
+                new[] { Subject("icon",1954, true) });
+
+            // Locked, nobody clears 90 and the draw falls through to the only active there is.
+            Assert.That(
+                PackService.Roll(
+                        _cardRatingCalculator, pool, 1, Array.Empty<string>(), false, 90,
+                        random: new Random(1))
+                    .Single().Id,
+                Is.EqualTo("active"));
+
+            // Unlocked, the icoon is the one card that clears it - which is why the top button is a
+            // floor rather than a player pinned to the top of the active pool.
+            Assert.That(
+                PackService.Roll(
+                        _cardRatingCalculator, pool, 1, Array.Empty<string>(), true, 90,
+                        random: new Random(1))
+                    .Single().Id,
+                Is.EqualTo("icon"));
         }
 
         /// <summary>
@@ -325,7 +521,7 @@ namespace UnitTests
             for (var i = 0; i < packs; i++)
             {
                 foreach (var card in PackService.Roll(
-                             _cardRatingCalculator, pool, size, Array.Empty<string>(), false, random))
+                             _cardRatingCalculator, pool, size, Array.Empty<string>(), false, random: random))
                 {
                     appearances[card.Id] = appearances.GetValueOrDefault(card.Id) + 1;
                 }
@@ -345,7 +541,7 @@ namespace UnitTests
             for (var i = 0; i < 20000; i++)
             {
                 var card = PackService.Roll(
-                    _cardRatingCalculator, pool, 1, Array.Empty<string>(), false, random).Single();
+                    _cardRatingCalculator, pool, 1, Array.Empty<string>(), false, random: random).Single();
                 seen[card.Id] = seen.GetValueOrDefault(card.Id) + 1;
             }
 
@@ -355,8 +551,8 @@ namespace UnitTests
 
         /* ----------------------------------------------------------------- */
 
-        private CardSubject Subject(string id, int visibleRating, bool isLegend) =>
-            new(id, id, visibleRating, _cardRatingCalculator.OverallFor(visibleRating), 20, isLegend);
+        private CardSubject Subject(string id, int visibleRating, bool isIcon) =>
+            new(id, id, visibleRating, _cardRatingCalculator.OverallFor(visibleRating), 20, isIcon);
 
         private CardPool PoolOf(params (string Id, int VisibleRating)[] players) =>
             new(

@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>De bind-ceremonie — tijdlijn en beats</title>
+<style>
+  /* ------------------------------------------------------------------ *
+   * A bench for the re-binding ceremony.
+   *
+   * Every duration, colour and box below is the value the real thing uses, so a decision
+   * made here transfers. Where something is a simplification it says so in place — there
+   * are three, all in the book itself, and none of them touches the light.
+   *
+   * The tabletop is lifted from `.game-stage` in game.css for the same reason
+   * rebind-object.html lifts it: this is a ceremony about a white object in a dark room,
+   * and judging it on anything but the real room settles nothing.
+   * ------------------------------------------------------------------ */
+  :root {
+    --grain-figure: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1400' height='1000'%3E%3Cfilter id='w' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.048' numOctaves='3' seed='4'/%3E%3CfeColorMatrix type='matrix' values='.333 .333 .333 0 0 .333 .333 .333 0 0 .333 .333 .333 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='1400' height='1000' filter='url(%23w)'/%3E%3C/svg%3E");
+    --grain-tight: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1400' height='1000'%3E%3Cfilter id='w' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.011 0.55' numOctaves='2' seed='9'/%3E%3CfeColorMatrix type='matrix' values='.267 .267 .267 0 .1 .267 .267 .267 0 .1 .267 .267 .267 0 .1 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='1400' height='1000' filter='url(%23w)'/%3E%3C/svg%3E");
+
+    /* albumLeather.ts, bordeaux — the incumbent stain. */
+    --leather-hi: #5a4526;
+    --leather-mid: #35270f;
+    --leather-lo: #4a3820;
+    --board-edge: #6b5325;
+    --foil: #e6c98a;
+    --foil-rule: #a9853c;
+    --foil-emboss: #241a05;
+    --board-hi: #f4efe2;
+    --board-mid: #e6dfcd;
+    --board-lo: #d8cfb8;
+    --board-ink: #6a5124;
+    --board-rule: #a98b4c;
+
+    --ink: #f6e3c6;
+    --ink-dim: #c3a281;
+    --accent-light: #eec18a;
+
+    /* The book, at the real ratio. Fixed here rather than viewport-derived so the bench is
+       the same size for everyone looking at it. */
+    --page-w: 300px;
+    --page-h: calc(var(--page-w) / 0.78);
+
+    /* The pacing multiplier. `animationSpeed.ts` ships 2; the slider moves it. */
+    --anim: 2;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0 0 60px;
+    font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ink);
+    background: #241009;
+  }
+
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 32px 24px 0; }
+
+  h1, h2 {
+    font-family: Georgia, "Times New Roman", serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.75);
+    margin: 0 0 8px;
+  }
+  h1 { font-size: 22px; }
+  h2 { font-size: 15px; margin-top: 34px; }
+  p { max-width: 74ch; color: var(--ink-dim); }
+  strong { color: var(--accent-light); }
+  code { font-family: Consolas, monospace; font-size: .9em; color: var(--accent-light); }
+
+  /* ---- the stage ---- */
+
+  .stage {
+    position: relative;
+    height: 560px;
+    margin: 20px 0 14px;
+    border-radius: 5px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #4e1d12;
+    background-image:
+      radial-gradient(ellipse 56% 40% at 50% -6%, rgba(255, 216, 162, .26), transparent 72%),
+      var(--grain-tight), var(--grain-figure),
+      radial-gradient(ellipse 112% 96% at 50% -8%, #833926 0%, #4c1c11 55%, #250c06 100%);
+    background-size: auto, 100% 100%, 100% 100%, auto;
+    background-repeat: no-repeat;
+    background-blend-mode: screen, overlay, soft-light, normal;
+    box-shadow: inset 0 0 90px rgba(0, 0, 0, .55);
+  }
+
+  /*
+   * The book. **Three simplifications, all here and none of them in the light:**
+   *
+   * 1. One cover rather than a stack of leaves. The real book's shutting beat is a 3D leaf
+   *    flip; this rotates a single board through the same 620ms so the beat has the right
+   *    length, but it will not look identical.
+   * 2. No page block behind it.
+   * 3. `--page-w` is a fixed 300px instead of the viewport formula.
+   *
+   * Alles van het licht af — de brightness-filter op de kaft, de ringen, de bloom — is de
+   * echte regelset, waarde voor waarde.
+   */
+  /*
+   * **Above the vignette.** The dim is a positioned layer at 30 and the book had no z-index
+   * at all, so a 55%-black wash sat over the one thing in the frame that is meant to be the
+   * light source — a white book rendered as middle grey, while the rings at 46 came through
+   * bright. That mismatch is exactly how the bug showed up.
+   */
+  .book-scene { perspective: 2600px; position: relative; z-index: 35; }
+
+  .book {
+    position: relative;
+    width: var(--page-w);
+    height: var(--page-h);
+    transform-style: preserve-3d;
+  }
+
+  .cover {
+    position: absolute;
+    inset: 0;
+    border-radius: 0 3px 3px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px;
+    text-align: center;
+    color: var(--foil);
+    background: linear-gradient(150deg,
+      var(--leather-hi) 0%, var(--leather-mid) 55%, var(--leather-lo) 100%);
+    box-shadow:
+      inset 12px 0 24px -12px rgba(0, 0, 0, .7),
+      0 26px 50px rgba(0, 0, 0, .55);
+    transform-origin: left center;
+    transition:
+      transform calc(620ms * var(--anim)) cubic-bezier(.4, .05, .25, 1),
+      filter calc(900ms * var(--anim)) cubic-bezier(.5, 0, .75, .5);
+  }
+
+  /*
+   * **The book lights up. It does not get a white sheet laid over it.**
+   *
+   * This replaced a white rectangle the size of the cover fading in on top, which is exactly
+   * what it looked like — an object appearing over the book rather than the book itself
+   * going incandescent. `filter` is the difference: it acts on the cover's own pixels, so
+   * the leather, the foil and the type all blow out together and the thing glowing is the
+   * book.
+   *
+   * `saturate(0)` comes **first** and that order matters. Filters apply left to right, and
+   * brightness alone on `#35270f` clips the channels unevenly — (53,39,15) × 8 lands on
+   * (255,255,120), which is yellow, not white. Desaturating to grey first means every
+   * channel clips at the same time.
+   *
+   * `drop-shadow` rides on the end of the same chain so the spill is computed from the
+   * brightened cover and follows its shape, instead of being a box glow behind it.
+   */
+  /*
+   * Up to full light across `charging`, and then **held** there for the whole of `holding`.
+   * The two set the same value, so the transition runs once and the peak simply stays — the
+   * hold is where the rings come on, one at a time, which is what fills it.
+   */
+  .stage[data-phase="charging"] .cover,
+  .stage[data-phase="holding"] .cover {
+    /*
+     * **Pure white by the top of the ramp — leather, foil, blocked type and all.**
+     *
+     * It was `saturate(.3) brightness(2.8)`, which is a very bright *cream* book, and that
+     * left the beads visibly crossing in front of it: they are near-white, so anything short
+     * of white behind them shows them up as passing objects rather than as light.
+     *
+     * `saturate(0)` first, then enough brightness that even the darkest thing on the cover
+     * clips. The leather mid-tone is `#35270f`, which desaturates to about 40 — so ×8 takes
+     * it past 255, and everything lighter got there earlier. Anything less and the type
+     * stays legible as type.
+     */
+    filter: saturate(0) brightness(8)
+      drop-shadow(0 0 34px rgba(255, 250, 235, .55))
+      drop-shadow(0 0 80px rgba(246, 226, 168, .35));
+    /*
+     * **Every shadow has to go too, and `brightness()` cannot do it.** A filter multiplies
+     * what is already painted, and black times eight is still black — so the title's
+     * `text-shadow` and the inset spine shadow came through a white-out completely intact.
+     * The result was a white book with the name still legible on it as two dark strokes.
+     */
+    box-shadow: none;
+  }
+
+  .stage[data-phase="charging"] .cover-kicker,
+  .stage[data-phase="holding"] .cover-kicker,
+  .stage[data-phase="charging"] .cover-title,
+  .stage[data-phase="holding"] .cover-title {
+    text-shadow: none;
+  }
+
+  .stage[data-phase="blooming"] .cover {
+    filter: saturate(0) brightness(9)
+      drop-shadow(0 0 60px rgba(255, 255, 255, .9))
+      drop-shadow(0 0 150px rgba(246, 222, 156, .6));
+    transition: filter calc(180ms * var(--anim)) ease-out;
+  }
+
+  .stage[data-phase="resolving"] .cover,
+  .stage[data-phase="resting"] .cover,
+  .stage[data-phase="handing"] .cover,
+  .stage[data-phase="done"] .cover {
+    filter: none;
+    transition: filter calc(1100ms * var(--anim)) cubic-bezier(.3, 0, .2, 1);
+  }
+
+  /* Open, at the start — the board standing off to the left. */
+  .stage[data-phase="idle"] .cover { transform: rotateY(-158deg); }
+
+  .cover-icons {
+    position: absolute;
+    inset: 0;
+    border-radius: 0 3px 3px 0;
+    background:
+      linear-gradient(45deg, var(--leather-lo) 0 50%, transparent 50%) left bottom / 13% 13% no-repeat,
+      linear-gradient(135deg, var(--leather-lo) 0 50%, transparent 50%) left top / 13% 13% no-repeat,
+      linear-gradient(225deg, var(--leather-lo) 0 50%, transparent 50%) right top / 13% 13% no-repeat,
+      linear-gradient(315deg, var(--leather-lo) 0 50%, transparent 50%) right bottom / 13% 13% no-repeat,
+      linear-gradient(150deg, var(--board-hi) 0%, var(--board-mid) 55%, var(--board-lo) 100%);
+    box-shadow: inset 12px 0 24px -12px rgba(0, 0, 0, .55);
+    display: none;
+  }
+  .stage.is-bound .cover-icons { display: block; }
+  .stage.is-bound .cover { color: var(--board-ink); }
+  .stage.is-bound .cover-kicker { opacity: 1; }
+  .stage.is-bound .cover-title { text-shadow: 0 1px 0 rgba(255, 255, 255, .85); }
+  .stage.is-bound .cover-rule {
+    background: linear-gradient(90deg, transparent, var(--board-rule) 50%, transparent);
+  }
+
+  .cover-kicker, .cover-title, .cover-rule { position: relative; }
+  .cover-kicker {
+    font-family: Georgia, serif; font-size: 12px; font-style: italic;
+    letter-spacing: 1px; opacity: .75;
+  }
+  .cover-title {
+    font-family: Georgia, serif; font-size: 26px; font-weight: bold;
+    letter-spacing: 2px; text-transform: uppercase;
+    text-shadow: 0 2px 0 var(--foil-emboss), 0 3px 8px rgba(0, 0, 0, .7);
+  }
+  .cover-rule {
+    width: 60%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--foil-rule) 50%, transparent);
+  }
+
+  /* ---- the light: real rules, real numbers ---- */
+
+  .rings {
+    position: absolute;
+    /* Centred on the book, which is centred in the stage — `top: 0` put the orbits a
+       whole stage-margin above it. */
+    top: 50%; left: 50%;
+    width: var(--page-w); height: var(--page-h);
+    margin: calc(var(--page-h) / -2) 0 0 calc(var(--page-w) / -2);
+    z-index: 46;
+    pointer-events: none;
+    transform-style: preserve-3d;
+  }
+
+  /*
+   * **One at a time, and only in the hold.** The fade used to live on the container, so all
+   * three arrived together the moment the charge started — three orbits switching on as one
+   * object, which is a light coming on rather than something gathering.
+   *
+   * It is per-ring now, with the stagger as a `transition-delay` off `--ring-in`. A delay
+   * rather than three keyframe animations because the rings are *already* animating their
+   * rotation, and one element cannot run two animations on different properties without
+   * both being restated every time either changes.
+   */
+  .ring {
+    position: absolute; top: 50%; left: 50%;
+    width: 0; height: 0;
+    transform-style: preserve-3d;
+    animation: orbit calc(var(--spin) * var(--anim)) linear infinite;
+    opacity: 0;
+    transition: opacity calc(420ms * var(--anim)) ease-out;
+  }
+  .ring.reverse { animation-direction: reverse; }
+
+  .stage[data-phase="holding"] .ring {
+    opacity: 1;
+    transition: opacity calc(420ms * var(--anim)) ease-out
+      calc(var(--ring-in) * var(--anim));
+  }
+
+  /*
+   * **They go out with the bloom, not after it.** They used to stay lit through the bloom and
+   * only fade once  began, so they were still turning as the white receded and the
+   * dark table came back — orbits going round a book that had already finished becoming
+   * something. 200ms, matching the bloom's own fade in, so the fade itself is never seen.
+   */
+  .stage[data-phase="blooming"] .ring {
+    opacity: 0;
+    transition: opacity calc(200ms * var(--anim)) ease-in;
+  }
+
+  .bead {
+    position: absolute;
+    width: var(--bead-size); height: var(--bead-size);
+    margin: calc(var(--bead-size) / -2) 0 0 calc(var(--bead-size) / -2);
+    border-radius: 50%;
+    /* White core rather than gold, holding to nearly 40% — the old `#fff8e2 → #e6c98a 45%`
+       spent most of the bead on semi-transparent gold and read as a speck. */
+    background: radial-gradient(circle,
+      #ffffff 0%, #fff6dc 38%, #f0d79b 62%, rgba(214, 178, 108, 0) 82%);
+    /* The halo is what makes a point read as light. Sized off the bead, so the big ones on
+       the inner ring glow more than the small ones on the outer. */
+    box-shadow:
+      0 0 calc(var(--bead-size) * 1.7) rgba(255, 248, 226, .95),
+      0 0 calc(var(--bead-size) * 3.6) rgba(230, 201, 138, .6);
+    transform: rotateZ(var(--bead-at)) translateX(calc(var(--page-w) * var(--radius)));
+  }
+
+  @keyframes orbit {
+    from { transform: rotateX(var(--tilt)) rotateY(var(--yaw)) rotateZ(0deg); }
+    to   { transform: rotateX(var(--tilt)) rotateY(var(--yaw)) rotateZ(360deg); }
+  }
+
+  /* Absolute to the stage rather than fixed to the window — the only deliberate difference
+     from the app, so the bench can sit in a page with text around it. */
+  .dim, .bloom { position: absolute; inset: 0; pointer-events: none; }
+
+  .dim {
+    z-index: 30;
+    background: radial-gradient(ellipse 70% 60% at 50% 46%,
+      rgba(0, 0, 0, .55) 0%, rgba(0, 0, 0, .9) 60%, rgba(0, 0, 0, .97) 100%);
+    opacity: 0;
+    /* The charge, exactly — the room finishes going dark as the book reaches full light. */
+    transition: opacity calc(900ms * var(--anim)) ease-out;
+  }
+  .stage[data-phase="charging"] .dim,
+  .stage[data-phase="holding"] .dim,
+  .stage[data-phase="blooming"] .dim { opacity: 1; }
+  .stage[data-phase="resolving"] .dim,
+  .stage[data-phase="resting"] .dim,
+  .stage[data-phase="handing"] .dim {
+    opacity: 0;
+    transition: opacity calc(1100ms * var(--anim)) cubic-bezier(.3, 0, .2, 1);
+  }
+
+  .bloom {
+    z-index: 40;
+    background: #fff;
+    opacity: 0;
+    transition: opacity calc(1100ms * var(--anim)) cubic-bezier(.4, 0, .2, 1);
+  }
+  .stage[data-phase="blooming"] .bloom {
+    opacity: 1;
+    transition: opacity calc(200ms * var(--anim)) ease-in;
+  }
+
+  .stage[data-phase="handing"] .book-scene {
+    opacity: 0;
+    transition: opacity calc(320ms * var(--anim)) ease-in;
+  }
+
+  /* ---- controls ---- */
+
+  .panel {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+    padding: 14px 16px;
+    background: linear-gradient(#34291a, #1f180e);
+    border: 1px solid #4a3712;
+    border-radius: 4px;
+    margin-bottom: 16px;
+  }
+  button {
+    font: inherit; font-size: 12px;
+    padding: 5px 12px;
+    color: var(--ink);
+    background: linear-gradient(#4a3a22, #2c2213);
+    border: 1px solid #5e4a24;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  button:hover { background: linear-gradient(#5d4a2c, #3a2d19); }
+  button[aria-pressed="true"] { background: linear-gradient(#7d6330, #4d3c1d); border-color: #a9853c; }
+  label { font-size: 12px; color: var(--ink-dim); display: flex; align-items: center; gap: 8px; }
+  input[type="range"] { width: 150px; }
+
+  .beats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .beat {
+    font-family: Consolas, monospace; font-size: 11px;
+    padding: 4px 9px; border-radius: 3px; cursor: pointer;
+    border: 1px solid #4a3712; background: #2a2114; color: var(--ink-dim);
+  }
+  .beat.on { background: #7d6330; color: #fff6e0; border-color: #a9853c; }
+  .beat b { color: var(--accent-light); font-weight: normal; }
+
+  .readout {
+    font-family: Consolas, monospace; font-size: 12px; color: var(--accent-light);
+    min-width: 190px;
+  }
+
+  table { border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th, td { text-align: left; padding: 5px 16px 5px 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+  th { color: var(--accent-light); font-weight: normal; font-family: Georgia, serif; }
+  td { color: var(--ink-dim); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>De bind-ceremonie</h1>
+  <p>
+    Het echte boek, de echte tafel, en de echte regels en tijden uit
+    <code>Album.tsx</code> en <code>album.css</code>. Bedoeld om de <strong>vorm van de
+    tijdlijn</strong> te beoordelen zonder een complete set te hoeven verzamelen: speel hem
+    af, zet hem trager, of hou één beat vast en kijk ernaar.
+  </p>
+
+  <div class="panel">
+    <button id="play">▶ afspelen</button>
+    <button id="stop">reset</button>
+    <label>snelheid
+      <input id="anim" type="range" min="0.5" max="6" step="0.25" value="2">
+      <span class="readout" id="animOut">×2 — zoals verzonden</span>
+    </label>
+    <span class="readout" id="clock">0 ms · —</span>
+  </div>
+
+  <div class="beats" id="beats"></div>
+
+  <div class="stage" id="stage" data-phase="idle">
+    <div class="dim"></div>
+
+    <div class="book-scene">
+      <div class="book">
+        <div class="cover">
+          <div class="cover-icons"></div>
+          <div class="cover-kicker">Verzamelalbum van</div>
+          <div class="cover-title">Rik Maas</div>
+          <div class="cover-rule"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rings" id="rings"></div>
+
+    <div class="bloom"></div>
+  </div>
+
+  <h2>De beats</h2>
+  <p>
+    Basiswaarden, dus <strong>de helft van hun echte lengte</strong> — <code>--anim</code>
+    is 2 en elke duur wordt daarmee vermenigvuldigd. Klik een beat om hem vast te houden.
+  </p>
+
+  <table id="table">
+    <tr><th>beat</th><th>basis</th><th>bij ×2</th><th>wat er gebeurt</th></tr>
+  </table>
+
+  <h2>Wat hier níet echt is</h2>
+  <p>
+    Drie vereenvoudigingen, allemaal in het boek zelf en geen ervan in het licht: het boek
+    is één board in plaats van een stapel bladen (de sluitbeweging duurt wel even lang), er
+    zit geen paginablok achter, en <code>--page-w</code> staat vast op 300px in plaats van
+    de viewport-formule. Verder is <code>.dim</code> en <code>.bloom</code> hier
+    <code>absolute</code> op de tafel in plaats van <code>fixed</code> op het venster, zodat
+    de bank in een pagina met tekst past. Alles van het licht zelf — de brightness op de kaft,
+    de ringen, de
+    bloom, de tijden en de curves — is regel voor regel wat de app doet.
+  </p>
+
+</div>
+
+<script>
+  /* The beats, and their base lengths — the same numbers as `Album.tsx`. */
+  var BEATS = [
+    ['shutting',  620, 'het boek gaat dicht'],
+    ['settling',  200, 'stil, niets beweegt'],
+    ['charging',  900, 'donker valt in, het boek loopt op naar vol licht'],
+    ['holding',  2200, 'blijft op het felste punt — de ringen komen één voor één op'],
+    ['blooming',  900, 'de hele pagina bloeit wit — de band wisselt hieronder'],
+    ['resolving', 1100, 'de bloom trekt weg, het nieuwe boek komt tevoorschijn'],
+    ['resting',   520, 'het gebonden boek op een gewone tafel'],
+    ['handing',   320, 'het album vervaagt (alleen als het pakje volgt)'],
+  ];
+
+  /* The three orbits, from REBIND_RINGS. */
+  var RINGS = [
+    { tilt: 74, yaw: 0,   radius: 0.72, spin: 1.5, beads: 16, size: 5, reverse: false, in: 0    },
+    { tilt: 62, yaw: 58,  radius: 0.92, spin: 2.1, beads: 20, size: 4, reverse: true,  in: 0.50 },
+    { tilt: 84, yaw: -34, radius: 0.58, spin: 1.1, beads: 12, size: 6, reverse: false, in: 1.00 },
+  ];
+
+  var stage = document.getElementById('stage');
+  var clock = document.getElementById('clock');
+  var beatsEl = document.getElementById('beats');
+  var anim = 2;
+  var timers = [];
+  var held = null;
+
+  RINGS.forEach(function (r) {
+    var ring = document.createElement('div');
+    ring.className = 'ring' + (r.reverse ? ' reverse' : '');
+    ring.style.setProperty('--tilt', r.tilt + 'deg');
+    ring.style.setProperty('--yaw', r.yaw + 'deg');
+    ring.style.setProperty('--radius', r.radius);
+    ring.style.setProperty('--spin', r.spin + 's');
+    ring.style.setProperty('--ring-in', r.in + 's');
+    for (var b = 0; b < r.beads; b++) {
+      var bead = document.createElement('span');
+      bead.className = 'bead';
+      bead.style.setProperty('--bead-at', (360 / r.beads) * b + 'deg');
+      bead.style.setProperty('--bead-size', r.size + 'px');
+      ring.appendChild(bead);
+    }
+    document.getElementById('rings').appendChild(ring);
+  });
+
+  var table = document.getElementById('table');
+  BEATS.forEach(function (b) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td><code>' + b[0] + '</code></td><td>' + b[1] + ' ms</td>' +
+      '<td>' + (b[1] * 2) + ' ms</td><td>' + b[2] + '</td>';
+    table.appendChild(tr);
+
+    var chip = document.createElement('button');
+    chip.className = 'beat';
+    chip.innerHTML = b[0] + ' <b>' + b[1] + '</b>';
+    chip.onclick = function () { hold(b[0]); };
+    chip.dataset.beat = b[0];
+    beatsEl.appendChild(chip);
+  });
+
+  function clear() {
+    timers.forEach(clearTimeout);
+    timers = [];
+  }
+
+  function mark(phase) {
+    stage.dataset.phase = phase;
+    /* The binding is present from the bloom onward — the swap happens where the page is
+       white and there is nothing to see it against. */
+    var bound = ['blooming', 'resolving', 'resting', 'handing', 'done'].indexOf(phase) >= 0;
+    stage.classList.toggle('is-bound', bound);
+
+    Array.prototype.forEach.call(beatsEl.children, function (c) {
+      c.classList.toggle('on', c.dataset.beat === phase);
+    });
+  }
+
+  function hold(phase) {
+    clear();
+    held = phase;
+    /* Straight from idle to the held beat, so what you see is that beat's end state. */
+    mark(phase);
+    clock.textContent = 'vastgehouden · ' + phase;
+  }
+
+  function play() {
+    clear();
+    held = null;
+    mark('idle');
+    stage.classList.remove('is-bound');
+
+    /* One frame at idle so the transitions have something to run from. */
+    requestAnimationFrame(function () {
+      var t = 0;
+      BEATS.forEach(function (b) {
+        (function (name, at) {
+          timers.push(setTimeout(function () {
+            mark(name);
+            clock.textContent = Math.round(at) + ' ms · ' + name;
+          }, at));
+        })(b[0], t);
+        t += b[1] * anim;
+      });
+
+      timers.push(setTimeout(function () {
+        mark('done');
+        clock.textContent = Math.round(t) + ' ms · klaar (totaal ' +
+          (t / 1000).toFixed(1) + 's)';
+      }, t));
+    });
+  }
+
+  document.getElementById('play').onclick = play;
+  document.getElementById('stop').onclick = function () {
+    clear();
+    held = null;
+    mark('idle');
+    stage.classList.remove('is-bound');
+    clock.textContent = '0 ms · —';
+  };
+
+  document.getElementById('anim').oninput = function (e) {
+    anim = parseFloat(e.target.value);
+    document.documentElement.style.setProperty('--anim', anim);
+    document.getElementById('animOut').textContent =
+      '×' + anim + (anim === 2 ? ' — zoals verzonden' : '');
+    var total = BEATS.reduce(function (s, b) { return s + b[1] * anim; }, 0);
+    if (!held) clock.textContent = 'totaal ' + (total / 1000).toFixed(1) + 's';
+  };
+
+  mark('idle');
+</script>
+</body>
+</html>

@@ -1,6 +1,74 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-11)
+## Where this stands (last updated 2026-08-12)
+
+**The table stopped negotiating its own sizes.** Three things on this page were sized by
+picking a number and letting whatever depended on it give way, and all three now run the
+other direction — the thing that matters is stated and the thing that can afford to move
+is solved for. See "The table is one object, and the book is solved against it".
+
+- **A packet on the shelf is exactly as wide as a card in the book, at every viewport and
+  every zoom** — so its coloured panel is exactly a card tall, which is what `--pack-h`
+  always claimed. It was only true where the margin happened to be generous: on a
+  1080-tall window a packet was 114px against a 153px card, on a 1440-tall one 100px
+  against 163px. The three-way `min()` that did that is deleted.
+- **Two packets stay side by side.** Both that and the parity above are now fixed
+  requirements, and `--page-w` takes a third term solved from them: the widest page whose
+  own margin still holds the pile. `--stage-w` went 1740 → 1860 to pay for it, which is
+  the "wooden wall" line the notes said to stay behind, crossed deliberately.
+- **The test panel moved off the bottom of the table and into the right margin**, under
+  the register. It was the last horizontal band under the book, and the book is sized off
+  viewport *height* first, so that row was coming straight out of the spread: the album's
+  height term went 63vh → 70vh on the strength of it. The panel is inside `.album-layout`
+  now, so it is absent on the four states that are not the album — where every button on
+  it was disabled anyway.
+- **The slab is one size in every state.** It was `min-height: 78vh` plus whatever the
+  content came to, so the ledger, the hourglass, the padlock, the five shut albums, the
+  book and the opener were each a differently-shaped piece of furniture. `--album-room`
+  reserves the book's footprint once and everything lies inside it — including the opener,
+  which gave up its own `62vh`.
+- **The stack breakpoint went 1150 → 1450**, and the two triggers collapsed into one. The
+  old tests asked whether the margin could hold a packet, which it now always can; what
+  gives instead is the book, and below ~1450 it gives too much.
+
+Net: the book is ~7% wider at 1920×960 and the packets are 8–44% wider, depending on how
+badly the window used to disagree with itself.
+
+**The icons are earned rather than granted, and the word is settled.** Two things landed
+together.
+
+First, **"legend" is retired: an out-of-service player's card is an *icoon*.** The term had
+been argued both ways and the codebase had split down the middle — the presentation layer
+already said `icoon` (`card--icoon`, `--icoon-wash`, `isIcoon`) while the data layer still
+said `legend` (`IsLegend`, `LegendsUnlockedAt`, `CardPool.Legends`). It is icon everywhere
+now, in C#, TypeScript, the routes, the columns, the copy and this document — including a
+migration that renames two columns, which has to be run by hand against both databases like
+every other one here. The presentation names were right all along and keep their spelling.
+`.card__legend` and the `legende` pill keep theirs too: they are deleted things, and
+renaming history makes it wrong.
+
+Second, and the substance: **completing the active set no longer unlocks the icons. It puts
+a packet on the shelf.** The claim used to latch `IconsUnlockedAt` the instant the last active
+card was filed, which spent the biggest milestone in a three-month collection silently,
+inside a pack reveal, with the reader watching a card come out of a packet rather than their
+album. Now the set going complete puts **a packet with one guaranteed icoon** on the shelf;
+opening it re-binds the album and then hands you the card. Two ceremonies in the only order
+they can go in, because the book has to be able to hold an icoon before one can come out of
+a packet. See "Earning the icons: the packet and the re-binding" — including why an abstract
+object was built for this first and then replaced, and
+[rebind-object.html](rebind-object.html), which is the record of the ten candidates that
+were drawn before it was.
+
+**Presents also stopped expiring, and "everybody" stopped being a null.** A gift stood open
+for seven days and a gift to everybody was a single row with no recipient — which meant "the
+roster at claim time", so with the deadline gone it would have been a present for whoever
+joins next year. Both are fixed at the root instead of with a calendar: nothing expires, and
+`GiveGift` expands "everybody" into one addressed row per player when the gift is given. The
+convenience stays in the call; the table only ever holds addressed presents.
+
+The unlock flag also **moved off the root of `CollectionState` and into `AlbumBinding`**, so
+`album: null` cannot carry a stale one and the latch is unreachable without a book — which
+is correct, because there is nothing for it to be a property of until there is one.
 
 **Phase 1 (frontend on mock data) is essentially complete.** Everything below the
 "Presentation layer" heading has been built and iterated on at length.
@@ -22,6 +90,41 @@ game today puts real packets on the shelf, everybody gets one free single a day,
 derived, not granted" — nothing was invented at implementation time — and the two
 unique indexes on `PackClaim` are the double-claim guard, exactly as specified.
 
+**The claim answers with the collection, not just the cards**, and the dependency
+direction is what makes that cheap. Opening a pack used to cost **two** full leaderboard
+replays — one inside the claim, one in the `refresh()` the page fired when the reveal
+ended — which is the same trap `POST .../create` had already avoided by returning the
+whole page. So:
+
+- **`CollectionService` owns the single replay and orchestrates.** It checks the player,
+  the album and the gate, hands the roster, the pool and the games to `PackService`, and
+  builds the resulting state from the *same* replay via a `Build` overload — the trick
+  `CardPoolService.GetPool(IReadOnlyList<DynamicRatingPlayer>)` already existed for.
+- **`PackService` does not replay anything, and must not learn how.** It lost
+  `LeaderBoardService` and `CardPoolService` from its constructor entirely. Injecting
+  either back is a convenient-looking change that silently doubles the cost of opening a
+  pack, which is why the constructor says so.
+- Reusing the replay across the write is safe because opening a pack cannot move
+  anybody's rating. It also means the state is built from the same counts the claim just
+  added to, so a packet that fills the last empty active slot reports
+  the set-completion packet in the very response that revealed the card — so it is on the
+  shelf by the time the reveal ends, with no refetch. (This bullet used to say the claim *latched* the
+  unlock on the tracked `collection`; it no longer writes it — see "Earning the icons".)
+- On the page, the state is parked in a ref until the reveal ends rather than applied on
+  arrival, or the book would quietly gain its new cards while you were still watching
+  them come out of the packet. It carries the player id it belongs to, and **every** path
+  that ends a reveal applies it — including "terug naar het album", which previously left
+  a claimed packet on the shelf that 404'd when clicked.
+
+**And the tear no longer waits for it.** The claim being a network call meant the packet
+sat in your hand for the length of a leaderboard replay before anything moved, which reads
+as a dropped click rather than as a wait. The tear now plays on the click and the roll runs
+underneath it; if the roll is still out when the tear ends, the first card rises anyway and
+stands there **face down** until there is something to turn it into. Only the flip waits,
+because the flip is the only beat that needs to know what the card is. `PackOpener` gained
+a `waiting` phase, a required `onFailed` — a refusal used to strand the page silently — and
+nothing else. See "The tear does not wait for the roll".
+
 Four things worth knowing about how it landed:
 
 - **`Derive` narrows to the day itself** rather than trusting its caller to have
@@ -35,9 +138,11 @@ Four things worth knowing about how it landed:
 - **The dev-only `DELETE` now takes the cards and the claims with it.** Neither
   cascades from the album row — both hang off the player — so "back to the start of
   the story" had to say so explicitly.
-- **`PUT api/collections/{playerId}/legends`**, development only, exists because the
-  latch is real now and earning it is a three-month proposition. Without it there is
-  no way to look at an icoon in a book at all.
+- **`PUT api/collections/{playerId}/icons`** exists because the latch is real now. It is
+  no longer development-only — it is how the unlock is *earned*, and the only thing that
+  writes the latch. Its two bypasses (`force=true`, and `unlocked=false` to relock) stay
+  development-only, because earning it legitimately is a three-month proposition and
+  without them there is no way to look at an icoon in a book at all.
 
 **With it, the phase-1 mock is gone.** `mockCardsClient`, `packSandbox`,
 `MOCK_PACKS`, `ACTIVE_POOL_SNAPSHOT`, `FALLBACK_LEGENDS`, the seeded starting
@@ -50,13 +155,81 @@ reason they have no card. **`npm start` with no API behind it no longer renders 
 collection**, which is the honest state of a feature whose pool, odds, draw and cards
 all live on the server.
 
-**The test panel stays**, against what this document used to say, and its pack
-buttons stay with it — as stubs. A pack cannot be invented in the browser any more,
-so `grant` logs and does nothing; the buttons and their per-level copy are kept
-because **granting a named player (or everybody) a specific pack is the next
-feature**, and they are its first caller. `GrantOptions` in `cardsClient.ts` is the
-contract it has to honour, and `PackService.Roll` is where the guarantees have to
-land. The panel itself wants a debug flag rather than `SHOW_DEBUG = true`.
+**Presents are real, and with them phase 2 is complete.** `PackGift`,
+`POST api/collections/gifts` and a floor on the draw are in, so the last grant-shaped
+thing in the design exists and the test panel's pack buttons are wired to it. The whole
+of it:
+
+- **A gift is a row, and it is the only exception to derivation there is.** Nothing else
+  writes a pack into existence, and a present is the one pack nothing *can* be derived
+  from — nobody played a game to earn it. What keeps that honest is how little `GiveGift`
+  does: it writes a `PackGift` and stops. The packet then appears on the shelf and the
+  ordinary claim opens it, so there is no second draw and no second mint to keep in step,
+  and the panel's buttons exercise the real path rather than a debug one beside it.
+- **Two axes, and the second is exclusive.** Who: a list of players, or — by leaving the
+  list out — everybody. What: either *n* ordinary cards or a floor on the overall, never
+  both. A request setting neither or both is a 400 rather than a guess.
+- **The guarantee is a minimum overall, not a tier and not a ceremony level.** It is the
+  form both of those reduce to (75 is "goud or better"; the ceremony's steps *are*
+  75/80/85/90), it says things neither can — a tier cannot separate 75–79 from 80–84,
+  since both are goud — and it is what the wrapper prints, so the print is by construction
+  the number the draw was made against. This **replaces `guaranteeTier`,
+  `guaranteePlayerId` and `guaranteeLevel`**, which are deleted: `Pack.minimumOverall` is
+  the whole of it now, on the wire and in the browser.
+- **A floor narrows the candidates and changes nothing else**, so the weighting still
+  applies inside the band and 75+ hands out far more 75s than 90s. If nobody clears it an
+  ordinary weighted draw happens — an empty packet is worse than a broken promise.
+- **"Everybody" is expanded into one addressed row per player, at gift time.** It used to be
+  a single row with a null recipient, which resolved the recipients at *claim* time and so
+  also reached whoever crossed the games gate later — and that was the only reason gifts
+  carried a deadline at all. Both are gone: **presents do not expire**, and the word
+  "everybody" is a convenience in the call rather than a shape in the table. Every row has a
+  recipient, so a present is addressed to the office as it stood on the day it was given.
+- **A gift claim is the one claim not keyed on the day.** `Derive` narrows game and daily
+  claims to today and reads gift claims in full, because a present outlives the day it was
+  opened on — key it on the date and the same packet is handed over every morning. There
+  is a test for exactly that, across three days.
+- **Presents sit on top of the pile**, above the game packs and the daily: the unusual
+  thing on the shelf, and the only one nobody played for.
+- The unique index is `(PlayerId, GiftId)` and needs neither a filter nor a date — `GiftId`
+  is null on every other claim and SQLite treats those NULLs as distinct. Withdrawing a
+  gift by deleting the row takes its claims and their cards with it, the same rule as a
+  deleted game.
+
+Two things worth knowing about how it landed:
+
+- **The rule lives in `Derive`, not in the query.** The first pass filtered gifts by
+  recipient in SQL only, so `Derive` would hand somebody a present addressed to a
+  colleague. A test caught it. Who a present is for, whether it has run out and whether it
+  is already claimed are all decided in `Derive` now, beside the day window, with the query
+  narrowing rows purely as a read optimisation.
+- **`AvailablePack.MinimumOverall` serialises as `null`, not as an absent field**, so
+  `=== undefined` reads every *earned* packet as guaranteed — printing `null+` in orange
+  foil on all of them. `packFloor` in `cardMock.ts` is now the single test both the print
+  and the foil go through, and its note says why.
+
+**The test panel stays**, against what this document used to say, and everything on it is
+real: the pack buttons hand the **signed-in player** a present, so nothing on the panel
+fakes state the server does not have. It deliberately does not offer the other two
+shapes — a button that quietly gave the whole office a packet is not a thing to have one
+click away from a button that gives you one, so a named list and "everybody" are reachable
+from the API only. The panel itself still wants a debug flag rather than
+`SHOW_DEBUG = true`.
+
+**It now lies at the foot of the right margin**, under the register, rather than on a
+full-width plate beneath the table. That was not about the panel: the book is sized off
+viewport height before anything else, so the ~83px band under it was coming straight out
+of the spread, and the album's height term went 63vh → 70vh when it left. It moved
+*inside* `.album-layout` to get there, so it is gone on the error notice, the ledger, the
+hourglass and the padlock — every button on it needs a player *and* an album, so on all
+four the whole panel was disabled anyway. It keeps `--debug`, which makes it the one thing
+in either margin that is not an object lying on the wood.
+
+The one cost, accepted: giving answers with the gift ids rather than a collection, because
+a present to everybody has no single collection to answer with and the giver is usually
+not the recipient. So the panel **refetches**, paying the leaderboard replay the claim
+route works so hard to avoid. That is the right trade for something clicked by hand a few
+times a month rather than a thousand times a year, and it is why the shelf takes a beat.
 
 Gone with the mock: the `kansen (console)` button, which drew a few thousand packs in
 the browser to check the observed frequencies. That check is now
@@ -64,7 +237,7 @@ the browser to check the observed frequencies. That check is now
 every build rather than when somebody remembers to press a button.
 
 **The first backend slice was `GET /api/cards/pool`.** Read-only — no migration, no
-tables, nothing persisted — and it existed because a legend is rated on their
+tables, nothing persisted — and it existed because an icoon is rated on their
 all-time-high `visibleRating`, which is computable only inside the leaderboard's full
 game replay. So the icoon pages show **20 real people** instead of six placeholders,
 spread 4/7/7/2 across the tiers. Built with it: `CardRatingCalculator` (the scale and
@@ -105,14 +278,20 @@ sounds added since the payoff ladder. Judge it on a **sub-75 new card** first �
 that is the majority case and the one with no ceremony under it.
 
 Before that: the **games gate dropped from 10 to 5**, for the card pool, the access
-gate and the legends pool alike. Four players join (Yannick, Sevda, Dmitry,
+gate and the icon pool alike. Four players join (Yannick, Sevda, Dmitry,
 Sandra), the set is 38 cards, and everyone's per-pack rate falls ~15%. `DHigh`
 stays at 2.5 — the slower completion is accepted, not compensated. See
 "Why ≥5 games".
 
+Also since: **the games gate moved off the ledger** (2026-08-11). Every name on the
+register can be signed now, no line carries a game count, and an under-gate player lands
+on a shut, padlocked album that tells them how many games are left — `LockedAlbum` plus
+`locked.css`. See "The ledger lists everybody, and every line can be signed" and "The
+album that will not open yet".
+
 Most recently: the **icoon card was rebuilt** (2026-08-10). It keeps its premise —
-legends wear a colourway rather than a black `legende` pill — and changes almost
-everything else: **one ground for every legend instead of one per tier**, the shard
+icons wear a colourway rather than a black `legende` pill — and changes almost
+everything else: **one ground for every icoon instead of one per tier**, the shard
 fan removed, the grade warmed, a 1px gold rule added, the sheen cut and the ink
 lifted. Rarity is still untouched. See "The icoon card", and
 [icoon-uniform.html](icoon-uniform.html) for the comparison it was decided on.
@@ -150,9 +329,8 @@ its rules into card.css / packopen.css, bring its timings back into
 `PackOpener.tsx` as constants, and delete the modules, `reveal.css` and the
 switcher.
 
-**Then:** `PackGift` and `POST api/collections/gifts` — present a pack to a named
-player or to everybody, and wire the test panel's pack buttons to it. Everything else
-in phase 2 is done.
+**Phase 2 has nothing left in it.** The gift endpoint was the last item and is built; the
+only open work above this line is the silhouette beat, which is presentation.
 
 Two smaller things still open:
 - Whether first-name-only is acceptable now that two Daans and two Jeroens read
@@ -164,10 +342,12 @@ The `src/mock/` directory now holds no mocks — `cardMock.ts` is the card domai
 UI needs and nothing else. Renaming it is ten import sites of churn for no behaviour,
 so it is worth doing on its own rather than smuggled into a slice.
 
-The `guarantee*` options survive on `Pack` with nothing setting them: they are how a
-ceremony level is reached on demand instead of on a ~3% roll, and the gift endpoint is
-what will set them. `window.cardDebug` is down to the animation speed and the mute
-setting, both of which are genuinely client-side.
+`Pack.minimumOverall` is what reaches a ceremony level on demand instead of on a ~3% roll,
+and the gift endpoint is what sets it. It replaced three options — `guaranteeTier`,
+`guaranteePlayerId` and `guaranteeLevel` — that sat on `Pack` for a phase with nothing
+setting them; one number says everything all three could and needs no lookup table to be
+read against. `window.cardDebug` is down to the animation speed and the mute setting, both
+of which are genuinely client-side.
 
 ## Context
 
@@ -186,7 +366,7 @@ improves — so the leaderboard becomes the metagame, because you start caring
 about the form of players you hold.
 
 Outcome: you play foosball, someone logs the game, all four players get a pack
-sized by how well they did, and collections build toward a legends unlock.
+sized by how well they did, and collections build toward a icons unlock.
 
 ## Settled decisions
 
@@ -199,26 +379,33 @@ sized by how well they did, and collections build toward a legends unlock.
 | Sound | Synthesised, **on, and no mute button** — the browser and the OS both already have one. Reachable from `cardDebug`. |
 | Starting a collection | A **ceremony, not an absence**. Five shut albums lie on the table, you pick one up, and your name is blocked into the cover in gold foil before the shelf and the empty book appear. |
 | Album cover | Five leather stains — bordeaux, cognac, bosgroen, marineblauw, antraciet — brass edge and gold foil on all five. **Chosen once**, with no preview. |
-| Access gate | Collection page unlocks once that player has **≥5 games** — symmetric with the card pool. |
+| Access gate | Collection page unlocks once that player has **≥5 games** — symmetric with the card pool. **Signing in is never refused**; an under-gate name lands on a shut, padlocked album that says how many games are left. |
 | Pack recipients | **All four participants** of a game. |
 | Pack size | 1 for playing, **+2** for winning, **+2** for beating expected margin by ≥3. So 1, 3 or 5. |
 | Opponent bonus | Winning *or* beating expected margin by ≥3 doubles both opponents' tickets in that pack. Flat 2×, does not stack to 4×. Flavour, not balance. |
 | Within a pack | Each player at most once — draw **without replacement**. |
 | Free pack | One 1-card pack per player per day. |
-| Pack expiry | **Hard.** Unrevealed at end of day = gone. |
+| Gifts | A pack handed out rather than earned, and the **only** grant-shaped thing in the design. To named players, or to everybody — which is expanded into one addressed row each when the gift is given. Either *n* ordinary cards **or** one card at a floor on the overall, never both. |
+| Gift expiry | **None.** A present stands open until it is opened. |
+| Pack expiry | **Hard.** Unrevealed at end of day = gone. Gifts and the set-completion packet excepted. |
 | Contents rolled | At reveal time. |
 | Duplicates | **Not** shown on the card at all — but in the tooltip and the card viewer, which are off-face surfaces. New cards are marked instead, with a glow at reveal. No conversion economy. |
 | Card rating | **Live**, computed on read from `visibleRating`. No stat columns on the card. |
 | Card sub-stats | **Dropped.** Not worth it for ~15 active players. |
 | Rarity axis | Rating alone — no foils, no serials, one card per player. |
 | Card pool | **Active** players with ≥5 games. |
-| Legends | Completing the active set permanently unlocks inactive (≥5 games) players in packs, alongside actives. Rated on all-time-high, and **interleaved into the book by rating** rather than given their own pages. |
+| The word | An out-of-service player's card is an **icoon** (plural *iconen*), never a "legend". Settled 2026-08-12, after being live both ways for a while; the data layer was renamed to match the presentation layer, which had it right. |
+| Icons | Inactive players with ≥5 games, drawable alongside actives once unlocked. Rated on all-time-high, and **interleaved into the book by rating** rather than given their own pages. |
+| Earning them | Completing the active set makes the unlock **claimable, not automatic** — it puts a packet with one guaranteed icoon on the shelf. Opening it re-binds the album and then reveals the card. The latch is still permanent once pulled. |
+| That packet | **Derived** like the daily freebie, never granted: offered while the set is complete and its claim does not exist, so it follows the set both ways. One card, normal weighting narrowed to the icons, and a guarantee axis of its own rather than a very high overall floor. |
+| Presents | **Never expire.** And a gift to "everybody" is expanded into one addressed row per player at gift time, so every row has a recipient and next year's joiners are not still owed a present. |
+| The icon binding | A **half-bound** book: ivory boards with the chosen stain kept as the spine and the four corners. Brass edge and gold foil unchanged, so the five stains stay one product line. The only re-bind that exists. |
 | Cards ↔ games | `CardInstance.GameId` FK with cascade delete. |
 | Cards ↔ players | `SubjectPlayerId` FK, **also cascade**. Player deletion only ever happens for accidentally-created players, so losing their cards is correct. |
 | Presentation | Not a screen: a **mahogany table** seen from above, with the book, the packets and the controls as objects lying on it. No OS chrome, token-driven. Chosen from ten candidates in two families — five screens, five timbers. |
 | Album | Hand-rolled stiff CSS 3D page flip. No new dependency. |
 | Card face | **Panini**: photo near-full-bleed and masked into the metal, no plates, first name only, DIN type, no stats. |
-| Icoon | The **legend** colourway, not a fifth tier: monochrome photo warmed back up, one near-white two-zone ground for **every** legend, a 1px gold rule on the edge, no shards. Replaces the `legende` pill. **The tier no longer moves anything.** No effect on rarity. |
+| Icoon | The colourway an out-of-service player's card wears, not a fifth tier: monochrome photo warmed back up, one near-white two-zone ground for **every** icoon, a 1px gold rule on the edge, no shards. Replaces the `legende` pill. **The tier no longer moves anything.** No effect on rarity. |
 | Sound | Fully **synthesised** (WebAudio, no assets). On, with no in-page toggle. |
 | Pacing | Two knobs — `DEFAULT_SCALE` (2) and `DEFAULT_CEREMONY_MS` (2000). Both settled by ear on the sliders and baked in. |
 | Reveal ceremony | Graduated over four levels at 75/80/85/90 overall. Identical at any timestamp `t`; only the *length* differs. |
@@ -227,17 +414,17 @@ Deferred: trading between collections.
 
 Still open: **which stage direction to use** — the last remaining visual decision.
 
-## The legends pool
+## The icon pool
 
 The `Active` flag is maintained — the database holds a healthy number of
-inactive players already, so the legends pool has content on day one. (The
+inactive players already, so the icon pool has content on day one. (The
 47-player list used for the numbers below came from `GET /api/leaderboard`,
 which filters on `Active` via `GetCurrentLeaderBoard()`, so it is the active
 roster only.)
 
-Legends are inactive players with ≥5 games, rated on their **all-time-high**
+Icons are inactive players with ≥5 games, rated on their **all-time-high**
 `visibleRating`. Unlock is a permanent latch: once you have completed the active
-set you keep legends forever, so new joiners and players crossing 5 games do
+set you keep the icons forever, so new joiners and players crossing 5 games do
 not un-complete it.
 
 **There are 20 of them**, now that `GET /api/cards/pool` can say so, and they
@@ -248,8 +435,8 @@ asserted.
 
 ### One sequence, not an annexe
 
-Legends are **shuffled in among the actives by rating**, not appended as a block of
-legends pages. The book is one ascending sequence and an icoon turns up on the
+Icons are **shuffled in among the actives by rating**, not appended as a block of
+icon pages. The book is one ascending sequence and an icoon turns up on the
 spread its rating earns it.
 
 The original design appended them, on the reasoning that the album should *grow*
@@ -261,20 +448,21 @@ player, which is where the book was always building toward.
 
 Consequences, both accepted:
 
-- An empty slot no longer tells you whether it is an active or a legend. See the
+- An empty slot no longer tells you whether it is an active or an icoon. See the
   icoon section for why that is kept.
 - The set roughly grows by half on unlock (38 → 58 at today's roster), all of it in
   the middle of the book rather than after it.
 
-The completion meter and the unlock gate still count **actives only** — legends are
-the reward for finishing that set, so they must not dilute the thing they are
-awarded for.
+The unlock gate still counts **actives only** — icons are the reward for finishing
+that set, so they must not dilute the thing they are awarded for. (The completion
+meter that used to count alongside it is gone with the footer; see "There is no
+footer".)
 
-The legend gate is held symmetric with the card pool deliberately, but it is the
+The icon gate is held symmetric with the card pool deliberately, but it is the
 one place where 5 is arguable: it means somebody who played five games and left
-is an icoon forever. **This has stopped being hypothetical.** Two legends sit at
+is an icoon forever. **This has stopped being hypothetical.** Two icons sit at
 exactly five games (overall 64 and 58) and three more in the 8–10 band, so the
-bottom of the legends pages is now people who passed through. Whether that reads
+bottom of the pool is now people who passed through. Whether that reads
 as a nice piece of office history or as clutter is the first thing to judge once
 the pages are real — and the gate is the knob.
 
@@ -322,7 +510,7 @@ all-time high is **1954** (Roel Loonen), with Petar at 1953 and Ton at 1931. Thi
 changes nothing structural, because all three land inside the 1851→2200 segment
 that was already there as headroom, and Roel comes out at overall 91. But it does
 mean the region above 1851 is **not** hypothetical the way the paragraphs below
-assume: legends are rated on peaks, and the best legend is above every active
+assume: icons are rated on peaks, and the best icoon is above every active
 player on the board.
 
 The table originally ran on to `4000 → 98`, which reserved 9 of the 59 available
@@ -343,7 +531,7 @@ straight line:
 | 98 | 3800 | 2800 | 200 | 133 |
 | 99 | 4000 | **3000** | — | — |
 
-**No player's overall changed** — 0 of 38 actives and 0 of the legend
+**No player's overall changed** — 0 of 38 actives and 0 of the icoon
 placeholders — so the odds table, the completion estimates and `DHigh` all stand
 untouched. That is the whole reason this change was safe to make on its own.
 
@@ -353,7 +541,7 @@ cubic (PCHIP) interpolation over the same anchors would smooth it to 1.50× whil
 passing through every anchor exactly; it moves four of forty cards by +1 and
 crosses no tier or ceremony boundary.
 
-Legends use the same scale applied to their **all-time-high** `visibleRating`.
+Icons use the same scale applied to their **all-time-high** `visibleRating`.
 `GetLeaderBoard` already replays every game in chronological order, so tracking
 a running per-player maximum is a few lines inside the existing loop.
 
@@ -375,8 +563,8 @@ steps at 75 / 80 / 85 / 90 — so a 90+ pull still escalates well past an 85 eve
 though the card itself shows no distinction above 85. See "The rare ceremony"
 below.
 
-Icoon exists, but on a **different axis**: it is what a legend's card looks like,
-not a rung above gold. A legend has a tier like everyone else, and it moves the
+Icoon exists, but on a **different axis**: it is what an icoon's card looks like,
+not a rung above gold. An icoon has a tier like everyone else, and it moves the
 icoon's metal. See "The icoon card" under the presentation layer.
 
 Also considered and rejected: collapsing 85+ into 75–84, or moving that
@@ -433,8 +621,11 @@ Tier populations are a **diamond, not a pyramid** (6/12/12/4), so FIFA-style
 tier-slot odds invert: a 30% "Brons slot" split across only 4 players makes each
 ~7.5% — commoner than any Goud player at 20%/12 ≈ 1.7%.
 
-Packs are also **never tier-guaranteed**: the only choice is pack size (1, 3 or
-5), and every card in every pack is drawn on the odds below.
+**Earned** packs are also never guaranteed: the only choice a game makes is the pack
+size (1, 3 or 5), and every card in every one of them is drawn on the odds below. A
+**gift** is the single exception and it is not a tier guarantee either — it is a floor on
+the overall, it narrows the candidates without touching the weighting inside them, and
+nothing that comes out of a game can carry one. See the gift notes at the top.
 
 A single global halving rate fails too, because the rating scale deliberately
 compresses the top: Petar (1851) and Mathijs (1035) are 9 overall points apart
@@ -466,7 +657,7 @@ the unlucky tail is still hunting at 6–7. 1.9 would push nearly everyone to ha
 a year. A reward almost nobody reaches is worse than one some people reach early.
 
 **Structural caveat:** completion time is a property of whoever is top of the
-leaderboard. If Petar goes inactive he moves to the legends pool and the
+leaderboard. If Petar goes inactive he moves to the icon pool and the
 remaining active set becomes dramatically easier. This number drifts with the
 roster; `DHigh` is the correction. Accepted knowingly.
 
@@ -541,7 +732,7 @@ Still excluded from the pool (under 5 games): Inge, Ancella, Molly, Ninette,
 Sylvia, Lianne, Thomas, Nino, Angela — all on two games or fewer, which is where
 the deduction is still ≥501 and the scale genuinely cannot say anything.
 
-Legends join the same pool with no special rarity. Their all-time-high overalls
+Icons join the same pool with no special rarity. Their all-time-high overalls
 are high, so the curve makes them rare automatically.
 
 ## Volume and pacing
@@ -593,14 +784,14 @@ Four production endpoints, one development-only, one hook, and no background job
 
 | | | |
 | --- | --- | --- |
-| `GET` | `api/cards/pool` | **Built.** Every player a pack can contain: actives on their current rating, legends on their all-time high. |
-| `GET` | `api/collections/{playerId}` | **Built.** The whole page in one response — pool, legends, owned counts, available packs, unlock state, eligibility, and the album's binding. |
+| `GET` | `api/cards/pool` | **Built.** Every player a pack can contain: actives on their current rating, icons on their all-time high. |
+| `GET` | `api/collections/{playerId}` | **Built.** The whole page in one response — pool, icons, owned counts, available packs, unlock state, eligibility, and the album's binding. |
 | `POST` | `api/collections/{playerId}/create` | **Built.** Fetches the player an album in the leather they picked. Idempotent; returns the same payload as the `GET`. |
-| `POST` | `api/collections/{playerId}/packs/{packId}/claim` | **Built.** Rolls, files the cards, returns them with `isNew` and `copies`. 409 for an already-claimed pack, for a player with no album and for one under the gate; 404 for an unknown player and for a pack that is not currently derived — which covers an invented id, somebody else's game and yesterday's packet alike. |
+| `POST` | `api/collections/{playerId}/packs/{packId}/claim` | **Built.** Rolls, files the cards, and returns them with `isNew` and `copies` **together with the whole collection they landed in** — so the page never refetches. 409 for an already-claimed pack, for a player with no album and for one under the gate; 404 for an unknown player and for a pack that is not currently derived, which covers an invented id, somebody else's game and yesterday's packet alike. A refusal carries no state, because nothing changed. |
 | `DELETE` | `api/collections/{playerId}` | **Built, development only.** Puts the album back on the table so the opening sequence can be watched again, and takes the cards and the claims with it. Idempotent; 404s outside Development rather than 403, because a route that is not meant to exist should not announce that it does. |
-| `PUT` | `api/collections/{playerId}/legends` | **Built, development only**, gated the same way. Flips the latch by hand, because earning it is a three-month proposition and it is the only way to see an icoon in a book. |
+| `PUT` | `api/collections/{playerId}/icons` | **Built, and a real endpoint in every environment** — this is how the icons are earned, and the only thing that writes the latch. The page calls it when the set-completion packet is picked up, **before** claiming that packet, because the draw reads the latch. Checks the active set itself rather than trusting the caller: 409 if it is not complete, because the only way to reach that is a stale page. Idempotent, and a second claim does not move the date. 404 for an unknown player and for one with no album. Two bypasses stay **development only** and 404 outside it: `force=true` skips the check, `unlocked=false` relocks. |
 | `PUT` | `api/collections/{playerId}/cover` | Later, and only if wanted. A re-bind. Reserved rather than built — see "The album is chosen once". |
-| `POST` | `api/collections/gifts` | **Next.** Present packs to a named player or to everybody — the one grant-shaped thing left, and what the test panel's pack buttons are waiting on. |
+| `POST` | `api/collections/gifts` | **Built.** Presents a pack to named players or to everybody — the one grant-shaped route in the design, and the only one that brings a pack into existence rather than deriving one. Either a size or a floor on the overall, never both: 400 for neither or both, for a size outside 1–10 and for a floor off the scale; 404 for a name that does not exist. It answers with the gift ids rather than a collection, because a present to everybody has no single collection to answer with. **Not** development-only — handing out packs is a real thing to want, and this app has no authentication anywhere by design, so an environment gate would remove the feature while protecting nothing. |
 
 The development-only `api/collections/{playerId}/packs/debug` that used to sit in this
 table was never built and is not going to be. A debug pack and a present are the same
@@ -629,8 +820,22 @@ An available pack is **computed**, not stored:
 available(player, today) =
       games today the player took part in     minus  PackClaim rows
     + the daily freebie                       minus  a daily claim
-    + gift rows not yet claimed                      (later)
+    + gift rows addressed to them             minus  a claim for each
+    + one icoon packet, if the active         minus  its claim, which is once
+      set is complete                                per player and never per day
 ```
+
+The gift line is the one exception, and it is the exception that shows the rule: a present
+is the only pack nothing can be derived from, because nothing happened to entitle anybody to
+it. So it needs a row — and the subtraction is still a claim table, and `CreateGame` still
+writes nothing.
+
+The last line is emphatically **not** an exception, and that is the point of it. Finishing
+the set is a fact about the collection, and a readable one, so it is read — rather than
+written as a gift row at the moment the last card landed, which would have been the
+`CreateGame` mistake wearing a different hat. It follows the set in both directions as a
+result: somebody crossing the games gate takes the packet off the shelf until they are
+collected too.
 
 `CreateGame` inserts nothing. This was originally specified the other way round —
 a `PackGrant` row written per participant inside the game hook — and deriving is
@@ -753,35 +958,50 @@ New entities in `Models/Results/`, registered in
 The existing `OwnsOne` flattening and absent Game→Player FKs are legacy shape;
 new tables should use real FKs.
 
-- **`PackClaim`** — **built.** `Id`, `PlayerId`, `Source` (`Game` | `Daily`; `Gift`
-  arrives with the gift table), `GameId` (nullable, cascade), `ClaimDate`,
-  `ClaimedAt`. Unique on `(PlayerId, Source, GameId)` and on `(PlayerId, ClaimDate)`
-  for dailies. **Those indexes are the double-claim guard** — two tabs racing means
-  one insert fails, and that failure is the 409. There is no separate check to forget.
+- **`PackClaim`** — **built.** `Id`, `PlayerId`, `Source` (`Game` | `Daily` | `Gift`),
+  `GameId` (nullable, cascade), `GiftId` (nullable, cascade), `ClaimDate`,
+  `ClaimedAt`. Unique on `(PlayerId, Source, GameId)`, on `(PlayerId, ClaimDate)`
+  for dailies, and on `(PlayerId, GiftId)`. **Those indexes are the double-claim guard** —
+  two tabs racing means one insert fails, and that failure is the 409. There is no separate
+  check to forget.
   - The daily index **must be filtered** (`WHERE "Source" = 'Daily'`). As written
     here it was `(PlayerId, Source, ClaimDate)`, which is fine, but the obvious
     unfiltered `(PlayerId, ClaimDate)` forbids a player claiming two *game* packs on
     one day — the normal case for anyone who plays twice in an afternoon. There is a
     test for exactly that.
   - SQLite treats NULLs as distinct in a unique index, so the first index does not
-    accidentally cover the dailies either. The two are genuinely separate rules.
+    accidentally cover the dailies either. The three are genuinely separate rules — and
+    the same NULL semantics are why the gift index needs no filter, since `GiftId` is null
+    on every game and daily claim.
+  - **The gift index carries no date, deliberately.** A present stands open for days, so
+    keying its claim on the day would let it be opened again every morning. That is also
+    why `Derive` narrows game and daily claims to today but reads gift claims in full,
+    and why `ClaimDate` is stored on a gift claim as a record rather than as a key.
   - `Source` is stored as a **string**, via `HasConversion<string>()`. EF maps enums
-    to `int`, and an added source would then silently renumber the existing ones.
+    to `int`, and an added source would then silently renumber the existing ones. `Gift`
+    was exactly that added source, and it cost nothing.
 - **`CardInstance`** — **built.** `Id`, `PlayerId` (owner), `SubjectPlayerId` (who's
   on the card, cascade delete), `PackClaimId` (cascade), `GameId` (cascade delete),
-  `IsLegend`, `MintedAt`, indexed on `(PlayerId, SubjectPlayerId)` because every read
+  `IsIcon`, `MintedAt`, indexed on `(PlayerId, SubjectPlayerId)` because every read
   of a collection is "how many of each subject".
   - Deleting a game therefore reaches its cards **two ways** — directly, and through
     the claim — which SQLite is happy to have. The direct one is kept because it is
     the one that states the rule.
-  - `IsLegend` is frozen at mint time rather than derived from the subject's `Active`
-    flag: the two answer different questions, and somebody going inactive next month
-    did not retroactively hand you an icoon.
+  - `IsIcon` is frozen at mint time, and it is **history only — nothing reads it to
+    decide what a card looks like.** This bullet used to reason that freezing it stopped
+    somebody going inactive from "retroactively handing you an icoon", which reads as
+    though the column governs the face. It does not, and the opposite is true: cards are
+    live, so **a card you already hold turns into an icoon the moment its subject goes out
+    of service**, because the album draws its slots and its colourway from the current
+    pool. That is the same rule as a zilver card becoming goud when someone's form
+    improves. What this column answers is "what came out of the packet", which is a
+    question about history rather than about presentation — wiring it into rendering would
+    freeze a card's face at mint and quietly contradict the live-card rule.
 - **`PlayerCollection`** — **built**, and the only table so far. `PlayerId` (PK
-  *and* FK to `Players`, cascade), `Cover`, `CreatedAt`, `LegendsUnlockedAt`
+  *and* FK to `Players`, cascade), `Cover`, `CreatedAt`, `IconsUnlockedAt`
   (nullable — a permanent latch, so new joiners and players crossing 5 games don't
-  un-complete an existing unlock; nothing writes it until the claim endpoint can
-  count owned cards).
+  un-complete an existing unlock; written **only** by the claim endpoint when the
+  collector presses the seal, never by opening a pack).
   - Named `PlayerCollectionState` here originally. It gained the binding and stopped
     being only a state bag, so it is `PlayerCollection` — it *is* the collection row.
   - **The row's existence is load-bearing.** No row means the collection has never
@@ -793,9 +1013,31 @@ new tables should use real FKs.
   - The cascade is required rather than tidy — `PlayerService.DeletePlayer` never
     loads a collection, so without it deleting a player fails on a FK violation the
     moment that player owns an album.
-- **`PackGift`**, later — `Id`, `PlayerId` (nullable: null means everyone), `Size`,
-  `Reason`, `CreatedAt`, `ExpiresAt` (nullable). The only grant-shaped table in
-  the design, because a present cannot be derived from anything that happened.
+- **`PackGift`** — **built.** `Id`, `PlayerId` (nullable: null means everyone), `Size`,
+  `MinimumOverall` (nullable), `Reason`, `CreatedAt`, `ExpiresAt` (nullable). The only
+  grant-shaped table in the design, because a present cannot be derived from anything that
+  happened.
+  - `MinimumOverall` was not in the original sketch and is the second half of the
+    feature: a gift is either *n* ordinary cards or **one** card at a floor. `Create`
+    forces `Size` to 1 whenever a floor is set, so the two cannot disagree — two
+    guaranteed golds in one packet is a different product and nothing has asked for one.
+  - **`PlayerId` is required: every present is addressed.** It was nullable, where null was
+    the whole of "everybody" — one row rather than one per player, resolving the recipients
+    at *claim* time. `GiveGift` now expands the word into one row per player on the roster,
+    so the convenience lives in the call and the table holds only addressed presents. The
+    migration that tightened the column expands any existing unaddressed rows the same way
+    and re-points their claims first, so no cards are lost — see `AddressEveryGift`, which
+    was hand-written because EF's scaffold would have defaulted the column to `""`.
+  - **`ExpiresAt` is null: presents do not expire.** They stood open for seven days, as the
+    deliberate exception to hard same-day expiry — a present that vanishes overnight is a
+    mean present, and unlike a game pack there is no "you were not here, so you earned
+    nothing" to fall back on. The deadline only ever existed to stop an *unaddressed* gift
+    reaching next year's joiners, and expanding "everybody" removes that reason at the root.
+    The column stays, and `Derive` still honours it, so a kind of gift that wants a deadline
+    can have one without a migration.
+  - The player FK cascades, so a player deleted as a mistake leaves no presents addressed
+    to them. Deleting a gift row is how a mistaken present is withdrawn, and it takes the
+    claims and their cards with it — the same rule as a deleted game, for the same reason.
 
 Cascade on `GameId` for `CardInstance`, so deleting a game removes the cards it
 minted. This is not tidiness — pack size depends on the score, so a mis-entered
@@ -809,10 +1051,28 @@ scheduled job, which is a moving part in a design whose main virtue is having
 none. A few thousand rows a year is nothing in SQLite, and they are a free record
 of where a card came from.
 
-Generated as `20260811121556_AddPackClaimAndCardInstance` — `dotnet-ef 8.0.0` is
-pinned in `.config/dotnet-tools.json`. Note that `dotnet ef` builds the project, so a
-running dev API locks `bin\Debug` and the build fails on the exe copy;
-`--configuration Release` sidesteps it without stopping the API.
+Generated as `20260811121556_AddPackClaimAndCardInstance` and
+`20260811133444_AddPackGift` — `dotnet-ef 8.0.0` is pinned in
+`.config/dotnet-tools.json`. Note that `dotnet ef` builds the project, so a running dev
+API locks `bin\Debug` and the build fails on the exe copy; `--configuration Release`
+sidesteps it without stopping the API.
+
+Note also that `dotnet ef` **picks its database from the environment, and defaults to
+Development** — not to Production the way a plain `Host.CreateDefaultBuilder` app does, since
+the tools set `ASPNETCORE_ENVIRONMENT=Development` themselves when it is unset. So a bare
+`dotnet ef database update` moves `C:\tafelvoetbal-data\`, and production needs
+`ASPNETCORE_ENVIRONMENT=Production` or an explicit `--connection`.
+
+**`dotnet ef migrations list` cannot tell "not applied" from "cannot reach the database".**
+With an unreachable path it reports *every* migration as `(Pending)`, silently — no warning,
+not even under `--verbose`. Reading that as the truth about production is a trap worth
+knowing about, because `newInitial (Pending)` against a database the app is plainly serving
+looks like a catastrophe and is in fact a connection failure. The `T:\` share is not mapped
+on the dev machine at all, so this is the *normal* result there rather than a corner case.
+
+The gift migration adds a column to `PackClaims`, which SQLite cannot do while keeping a
+new foreign key — so EF rebuilds the table and recreates its indexes. Additive and safe,
+but worth knowing it is not the one-line `ALTER` it reads as.
 
 ### Services
 
@@ -829,15 +1089,23 @@ Done:
   history is `Rating − Std` and needed no new arithmetic; it is now expressed once,
   as `PlayerStats.VisibleRating`, and used by the leaderboard rows, the per-game
   old/new ratings and the peak alike so the three cannot drift.
-- **`Services/CardPoolService.cs`** — actives and legends. Knows nothing about
+- **`Services/CardPoolService.cs`** — actives and icons. Knows nothing about
   collections or packs; it is the set, not anyone's state over it, which is what
   lets `CollectionService` call straight into it rather than build its own list.
 
 - **`Services/PackService.cs`** — deriving, sizing, rolling, claiming, the daily
-  freebie. `Derive`, `PackForGame`, `DailyPack` and `Roll` are all **static**: they
-  are pure functions of the arguments handed to them, which is what lets the tests
-  drive them without a database, and `Roll` takes an injectable `Random` for the same
-  reason.
+  freebie, and giving. `Derive`, `PackForGame`, `DailyPack`, `GiftPack` and `Roll` are all
+  **static**: they are pure functions of the arguments handed to them, which is what lets
+  the tests drive them without a database, and `Roll` takes an injectable `Random` for the
+  same reason.
+  - `GiveGift` is the exception and has to be — it is the one write in this design that
+    brings a pack into existence. It writes a `PackGift` and nothing else: no roll, no
+    mint, no collection touched, so from the tear onwards a present and an earned pack are
+    the same object. `ReadDerivationInputs` is the shared read behind `GetAvailable` and
+    `Claim`, so the shelf and the claim cannot come to different answers.
+  - `Roll` takes a nullable `minimumOverall` **before** the `Random`, which is why the
+    tests pass `random:` by name. It narrows the candidates and touches nothing else, and
+    falls through to the whole pool when nobody clears the floor.
 - **`Services/CollectionService.cs`** — now also fills `Owned` from `CardInstance` and
   `Packs` from `PackService`, and hands over the games the replay already returned
   rather than letting anything re-query them. See the `OldRating` note at the top of
@@ -854,15 +1122,33 @@ existing GET.
 ### One collection endpoint, not three
 
 `Controllers/CollectionController.cs`, `[Route("api")]` to match existing style,
-and it returns the whole page in one response — `pool`, `legends`, `owned`,
-`packs`, `legendsUnlocked`, `eligible`.
+and it returns the whole page in one response — `pool`, `icons`, `owned`,
+`packs`, `iconsUnlocked`, `eligible`.
 
-**Not split into collection / pool / legends routes.** The book is one object:
-`CollectionPage` builds its sections from pool + legends + counts together and
+**Not split into collection / pool / icons routes.** The book is one object:
+`CollectionPage` builds its sections from pool + icons + counts together and
 `albumSlotOrder` walks the result, so three routes would mean either an album that
 cannot draw until all three land, or one that draws and then *grows a section* —
 which shifts every card-viewer index behind it, underneath an open viewer. The
 same argument rules out splitting the pool into ordinary cards and icoons.
+
+**That argument does not cover `packs`, and it is worth saying so** rather than leaving
+somebody to notice the gap and conclude the shape was an accident. The shelf is a
+separate object in the opposite margin; it could arrive a beat late and shift no card
+index at all. `packs` is on this response for a different reason, and this is the one to
+keep:
+
+> **Deriving a pack needs the replayed games**, because `OldRating` only exists inside
+> `GetLeaderBoard()` — and the collection read is already paying for that replay to
+> produce the pool. A standalone `GET /packs` would pay for a **second** full replay of
+> every game ever played, in order to return two or three small objects. Splitting
+> duplicates the single most expensive thing on the request.
+
+What it costs, both accepted: packs are suppressed when there is no album, a rule that
+exists only because they share a payload with one; and there is no cheap route to poll
+if the shelf should ever want to notice a colleague logging a game while you are looking
+at it. Neither is worth a second endpoint — and if the second ever does become real, the
+thing to fix is caching the replay, not splitting the route.
 
 Two things that shape the payload:
 
@@ -921,8 +1207,9 @@ lying on it, and the site's black is the room around it.
 Nav, leaderboard, games and player pages stay pure teletext, untouched.
 
 The stage is **fully token-driven** — one set of custom properties covers the
-header, footer, plates, buttons, input, meter, readouts *and* the book's inside
-covers (`--book-inside`).
+plates, buttons, input, meter, readouts *and* the book's inside covers
+(`--book-inside`). The header and the footer are both gone from the album page
+now, but `GameShell` still takes them and the tokens still dress them.
 
 #### How this was chosen
 
@@ -942,12 +1229,13 @@ the top and a hard vignette at the corners.
 
 Three rules the table follows, each of them arrived at by getting it wrong first:
 
-1. **The table is a table-sized object, not a background.** `width: min(1660px,
+1. **The table is a table-sized object, not a background.** `width: min(1740px,
    97vw)`, centred, with an edge that catches the light and a shadow on the floor.
    Bleeding the wood to the edges of the viewport made it a texture behind a page.
    The figure has to clear the album, which sizes itself from the *viewport*
    rather than from its container — see "The shelf was overlapping the book" for
-   where 1660 comes from.
+   where the number comes from, and "The footer's space went into the spread" for
+   why it is 1740 rather than 1660.
 2. **Nothing is spread on it.** An earlier pass put a felt blotter, a paper
    placemat, a baize inlay and a café cloth under the book. Covering the wood with
    a mat defeats the only thing the timber is for. Bare wood, the book, the
@@ -1041,9 +1329,13 @@ You got in by writing your name in a book, so you get out by crossing it out —
 object and the same gesture reversed. Nothing had to be invented for it, which is the test
 this table applies to every control.
 
-- **In the margin opposite the packet shelf**, and out of flow for the same reason: the
-  book is centred on the table and neither margin can move it. The two things lying beside
-  the album are what you came for and how you leave.
+- **At the top of the margin opposite the packet shelf**, and out of flow for the same
+  reason: the book is centred on the table and neither margin can move it. The two things
+  lying beside the album are what you came for and how you leave.
+  - It no longer has that margin to itself — the test panel lies at the foot of the same
+    column now (`bottom: 0`, so it needs to know nothing about the register's height).
+    The register keeps its 210px cap rather than stretching to match the plate: a ledger
+    widened to a 340px slab stops reading as one sheet of the book you signed.
 - **The strike is drawn, not switched on.** A pen crossing out a name is a stroke with a
   direction and a duration; `line-through` appearing all at once is a state change, and the
   difference is the whole beat. A `scaleX` on a pseudo-element, so it costs no layout.
@@ -1078,20 +1370,91 @@ Two things moved out of the header with it:
 `GameShell` now renders its header only when something is in it. An empty one still
 contributed its bottom margin and pushed the whole table down for nothing.
 
-#### The ledger lists everybody
+#### There is no footer either
 
-Including players under the games gate, struck through, with how far off they are.
+It carried four readouts in a row under the table: `n/m actieve spelers`, a 24-chunk
+completion meter, a card count, and a line that read `verzamel alles voor de iconen` /
+`de set is compleet` / `iconen ontgrendeld`. All four are gone, and `CollectionPage`
+passes no `footer` at all.
 
-Filtering them out was the first version and it is worse: a name that is simply not
-there cannot explain itself, and the players this affects are exactly the newest
-colleagues — the ones with least reason to assume the page is working. This is also
+They were a second, worse copy of what the book already says. An empty slot *is* the
+missing player, forty of them side by side *are* the meter, and the gold seal beside the
+book already announces a complete set — louder than a line of type ever did, and in the
+place the reader is already looking. Keeping the row meant every one of those facts had
+two renderings that could disagree, pinned to the one strip of table where nothing else
+in the design lives.
+
+`ownedActive`, `totalActive`, `totalCards`, `filledChunks` and `METER_CHUNKS` went with
+it. `.game-footer`, `.game-meter` and `.game-readout` are still in `game.css` and
+`GameShell` still takes a `footer` — nothing on the album page uses them.
+
+#### The ledger lists everybody, and every line can be signed
+
+Including players under the games gate — and **the ledger says nothing about the gate
+at all**, which is the second version of this and the right one.
+
+Filtering under-gate names out was the first version and it is the worst: a name that
+is simply not there cannot explain itself, and the players this affects are exactly the
+newest colleagues — the ones with least reason to assume the page is working. This is
 why the type-ahead is backed by `GET api/players?activeOnly=true` rather than by the
 card pool, which excludes them by definition.
+
+Listing them **struck through, with "nog 2 wedstrijden" beside them**, was the second,
+and it is what the third replaced. Three things were wrong with it:
+
+- It put the gate on the one page whose entire job is asking who you are. The gate is
+  not a property of the signature; it is a property of the album behind it.
+- A greyed-out, unclickable line is a dead end shown to the four people on the list who
+  are least sure the page works. It explains itself only in the sense that a disabled
+  button does.
+- The games count in the right-hand column — printed for **everybody**, not just the
+  short ones — turned a register into a standings table. There is a leaderboard two
+  clicks away for that, and one register that reads as one is a register nobody trusts.
+
+So: every line signs, the count column is gone, and the gate is `LockedAlbum` — a place
+you arrive at, with your own numbers on it. See "The album that will not open yet".
 
 One hole, accepted: `LeaderBoardService` builds its stats map per game, so a player
 with **no games at all** is absent from that route entirely — they exist in `Players`
 and nowhere else. The ledger's empty state says as much rather than us reshaping
 `PlayerService` for somebody's first week.
+
+#### The album that will not open yet
+
+Where an under-gate player lands **after** signing in: their album, shut, with a brass
+strap down the fore-edge and a padlock on it. Under the book, the number of games still
+to play; under that, one pip per game the gate asks for with the played ones filled in;
+under that, the register.
+
+- **An object, not a notice.** The gate is not an error — there is an album waiting and
+  the only missing ingredient is games. A padlocked book says that in one look, where a
+  centred paragraph of Dutch on bare timber says "something went wrong". It is also the
+  only thing on this table that would not have to be invented: `albumLeather` already
+  paints a shut book, and brass is already the metal on every cover.
+- **The leather is bordeaux and it is not a choice.** No cover has been picked — that
+  ceremony is on the far side of the gate — so it takes the incumbent stain.
+- **The cover is blocked blind**, a kicker and a rule, exactly like the five books on the
+  choosing table. Printing the owner's name on it would spend the payoff `AlbumChoice`
+  exists to deliver. The name is on the register instead, where it means "you are signed
+  in as this person" rather than "this book is yours".
+- **The number is the biggest thing after the book**, because "how many more" is the only
+  question anybody arrives here with. The total played and the rule behind it are context
+  set underneath it.
+- **The pips are not `.game-meter`.** That is a completion readout for a collection, and
+  borrowing it here would say the album is partly full when it is not open.
+- **Smaller than `--page-w`.** A shut book at full page height leaves no room under it for
+  the number, the pips and the register, so it has its own size tokens.
+- **The register comes along, and that is load-bearing.** The pick is remembered in this
+  browser, so a screen with no way out pins the page to a mistyped colleague's gate until
+  localStorage is cleared by hand. It sits centred *under* the book rather than in the
+  right margin: there is no packet shelf opposite it here, and the margins are the pair
+  "what you came for / how you leave" — one sheet alone in one of them looks mislaid.
+
+The number is quoted from `collection.minGames`, the server's value, not from `MIN_GAMES`
+— so the copy cannot drift from the rule that is actually enforced. The games-left figure
+is clamped at zero for exactly that reason: the page branches on the client constant and
+prints the server's, and a disagreement between the two would otherwise land here as a
+negative.
 
 #### Choosing the album
 
@@ -1203,6 +1566,165 @@ custom properties cannot be transitioned** — which is exactly why `.album__bin
 its own element rather than a background on `.album__book`. So changing a cover cuts
 unless two stacked layers are crossfaded on opacity.
 
+#### Earning the icons: the packet and the re-binding
+
+The re-bind arrived, and it is not a cover swap. **It is the icons unlock**, which is the
+one thing a book could legitimately be taken away and rebound for — so the paragraph above
+still holds: there is no `PUT .../cover`, and choosing your leather is still a one-time
+ceremony. All five pieces of groundwork it lists paid off unchanged.
+
+**Completing the set is an offer, not an unlock.** `PackService.Claim` used to latch
+`IconsUnlockedAt` the instant the last active card was filed. That put the payoff for three
+months of collecting inside a pack reveal, at the moment the reader's attention was on a
+card coming out of a packet — and it made the milestone unmarkable, because by the time
+anything could have been shown it had already happened. So the claim writes nothing, and
+re-introducing a write there is how it comes back: the offer would close before it could be
+taken. It is the same shape of mistake as granting packs inside `CreateGame` — a write
+bolted onto the nearest passing transaction, taking a moment away from the place built to
+give it.
+
+**The predicate moved to where icon-ness is decided.** `CardPoolService.ActiveSetComplete`
+is a pure static next to the code that sorts the roster into actives and icons, in the
+`PackService.Roll` / `Derive` idiom. One file now answers "who is an icoon, and when do you
+get them". It is *not* on `PackService`, and being inline in `Claim` is precisely what let
+the unlock become a side effect of opening a pack. An empty roster is deliberately not a
+completed set: vacuous truth would hand the icons to the first person to open a packet on a
+fresh database, which is the state every test fixture starts in.
+
+##### The offer is a packet with one guaranteed icoon
+
+**A first pass made the affordance an abstract object** — a gold foil seal lying in the
+margin, which you pressed to re-bind the book. It was built, and then replaced, and the
+argument that replaced it is worth keeping: the ceremony ended on a book that had just grown
+about twenty **empty** slots. The payoff for three months of collecting was "your album got
+bigger and emptier". Ten candidate objects were drawn at real size on the real tabletop
+first — see [rebind-object.html](rebind-object.html), which is still the record of that, and
+of the two findings worth keeping (a run-out hourglass is unusable because
+`Hourglass.tsx` is the loading indicator; a date stamp has the best gesture of the ten and
+fails on perspective, reading as a knob from above).
+
+So the offer is **a packet**, and opening it hands you your first icoon. It is one object
+instead of two, one click instead of two, and it fills a slot in the book it just made room
+for.
+
+**It is derived, not granted.** Writing a `PackGift` row when the last active card landed
+would have been easy and is the `CreateGame` mistake a third time. Nothing entitles anyone
+to this except the state of their collection, that state is readable, so it is read:
+`PackSource.Icons`, offered while `ActiveSetComplete` holds and no `Icons` claim exists,
+exactly the shape the daily freebie already had. The claim is guarded by a filtered unique
+index on the player **alone** — no date, because keying it on the day would offer a fresh
+guaranteed icoon every morning.
+
+Three decisions on it, all asked rather than assumed:
+
+- **Normal weighting**, narrowed to the icons. Not flat — a flat draw would make the rarest
+  card in the game a one-in-twenty on a packet everybody eventually gets, and Roel Loonen at
+  91 should stay something to chase.
+- **It follows the set.** A new player crossing the games gate takes it off the shelf until
+  they are collected too. That is what "derived" means, and there is nothing to reconcile;
+  the alternative needed a row to remember it had been earned.
+- **`GuaranteesIcon` is its own axis, not a very high `MinimumOverall`.** An icoon is not a
+  rating band — they run right across the tiers — so any floor catching all of them would
+  catch most of the actives.
+
+There is **no `IconsClaimable` flag** anywhere, and an earlier version of this section
+argued for one. The packet being on the shelf is the whole of the offer; a boolean saying
+the same thing is a second thing to keep in step with the derivation, and the two would
+eventually disagree about whether the affordance should be on screen.
+
+##### Two ceremonies, and the order is forced
+
+The packet cannot *contain* an icoon until the unlock has landed — the draw reads the latch
+— so there is exactly one legal order, and it is not a matter of taste:
+
+```
+click packet → PUT .../icons  → book shuts, re-binds   (call 1, Album's ceremony)
+             → claim the pack → reveal, first icoon    (call 2, PackOpener's ceremony)
+```
+
+Two calls rather than one, and that is what keeps the latch out of `Claim`. `openPack`
+recognises the packet, fires the unlock, plays the re-binding while it is in flight, and
+`handleRebound` hands the packet to the opener when the book is back. `PackOpener` needed no
+change at all — it is handed a pack like any other.
+
+The unlock's response is applied **immediately** rather than parked, which is the opposite
+of the pack-reveal rule and deliberate: the claim about to follow depends on it. Growing the
+album by half at the same moment is free, because the book is shut.
+
+Skipped entirely when the book is already bound — the test panel's `force` path — because
+re-binding a book already in its icon binding is a ceremony with nothing to show.
+
+**The ceremony lives inside `Album`, not beside it.** `AlbumChoice` is the precedent for the
+*timing* — a phase enum driving a phase class, base constants at half length, `after()`
+timers cleared on unmount, the write fired at the start and `onDone` at the end — but not
+for the placement. Three reasons, and the first decides it: the book has to be seen to
+**shut**, and only the real one can do that, because it owns the leaf state, the
+`.album--closed` transform and `playCoverTurn`. A stand-in would have to reproduce a shut
+book's exact 3D state to hand back motionlessly, which `AlbumChoice` only gets away with
+because it never has to match an *open* book. And the new cover layer has to live on the
+real cover regardless, since the book keeps that binding forever afterwards; building it
+twice is how the two drift.
+
+Five beats, base (so half their real length at `--anim = 2`), ≈2450 total — close enough to
+`DEFAULT_CEREMONY_MS` that the pacing was already known-good on this stage:
+
+| beat | base | what moves | sound |
+|---|---|---|---|
+| `shutting` | 620 | `flipped` forced to 0; the existing closed-book transform and leaf flip do the work | `playCoverTurn` |
+| `settling` | 200 | held shut, nothing moving — a press has a pause before it | — |
+| `binding` | 900 | the build: the new binding drawn across the board from the spine | `playRebind(900)` |
+| `blocking` | 45 × 6 | `ICONEN` foil-blocked a letter at a time | `playFoilStamp` per letter |
+| `resting` | 460 | the board settles — **the accent** | `playCoverTurn` at +120 |
+
+What accumulates is one continuous quantity, the binding travelling across the board, so the
+build looks identical at any timestamp — the load-bearing rule. The single accent is the last
+letter landing together with the board. `playRebind` takes its length from the caller like
+`playRareRise`, and is friction and air with **no pitch and no low end**: every note in
+`sounds.ts` belongs to the D-minor payoff ladder, so a pitched riser would either join that
+chord or fight it, and a boom would spend the arrival early.
+
+**Half-bound, and that is what makes the spine free.** Ivory boards with the chosen stain
+kept as the spine strip and four corner triangles. `albumLeather.ts` warns that the cover,
+the binding and the shut leaf's board edge must agree or the book comes apart at the spine —
+and on a half-bound book the spine *is* the leather, so `.album__binding` and `--board-edge`
+needed no new rules at all. The boards are warm ivory rather than white (`--board-hi/-mid/
+-lo`), because a true white next to brass reads as paper stock and the object has to stay a
+book, and they are identical on all five stains for the same reason the brass edge is.
+Emitted unconditionally from `albumLeather`, so there is no second code path to fall out of
+step.
+
+**The wipe is a `clip-path`, not the opacity crossfade the note above predicted.**
+`.album__cover-icons` is its own element painting the finished binding as one un-transitioned
+`background` of stacked layers, revealed by `clip-path: inset(0 100% 0 0)` → `inset(0)`.
+`clip-path` is transitionable and `inset()` interpolates, so none of the custom-property
+problem applies. It is also better than a crossfade on its own terms: a wipe travelling out
+of the hinge reads as the book being **re-cased**, where a dissolve reads as one cover
+becoming another. The curve spends most of its length crossing the first third and resolves
+in the last fifth — build slow, land fast; a linear wipe reads as a progress bar.
+
+Two traps here, both worth naming because both are the *opposite* of what the surrounding
+code taught. `.album__face` does **not** set `transform-style: preserve-3d`, so its contents
+are flattened and a `translateZ(1px)` on the new layer buys nothing — the 3D trap documented
+on `.album__face` applies to the face, not to what is inside it. And because ordinary 2D
+painting order governs in there, an absolutely positioned layer paints over the cover's
+in-flow text: the printing needs `position: relative` or **the wipe erases the owner's name
+off their own cover on its way across**.
+
+**The book grows behind a shut cover.** The claim's response is parked in
+`pendingCollection` and applied on `onRebound`, the same ref the pack reveal uses — so the
+roughly-half-again more slots arrive when the book is closed and there is nothing on screen
+to shift. Strictly easier than the reveal case it borrows from. The leaf is 0 by then, so the
+clamp in `Album` has nothing to do; it still earns its keep on reload.
+
+If the `PUT` fails the ceremony **finishes anyway** — a book that stops halfway through being
+rebound is a worse artefact than one that completes and then reports a problem. `onRebound`
+finds nothing parked, reopens the book, leaves the seal, and refetches.
+
+Reduced motion and a click both land on the **finished** state, never a mid-point: a ceremony
+frozen part-way reads as a hang rather than as a shorter ceremony. `prefersReducedMotion`
+moved to `utils/animationSpeed.ts` for this, since it is the third pacing knob and both
+sequences on the page have to agree about it.
+
 ### The album: stiff CSS 3D flip
 
 Hand-rolled, no dependency:
@@ -1222,9 +1744,472 @@ Stiff rather than soft-curling is deliberate: bending a page needs a deformable
 mesh, and the libraries that fake it read as 2010s iPad iBooks. Encarta and the
 XP Help viewer flipped stiffly.
 
-Sizing is driven by viewport **height** first: `min(40vw, 56vh × 0.78, 520px)`. A
+Sizing is driven by viewport **height** first: `min(40vw, 63vh × 0.78, 560px)`. A
 purely width-driven book grew taller than the viewport on shorter screens and
-pushed the controls below the fold.
+pushed the controls below the fold. The height term is deliberately written so it
+cancels into "the page is exactly Xvh tall", which makes X spendable against
+anything else on the stage — see "The footer's space went into the spread".
+
+#### The page is bare, and that took four rounds to arrive at
+
+**A slots page now carries the paper, the mounts, the cards and the page number.
+Nothing else.** Three things were taken off it, and none of them should come back
+without reading this:
+
+- **The running head.** "Verzamelalbum · \<naam>" with the tally opposite, above a
+  2px rule. Every word of it was already known — the cover carries whose album it
+  is, which is the same argument that took the owner off the header above the
+  stage — so the head repeated a line the reader had just read, on every page,
+  twelve times over.
+- **The keyline.** A hairline inset 8px from the trim with a companion rule, as on
+  a plate book. It drew a box around a page whose content already sits in a grid,
+  inside a frame the binding was already providing.
+- **The ghosted monogram.** A serif "T" at 42% of the page width, centred at 5%
+  opacity. **It sat directly behind the middle column of cards**, which is the
+  generalisable part: nothing decorative goes behind a card. A page mark is not
+  forbidden, but it belongs in a margin — and if it is ever wanted large, the
+  editorial trick is to set it in the margin and let the trim crop it, so it
+  cannot reach the grid.
+
+The bareness is a deliberate endpoint, not a lack of ideas. Twenty alternatives
+were mocked up as standalone spreads first — a works-drawing of the table with the
+gutter as the halfway line and the rods running through the card rows; photo
+corners with pencilled names and the ghost of a card pulled out years ago; gilt
+tooling with marbled paper in the gutter; a passe-partout with engraved brass
+nameplates; black velvet; a mahogany tray; a printer's proof; a teletekst
+supplement; a herbarium sheet; and ten modern ones from a Swiss grid through a
+progress rail to a contact sheet. **Every one of them was more page than the cards
+needed.** That is the finding worth keeping: on this page the collection is the
+content, and each layer of furniture was competing with it rather than framing it.
+
+#### The cover carries a name and nothing else
+
+**The tally is off the cover too.** It read `<owned> / <total> spelers` under the
+name, and it was the least physically defensible thing in the album: a figure that
+changes every time a packet is opened, blocked into a binding **in gold foil**.
+Foil is struck once when the book is bound and is never rewritten. So the cover now
+carries the kicker, the name, and the rule that used to divide the two — which
+closes the cover as a flourish rather than dividing it, the way a foil rule does on
+a real binding.
+
+`AlbumPage.subtitle` went with it; nothing else ever set it. `.album__cover-sub`
+**stays in album.css**, because `AlbumChoice` uses it for the static "nog geen
+kaarten" on the unbound books — a printed line, not a counter. One consequence
+worth knowing: that line therefore disappears between the ceremony's cover and the
+bound album's. If the discontinuity reads badly, the fix is a line that is true
+forever — an edition ("seizoen 2026"), which is exactly what a real album cover
+carries — not the tally coming back.
+
+**Where a count belongs is the checklist at the back**, because that is the one
+page in an album a hand writes on. See "The checklist at the back" below.
+
+#### Boards, endpapers and the voorwoord
+
+**Leaf 0 used to carry `[cover | first page of players]`, and that was wrong.** Opening
+the book landed you on a spread whose left-hand side was the *back of the cover* with
+six card slots printed on it — one physical sheet doing duty as both the board and the
+first page, which is a thing no book does.
+
+The old comment gave a real reason for it: an inside cover costs a page, and on mobile
+(one page per swipe) it would be a swipe with nothing on it. **That reason is answered
+rather than overruled** — the page is not empty, it carries the voorwoord:
+
+```
+ 0  cover        leaf 0 front    the board, outside
+ 1  endpaper     leaf 0 back     the board, inside — nothing printed on it
+ 2  foreword     leaf 1 front    the voorwoord
+ 3  first slots  leaf 1 back     cards start on a spread of their own
+ …
+ E  endpaper     last leaf       the back board, inside
+```
+
+- **The back endpaper must land on an even index**, because that is a leaf *front*,
+  which puts it on the right-hand side of the last spread — the side the inside of a
+  back board is on. An odd `pages.length` takes one blank sheet first, and a blank
+  leaf at the end of the text block is what a real book has there too. This replaces
+  the older "no padding to an even page count" rule: that existed because padding
+  bought a spread with nothing on either side, and this pads *toward* something.
+- Verified across roster sizes 20 / 24 / 30 / 44: first spread is always
+  endpaper|voorwoord, cards always start on an odd index, the checklist always starts
+  on an odd index, and the back board is always even and always reachable at
+  `maxFlipped`. At 44 the final spread comes out `(blank) | endpaper`, which is the
+  parity case and is also what a real book does there.
+- **Endpapers are leather, from the same `--leather-*` tokens as the cover.** A stain
+  chosen for the outside has to be the stain inside, or the board is two different
+  objects front and back. The gradient runs the other way (330deg against the cover's
+  150deg) because it *is* the other side of the same board, and the hinge shadow comes
+  from `.album__face--front` / `--back` rather than from the page number, so it is on
+  the gutter side whichever half the face lands on.
+- **The boards stand proud of the paper by `--board-out` (9px)** — a binding's
+  *squares* — and **they are leaves**: leaf 0 and the last leaf are `--board-out` wider
+  and that much taller at each end than a page.
+  - This was first done by growing `.album__binding` instead, on the grounds that one
+    static rectangle behind everything cannot be caught mid-rotation being the wrong
+    shape and covers the back board for free. **That was wrong, and the reason is worth
+    keeping**: the overhang belongs to two objects that *move*, so drawing it on
+    something that does not left a shut book with no squares at all and forced the whole
+    case to appear once the cover had landed. Fading it in only turned a pop into a
+    smear — the mismatch was structural, not a timing problem. The cover's edge has to
+    be part of the object that rotates.
+  - The arithmetic lines up with the fore-edge, which is what makes the two agree rather
+    than merely coexist. A leaf sits at `left: 50%` with its origin on the spine, so a
+    board spans `[W, 2W + O]` unflipped and mirrors to `[-O, W]` flipped — exactly the
+    strips `.album__foreedge` occupies, verified on both sides.
+  - **A board's faces sit at `translateZ(0.25px)`, not `1px`.** The boards now reach into
+    the strip the fore-edge draws in, and at equal depth the board covered the page stack
+    completely. The strip cannot simply be raised, because above `1px` it also clears the
+    *pages* and the stack shows through a turning leaf. `0.25px` gives the one order that
+    is true of a book: **board < page edges < pages.**
+  - `.album__binding` is back to `inset: 0`. What is left of its job is the leather at the
+    gutter and the drop shadow the object throws on the table, both of which sit behind
+    the text block — so when it returns after a shut is now invisible either way, and it
+    shares the inside covers' discrete reveal again.
+- **`--board-out` and the fore-edge are coupled.** The leaf stack sits inside the
+  leather overhang, so `EDGE_MIN + EDGE_RANGE` in Album.tsx (8px) must stay under it.
+  A stack wider than the boards is page edges poking out past the binding.
+- **The pastedown is paper. The leather is the frame around it.** On a cased book the
+  covering skin wraps the board's edges and folds onto the inside, and a sheet of paper
+  is pasted down *inside* that fold — only the turn-in is leather.
+  - It went leather first, on the reading that the inside of the cover should be the
+    colour of the cover, and that made the album's largest surface a dark slab. Two
+    attempts to rescue it by lightening both failed, and instructively: `color-mix`
+    toward cream takes the hue out along with the darkness (a near-black stain mixed
+    toward pale cream lands on **grey**, so the half read as mount board), and a warm
+    wash over the stain was lighter but still obviously hide. **The eye was not asking
+    for lighter leather, it was asking for paper.** Lightness is not the same axis as
+    saturation, and neither is the same as material.
+  - It is a hair deeper than the text block. Endpapers are a heavier stock than the
+    pages they protect, and that difference is what stops the front matter reading as a
+    page that lost its printing.
+- **What says *glued* is the turn-in**, not a shadow. On a cased book the covering
+  leather wraps the board's edges, folds onto the inside, and the pastedown is glued
+  down inside that fold — so a narrow leather frame runs all round it. A loose sheet
+  has a shadow under it and no frame; this has a frame and casts nothing outward,
+  because it is all one board.
+  - A **4px border in `--leather-mid`**, not an inset ring. `inset 0 0 0 5px` plus a
+    10px blur was a near-black frame with a soft black gutter inside it — a mount
+    frame around a panel, and heavy enough to be most of what you saw on the spread.
+  - **Open on the gutter side.** A pastedown runs into the hinge; there is no fold to
+    see there, and drawing one boxed the paper in on the one side where a board is
+    continuous. Which side that is comes off `.album__face--front` / `--back`.
+- **The boards have an edge of their own, at every spread.** The stack was paper only,
+  so a side holding nothing but a board had no edge at all — the leather overhang simply
+  showed through. That made the material immediately outside the page trim *flip* as you
+  turned: leather at the last spread, where the pastedown is glued to the board, and
+  cream one spread earlier. Same at the front. A board is not an absence of pages.
+  - **The strip is now exactly `--board-out`, and the paper divides it** rather than
+    extending it: the board's edge and the overhang are one object seen two ways, so the
+    strip *is* the leather band, with the paper stack taking the inner `--edge-w` and the
+    board's cut edge showing for the rest. Constant total width, and nothing can poke
+    past the binding.
+    - The first attempt added a separate `--edge-board` on top of the paper stack, which
+      came to 11px against a 9px overhang — page edges sticking out past the boards,
+      which is the one thing `--board-out` exists to prevent.
+  - The board edge is a touch lighter than the binding behind it, so it reads as a cut
+    edge catching the lamp rather than as more of the same leather field.
+  - **The paper edges are muted, not white.** They were `rgba(255,252,240,.92)`, which
+    is *brighter than the page beside them*, so a 7px stack read as a strip of white
+    paper rather than as the cut edges of the sheets you are looking at. A fore-edge
+    stands in the shadow of the board over it: barely lighter than the page at its lit
+    faces, properly dark between them. Widening the gap between the two values is what
+    turns a band back into edges.
+  - **The stack has ends.** The strip is one rectangle, so its hairlines all ran the
+    exact height of the page and stopped square — the one thing a fanned stack never
+    does. Deep shading at head and tail plus a 6px radius on the **outer** corners only
+    lets the outermost leaves fall away before the innermost, so the pile has ends
+    rather than being a cut-off ribbon. Done with shading and a radius rather than
+    `clip-path`: clipping flattens 3D content, and this element's half-pixel Z inside
+    `.album__book`'s `preserve-3d` is the only thing keeping it in front of the binding
+    and behind the pages — the same reason the binding is hidden rather than clipped.
+  - **`EDGE_RANGE` is 5, not 6, so the board edge is never thinner than 2px.** Every
+    pixel the paper takes is a pixel of board it covers; letting the stack reach 9px
+    would make the boards vanish exactly when the text block is thickest.
+- **The fore-edge counts paper leaves only, and can be nothing.** It was
+  `flipped / leafCount`, which counted the front board as a turned page: opening the
+  cover drew *cream page edges* on the left when nothing made of paper had moved. The
+  text block is `leafCount - 2` — and a side holding no leaves gets **zero width**, not
+  `EDGE_MIN`. A floor under both sides is what put a hairline of paper down the left
+  trim of the very first spread; zero is a real state at both ends of the book's
+  travel, not a degenerate one.
+- **The book is a cased hardcover, and the spine says so.** Worth settling in writing,
+  because a sticker album is the one thing it is not: a Panini album is saddle-stitched
+  card with no boards and nothing at the head of its spine. This album went the other
+  way long before the spine existed — five leather stains, gold foil blocking, a
+  binding ceremony — so the reference for the *case* is a cased book and the Panini
+  reference lives in the cards and their mounts. Splitting the difference is the one
+  option with nothing to recommend it: half a hardcover reads as a mistake, not as a
+  third thing.
+  - **All the hardware lives in the caps, and none of it on the paper.** The visible
+    case of an open book is the head and tail overhang — that gap is the only place you
+    can see past the paper into the hollow. So `.album__spinecap--head` / `--tail`
+    carry the hinge grooves, the hollow and the headband, and `.album__spine` over the
+    pages is **shading with no hard edge anywhere in it**.
+    - This was learnt the hard way. The grooves and a 2px leather core started out on
+      the full-height overlay, where they became two rules drawn down the paper beside
+      the gutter on every card page — and the core ran on past the board's outline into
+      the overhang, cutting across the very edge it was supposed to be part of. A
+      gradient cannot make either mistake; a hard stop always can.
+  - **A cap paints no leather of its own**, and this is the rule to keep. It had
+    `linear-gradient(180deg, hi, mid)` as its ground, which looks harmless and is not:
+    the binding runs that same gradient over the *whole book height*, so at the tail it
+    has long since reached `--leather-mid` while a 9px cap runs the full `hi → mid`
+    inside itself and arrives at its own top edge still on `--leather-hi`. A lighter
+    patch on darker leather with a seam round it — the spine reading as something laid
+    on top of the case's outline rather than as part of it. Painting nothing cannot go
+    wrong: the binding shows through at whatever value its gradient has reached, on all
+    five stains, and the cap only ever *removes* light. It also stops 1px short of the
+    outer edge, so the outermost leather and the brass rule run unbroken across the
+    head and the tail — the silhouette is never touched.
+  - **22px wide, and the book now agrees with itself about its thickness.** The spine
+    started at 40px, which made the gutter the *widest* dark thing on the spread when a
+    fold is the narrowest — and its soft wings were duplicating a falloff every page
+    already carries (`inset 12px 0 24px` toward the spine). Two soft falloffs stack into
+    one broad wash with no defined edge anywhere in it. The division of labour now:
+    **the pages own the falloff, the spine owns the fold**, with steep stops putting
+    most of the alpha inside the middle ~2px so the crease has a core without a hard
+    edge. Narrowing the caps to match moved the grooves from ±10px to ±5.5px, i.e. a
+    spine ~11px across — the text block plus its two boards — against the 8px the
+    fore-edge reports for the same leaves. At 40px they described a book two and a half
+    times thicker than the fore-edge did, and the fore-edge is the one derived from the
+    real leaf count.
+  - **Hinge grooves**, at ±5.5px from the fold: the channel the covering leather is
+    creased into where each board hinges on the spine. One dark line at the fold says
+    "two sheets meet here"; a line with a groove either side says "a spine with boards
+    on it", which is the whole difference between a case and a fold.
+  - **Headbands**, the striped cord capping the hollow — the most recognisable tell of a
+    cased book. They are **children of the caps**, so they cannot escape the overhang:
+    it is the one element that would look worst floating on a page, and making that
+    impossible beats remembering not to. Tucked against the text block (bottom of the
+    head cap, top of the tail), which is where the cord is glued — over the folded
+    sheets, under the turn-in.
+- **The spine is drawn over the gutter**, because there is nowhere else to put it. The
+  halves are exactly `--page-w` each and meet at the centre, so nothing behind them
+  shows there; and the book cannot simply be widened to open a real gap, because
+  `--page-w` is the term the card grid, the checklist and the shelf's packet width all
+  derive from, and the leaf model rotates about a single origin, so a gap opened on one
+  side closes on the other. The overlay reaches ~17px into each page, which is inside
+  the 22px inner margin `--page-pad-x` guarantees — it darkens paper and never a card,
+  the same bargain the turn strips struck on the outer margin. It is mostly gradient
+  (a solid band would be a bar lying across the spread; darkness gathering at the fold
+  is paper curving away from the light), with 2px of opaque leather for the fold itself
+  and one hairline of sheen down it. **Known cheat:** a leaf turning through the gutter
+  passes behind it. At the gutter a turning page is edge-on and a few pixels wide, so
+  it barely shows; if it ever does, fade the spine out while `moving` is set rather
+  than moving it behind the leaves, where it could not be seen at all.
+- Two consequences worth knowing. The folio now starts at 2 on the voorwoord and 3 on
+  the first card page, because the endpaper counts as a page in `sheetCount` even
+  though it prints no number — a real book would set the front matter in roman
+  numerals, and that is not solved. And a **stored reading position from before this
+  change lands one leaf earlier** in content terms; it is clamped and harmless, so no
+  migration.
+
+#### The mount is a recess, and the book has a thickness
+
+Two of the nine proposals in [album-look.md](album-look.md) are in. Both are pure CSS
+plus, in the second case, two numbers the book already had.
+
+**The mount is die-cut, not drawn.** It was a 2px dashed gilt rule — chosen over
+corner ticks because brackets plus a dashed rule read as two ideas competing on one
+small rectangle, which still holds. But a dashed rule is a *drawing of* a place, and
+with the page carrying nothing else the mount is very nearly the only furniture left
+and can afford to be the real thing. Three layers, each doing one job: a **1px**
+hairline where the cut meets the surface (2px is a stroke somebody chose; a cut edge
+is a boundary), an inset shadow from **above** because the stage lights from above,
+and a 1px lit **bottom lip**, which is what stops the whole thing reading as a grey
+smudge. The shadow stays tight deliberately — a wider blur greys the silhouette
+underneath, and the silhouette is the entire point of an empty slot. Everything else
+is unchanged: same footprint, same 6px radius, still completely hidden under a filled
+card, so the rule that the mount is exactly the card's box and never larger survives.
+
+**The fore-edge, and it tells you where you are.** A stack of leaf edges down the
+outer trim of each half, one element a side: two hairline sets per 2px for the leaves,
+plus a vertical falloff so it does not read as a flat ribbon of stripes.
+
+- **The two sides are deliberately unequal**, driven by `--edge-l` / `--edge-r` from
+  `flipped / leafCount`. A fixed equal stack would actively **lie**: at the last
+  spread there is nothing left to turn, and a fat stack still on the right would say
+  otherwise. So the thickness crosses the spine as you read — the one thing a real
+  book does that no printed page can — and it needs no new state.
+- `EDGE_MIN` keeps the thin side from vanishing: one leaf is still a leaf, and a side
+  at zero reads as the effect failing rather than as a book nearly read.
+- **A sibling of `.album__book`, not a child**, for the same reason the turn strips
+  are: the book is `preserve-3d`, so anything inside it joins the 3D scene and gets
+  depth-sorted against the turning leaves.
+- **It must not cost the turn strip a pixel.** The fore-edge paints over the page's
+  outer margin, and that margin *is* the strip's 22px hit area — the one column a hand
+  lands on, and an overlap there has been expensive once already. So it sits under the
+  button (z-index 39 against 40) with `pointer-events: none`, and the check is
+  automated rather than eyeballed: a harness probes four screen points across the
+  strip with `elementFromPoint` and asserts every one resolves to the button.
+- **Not rendered while shut**, like the turn strips: a closed book slides half a page
+  left and these are pinned to `.album`, so they would stay behind at the open book's
+  edges. A shut book *does* have a visible fore-edge and it would be worth having —
+  that needs the stack to live on the cover leaf inside the 3D scene, which is a
+  different job.
+- **A leaf leaves its pile at once and joins the other one on landing.** Three beats:
+  the pile it is lifted off loses it immediately, the page travels, the pile it lands on
+  gains it. Both sides changing together — at either end of the flip — is wrong in the
+  same way a page teleporting would be.
+  - The two sides are therefore read at different moments: `leftLeaves =
+    min(live, settled)` and `rightLeaves = paperLeaves − max(live, settled)`, where
+    `live` comes from `flipped` and `settled` from `settledFlipped`. `min`/`max` covers
+    both directions with no test for which way the book is turning — going forward
+    `flipped` runs ahead, so `min` holds the left until landing while `max` drops the
+    right at once; going back `settledFlipped` is the higher one and the roles swap.
+  - **Mid-flight the two sum to one less than `paperLeaves`, and that is correct** —
+    the leaf in the air is on neither pile. Anyone "fixing" that sum will put the beats
+    back in lockstep.
+- **The gain waits for the landing, and getting that to happen took two goes because
+  CSS cannot express it here.**
+  - It first interpolated the width across the flip on the leaf's own 620ms curve, on
+    the reasoning that the thickness should move while the page moves. That reads
+    wrong: the new line appears the instant you click, so the pile has grown by a page
+    still in the air.
+  - The obvious fix was `transition: width 0s linear <flip duration>` — a discrete
+    change on a delay, exactly the idiom `.album__binding` uses to wait out the cover
+    fall. **It does not fire on this property.** The width comes from a custom property
+    (`--edge-w`), and a property that changes because a `var()` it references changed
+    does not reliably start a transition, so the width went on snapping at click.
+  - So `settledFlipped` in Album.tsx holds the *state* back by one flip instead, on a
+    `setTimeout(ms(SHUT_MS))` — `SHUT_MS` is already documented as matching
+    `.album__leaf`'s transition and `ms()` scales it by the same `--anim` the CSS
+    multiplies by, so the two cannot drift. Reduced motion sets it straight through, or
+    the stack would freeze a turn behind a flip that never animates. **Do not add a
+    width transition back on top of this** — the two compose into a double delay.
+
+#### The checklist at the back — built
+
+The conventional back-of-album page: every collectable listed and numbered, ticked
+off as you get it. It is also the one place in the book where a **mutable number is
+physically honest**, which is the whole reason it exists here — and the reasoning is
+what makes it so.
+
+**Two hands on one page, and every rule in `album.css` belongs to one of them:**
+
+| | who | what |
+| --- | --- | --- |
+| `#6b5325` brown | the press | numbers, names, leader dots, the empty boxes, the total |
+| `--graphite` | the reader | the ticks, the doubles figures, the tally figure |
+
+Keeping the two inks apart is what lets this page carry a changing number. **Do not
+unify the palette**: a tick in the paper's own brown would read as *printed* to mean
+"you have this one", which is a printing press that knows what is in your album.
+
+- **The book prints the empty list; the reader adds the marks.** Numbers and names
+  are factory ink and never change. A tick appearing when a card arrives is your
+  own hand in your own book, so nothing pretends printed ink rewrote itself.
+- **Pencil, not ink**, to keep the two hands distinguishable. Note that **nothing is
+  ever erased**: there is no trading cards away in this design, so a tick once made
+  is permanent. A player going **inactive** needs no mechanism at all — a printed
+  album cannot un-print a slot, the place stays in the book, and you do still own
+  the card.
+- **The tally is set as a form**: `Verzameld: ____ van 24` comes off the press with
+  the blank empty, and only the figure in the blank is written in. That is precisely
+  what the cover could not do, where the same number was blocked in gold foil.
+  - **Only the current figure is written.** A lineage of struck-through earlier
+    figures is the honest way to show a tally being kept, but it is real data or it
+    is nothing: inventing plausible past numbers would be fabricating a history the
+    reader would read as true. The genuine one is derivable from `CardInstance`
+    timestamps — the tally on each earlier day a first copy landed — and that is a
+    backend errand, not a render.
+  - The figure is **counted client-side** from the sections already in hand. It is
+    the same number the cover used to print; no endpoint was added for it.
+- **The list prints the name without the nickname**, via the same `splitName` the
+  card face and the initials use — so the list cannot start disagreeing with them
+  about what a name is. Stored names carry a nickname in quotes (`Petar "beetje
+  gepiel" Drandarov`), and a checklist column is ~90px wide: the least room in the
+  album for the longest part of a name. The nickname is not lost, it is on the back
+  of the card, which is why it was put there.
+- **Numbering is gathered while the slots pages are laid out**, not by walking the
+  roster a second time — the same reason `albumSlotOrder` is built from
+  `buildPages`. Numbers count over *slots only*, so a padding page cannot shift
+  them. Note the numbers are so far printed **only in the list**: putting one in the
+  mount is the follow-up that makes them fully useful, and it is the one part of
+  this that touches the deliberately bare slots page.
+- **The ticks are drawn, not typed.** Two strokes with round caps, the variant and a
+  degree of tilt from a **hash of the player id** so a card's mark is identical
+  across reloads and re-renders — `Math.random()` would have forty ticks twitching
+  every time the page turned. Explicitly **no handwriting font**: the stacks that
+  look right on Windows fall back through generic `cursive`, which is Comic Sans on
+  most machines this runs on.
+  - The tick is drawn **124% of its box and offset**, so it breaks the printed edge.
+    A mark that fits neatly inside a printed box was printed with it.
+- **The rows are the index.** Clicking one turns the book to that card's page, via a
+  new `goToPage` — which, unlike the `focusPlayerId` effect, **does** play the page
+  turn: that one turns the book behind the card viewer's scrim where an unseen turn
+  is unexplained noise, and this one is a reader asking the book for a page.
+- **It starts on a left-hand page**, by the same padding trick sections use, because
+  a spread with cards on one side and a list on the other reads as a mistake.
+- **Real content, so real semantics**: an `<ol>`, with the mark `aria-hidden` and
+  the state in the row's label via the shared `ownedLabel`, plus the same
+  `visible`-gated `tabIndex` the slots use — or tabbing walks every checklist row on
+  every leaf currently rotated away.
+
+The three open questions from the plan all resolved without new plumbing:
+`maxFlipped` already derives from `pages.length` so appended pages are reachable;
+`albumSlotOrder` flatMaps `page.slots` so checklist pages contribute nothing to the
+card viewer's order; and the tally is counted client-side as above.
+
+**Two layout decisions worth not re-deriving:**
+
+- **Forty lines per page is a fixed number, and has to be.** Page composition cannot
+  depend on the viewport: the reading position is stored as a *leaf index*, so a
+  phone paginating the list differently from a desktop would land the same stored
+  position on a different page on each. `CHECKLIST_ROWS_PER_PAGE` is therefore sized
+  to the smaller page — a short phone gets `--page-h` down around 386px.
+- **The list is a `grid` of twenty `1fr` rows, not multicol, and specifically to
+  avoid a magic number.** The first attempt derived a row height as
+  `(var(--page-h) - 96px) / 20`, and the constant was wrong: the head, tally and
+  folio come to ~104px on a desktop leaf and ~94px on a phone, so twenty rows
+  overflowed and `.album__page`'s `overflow: hidden` quietly clipped the last one.
+  `1fr` rows size themselves from whatever height the list actually gets, so it is
+  correct at every page size by construction. **The `20` in the CSS is
+  `CHECKLIST_ROWS_PER_PAGE / 2`** — they have to agree.
+  - A short last page leaves the remaining cells empty, which is what the back of a
+    real album looks like, and the rows stay on a full page's pitch because `1fr`
+    sizes a track whether anything is in it or not.
+- On a phone the two columns stay, and the space comes out of the furniture rather
+  than the name: tighter gutter, smaller number column, and **the leader dots are
+  dropped** — they are the most decorative element on the row and the only one
+  carrying no information.
+- The **ruled grid comes off this page**. Its three bands are spaced for the card
+  grid, and behind a dense two-column list they are ruling that lines up with
+  nothing; the list brings its own.
+
+**Whole-pixel type, because the first cut read as blurry.** `--page-w` is a `min()`
+of viewport terms and so is almost always fractional — 442.3px on a 1440×900 window
+— and every size on the page was a ratio of it, which produced font sizes like
+9.29px. Fractional sizes are invisible on a card title and are exactly where 8–11px
+serif body text goes soft, and the page is resampled a second time by the leaf's 3D
+context. So:
+
+- **One rounded size lives on `.album__page--list`**, snapped with
+  `clamp(8px, round(down, calc(var(--page-w) * 0.023), 1px), 13px)`, and everything
+  else on the page is a **whole-number `em` multiple of it** (`1em`, `2em`) rather
+  than carrying its own ratio. Anything added here should follow that: **no
+  `1.15em`**. The plain `font-size: 10px` before it is a fallback, not a leftover —
+  `round()` is CSS Values 4, and a browser without it drops the declaration at parse
+  time and would otherwise inherit Tahoma at 16px.
+- **The tally figure is lifted a pixel, not rotated.** A `rotate(-1.4deg)` said the
+  same thing about a hand not lining up with the printing and made the one figure
+  the reader is meant to *read* the blurriest text on the page, because rotating a
+  glyph resamples it. A whole-pixel `translateY(-1px)` does not resample at all.
+
+**The thinnest part of the illusion** is the two numeric marks — the doubles figure
+and the tally — which are a graphite italic rather than handwriting. That is the
+honest limit of having no script face available. If it ever matters enough, the
+answer is hand-drawn SVG digits, not a font.
+
+Two notes for whoever picks this up:
+
+- **The rows still use `align-content: start`**, so the vertical slack — which was
+  always there, and is now ~40px larger — collects below the cards. Centring them
+  was considered and not done: rows should fill a printed page from the top, and a
+  partly filled last page would otherwise float its single row mid-leaf.
+- The **faint ruled grid survives** in the page's background stack. It is a
+  background layer rather than printed matter, it cannot paint over a card, and
+  it is the last thing keeping the paper from being a flat tint. It is one
+  `repeating-linear-gradient` to delete if it ever reads as clutter.
 
 **The page turn is on the book, not beside it.** A transparent strip down the
 outer edge of each open page (`.album__turn`). Clicking the shut cover already
@@ -1322,9 +2307,9 @@ The photo fills almost the whole card. Everything else is overlaid on it.
 
 ### The icoon card
 
-**Icoon is not a fifth tier, it is the legend.** The same axis FIFA's Icons sit on:
+**Icoon is not a fifth tier, it is the icoon.** The same axis FIFA's Icons sit on:
 not *better than gold* but *a different kind of card* — who someone is rather than
-how good they are now. That axis already existed here as `isLegend`, so this is
+how good they are now. That axis already existed here as `isIcon`, so this is
 that flag finally doing something on the face rather than a new concept.
 
 It **replaces the black `legende` pill**, which was the only element on the card
@@ -1347,7 +2332,7 @@ Four parts and no more:
    multiply before anything breaks.
 2. **One near-white two-zone ground**, a warm ivory light zone in the upper right
    over a near-neutral body shading to grey-taupe at the lower left, so an icoon
-   reads from the far side of a spread. The same ground on every legend.
+   reads from the far side of a spread. The same ground on every icoon.
 3. **A 1px gold rule** on the edge — `rgba(176,142,66,.85)` at inset 0.
 4. **The type is an olive-bronze**, `#7C6A3C`, where the tiers use a near-black.
    The reference sets its number, name and rules in metal, and that is most of why
@@ -1362,7 +2347,7 @@ diagonal stripe with nothing to justify it, and this card reads as printed board
 Everything above except the premise is newer than the first version, and the four
 things that changed all changed for the same reason: **the design was judged on
 five cards and broke on twenty.** Worked through in
-[icoon-uniform.html](icoon-uniform.html), which renders the whole legend pool.
+[icoon-uniform.html](icoon-uniform.html), which renders the whole icoon pool.
 
 **One colourway, not one per tier.** The three differed in exactly four values —
 the ground, the coloured ray, the white ray and the photo wash. The white ray was a
@@ -1373,8 +2358,8 @@ gold by *saturation alone*, in the same hue family, over the ~30% of the card th
 mask clears. Only silver read as its own thing, and only because warm-versus-cool
 survives at album size. Three colourways that read as two is not a system.
 
-The old rule — the tier must follow the legend down, because a gold ground on a
-69-rated legend lies about him — held while the grounds were *coloured*. This ground
+The old rule — the tier must follow the icoon down, because a gold ground on a
+69-rated icoon lies about him — held while the grounds were *coloured*. This ground
 is near-white and makes no rating claim, so the claim is left to the overall, which
 is the one hard fact on the face anyway.
 
@@ -1469,7 +2454,7 @@ both times; the two are one light and cannot be tuned apart.
 - **The field's variables live on `.opener__stage`, not on the card.**
   `.opener__flash` is a sibling of the flip and the `card--icoon` class is several
   levels down inside it; CSS cannot select upward. `PackOpener` publishes
-  `opener__stage--icoon` off `current.player.isLegend` on their nearest common
+  `opener__stage--icoon` off `current.player.isIcon` on their nearest common
   ancestor. Nothing else about the ceremony changes — icoon is still not a tier,
   and the level, the build length and the gold ramp are still the overall's.
 - **The "new" rim goes gold with it**, which reverses the first pass here. It was
@@ -1546,14 +2531,14 @@ checkerboard card backs).
 Empty slots are deliberately **not** marked as icoons. A silhouette's job is to be
 identically blank.
 
-This used to have a second half — "and legends have their own pages in the album",
+This used to have a second half — "and icons have their own pages in the album",
 so you could tell from *where you were* what a blank slot was. That stopped being
-true when legends were interleaved by rating (see "One sequence, not an annexe"),
+true when icons were interleaved by rating (see "One sequence, not an annexe"),
 and the decision is kept anyway: an unmarked silhouette now genuinely does not say
 whether it is an active or an icoon. Which is arguably better — an icoon-shaped
 hole would advertise a card you have never seen — but it is now a real gap in the
 album rather than a redundant one, and it is the thing to revisit first if the
-legends half of the book turns out to be unreadable while empty.
+icons half of the book turns out to be unreadable while empty.
 
 The full comparison — five candidates, four real faces, both frame readings, and
 the live photo-grade sliders — is in
@@ -1679,8 +2664,12 @@ Five beats: wrapper → tear → the card arrives → reveal → hand-off to the
   - Two knock-ons: `.album-side` widened to `clamp(148px, 24vw, 352px)` to fit two
     packets per row (at 216px the shelf was a scrolling strip one and a half packets
     tall), and the shelf's `max-height` went 46vh → 56vh so two rows fit.
-  - That width is now an upper bound rather than the width — see "The book does not
-    move" below.
+  - **The parity was aspirational for a while, and is structural now.** For as long as
+    the shelf took the room the book left over, a `min()` in `.album-side .pack-shelf`
+    shrank the packets to whatever two of them could fit in it — so the sentence above
+    held only on windows where that was generous. Both that width and that `min()` are
+    gone; `.album-side` states its width and the book is solved against it. See "The
+    table is one object, and the book is solved against it".
 
 **The book does not move.** `.album-layout` was a two-column flex row, so the book
 centred inside whatever width the shelf left rather than on the stage: it sat
@@ -1703,21 +2692,27 @@ truer reading of "objects lying next to the book".
   becoming `--stage-w` / `--stage-pad`: if the stage's own box and the box in that
   formula drift apart, the shelf overlaps the book. Which is exactly what happened —
   see "The shelf was overlapping the book".
-- The packets shrink to keep the pile **two columns** where they can, down to a 96px
-  floor, below which the shelf becomes one centred column at whatever size fits. Two
-  columns is what makes it read as a pile; a few percent off card parity is a
-  cheaper price than a list. Card-sized survives from ~1600px wide; 1440×900 gets
-  96px packets in two columns; tall windows (a big book, a thin margin) get one.
-  Those figures are for a full-bleed stage. On the tabletop stages the slab, not the
-  window, is what the margin comes out of — see "The table is 1660, not 1520".
-- Below the width where even one packet fits, the shelf goes back above the book in
-  flow. Two triggers, because the book grows with viewport *height* as well:
-  `max-width: 1150px`, or `max-width: 1400px and min-height: 1000px` — a 1300×1400
-  window is wide by the first test but its book is 1040px and leaves 91px a side.
+  - **That cost has since been paid back the other way round.** `--shelf-room` is still
+    the formula, but it is now the *guard* rather than the mechanism: the shelf states the
+    width two card-width packets need and `--page-w` is solved so the margin has it. See
+    "The table is one object, and the book is solved against it", which supersedes the
+    bullet below.
+- ~~The packets shrink to keep the pile **two columns** where they can, down to a 96px
+  floor, below which the shelf becomes one centred column at whatever size fits.~~ This
+  was the ladder, and it is deleted. Two columns is what makes it read as a pile — that
+  part stands and is now a requirement rather than a preference — but "a few percent off
+  card parity is a cheaper price than a list" turned out to be 25–39% off it on a tall
+  window, which is not a few percent and is not what the sentence was agreeing to.
+- Below **1450px** the shelf goes back above the book in flow. One trigger, where there
+  used to be two (`max-width: 1150px`, or `max-width: 1400px and min-height: 1000px`) —
+  both of those asked whether the margin could still hold a packet, and it always can now.
+  What gives instead is the book, and below ~1450 it gives more than the margin is worth:
+  at 1200×800 the solve comes out at a 309px page against the 393px stacking allows.
   Stacking is symmetric, so the book stays centred there too. This replaces the old
-  900px breakpoint.
-- The shelf is also capped to `min(56vh, --page-h)`: out of flow it contributes no
-  height, so a shelf taller than the book would run down over the test panel.
+  900px breakpoint and then the 1150px one.
+- The shelf is capped to the **book's own height** (it was `min(56vh, --page-h)`): out of
+  flow it contributes no height, so a shelf taller than the book would run down past it.
+  It is a flex child of `.album-side`, so it gives way to the seal when both are out.
 - Rejected: reserving a mirrored gutter on the right (keeps the book centred, but
   spends ~700px of layout width on furniture), and animating the collapse with a
   `grid-template-columns` transition (makes the jump graceful without removing it).
@@ -1727,9 +2722,12 @@ truer reading of "objects lying next to the book".
   about the grant, not about the product. Both crowded the badge, which is the thing
   that makes these read as rik-dev packets at all. The reason still reaches anyone who
   wants it as the tile's `title`/`aria-label`; the opener's hint says what to do.
-  - A debug pack prints its guarantee instead of a count (`80+` for
-    `guaranteeLevel: 2`, thresholds read off `CEREMONY_STEPS` so the print cannot
-    drift from the draw). Those are always single cards, so no count is lost.
+  - A guaranteed packet prints its floor instead of a count (`80+` for
+    `minimumOverall: 80`) and is the only orange one. Those are always single cards, so
+    no count is lost. The floor arrives as the overall itself rather than as a level to
+    look up, so the print cannot drift from the draw — there is no table between them.
+    Read it through `packFloor`, never off the field: the server sends `null` on every
+    earned pack, so a strict `=== undefined` prints `null+` on all of them.
   - Everything is positioned **and sized** in % of the packet, so one set of rules
     serves the opener and the shelf with no overrides — which only works now the two
     are within ~1.7× of each other rather than 4×. Nothing may sit inside `--crimp`
@@ -1869,6 +2867,55 @@ truer reading of "objects lying next to the book".
   Without it both occupy the centre at once and a face-up player appears to turn
   back into a card back.
 
+#### The tear does not wait for the roll
+
+`onOpen` used to be awaited before anything moved, which was harmless while it was a
+mock and wrong the moment it became `POST …/packs/{packId}/claim` — a full leaderboard
+replay. The packet lay in your hand doing nothing for as long as the server took, and a
+click with no consequence reads as a **dropped click**, not as a wait. It is the same
+note the silhouette beat produced: held time on its own is latency, and the eye reads
+latency as a fault.
+
+So the tear plays on the click and the roll runs underneath it. The two meet whichever
+way round they finish:
+
+- **Cards first** — the ordinary case, since the tear alone is 840ms real at the settled
+  pacing. Nothing waits and nothing about the reveal changes at all.
+- **Tear first** — the first card still rises out of the wrapper and **stands there face
+  down** until there is something to turn it into. Only the *flip* is withheld, because
+  the flip is the only beat that needs to know what the card is. A face-down card is a
+  card you are waiting on; a torn wrapper with nothing under it is a page that has hung.
+
+Four things fell out of it, all of them in the component:
+
+- **`waiting` shares the whole of `revealing`'s markup** rather than getting a branch of
+  its own. A separate branch is a separate element, so the riser would unmount and
+  remount when the cards landed and play its 180ms entrance a second time — a card
+  rising out of a wrapper it is already out of. `current` is therefore allowed to be
+  undefined for that window, and the front face simply is not rendered; it is turned away
+  and back-face culled, so there is nothing there to draw.
+- **A card that stood waiting spends both leads.** `playCard` takes a `standing` flag
+  that zeroes them. `FLIP_LEAD_MS` exists to let the entrance finish and the entrance is
+  long over; `CEREMONY_LEAD_MS` — the beat where a rare card sits looking like any other
+  — has just been held for longer than it asks for, by the network. The turn is what
+  happens next, which is the point: the flip *is* the answer arriving.
+- **A skip that lands before the cards do is held, not swallowed.** Finishing on an empty
+  hand would report a pack of nothing while the server was still filling it, so the click
+  is remembered and honoured the moment the roll lands.
+- **`onFailed` is now a required prop.** A refusal used to leave the packet sealed and the
+  page stranded behind an exit button that hides itself for the length of a reveal —
+  wrong, but invisibly so. Something has visibly begun now, so it has to visibly end: the
+  page puts the packet away and **refetches**, because every refusal this endpoint issues
+  means the shelf is out of date (409 for a packet opened in another tab, 404 for one that
+  expired at midnight or whose game has been deleted). The refetch is both the explanation
+  and the fix.
+
+Deliberately *not* added: an idle float or breathe on the waiting card back. It would have
+to be removed at the turn, and any animation removed mid-cycle snaps. The wait is usually
+zero and rarely more than a few hundred ms, so a still card back is the honest reading. If
+the claim ever gets slow enough that this stops being true, that is the fix to revisit —
+and the pack shelf is the place it would show first.
+
 ### The shelf stays up
 
 *On trial — built, not yet signed off.*
@@ -1977,7 +3024,8 @@ margin it leaves is symmetric whether or not both hold packets:
 
 1598 at 1920×1080, and 1644 at the same width on a taller window, where the book caps
 at 1040. **1660** covers any 1920-wide window; the shelf gets 257px and holds two
-columns of 111px packets.
+columns of 111px packets. (The table is 1740 now — the formula is what moved it, see
+below.)
 
 Full card parity would want ~1781 — 93vw at 1920 — and that is the line this stays
 behind deliberately. The slab exists to read as a table in a dark room rather than a
@@ -1994,6 +3042,140 @@ side padding absorbs almost exactly that and always did, which is why this was n
 bug. It is worth knowing that the figure is not slack but a fit: widening it is
 subtracted twice in `--pack-w`, and past ~11px two packets no longer clear the shelf's
 352px cap and the pile drops to a single column.
+
+#### The footer's space went into the spread
+
+Deleting the footer left a strip of bare table at the bottom of the stage doing nothing,
+and the book is what the page is for, so the book got it. **The page went 59vh → 63vh
+and its cap 520 → 560, and the table went 1660 → 1740.**
+
+The vertical arithmetic is the same accounting the 56 → 59 bump used, and it is the
+whole reason `--page-w`'s height term is written as `Xvh × 0.78` against a `/ 0.78`
+page height: the two cancel, so X *is* the page height in vh and can be compared
+directly against anything else competing for the column. The footer was a 22px row plus
+a 24px margin, ~46px, and 4vh is under 46px on every window up to 1080 tall — so the
+spread is no taller than the spread-and-footer were, at any size, and the page controls
+stay where they were relative to the fold. Above 1080 the 560px cap binds before 63vh
+does (they cross at 1139px tall), so the page never exceeds 718px however tall the
+window.
+
+The width follows from the height, which is the part worth noticing: at 1920×1080 the
+*height* term binds, so raising it widened the book too — 994 → 1062 — without touching
+a width term. Raising the cap to 560 carries the same growth onto tall windows, where
+the cap is what binds instead.
+
+**The table's 1740 is derived, not measured: it is 1660 plus the 80px the book's cap
+grew** (520 → 560 a page is 1040 → 1120 a book). Adding the book's growth to both sides
+of the formula leaves the binding case untouched — the shelf's tall-window margin is
+234px before and after — so the pile is provably the same pile rather than one that
+happens to still fit. `min(1740px, 97vw)` is also never narrower than `min(1660px,
+97vw)` at any width, so nothing below 1920 got tighter; the 1660-to-1740 band just
+follows 97vw as it already did.
+
+What it costs: card parity for the packets recedes, from 79% of a card to 75%, because
+the cards grew with the page while the margin did not. Parity would now want ~1894 —
+99vw at 1920, i.e. the wooden wall this design has refused twice. It stays refused.
+(**It is refused no longer** — see the next section, which is what happens when the
+recession above is followed to its end.)
+
+The phone book took the same dividend, 58vh → 61vh, with its width terms untouched:
+`80vw` is what binds on a phone, so that one only shows up on a portrait tablet — which
+is the case that has the height to give.
+
+#### The table is one object, and the book is solved against it
+
+Three sizes on this page were arrived at by picking one number and letting whatever
+depended on it absorb the consequences. Each time, the thing that absorbed them was the
+thing the design cared most about, and each time nothing surfaced it — a percentage that
+drifts with the window has no error state.
+
+- The packets absorbed the shelf's width. A packet was "as wide as a card" only where the
+  margin allowed two of them at that size: **114px against a 153px card at 1920×1080, and
+  100px against 163px on a 1440-tall window.** Two sentences in this document and three
+  comments in the CSS said the coloured panel is exactly one card tall, and on the common
+  desktop it was 1.3 cards short of it.
+- The book absorbed the vertical column. The test panel's plate under the table was ~83px
+  of the one axis the book is sized on first.
+- The slab absorbed its contents. `min-height: 78vh` plus content meant seven states and
+  seven table sizes, on a stage whose whole premise is that it is an object rather than a
+  page.
+
+All three now run the other way. **What matters is stated; what can move is solved for.**
+
+**The shelf states its width and the book is solved against it.** The chain is
+`--album-card-w = (--page-w − 72px) / 3` from the album's grid, and
+
+```
+shelf column = 2 × --album-card-w + --pack-gap + 2 × --shelf-pad + --shelf-bar
+(stage inner − 2 × --page-w) / 2   ≥   --shelf-gap + shelf column + 16px
+```
+
+Substituting and solving for `--page-w` gives a third term in its `min()` — the widest
+page whose own margin still holds the pile — which lands a few px *inside* the margin
+rather than on its edge, because at equality `flex-wrap` deciding whether 242.827px fits
+in 242.827px is a coin toss, and at 1600×780 it came down tails. Everything in the solve
+is on `:root` in game.css and is viewport-relative or a literal, so it resolves with
+nothing measured. Nothing in it may ever be made to depend on `--page-w` or
+`--album-card-w`: that closes the loop and CSS drops the property as invalid.
+
+Two new tokens came out of it, `--shelf-pad` and `--shelf-bar`, both of them figures that
+used to be literals inside `.pack-shelf`. The gutter is the more interesting one: `.pack`
+is a fixed width, so a scrollbar appearing inside a scrolling shelf cannot narrow the
+packets — it pushes the second column onto a row of its own, and it does that exactly
+when the pile is deepest. So the gutter has to be *wider* than a scrollbar rather than
+equal to one. 18px, against Windows' 15–17.
+
+**`--stage-w` went 1740 → 1860, and the wooden wall is accepted.** At 1740 the solve
+gives a 474px page, which is the book we already had: two card-width columns and no
+growth at all. At 1860 it gives 502 and the album is ~7% wider. The surround goes from
+90px of black a side at 1920 to 30px, which is the line "it stays refused" above was
+drawing. It is crossed because the two things it was protecting — a pile of two, and
+packets that match the cards — are worth more than the black, and because `98vw` still
+keeps a surround on anything narrower.
+
+**The height term went 63vh → 70vh, and the panel moved into the right margin.** 70 is a
+ceiling rather than a round number: everything above and below the spread is fixed px
+(navbar 80, stage padding 76, nav-label 25, `.album`'s 8) — about 227px — so fitting means
+`k ≤ 1 − 227/H`, which is 0.70 at a 760px-tall viewport. That is a 1536×864 laptop at
+Windows' 125% scaling, and it is the shortest window worth designing for; 72 would fit
+1080 and overflow it.
+
+**The slab is one size in every state.** `--album-room` is the book's footprint —
+`--page-h` plus 40px for the nav-label row and `.album`'s padding — and `--stage-h` is
+that plus the stage's own. `.album-layout` reserves it, which is also what stops the
+panel in the margin riding up and down as the middle of the layout changes. The five shut
+albums already came to the same figure within a pixel, deliberately; that was two
+components agreeing and is now one box they sit in.
+
+The opener is the occupant that had to give something up: its `min-height: 62vh` is now
+`min(62vh, --album-room − 30px)`, the 30 being the "terug naar het album" row. On a
+960-tall window that still resolves to 62vh exactly, so the common case is untouched; the
+`min()` only bites where 62vh overshot the book, which on a 2000-tall window was by 590px
+of empty wood. **That was only safe because the ceremony's vignette and bloom centre on
+`--card-cx` / `--card-cy`, the card's measured position** — the `50% 45%` in those
+gradients is a fallback, and had it still been the alignment, moving the opener's box
+would have slid the card out of its own spotlight.
+
+**Below 1450px the whole thing stacks and every ceiling lifts** — `.game-stage` back to a
+`min-height`, `.album-layout` back to no reserved footprint — because stacked there is no
+fixed footprint to reserve and a fixed height would clip the register and the panel off
+the bottom of an `overflow: hidden` slab.
+
+One trap worth recording, found in the built CSS rather than the source: cssnano resolves
+what it can inside a `calc()` and emits a literal declaration **in front of** the
+var-based one. `--album-card-w` is itself a calc over a `min()`, which it cannot parse, so
+with a `var(--album-card-w, 96px)` fallback in `.album-side`'s width it emitted
+`width: min(244px, …)` above the real rule — a shelf built for 96px packets, one cascade
+slip from applying. The fallback is dropped there; album.css and game.css are always in
+the same bundle, so it was never protecting anything.
+
+The lean figure from the section above survives with a different meaning. It is still ~6%
+of the width per side and ~9.5px under the hover `scale(1.04)`, and `--shelf-pad`'s 13px
+still absorbs it. What changed is what raising it costs: it used to be subtracted *twice*
+out of a two-column packet width, so widening it silently dropped the pile to one column.
+It is now a term in the book's own width, so widening it costs a couple of px of spread —
+a thing that can be read off the formula rather than found by noticing the pile has
+collapsed.
 
 ### New, not duplicate
 
@@ -2681,9 +3863,10 @@ Implementation notes, each of which cost a round:
   by design and the screen-filling glow must not — it would hang there lighting
   an empty stage while the card travels.
 
-`guaranteeTier` / `guaranteePlayerId` / `guaranteeLevel` on `Pack` and
-`DrawOptions` exist purely so a level can be summoned on demand while tuning.
-They are mock-only and go away with phase 2.
+`minimumOverall` on `Pack` exists so a level can be summoned on demand while tuning
+rather than waited for on a ~3% roll. It is server truth now — a `PackGift` sets it — and
+it replaced the mock-only `guaranteeTier` / `guaranteePlayerId` / `guaranteeLevel` trio,
+which is deleted.
 
 ### Pacing: two knobs, and everything derives from them
 
@@ -2872,14 +4055,15 @@ All under `anago-leader-board-ui/src/`.
 
 `src/styles/game.css` (game-screen shell), `card.css`, `album.css` (book and
 flip), `packopen.css` (the five beats), `viewer.css` (the enlarged card),
-`ledger.css` (the signing-in book), `albumchoice.css` (the five shut albums).
+`ledger.css` (the signing-in book), `albumchoice.css` (the five shut albums),
+`locked.css` (the padlocked album behind the games gate).
 Deliberately **not** `@mui/styles` — JSS is deprecated and unpleasant for
 multi-step keyframe sequences, and plain CSS is already an established pattern via
 `App.css`.
 
 New components: `components/GameShell.tsx`, `Album.tsx`, `PlayerCard.tsx`,
 `PackOpener.tsx`, `PackTile.tsx`, `PackFace.tsx`, `CardViewer.tsx`,
-`SigningLedger.tsx`, `LedgerCorner.tsx`, `AlbumChoice.tsx`.
+`SigningLedger.tsx`, `LedgerCorner.tsx`, `AlbumChoice.tsx`, `LockedAlbum.tsx`.
 
 `PlayerPicker.tsx` **is deleted.** It was the header's type-ahead; the ledger took over
 signing in and the register took over signing out, so there was nothing left for it to do.
@@ -2927,7 +4111,7 @@ red/green/yellow/cyan).
 - Gate on ≥5 games for the picked player (`MIN_GAMES` in `mock/cardMock.ts`;
   `MinGamesForCards` in `appsettings.json` once the backend exists — it belongs
   next to `DHigh`, since the two are tuned against each other).
-- Unrevealed packs, the pack opener, the album, legends progress — see the
+- Unrevealed packs, the pack opener, the album, icons progress — see the
   Presentation layer above.
 - Reuse `hooks/useIsMobile.ts` for the single-page mobile album.
 
@@ -2954,7 +4138,7 @@ and no API called for cards.**
 - `drawPack(size, opponentIds?)` — weighted sampling without replacement,
   including the 2× opponent bonus.
 - A few canned unrevealed packs, and a partially-filled collection so
-  silhouettes, duplicates and legends progress all have something to render.
+  silhouettes, duplicates and icons progress all have something to render.
 
 Implementing the *real* weighting in the mock rather than uniform random matters:
 the entire point of phase 1 is judging whether a rare pull **feels** rare, and it
@@ -2996,14 +4180,18 @@ Order within phase 1: `XpWindow` → `PlayerCard` → `Album` with the flip →
    `POST api/collections/{playerId}/packs/{packId}/claim`.~~ **Done**, and with it the
    whole of the sandbox, `mockCardsClient` and `cardMock`'s fixture half. The file
    survives as presentation only — see "Where this stands". The **test panel does not
-   die with it**, against what step 5 originally assumed: its pack buttons are the
-   first caller for the gift endpoint, so they stay as stubs rather than being deleted
-   and rewritten.
-6. `PackGift` and `POST api/collections/gifts` — present a pack to a named player or
-   to everybody, and wire the test panel's buttons to it. The guarantees in
-   `GrantOptions` need a home in `PackService.Roll`. This is the only grant-shaped
-   table in the design, because a present cannot be derived from anything that
-   happened.
+   die with it**, against what step 5 originally assumed: its pack buttons became the
+   first caller for the gift endpoint, so they were kept rather than deleted and rewritten.
+6. ~~`PackGift` and `POST api/collections/gifts` — present a pack to a named player or
+   to everybody, and wire the test panel's buttons to it.~~ **Done**, and with it the panel's
+   buttons, which now hand the signed-in player a real present. The guarantee found its home
+   in `PackService.Roll` as a **minimum overall** rather than the three `guarantee*` options
+   that were sketched for it — see "Where this stands" for why one number replaced all
+   three. This is the only grant-shaped table in the design, because a present cannot be
+   derived from anything that happened.
+
+**That is all of phase 2.** What is left in this document is presentation: the silhouette
+beat, and the two smaller open questions at the top.
 
 Note what the collection slice cost that was not foreseen: `CardPoolService` needed a
 second `GetPool` overload taking an already-replayed roster. `GetLeaderBoard()` is not
@@ -3015,7 +4203,7 @@ collection read paid for two full replays.
 Splitting 2 out ahead of the migration was worth it beyond the icoon pages: it put
 the scale in front of real data early, which is what turned up the midpoint
 rounding trap, the wrong "highest rating ever recorded" claim, and the fact that
-the 5–9 games band in the legends pool is populated after all.
+the 5–9 games band in the icon pool is populated after all.
 
 ## Verification
 
@@ -3043,7 +4231,8 @@ presentation layer.
     while browsing. Tab reaches only the two visible pages' cards.
 4. Open a mock common pack: **stopwatch it under 2 seconds**, and a click
    mid-animation lands immediately on the end state.
-5. Force each ceremony level via `guaranteeLevel` and **screen-record two levels,
+5. Force each ceremony level with the test panel's `75+`/`80+`/`85+`/`90+` buttons — a
+   gift with a `minimumOverall` — and **screen-record two levels,
    then compare frames at the same `t`** — they must be indistinguishable until
    the shorter one stops. This is the one check that catches a regression of the
    governing rule, and eyeballing it is not enough.
@@ -3089,7 +4278,11 @@ presentation layer.
     - `DELETE api/player/{id}` for a throwaway player who owns an album → no FK
       violation, and the row goes with them. That is what the cascade is for.
     - Clear `tafelvoetbal.cards.playerId` → the ledger fills the stage, with **no header at
-      all** and no footer. An under-gate name is listed struck through.
+      all** and no footer. Every name on it is clickable and none of them carries a game
+      count.
+    - Sign in as a player with fewer than 5 games → the padlocked
+      album, the games still to play, the pips, and a register that gets you back out.
+      Reload on it → the same screen, not the ledger and not a cover choice.
     - The register lies in the right margin once signed in, opposite the packet shelf, and
       is present during the cover choice too — signing in as the wrong person and getting
       out again before binding a book has to work. Click it: the name is crossed through,
@@ -3097,7 +4290,8 @@ presentation layer.
     - Below 1150px wide the margins collapse and the register stacks **below** the book
       while the shelf stacks above it.
     - Pick a leather → four books leave, one centres, the name foils in, the book lands
-      **shut** on page one. Watch the handover frame as the footer appears.
+      **shut** on page one. Watch the handover frame: nothing under the table moves, and
+      the book must not shift down as the album takes over.
     - **Reload → straight to the album, with no flash of the ledger and no flash of the
       cover-choice table.** Two separate ordering bugs, both of which happened, and the
       pair of regressions to watch:
@@ -3134,8 +4328,29 @@ presentation layer.
     - `DELETE /api/game/{id}` → the packet stops being offered and its cards vanish.
     - Two tabs on the same packet → one reveal, one 409, one set of cards.
     - Past midnight, yesterday's unclaimed packets are gone whether opened or not.
-    - The test panel's pack buttons log a warning and do nothing. Expected until the
-      gift endpoint lands.
+2b. **The gift slice.** Another `dotnet ef database update` per database — it applies every
+    pending migration in order and is safe to re-run, so there is nothing to do beyond that
+    one command. Mind which database it is: the tools default to **Development**, so
+    production needs `ASPNETCORE_ENVIRONMENT=Production` or an explicit `--connection`. Then:
+    - Every test-panel pack button puts a packet on **your own** shelf, above the game
+      packs and the daily. The three sized ones are coloured by size; the four `n+` ones
+      are orange and print `75+`…`90+` rather than a count. **No game packet prints
+      `null+` or is orange** — that is the regression to watch, and it is what `packFloor`
+      exists for.
+    - Open a `90+` on today's roster, where nobody clears 90: one ordinary card comes out
+      rather than an empty packet or an error. With the icons latch on, it can reach an
+      icoon.
+    - `POST api/collections/gifts` with `{"size":3}` and no `playerIds` → `everybody: true`
+      and one gift id. Every player with an album now has that packet, and each of them can
+      open it once.
+    - `{"size":3,"minimumOverall":85}` → 400. `{}` → 400. `{"size":99}` → 400.
+      `{"minimumOverall":120}` → 400. `{"playerIds":["nonsense"],"size":1}` → 404, and no
+      row written by any of them.
+    - Open a gift, then come back **tomorrow**: it must not be on the shelf again. This is
+      the one thing the gift claim's missing date would break, and it cannot be seen on the
+      day it is made.
+    - Delete the `PackGifts` row for a present you have already opened → its cards and its
+      claim go with it.
 3. ~~Unit-test pack sizing: a win gives 3, a win beating expected margin by 3+
    gives 5, a loss beating expected margin by 3+ gives 3, a plain loss gives 1.~~
    **Done**, from both teams' seats — `UnitTests/PackTests.cs`.
@@ -3155,12 +4370,25 @@ presentation layer.
     daily can only be claimed once a day and comes back tomorrow; two game packs on one
     day do not collide (the filtered index); a claim cannot outlive its player; claiming
     mints a card that a fresh read of the collection has; a second copy reports
-    `isNew: false` and `copies: 2`; completing the active set latches the legends;
-    deleting the game takes its cards; emptying a collection takes the cards and the
-    claims; and packs are only offered once there is a book.
+    `isNew: false` and `copies: 2`; deleting the game takes its cards; emptying a
+    collection takes the cards and the claims; and packs are only offered once there is
+    a book.
     - The one-player-pool helper is what makes any of the draw-dependent assertions
       possible: one player over the gate and nine under it means the roll has exactly
       one card it can produce.
+    - **The icons claim**, in the same file, and the first assertion is a reversal:
+      completing the active set *offers* the icons rather than latching them, and the row
+      stays null. Then the claim end to end; an incomplete set refused with `SetIncomplete`
+      and nothing written; a second claim idempotent **and not moving the date**; the
+      `force` bypass skipping the check; no album and no player; and emptying the album
+      taking the unlock with it — which cannot be asserted on the wire, because the flag
+      lives on `Album` and there is no album left to carry it. That *is* the guarantee.
+    - **`AHeldCardBecomesAnIconWhenItsSubjectGoesOutOfService`** pins the rule nothing
+      pinned before, and the one two others are easy to mistake for: flip `Active` on a
+      subject whose card you hold, and it leaves `Pool`, stays in `Owned`, is absent from
+      `Icons` while locked — so it has no slot and quietly leaves the book — and comes back
+      as an icoon, already collected, on unlock. `CardInstance.IsIcon` stays false
+      throughout, because it is history.
 6. `dotnet run` the API, `npm start` the UI (proxy via `public/config.js`).
 7. Submit a game → all four participants each have a pack of the right size →
    reveal → cards persist across a hard reload.
@@ -3177,9 +4405,40 @@ presentation layer.
 13. Claim the same pack from two tabs at once and confirm exactly one succeeds —
     the unique index is what enforces this, so it is worth proving.
 14. Confirm inactive ≥5-game players appear only for collectors who have
-    unlocked legends, rated on their all-time-high.
-15. Complete an active set on a test collector and confirm the legends latch
-    survives a new player later crossing 5 games.
+    unlocked icons, rated on their all-time-high.
+15. Complete an active set on a test collector. A packet printed `icoon` and foiled **gold**
+    (not the orange of a floor packet) appears at the top of the shelf — it is the only
+    thing that announces this. Clicking it shuts and re-binds the book, then opens and
+    reveals an icoon, which is in the album's own slot afterwards. The latch then survives a
+    new player later crossing 5 games.
+    - Confirm the card really is an icoon and not an ordinary one — that is the ordering
+      working: the unlock has to land before the packet is claimed.
+    - Confirm the packet **leaves the shelf** once opened and does not come back tomorrow —
+      its claim is keyed on the player, never on the day, which is what stops it being an
+      unlimited supply of guaranteed icoons at one a night.
+    - Let a new player cross 5 games *before* opening it, and confirm the packet disappears
+      until they are collected too. It is derived, so it follows the set both ways.
+    - Force the latch from the test panel first, then open the packet: no ceremony, because
+      re-binding a book already in its icon binding has nothing to show.
+    - In production configuration, `PUT .../icons` against an incomplete set is a 409, and
+      `?force=true` is a 404.
+    - Under `prefers-reduced-motion: reduce` the book lands shut and re-bound in one frame.
+15a. **Run all four migrations by hand against both databases** — `C:\tafelvoetbal-data\`
+    and `T:\tafelvoetbal-server\data\` — and confirm `GET /api/collections/{id}` returns
+    200 on each. The unit tests build their schema with `EnsureCreated()` from the model,
+    so **they pass whether or not the migrations have been applied**. This is the one step
+    nothing else catches.
+    - `AddressEveryGift` is the one to watch. It expands any existing unaddressed gift into
+      one row per player and re-points that gift's claims before deleting the original, so
+      nothing is lost — but it is hand-written, and worth reading before it is run anywhere
+      with real presents in it.
+15c. Give a present to everybody and confirm the receipt carries **one gift id per player**,
+    that no row has a null recipient, and that somebody added afterwards is not offered one.
+    Then confirm no present expires — a gift from last week is still on the shelf.
+15b. Set a subject whose card you hold to inactive with the icons locked: the card leaves
+    the book, `{totalCards} kaarten` is unchanged, and unlocking brings it back as an
+    icoon, already collected. Then repeat with the icons *already* unlocked and confirm it
+    turns into an icoon in place, immediately, with no ceremony.
 16. After swapping the mock client for the HTTP one, re-run the phase-1 visual
     checks — no component should have needed changing.
 
@@ -3187,10 +4446,10 @@ presentation layer.
 
 - Peaks are ≥ the current visible rating for all 76 players, and exactly 0 for
   anyone who never played.
-- The endpoint returns 37 actives and 20 legends at `MinGames` 5.
-- The frontend falls back to the six placeholder legends when the route 404s, so
+- The endpoint returns 37 actives and 20 icons at `MinGames` 5.
+- The frontend falls back to the six placeholder icons when the route 404s, so
   `npm start` with no backend still behaves as it did all through phase 1.
-- **Avatar and silhouette coverage is 100%** — 20/20 legends and 37/37 actives
+- **Avatar and silhouette coverage is 100%** — 20/20 icons and 37/37 actives
   have both a real photo (not the `empty-avatar.jpg` fallback) and a generated
   mask. This was the open risk under it and it is gone: the icoon card is
   photo-led, inactive players are exactly the ones least likely to have a portrait

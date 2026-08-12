@@ -6,8 +6,8 @@ import {
   Button,
   Grid,
   Modal,
-  Select,
-  MenuItem,
+  Autocomplete,
+  TextField,
   useMediaQuery,
 } from "@mui/material";
 import { styled } from "@mui/system";
@@ -20,6 +20,7 @@ import {
 } from "@mui/base/Unstable_NumberInput";
 
 import GameAnalyticsTooltipWrapper from "./GameAnalyticsTooltipWrapper";
+import { readCurrentPlayerId } from "../utils/currentPlayer";
 import AddIcon from "@mui/icons-material/Add";
 import { Theme } from "@mui/material";
 import { makeStyles, createStyles } from "@mui/styles";
@@ -42,6 +43,48 @@ interface GamesPerDay {
 interface GamesPerDayList {
   matchesPerDay: GamesPerDay[];
 }
+
+/** The four player slots on the match form. Each holds an index into `players`. */
+type PlayerField =
+  | "team1_player1"
+  | "team1_player2"
+  | "team2_player1"
+  | "team2_player2";
+
+/**
+ * The four slots a freshly opened match form starts on.
+ *
+ * The first one is **whoever is signed in on this browser** — the id the card pages
+ * remember — because the person filling in a wedstrijdformulier has, nearly always, just
+ * played the match. Falling back to the top of the list when nobody is signed in, or when
+ * the remembered name is not in the active list any more.
+ *
+ * The other three are simply the first names that are not the first slot. Skipping it
+ * matters: `inValidMatch` refuses a form with a repeated player, so seeding one twice
+ * would open the form already invalid.
+ */
+const defaultPlayerSlots = (
+  players: DynamicRatingPlayer[]
+): Record<PlayerField, number> => {
+  const rememberedId = readCurrentPlayerId();
+  const remembered = rememberedId
+    ? players.findIndex((p) => p.id === rememberedId)
+    : -1;
+  const first = remembered >= 0 ? remembered : 0;
+
+  const rest = players
+    .map((_, index) => index)
+    .filter((index) => index !== first);
+
+  return {
+    team1_player1: first,
+    /* `?? first` only bites on a list too short to fill a match, where every slot
+       collapses onto the same index and the form is invalid anyway. */
+    team1_player2: rest[0] ?? first,
+    team2_player1: rest[1] ?? first,
+    team2_player2: rest[2] ?? first,
+  };
+};
 
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
@@ -427,16 +470,7 @@ const GamesPage: React.FC = () => {
     const p: DynamicRatingPlayer[] = await client.getPlayers(true);
     p.sort((a, b) => (a.name! > b.name! ? 1 : b.name! > a.name! ? -1 : 0));
     setPlayers(p);
-
-    const team1_player2 = Math.min(1, p.length);
-    const team2_player1 = Math.min(2, p.length);
-    const team2_player2 = Math.min(3, p.length);
-    setNewMatchForm((prev) => ({
-      ...prev,
-      team1_player2,
-      team2_player1,
-      team2_player2,
-    }));
+    setNewMatchForm((prev) => ({ ...prev, ...defaultPlayerSlots(p) }));
   };
 
   const refreshMatches = async () => {
@@ -512,11 +546,10 @@ const GamesPage: React.FC = () => {
   };
 
   const closeGameModal = () => {
+    // Back to the same slots a first open lands on — including the signed-in player in
+    // the first one, which a hard-coded 0/1/2/3 reset used to throw away after one save.
     setNewMatchForm({
-      team1_player1: 0,
-      team1_player2: 1,
-      team2_player1: 2,
-      team2_player2: 3,
+      ...defaultPlayerSlots(players ?? []),
       team1_score: 0,
       team2_score: 0,
     });
@@ -799,6 +832,57 @@ const showMatchesOnDay = (day: GamesPerDay) =>
     `
   );
 
+  /**
+   * A player slot on the match form: a search box first, a list second.
+   *
+   * The four slots used to be plain dropdowns, which meant scrolling a menu of every
+   * active player to find a name you already knew. This is the same control as the
+   * ledger's on the album page — type a few letters, the list narrows, Enter takes the
+   * top hit — only wearing MUI's clothes, because this page is MUI throughout.
+   *
+   * The form still stores an *index* into `players`, so nothing downstream changes:
+   * `handleSaveMatch` and the duplicate check both read the same four numbers they
+   * always did.
+   */
+  const showPlayerPicker = (field: PlayerField, label: string) => {
+    const options = players ?? [];
+    /* Falls back to the first name only while the list is still settling — the indices
+       are clamped to the list's length the moment it lands. */
+    const selected = options[newMatchForm[field]] ?? options[0];
+    if (!selected) return null;
+
+    return (
+      <Autocomplete<DynamicRatingPlayer, false, true, false>
+        options={options}
+        value={selected}
+        onChange={(_, next) =>
+          setNewMatchForm({ ...newMatchForm, [field]: options.indexOf(next) })
+        }
+        getOptionLabel={(player) => player.name ?? ""}
+        isOptionEqualToValue={(option, value) => option.id === value.id}
+        /* No clear button: a slot without a player is not a state the form has. */
+        disableClearable
+        /* The name is selected on focus, so typing replaces it rather than appending to
+           it — what makes this read as a search box rather than as a filled-in field. */
+        selectOnFocus
+        autoHighlight
+        openOnFocus
+        blurOnSelect
+        className={classes.select}
+        noOptionsText="geen speler gevonden"
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            variant="outlined"
+            size="small"
+            placeholder="zoek speler"
+            inputProps={{ ...params.inputProps, "aria-label": label }}
+          />
+        )}
+      />
+    );
+  };
+
   function showDuplicateGameDialog() {
     return (
       <Modal
@@ -868,40 +952,8 @@ const showMatchesOnDay = (day: GamesPerDay) =>
               style={{ flex: "1 1 auto", width: "100%" }}
             >
               Team 1 <br />
-              <Select
-                variant="outlined"
-                value={newMatchForm.team1_player1}
-                onChange={(e) =>
-                  setNewMatchForm({
-                    ...newMatchForm,
-                    team1_player1: e.target.value as number,
-                  })
-                }
-                className={classes.select}
-              >
-                {players?.map((player, index) => (
-                  <MenuItem key={player.id} value={index}>
-                    {player.name}
-                  </MenuItem>
-                ))}
-              </Select>
-              <br />
-              <Select
-                value={newMatchForm.team1_player2}
-                onChange={(e) =>
-                  setNewMatchForm({
-                    ...newMatchForm,
-                    team1_player2: e.target.value as number,
-                  })
-                }
-                className={classes.select}
-              >
-                {players?.map((player, index) => (
-                  <MenuItem key={player.id + "-2"} value={index}>
-                    {player.name}
-                  </MenuItem>
-                ))}
-              </Select>
+              {showPlayerPicker("team1_player1", "Team 1, speler 1")}
+              {showPlayerPicker("team1_player2", "Team 1, speler 2")}
             </Grid>
 
             <Grid item xs={isMobile ? 6 : 2}>
@@ -946,40 +998,8 @@ const showMatchesOnDay = (day: GamesPerDay) =>
 
             <Grid item spacing={0} xs={isMobile ? 12 : 4}>
               Team 2 <br />
-              <Select
-                variant="outlined"
-                value={newMatchForm.team2_player1}
-                onChange={(e) =>
-                  setNewMatchForm({
-                    ...newMatchForm,
-                    team2_player1: e.target.value as number,
-                  })
-                }
-                className={classes.select}
-              >
-                {players?.map((player, index) => (
-                  <MenuItem key={player.id + "-3"} value={index}>
-                    {player.name}
-                  </MenuItem>
-                ))}
-              </Select>
-              <br />
-              <Select
-                value={newMatchForm.team2_player2}
-                onChange={(e) =>
-                  setNewMatchForm({
-                    ...newMatchForm,
-                    team2_player2: e.target.value as number,
-                  })
-                }
-                className={classes.select}
-              >
-                {players?.map((player, index) => (
-                  <MenuItem key={player.id + "-4"} value={index}>
-                    {player.name}
-                  </MenuItem>
-                ))}
-              </Select>
+              {showPlayerPicker("team2_player1", "Team 2, speler 1")}
+              {showPlayerPicker("team2_player2", "Team 2, speler 2")}
             </Grid>
           </Grid>
 

@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Het object dat het album opnieuw bindt — tien kandidaten</title>
+<style>
+  /* ------------------------------------------------------------------ *
+   * The tabletop, lifted from `.game-stage` in game.css.
+   *
+   * Copied rather than approximated: these objects have to be judged on the surface
+   * they will actually lie on, and the whole argument below is about whether each one
+   * reads as a thing on french-polished mahogany. A neutral grey card would flatter
+   * all ten of them equally and settle nothing.
+   * ------------------------------------------------------------------ */
+  :root {
+    --grain-figure: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1400' height='1000'%3E%3Cfilter id='w' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.048' numOctaves='3' seed='4'/%3E%3CfeColorMatrix type='matrix' values='.333 .333 .333 0 0 .333 .333 .333 0 0 .333 .333 .333 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='1400' height='1000' filter='url(%23w)'/%3E%3C/svg%3E");
+    --grain-tight: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1400' height='1000'%3E%3Cfilter id='w' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.011 0.55' numOctaves='2' seed='9'/%3E%3CfeColorMatrix type='matrix' values='.267 .267 .267 0 .1 .267 .267 .267 0 .1 .267 .267 .267 0 .1 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='1400' height='1000' filter='url(%23w)'/%3E%3C/svg%3E");
+
+    /* The album's own tokens. Every object below is drawn out of these and nothing else. */
+    --board-edge: #6b5325;
+    --foil: #e6c98a;
+    --foil-rule: #a9853c;
+    --foil-emboss: #241a05;
+    --board-hi: #f4efe2;
+    --board-mid: #e6dfcd;
+    --board-lo: #d8cfb8;
+    --board-ink: #6a5124;
+
+    /* Bordeaux, the incumbent stain — standing in for "the cover you chose". */
+    --leather-hi: #5a4526;
+    --leather-mid: #35270f;
+    --leather-lo: #4a3820;
+
+    --ink: #f6e3c6;
+    --ink-dim: #c3a281;
+    --accent-light: #eec18a;
+
+    /* The one light, and the shadow every object on the table casts under it. */
+    --drop: 3px 8px 18px rgba(14, 5, 2, 0.6);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0 0 80px;
+    font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--ink);
+    background-color: #4e1d12;
+    background-image:
+      radial-gradient(ellipse 56% 40% at 50% -6%, rgba(255, 216, 162, 0.26), transparent 72%),
+      var(--grain-tight),
+      var(--grain-figure),
+      radial-gradient(ellipse 112% 96% at 50% -8%, #833926 0%, #4c1c11 55%, #250c06 100%);
+    background-size: auto, 100% 100%, 100% 100%, auto;
+    background-repeat: no-repeat;
+    background-blend-mode: screen, overlay, soft-light, normal;
+    background-attachment: fixed;
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 40px 24px 0; }
+
+  h1, h2, h3 {
+    font-family: Georgia, "Times New Roman", serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--ink);
+    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.75);
+    margin: 0 0 6px;
+  }
+  h1 { font-size: 26px; }
+  h2 { font-size: 17px; margin-top: 46px; }
+  h3 { font-size: 13px; letter-spacing: 1.5px; margin: 0 0 2px; text-transform: none; }
+
+  .lede { color: var(--ink-dim); max-width: 76ch; margin: 0 0 4px; }
+  .lede strong { color: var(--accent-light); }
+  p { max-width: 76ch; }
+  em { color: var(--accent-light); font-style: italic; }
+  code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.9em;
+    color: var(--accent-light);
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.5);
+    box-shadow: 0 1px 0 rgba(255, 200, 140, 0.06);
+    margin: 34px 0;
+  }
+
+  /* The shelf: every candidate at the size it will really be, on the real wood. */
+  .shelf {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
+    gap: 30px 18px;
+    margin: 26px 0 8px;
+  }
+
+  .cand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    text-align: center;
+  }
+
+  /* Real size. The seal as shipped is `clamp(52px, 7vw, 74px)`, so 68px is the middle
+     of the band every one of these has to work at. */
+  .obj { width: 68px; height: 68px; display: block; filter: drop-shadow(2px 5px 7px rgba(14, 5, 2, 0.55)); }
+  .obj--tall { height: 74px; }
+
+  .cand__name {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: var(--accent-light);
+  }
+  .cand__num {
+    font-family: Georgia, serif;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: rgba(195, 162, 129, 0.7);
+  }
+  .cand__note { font-size: 11px; color: var(--ink-dim); line-height: 1.5; max-width: 20ch; }
+
+  /* The long-form entries. Engraved into the wood, not panelled onto it. */
+  .entry {
+    display: grid;
+    grid-template-columns: 108px 1fr;
+    gap: 22px;
+    padding: 22px 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.42);
+    box-shadow: inset 0 1px 0 rgba(255, 200, 140, 0.05);
+    align-items: start;
+  }
+  .entry__art { display: flex; justify-content: center; padding-top: 4px; }
+  .entry dl { margin: 8px 0 0; display: grid; grid-template-columns: 92px 1fr; gap: 3px 14px; }
+  .entry dt {
+    font-family: Georgia, serif;
+    font-size: 11px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: rgba(195, 162, 129, 0.85);
+  }
+  .entry dd { margin: 0; font-size: 13px; }
+  .verdict { color: var(--accent-light); }
+  .risk { color: #e0a58e; }
+
+  .rule-list { max-width: 76ch; padding-left: 20px; }
+  .rule-list li { margin-bottom: 7px; }
+
+  .pick {
+    margin-top: 12px;
+    padding: 18px 22px;
+    border-left: 3px solid var(--foil-rule);
+    background: rgba(0, 0, 0, 0.24);
+    max-width: 82ch;
+  }
+  .pick h3 { color: var(--accent-light); font-size: 14px; }
+
+  .footnote { color: rgba(195, 162, 129, 0.72); font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Het object dat het album opnieuw bindt</h1>
+  <p class="lede">
+    Tien kandidaten, op de tafel waar ze echt komen te liggen en op de maat die ze echt
+    krijgen. Het gaat om <strong>één</strong> object: het ding dat naast het boek verschijnt
+    zodra de actieve set compleet is, en dat het album — als je erop drukt — opnieuw laat
+    binden in de icoon-editie.
+  </p>
+  <p class="lede">
+    De zes onderaan zijn <strong>tijd</strong>-kandidaten, want dat is wat een icoon in de kern
+    is: iemand die er niet meer is. De vier daarboven waren de eerste ronde en staan erbij
+    omdat ze de vergelijking scherper maken, niet omdat ze even sterk zijn.
+  </p>
+
+  <h2>Wat het moet halen</h2>
+  <ol class="rule-list">
+    <li><strong>Het is een voorwerp, of het is gegraveerd.</strong> Geen plaatje, geen kader,
+      geen knop. De hele tafel staat of valt hiermee.</li>
+    <li><strong>Eén lichtbron.</strong> Het deelt <code>--drop</code> met de pakjes en het boek.
+      Voorwerpen die het oneens zijn over waar de lamp staat, slopen de tafel sneller dan
+      welke verkeerde kleur ook.</li>
+    <li><strong>Het leest op 52–74px.</strong> Dat is de band die de zegel-versie nu heeft. Alles
+      wat een tweede blik nodig heeft, valt af.</li>
+    <li><strong>Het gebaar moet kloppen.</strong> Je drukt er één keer in je hele
+      verzamel-leven op. Wat je met dit voorwerp dóet, moet "het boek gaat opnieuw gebonden
+      worden" zijn — niet "open dit" en niet "bekijk dit".</li>
+    <li><strong>Het ontleent zijn kleur aan het album.</strong> <code>--foil</code>,
+      <code>--foil-rule</code>, <code>--board-edge</code>, <code>--foil-emboss</code> en de
+      ivoren <code>--board-*</code>. Geen nieuwe hexen — daaraan zie je dat het bij
+      <em>dit</em> boek hoort.</li>
+    <li><strong>Het mag niet iets anders al betekenen.</strong> Het hangslot hoort bij de
+      wedstrijden-poort, de zandloper bij het laden. Die taal is vergeven.</li>
+  </ol>
+
+  <h2>De tien, op tafel</h2>
+  <div class="shelf">
+
+    <!-- 1 · pocket watch -->
+    <div class="cand">
+      <svg class="obj obj--tall" viewBox="0 0 96 104" role="img" aria-label="Stilstaand zakhorloge">
+        <path d="M48 6a7 7 0 0 1 0 14" fill="none" stroke="var(--foil-rule)" stroke-width="4.5"/>
+        <rect x="43.5" y="17" width="9" height="8" rx="2.5" fill="var(--foil)"/>
+        <circle cx="48" cy="62" r="35" fill="var(--board-edge)"/>
+        <circle cx="48" cy="62" r="32" fill="var(--foil)"/>
+        <circle cx="48" cy="62" r="27.5" fill="var(--board-hi)"/>
+        <g stroke="var(--foil-emboss)" stroke-width="1.6" stroke-linecap="round" opacity=".8">
+          <line x1="48" y1="37" x2="48" y2="41"/><line x1="48" y1="83" x2="48" y2="87"/>
+          <line x1="23" y1="62" x2="27" y2="62"/><line x1="69" y1="62" x2="73" y2="62"/>
+        </g>
+        <g stroke="var(--foil-emboss)" stroke-width="1" stroke-linecap="round" opacity=".45">
+          <line x1="60.5" y1="40.3" x2="58.5" y2="43.7"/><line x1="35.5" y1="83.7" x2="37.5" y2="80.3"/>
+          <line x1="69.7" y1="49.5" x2="66.3" y2="51.5"/><line x1="26.3" y1="74.5" x2="29.7" y2="72.5"/>
+          <line x1="69.7" y1="74.5" x2="66.3" y2="72.5"/><line x1="26.3" y1="49.5" x2="29.7" y2="51.5"/>
+          <line x1="60.5" y1="83.7" x2="58.5" y2="80.3"/><line x1="35.5" y1="40.3" x2="37.5" y2="43.7"/>
+        </g>
+        <line x1="48" y1="62" x2="38" y2="74" stroke="#2e2510" stroke-width="2.8" stroke-linecap="round"/>
+        <line x1="48" y1="62" x2="34" y2="50" stroke="#2e2510" stroke-width="1.9" stroke-linecap="round"/>
+        <circle cx="48" cy="62" r="2.3" fill="#2e2510"/>
+      </svg>
+      <div><span class="cand__num">1</span> <span class="cand__name">Het zakhorloge</span></div>
+      <p class="cand__note">Stilgezet. De tijd is voor deze mensen gestopt.</p>
+    </div>
+
+    <!-- 2 · tear-off calendar sheet -->
+    <div class="cand">
+      <svg class="obj" viewBox="0 0 96 96" role="img" aria-label="Afgescheurd kalenderblad">
+        <g transform="rotate(-5 48 50)">
+          <path d="M17 15h62v50l-13 14H17Z" fill="var(--board-hi)"/>
+          <path d="M17 15h62v50l-13 14H17Z" fill="none" stroke="#b9ad91" stroke-width="1"/>
+          <path d="M79 65 66 79V65Z" fill="var(--board-lo)"/>
+          <rect x="17" y="15" width="62" height="9" fill="#8c2f1e"/>
+          <circle cx="33" cy="19.5" r="2.4" fill="#2a1a10"/>
+          <circle cx="63" cy="19.5" r="2.4" fill="#2a1a10"/>
+          <text x="47" y="56" text-anchor="middle" font-family="Georgia, serif" font-size="30"
+                font-weight="bold" fill="var(--board-ink)">31</text>
+          <text x="47" y="70" text-anchor="middle" font-family="Georgia, serif" font-size="10"
+                letter-spacing="2" fill="#9a8b6a">DEC</text>
+        </g>
+      </svg>
+      <div><span class="cand__num">2</span> <span class="cand__name">Het kalenderblad</span></div>
+      <p class="cand__note">Eén dag, afgescheurd en blijven liggen.</p>
+    </div>
+
+    <!-- 3 · cancelled postage stamp -->
+    <div class="cand">
+      <svg class="obj" viewBox="0 0 96 96" role="img" aria-label="Afgestempelde postzegel">
+        <defs>
+          <mask id="perf">
+            <rect x="14" y="16" width="68" height="64" fill="#fff"/>
+            <g fill="#000">
+              <circle cx="14" cy="24" r="3"/><circle cx="14" cy="37" r="3"/>
+              <circle cx="14" cy="50" r="3"/><circle cx="14" cy="63" r="3"/>
+              <circle cx="14" cy="76" r="3"/>
+              <circle cx="82" cy="24" r="3"/><circle cx="82" cy="37" r="3"/>
+              <circle cx="82" cy="50" r="3"/><circle cx="82" cy="63" r="3"/>
+              <circle cx="82" cy="76" r="3"/>
+              <circle cx="27" cy="16" r="3"/><circle cx="40" cy="16" r="3"/>
+              <circle cx="53" cy="16" r="3"/><circle cx="66" cy="16" r="3"/>
+              <circle cx="27" cy="80" r="3"/><circle cx="40" cy="80" r="3"/>
+              <circle cx="53" cy="80" r="3"/><circle cx="66" cy="80" r="3"/>
+            </g>
+          </mask>
+        </defs>
+        <g mask="url(#perf)">
+          <rect x="14" y="16" width="68" height="64" fill="#e9dfc4"/>
+          <rect x="20" y="22" width="56" height="52" fill="none" stroke="var(--foil-rule)" stroke-width="1.4"/>
+          <path d="M48 34a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17Z" fill="#8e7d5c"/>
+          <path d="M33 74c1.5-11 7.5-17 15-17s13.5 6 15 17Z" fill="#8e7d5c"/>
+        </g>
+        <g transform="rotate(-13 44 46)" opacity=".62">
+          <circle cx="44" cy="46" r="20" fill="none" stroke="#22303a" stroke-width="2.4"/>
+          <circle cx="44" cy="46" r="14.5" fill="none" stroke="#22303a" stroke-width="1.4"/>
+          <text x="44" y="49" text-anchor="middle" font-family="Georgia, serif" font-size="9"
+                font-weight="bold" fill="#22303a">2019</text>
+          <g stroke="#22303a" stroke-width="2" fill="none">
+            <path d="M64 40q6 3 12 0"/><path d="M64 46q6 3 12 0"/><path d="M64 52q6 3 12 0"/>
+          </g>
+        </g>
+      </svg>
+      <div><span class="cand__num">3</span> <span class="cand__name">De postzegel</span></div>
+      <p class="cand__note">Afgestempeld: uit omloop, en zelf een verzamelobject.</p>
+    </div>
+
+    <!-- 4 · archivist's date stamp -->
+    <div class="cand">
+      <svg class="obj" viewBox="0 0 96 96" role="img" aria-label="Datumstempel">
+        <rect x="20" y="60" width="56" height="24" rx="3" fill="#2b2318"/>
+        <rect x="24" y="72" width="48" height="12" rx="2" fill="var(--board-edge)"/>
+        <text x="48" y="81.5" text-anchor="middle" font-family="Consolas, monospace"
+              font-size="8" letter-spacing="1" fill="var(--board-hi)">31·XII</text>
+        <rect x="43" y="42" width="10" height="20" rx="2" fill="#7a5c26"/>
+        <ellipse cx="48" cy="42" rx="23" ry="13" fill="#4f3a1a"/>
+        <ellipse cx="48" cy="38" rx="23" ry="13" fill="#7d5a2a"/>
+        <ellipse cx="48" cy="36.5" rx="17" ry="9" fill="#96702f"/>
+        <g stroke="#5c4218" stroke-width="1" opacity=".55">
+          <line x1="31" y1="38" x2="31" y2="41"/><line x1="39" y1="42" x2="39" y2="45"/>
+          <line x1="48" y1="43" x2="48" y2="46"/><line x1="57" y1="42" x2="57" y2="45"/>
+          <line x1="65" y1="38" x2="65" y2="41"/>
+        </g>
+      </svg>
+      <div><span class="cand__num">4</span> <span class="cand__name">De datumstempel</span></div>
+      <p class="cand__note">Het gebaar zit in het voorwerp: je drukt hem aan.</p>
+    </div>
+
+    <!-- 5 · run-out hourglass -->
+    <div class="cand">
+      <svg class="obj obj--tall" viewBox="0 0 96 104" role="img" aria-label="Uitgelopen zandloper">
+        <rect x="20" y="12" width="56" height="7" rx="2.5" fill="var(--foil-rule)"/>
+        <rect x="20" y="85" width="56" height="7" rx="2.5" fill="var(--foil-rule)"/>
+        <rect x="24" y="19" width="4.5" height="66" fill="var(--board-edge)"/>
+        <rect x="67.5" y="19" width="4.5" height="66" fill="var(--board-edge)"/>
+        <path d="M32 19h32L49.6 52 64 85H32l14.4-33Z" fill="rgba(226,240,246,.16)"
+              stroke="rgba(240,248,255,.32)" stroke-width="1"/>
+        <path d="M35 84h26L48 54Z" fill="#d9b878"/>
+        <ellipse cx="48" cy="84" rx="13" ry="2" fill="#c9a765"/>
+      </svg>
+      <div><span class="cand__num">5</span> <span class="cand__name">De zandloper</span></div>
+      <p class="cand__note">Uitgelopen. Maar het laden gebruikt dit al.</p>
+    </div>
+
+    <!-- 6 · shellac record -->
+    <div class="cand">
+      <svg class="obj" viewBox="0 0 96 96" role="img" aria-label="Grammofoonplaat">
+        <circle cx="48" cy="48" r="35" fill="#15100c"/>
+        <g fill="none" stroke="rgba(255,236,200,.09)" stroke-width="1">
+          <circle cx="48" cy="48" r="31"/><circle cx="48" cy="48" r="28"/>
+          <circle cx="48" cy="48" r="25"/><circle cx="48" cy="48" r="22"/>
+          <circle cx="48" cy="48" r="19"/>
+        </g>
+        <path d="M48 13a35 35 0 0 1 24.7 10.2l-4.2 4.3A29 29 0 0 0 48 19Z"
+              fill="rgba(255,231,190,.13)"/>
+        <circle cx="48" cy="48" r="14.5" fill="#8c2f1e"/>
+        <circle cx="48" cy="48" r="14.5" fill="none" stroke="rgba(0,0,0,.35)"/>
+        <text x="48" y="45" text-anchor="middle" font-family="Georgia, serif" font-size="6"
+              letter-spacing="1" fill="var(--foil)">ANAGO</text>
+        <text x="48" y="55" text-anchor="middle" font-family="Georgia, serif" font-size="5"
+              letter-spacing="1" fill="rgba(230,201,138,.75)">1998</text>
+        <circle cx="48" cy="48" r="2.3" fill="#15100c"/>
+      </svg>
+      <div><span class="cand__num">6</span> <span class="cand__name">De grammofoonplaat</span></div>
+      <p class="cand__note">Stemmen van toen, nog een keer op te zetten.</p>
+    </div>
+
+    <!-- 7 · ex libris bookplate -->
+    <div class="cand">
+      <svg class="obj" viewBox="0 0 96 96" role="img" aria-label="Ex libris boekplaat">
+        <g transform="rotate(-2 48 48)">
+          <rect x="16" y="18" width="64" height="60" fill="#efe6cf"/>
+          <rect x="16" y="18" width="64" height="60" fill="none" stroke="#c2b493"/>
+          <rect x="21" y="23" width="54" height="50" fill="none" stroke="var(--foil-rule)" stroke-width="1.8"/>
+          <rect x="24" y="26" width="48" height="44" fill="none" stroke="var(--foil-rule)" stroke-width=".7"/>
+          <text x="48" y="43" text-anchor="middle" font-family="Georgia, serif" font-size="8"
+                letter-spacing="1.5" fill="var(--board-ink)">EX LIBRIS</text>
+          <path d="M40 50h16M44 55h8" stroke="var(--foil-rule)" stroke-width="1.2"/>
+          <path d="M48 59l2.2 4.4 4.8.7-3.5 3.4.8 4.8L48 70l-4.3 2.3.8-4.8-3.5-3.4 4.8-.7Z"
+                fill="var(--foil-rule)" opacity=".8"/>
+        </g>
+      </svg>
+      <div><span class="cand__num">7</span> <span class="cand__name">De boekplaat</span></div>
+      <p class="cand__note">Het enige voorwerp dat er is om ín een boek te gaan.</p>
+    </div>
+
+    <!-- 8 · sepia photo, face down -->
+    <div class="cand">
+      <svg class="obj" viewBox="0 0 96 96" role="img" aria-label="Omgekeerde foto">
+        <g transform="rotate(6 48 48)">
+          <rect x="17" y="22" width="62" height="52" fill="#e4d8ba"/>
+          <rect x="17" y="22" width="62" height="52" fill="none" stroke="#bdae8b"/>
+          <path d="M17 22h11L17 33Z" fill="#cbbc98"/>
+          <path d="M79 22H68l11 11Z" fill="#cbbc98"/>
+          <path d="M17 74h11L17 63Z" fill="#cbbc98"/>
+          <path d="M79 74H68l11-11Z" fill="#cbbc98"/>
+          <g fill="#c4ae82" opacity=".55">
+            <circle cx="34" cy="38" r="1.6"/><circle cx="59" cy="33" r="1.1"/>
+            <circle cx="66" cy="58" r="1.7"/><circle cx="30" cy="62" r="1.2"/>
+            <circle cx="47" cy="49" r="1"/>
+          </g>
+          <path d="M31 55q9-7 17-2" stroke="#8d7a52" stroke-width="1.3" fill="none" opacity=".6"/>
+        </g>
+      </svg>
+      <div><span class="cand__num">8</span> <span class="cand__name">De foto, omgekeerd</span></div>
+      <p class="cand__note">Je hebt ze nog niet gezien. Omdraaien is het gebaar.</p>
+    </div>
+
+    <!-- 9 · brass memorial plaque -->
+    <div class="cand">
+      <svg class="obj" viewBox="0 0 96 96" role="img" aria-label="Messing plaquette">
+        <rect x="10" y="28" width="76" height="40" rx="2" fill="var(--board-edge)"/>
+        <rect x="12" y="30" width="72" height="36" rx="1.5" fill="var(--foil)"/>
+        <rect x="12" y="30" width="72" height="18" fill="rgba(255,255,255,.16)"/>
+        <text x="48" y="52" text-anchor="middle" font-family="Georgia, serif" font-size="8.5"
+              letter-spacing="2.5" fill="var(--foil-emboss)">ICONEN</text>
+        <g fill="var(--board-edge)">
+          <circle cx="19" cy="36" r="2.4"/><circle cx="77" cy="36" r="2.4"/>
+          <circle cx="19" cy="60" r="2.4"/><circle cx="77" cy="60" r="2.4"/>
+        </g>
+      </svg>
+      <div><span class="cand__num">9</span> <span class="cand__name">De plaquette</span></div>
+      <p class="cand__note">Onmiskenbaar herdenking — en onmiskenbaar zwaar.</p>
+    </div>
+
+    <!-- 10 · card-index tab -->
+    <div class="cand">
+      <svg class="obj" viewBox="0 0 96 96" role="img" aria-label="Kaartsysteem-tab">
+        <rect x="14" y="26" width="68" height="52" rx="1.5" fill="#ded2b4"/>
+        <path d="M22 18h26v9H22Z" fill="#e9dfc4"/>
+        <path d="M22 18h26v9H22Z" fill="none" stroke="#c0b190"/>
+        <rect x="14" y="26" width="68" height="52" rx="1.5" fill="none" stroke="#c0b190"/>
+        <rect x="14" y="26" width="68" height="4" fill="#8c2f1e"/>
+        <g stroke="#b6a684" stroke-width="1">
+          <line x1="20" y1="40" x2="76" y2="40"/><line x1="20" y1="48" x2="76" y2="48"/>
+          <line x1="20" y1="56" x2="76" y2="56"/><line x1="20" y1="64" x2="76" y2="64"/>
+          <line x1="20" y1="72" x2="76" y2="72"/>
+        </g>
+        <text x="26" y="24.5" font-family="Consolas, monospace" font-size="6"
+              letter-spacing="1" fill="var(--board-ink)">A–Z</text>
+      </svg>
+      <div><span class="cand__num">10</span> <span class="cand__name">De registerkaart</span></div>
+      <p class="cand__note">Het archief van iedereen die hier langskwam.</p>
+    </div>
+
+  </div>
+
+  <h2>Eén voor één</h2>
+
+  <div class="entry">
+    <div class="entry__art">
+      <svg class="obj obj--tall" viewBox="0 0 96 104" aria-hidden="true">
+        <path d="M48 6a7 7 0 0 1 0 14" fill="none" stroke="var(--foil-rule)" stroke-width="4.5"/>
+        <rect x="43.5" y="17" width="9" height="8" rx="2.5" fill="var(--foil)"/>
+        <circle cx="48" cy="62" r="35" fill="var(--board-edge)"/>
+        <circle cx="48" cy="62" r="32" fill="var(--foil)"/>
+        <circle cx="48" cy="62" r="27.5" fill="var(--board-hi)"/>
+        <g stroke="var(--foil-emboss)" stroke-width="1.6" stroke-linecap="round" opacity=".8">
+          <line x1="48" y1="37" x2="48" y2="41"/><line x1="48" y1="83" x2="48" y2="87"/>
+          <line x1="23" y1="62" x2="27" y2="62"/><line x1="69" y1="62" x2="73" y2="62"/>
+        </g>
+        <line x1="48" y1="62" x2="38" y2="74" stroke="#2e2510" stroke-width="2.8" stroke-linecap="round"/>
+        <line x1="48" y1="62" x2="34" y2="50" stroke="#2e2510" stroke-width="1.9" stroke-linecap="round"/>
+        <circle cx="48" cy="62" r="2.3" fill="#2e2510"/>
+      </svg>
+    </div>
+    <div>
+      <h3><span class="cand__num">1 ·</span> Het zakhorloge, stilgezet</h3>
+      <dl>
+        <dt>Zegt</dt><dd>De tijd is voor deze mensen gestopt. Een stilstaand uurwerk is het
+          duidelijkste beeld van "toen" dat er bestaat, en een zakhorloge is bovendien iets
+          dat wordt <em>doorgegeven</em> — precies wat een icoon-album is.</dd>
+        <dt>Gebaar</dt><dd>Indrukken van de kroon. Klein, mechanisch, en al aanwezig in het
+          voorwerp; hij hoeft niets uit te leggen.</dd>
+        <dt>Op 68px</dt><dd class="verdict">Sterk. Een ronde messing schijf met een lichte
+          wijzerplaat is dezelfde silhouetklasse als de zegel, dus hij haalt de maat
+          zeker.</dd>
+        <dt>Risico</dt><dd class="risk">De wijzers zijn op deze maat 2px. Ze moeten een
+          <em>vreemde</em> stand hebben — 10-over-10 leest als "een klok", scheef leest als
+          "stilgezet" — en dat is het enige detail dat het beeld draagt.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="entry">
+    <div class="entry__art">
+      <svg class="obj" viewBox="0 0 96 96" aria-hidden="true">
+        <g transform="rotate(-5 48 50)">
+          <path d="M17 15h62v50l-13 14H17Z" fill="var(--board-hi)" stroke="#b9ad91"/>
+          <path d="M79 65 66 79V65Z" fill="var(--board-lo)"/>
+          <rect x="17" y="15" width="62" height="9" fill="#8c2f1e"/>
+          <circle cx="33" cy="19.5" r="2.4" fill="#2a1a10"/>
+          <circle cx="63" cy="19.5" r="2.4" fill="#2a1a10"/>
+          <text x="47" y="56" text-anchor="middle" font-family="Georgia, serif" font-size="30"
+                font-weight="bold" fill="var(--board-ink)">31</text>
+          <text x="47" y="70" text-anchor="middle" font-family="Georgia, serif" font-size="10"
+                letter-spacing="2" fill="#9a8b6a">DEC</text>
+        </g>
+      </svg>
+    </div>
+    <div>
+      <h3><span class="cand__num">2 ·</span> Het afgescheurde kalenderblad</h3>
+      <dl>
+        <dt>Zegt</dt><dd>Een dag die voorbij is en is blijven liggen. Het is het enige
+          voorwerp hier dat <em>zelf</em> een verstreken dag ís in plaats van tijd te
+          meten.</dd>
+        <dt>Gebaar</dt><dd>Optillen. Zwakker dan indrukken: een los blaadje oppakken is
+          niet dezelfde beslissing als een zegel aandrukken.</dd>
+        <dt>Op 68px</dt><dd class="verdict">Goed leesbaar — het grote dagcijfer is
+          onmiskenbaar, ook heel klein.</dd>
+        <dt>Risico</dt><dd class="risk">Vraagt om een datum, en welke? "31 DEC" is willekeurig,
+          en de dag dat jij je set volmaakte zegt niets over de mensen die je ermee
+          verdient. Een voorwerp met een leugen erop gedrukt.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="entry">
+    <div class="entry__art">
+      <svg class="obj" viewBox="0 0 96 96" aria-hidden="true">
+        <defs>
+          <mask id="perf2">
+            <rect x="14" y="16" width="68" height="64" fill="#fff"/>
+            <g fill="#000">
+              <circle cx="14" cy="24" r="3"/><circle cx="14" cy="37" r="3"/>
+              <circle cx="14" cy="50" r="3"/><circle cx="14" cy="63" r="3"/>
+              <circle cx="14" cy="76" r="3"/>
+              <circle cx="82" cy="24" r="3"/><circle cx="82" cy="37" r="3"/>
+              <circle cx="82" cy="50" r="3"/><circle cx="82" cy="63" r="3"/>
+              <circle cx="82" cy="76" r="3"/>
+              <circle cx="27" cy="16" r="3"/><circle cx="40" cy="16" r="3"/>
+              <circle cx="53" cy="16" r="3"/><circle cx="66" cy="16" r="3"/>
+              <circle cx="27" cy="80" r="3"/><circle cx="40" cy="80" r="3"/>
+              <circle cx="53" cy="80" r="3"/><circle cx="66" cy="80" r="3"/>
+            </g>
+          </mask>
+        </defs>
+        <g mask="url(#perf2)">
+          <rect x="14" y="16" width="68" height="64" fill="#e9dfc4"/>
+          <rect x="20" y="22" width="56" height="52" fill="none" stroke="var(--foil-rule)" stroke-width="1.4"/>
+          <path d="M48 34a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17Z" fill="#8e7d5c"/>
+          <path d="M33 74c1.5-11 7.5-17 15-17s13.5 6 15 17Z" fill="#8e7d5c"/>
+        </g>
+        <g transform="rotate(-13 44 46)" opacity=".62">
+          <circle cx="44" cy="46" r="20" fill="none" stroke="#22303a" stroke-width="2.4"/>
+          <circle cx="44" cy="46" r="14.5" fill="none" stroke="#22303a" stroke-width="1.4"/>
+          <text x="44" y="49" text-anchor="middle" font-family="Georgia, serif" font-size="9"
+                font-weight="bold" fill="#22303a">2019</text>
+        </g>
+      </svg>
+    </div>
+    <div>
+      <h3><span class="cand__num">3 ·</span> De afgestempelde postzegel</h3>
+      <dl>
+        <dt>Zegt</dt><dd>Twee dingen tegelijk, en dat is de kracht. <em>Afgestempeld</em> is
+          precies wat een icoon is — uit omloop, gebruikt, niet meer geldig. En een postzegel
+          met een silhouet erop is het oervoorwerp van het verzamelen: het album bestaat
+          omdat de postzegel bestond.</dd>
+        <dt>Gebaar</dt><dd>Erop drukken leest hier zelfs dubbel: de stempel <em>is</em> het
+          drukken, al is die al gezet.</dd>
+        <dt>Op 68px</dt><dd class="verdict">Werkt, en de perforatie doet het meeste werk —
+          die vorm herkent iedereen op elke maat.</dd>
+        <dt>Risico</dt><dd class="risk">Twee ideeën in één voorwerp (de zegel én de afdruk
+          erover) is veel op 68px, en de stempel moet donker genoeg zijn om te lezen zonder
+          de zegel eronder te verzuipen. Ook: het silhouet erop kan als "een specifieke
+          speler" gelezen worden, wat het niet is.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="entry">
+    <div class="entry__art">
+      <svg class="obj" viewBox="0 0 96 96" aria-hidden="true">
+        <rect x="20" y="60" width="56" height="24" rx="3" fill="#2b2318"/>
+        <rect x="24" y="72" width="48" height="12" rx="2" fill="var(--board-edge)"/>
+        <text x="48" y="81.5" text-anchor="middle" font-family="Consolas, monospace"
+              font-size="8" letter-spacing="1" fill="var(--board-hi)">31·XII</text>
+        <rect x="43" y="42" width="10" height="20" rx="2" fill="#7a5c26"/>
+        <ellipse cx="48" cy="42" rx="23" ry="13" fill="#4f3a1a"/>
+        <ellipse cx="48" cy="38" rx="23" ry="13" fill="#7d5a2a"/>
+        <ellipse cx="48" cy="36.5" rx="17" ry="9" fill="#96702f"/>
+      </svg>
+    </div>
+    <div>
+      <h3><span class="cand__num">4 ·</span> De datumstempel</h3>
+      <dl>
+        <dt>Zegt</dt><dd>Archiveren. Het is het gereedschap van iemand wiens werk het is om
+          vast te leggen wanneer iets voorbij was.</dd>
+        <dt>Gebaar</dt><dd class="verdict">Het beste van alle tien. Een stempel <em>is</em>
+          een dingetje dat je aandrukt; er is geen enkele uitleg nodig, en het gebaar en de
+          betekenis zijn hetzelfde.</dd>
+        <dt>Op 68px</dt><dd class="risk">Het zwakste van alle tien. Van bovenaf — en dat is
+          hoe deze tafel gezien wordt — is een stempel een knop op een blokje, en dat leest
+          als een knop. Precies het ene woord dat dit voorwerp niet mag zijn.</dd>
+        <dt>Risico</dt><dd class="risk">Het perspectief. Het moet van de zijkant om te lezen,
+          en dan is het het enige voorwerp op de tafel dat niet van boven is gezien.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="entry">
+    <div class="entry__art">
+      <svg class="obj obj--tall" viewBox="0 0 96 104" aria-hidden="true">
+        <rect x="20" y="12" width="56" height="7" rx="2.5" fill="var(--foil-rule)"/>
+        <rect x="20" y="85" width="56" height="7" rx="2.5" fill="var(--foil-rule)"/>
+        <rect x="24" y="19" width="4.5" height="66" fill="var(--board-edge)"/>
+        <rect x="67.5" y="19" width="4.5" height="66" fill="var(--board-edge)"/>
+        <path d="M32 19h32L49.6 52 64 85H32l14.4-33Z" fill="rgba(226,240,246,.16)"
+              stroke="rgba(240,248,255,.32)"/>
+        <path d="M35 84h26L48 54Z" fill="#d9b878"/>
+      </svg>
+    </div>
+    <div>
+      <h3><span class="cand__num">5 ·</span> De uitgelopen zandloper</h3>
+      <dl>
+        <dt>Zegt</dt><dd>Tijd die op is. Het meest directe beeld in de hele lijst.</dd>
+        <dt>Op 68px</dt><dd class="verdict">Prima — het silhouet is beroemd genoeg om op elke
+          maat te werken.</dd>
+        <dt>Risico</dt><dd class="risk"><strong>Dit is al iets anders in deze app.</strong>
+          <code>Hourglass.tsx</code> is de laadindicator: hij staat op het scherm terwijl de
+          collectie wordt opgehaald. Een tweede zandloper die "verdien je iconen" betekent,
+          leert de lezer dat hetzelfde voorwerp twee dingen zegt, en de laadindicator wint
+          die strijd omdat je hem vaker ziet. <em>Dat maakt hem hier onbruikbaar</em>, hoe
+          goed het beeld ook is.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="entry">
+    <div class="entry__art">
+      <svg class="obj" viewBox="0 0 96 96" aria-hidden="true">
+        <circle cx="48" cy="48" r="35" fill="#15100c"/>
+        <g fill="none" stroke="rgba(255,236,200,.09)">
+          <circle cx="48" cy="48" r="31"/><circle cx="48" cy="48" r="28"/>
+          <circle cx="48" cy="48" r="25"/><circle cx="48" cy="48" r="22"/>
+        </g>
+        <path d="M48 13a35 35 0 0 1 24.7 10.2l-4.2 4.3A29 29 0 0 0 48 19Z" fill="rgba(255,231,190,.13)"/>
+        <circle cx="48" cy="48" r="14.5" fill="#8c2f1e"/>
+        <text x="48" y="45" text-anchor="middle" font-family="Georgia, serif" font-size="6"
+              letter-spacing="1" fill="var(--foil)">ANAGO</text>
+        <text x="48" y="55" text-anchor="middle" font-family="Georgia, serif" font-size="5"
+              letter-spacing="1" fill="rgba(230,201,138,.75)">1998</text>
+        <circle cx="48" cy="48" r="2.3" fill="#15100c"/>
+      </svg>
+    </div>
+    <div>
+      <h3><span class="cand__num">6 ·</span> De grammofoonplaat</h3>
+      <dl>
+        <dt>Zegt</dt><dd>Iets van toen dat je opnieuw kunt opzetten. Van de tien is dit de
+          enige die de iconen niet als <em>verloren</em> maar als <em>weer beschikbaar</em>
+          neerzet, en dat is precies wat de ontgrendeling doet.</dd>
+        <dt>Gebaar</dt><dd>Opzetten, laten draaien. Aardig, maar het is geen druk, en het
+          zou de enige beweging op de tafel zijn die doorgaat.</dd>
+        <dt>Op 68px</dt><dd class="verdict">Uitstekend. Een zwarte schijf met een gekleurd
+          label is bijna niet stuk te krijgen.</dd>
+        <dt>Risico</dt><dd class="risk">Bijna zwart, en dat is het probleem: de tafel is
+          donker roodbruin en de plaat wordt een gat erin in plaats van een voorwerp erop.
+          De enige kandidaat die tegen de ondergrond vecht in plaats van erop te liggen. En
+          het jaartal op het label heeft hetzelfde bezwaar als het kalenderblad.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="entry">
+    <div class="entry__art">
+      <svg class="obj" viewBox="0 0 96 96" aria-hidden="true">
+        <g transform="rotate(-2 48 48)">
+          <rect x="16" y="18" width="64" height="60" fill="#efe6cf" stroke="#c2b493"/>
+          <rect x="21" y="23" width="54" height="50" fill="none" stroke="var(--foil-rule)" stroke-width="1.8"/>
+          <rect x="24" y="26" width="48" height="44" fill="none" stroke="var(--foil-rule)" stroke-width=".7"/>
+          <text x="48" y="43" text-anchor="middle" font-family="Georgia, serif" font-size="8"
+                letter-spacing="1.5" fill="var(--board-ink)">EX LIBRIS</text>
+          <path d="M40 50h16M44 55h8" stroke="var(--foil-rule)" stroke-width="1.2"/>
+          <path d="M48 59l2.2 4.4 4.8.7-3.5 3.4.8 4.8L48 70l-4.3 2.3.8-4.8-3.5-3.4 4.8-.7Z"
+                fill="var(--foil-rule)" opacity=".8"/>
+        </g>
+      </svg>
+    </div>
+    <div>
+      <h3><span class="cand__num">7 ·</span> De boekplaat <span class="footnote">(eerste ronde)</span></h3>
+      <dl>
+        <dt>Zegt</dt><dd>Dit boek is van jou, en dit is wat erin zit.</dd>
+        <dt>Gebaar</dt><dd class="verdict">Het enige voorwerp in de lijst dat <em>bestaat</em>
+          om aan een boek te worden toegevoegd. De ceremonie doet dan letterlijk waar het
+          ding voor is — geen metafoor nodig.</dd>
+        <dt>Op 68px</dt><dd class="verdict">Goed, mits de dubbele kaderlijn en het ornament
+          het enige zijn wat erop staat. "EX LIBRIS" is op deze maat 5px hoog.</dd>
+        <dt>Risico</dt><dd class="risk">Niets aan tijd, en dus niets aan "mensen van toen" —
+          dat is precies waarom hij nu op nummer zeven staat in plaats van als winnaar.
+          Ook: een tweede beschreven papiertje naast het inschrijfregister in dezelfde
+          marge.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="entry">
+    <div class="entry__art">
+      <svg class="obj" viewBox="0 0 96 96" aria-hidden="true">
+        <g transform="rotate(6 48 48)">
+          <rect x="17" y="22" width="62" height="52" fill="#e4d8ba" stroke="#bdae8b"/>
+          <path d="M17 22h11L17 33Z" fill="#cbbc98"/>
+          <path d="M79 22H68l11 11Z" fill="#cbbc98"/>
+          <path d="M17 74h11L17 63Z" fill="#cbbc98"/>
+          <path d="M79 74H68l11-11Z" fill="#cbbc98"/>
+          <g fill="#c4ae82" opacity=".55">
+            <circle cx="34" cy="38" r="1.6"/><circle cx="59" cy="33" r="1.1"/>
+            <circle cx="66" cy="58" r="1.7"/><circle cx="30" cy="62" r="1.2"/>
+          </g>
+          <path d="M31 55q9-7 17-2" stroke="#8d7a52" stroke-width="1.3" fill="none" opacity=".6"/>
+        </g>
+      </svg>
+    </div>
+    <div>
+      <h3><span class="cand__num">8 ·</span> De omgekeerde foto <span class="footnote">(eerste ronde)</span></h3>
+      <dl>
+        <dt>Zegt</dt><dd>Hier zijn ze — maar je hebt ze nog niet gezien. Het is het enige
+          voorwerp dat de mensen zélf is in plaats van een verwijzing naar ze.</dd>
+        <dt>Gebaar</dt><dd class="verdict">Omdraaien. Van alle tien het mooiste gebaar, en het
+          past bij een album vol kaarten die je omdraait.</dd>
+        <dt>Op 68px</dt><dd>Redelijk, maar hij hangt volledig aan de hoekmontjes en de
+          vlekjes; zonder die twee is het een leeg rechthoekje.</dd>
+        <dt>Risico</dt><dd class="risk">De achterkant van een foto is niet te onderscheiden
+          van "een blanco kaartje", en de kaarten in dit spel hebben al een achterkant die
+          iets anders betekent. Het gebaar is beter dan het voorwerp.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="entry">
+    <div class="entry__art">
+      <svg class="obj" viewBox="0 0 96 96" aria-hidden="true">
+        <rect x="10" y="28" width="76" height="40" rx="2" fill="var(--board-edge)"/>
+        <rect x="12" y="30" width="72" height="36" rx="1.5" fill="var(--foil)"/>
+        <rect x="12" y="30" width="72" height="18" fill="rgba(255,255,255,.16)"/>
+        <text x="48" y="52" text-anchor="middle" font-family="Georgia, serif" font-size="8.5"
+              letter-spacing="2.5" fill="var(--foil-emboss)">ICONEN</text>
+        <g fill="var(--board-edge)">
+          <circle cx="19" cy="36" r="2.4"/><circle cx="77" cy="36" r="2.4"/>
+          <circle cx="19" cy="60" r="2.4"/><circle cx="77" cy="60" r="2.4"/>
+        </g>
+      </svg>
+    </div>
+    <div>
+      <h3><span class="cand__num">9 ·</span> De plaquette <span class="footnote">(eerste ronde)</span></h3>
+      <dl>
+        <dt>Zegt</dt><dd>Herdenking, en dat zonder omhaal.</dd>
+        <dt>Op 68px</dt><dd class="verdict">Het beste leesbaar van alle tien — een messing
+          balk met gegraveerde letters heeft geen detail nodig.</dd>
+        <dt>Risico</dt><dd class="risk">Te zwaar en te ernstig. Dit is een tafelvoetbalranglijst
+          en de plaquette hoort bij een dode, niet bij Roel die van baan is gewisseld. Hij
+          moet ook het woord "ICONEN" dragen om iets te betekenen — en dat woord is er net
+          bij de boekomslag uitgehaald, om precies dezelfde reden.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="entry">
+    <div class="entry__art">
+      <svg class="obj" viewBox="0 0 96 96" aria-hidden="true">
+        <rect x="14" y="26" width="68" height="52" rx="1.5" fill="#ded2b4"/>
+        <path d="M22 18h26v9H22Z" fill="#e9dfc4" stroke="#c0b190"/>
+        <rect x="14" y="26" width="68" height="52" rx="1.5" fill="none" stroke="#c0b190"/>
+        <rect x="14" y="26" width="68" height="4" fill="#8c2f1e"/>
+        <g stroke="#b6a684">
+          <line x1="20" y1="40" x2="76" y2="40"/><line x1="20" y1="48" x2="76" y2="48"/>
+          <line x1="20" y1="56" x2="76" y2="56"/><line x1="20" y1="64" x2="76" y2="64"/>
+        </g>
+      </svg>
+    </div>
+    <div>
+      <h3><span class="cand__num">10 ·</span> De registerkaart <span class="footnote">(eerste ronde)</span></h3>
+      <dl>
+        <dt>Zegt</dt><dd>Het archief: iedereen die hier ooit langskwam, op alfabet.</dd>
+        <dt>Op 68px</dt><dd>Werkt, maar de lijntjes zijn 1px en de tab is het enige wat het
+          van een blanco kaartje onderscheidt.</dd>
+        <dt>Risico</dt><dd class="risk">Het lijkt te veel op het inschrijfregister waarmee je
+          binnenkomt — gelinieerd papier met een naam erop — en het ligt in dezelfde marge.
+          Twee papieren dingen naast elkaar die verschillende dingen doen.</dd>
+      </dl>
+    </div>
+  </div>
+
+  <hr>
+
+  <h2>Wat ik zou kiezen</h2>
+
+  <div class="pick">
+    <h3>1 · Het zakhorloge, stilgezet</h3>
+    <p>
+      Het haalt alle zes de regels en het is het enige voorwerp dat <em>tijd</em>,
+      <em>een voorwerp op hout</em> en <em>een druk</em> alle drie in één ding heeft. Messing
+      met een ivoren wijzerplaat is bovendien exact het materiaalpaar dat de nieuwe band
+      krijgt — de zegel en de omslag worden zichtbaar hetzelfde boek. En een zakhorloge is
+      iets dat je van iemand krijgt die er niet meer is, wat de iconen precies zijn.
+    </p>
+    <p style="margin-bottom:0">
+      De <strong>postzegel (3)</strong> is de sterkste tweede en op één punt zelfs beter: hij
+      is zelf een verzamelobject, en "afgestempeld" is een scherpere beschrijving van een
+      icoon dan "stilgezet". Als het horloge in de praktijk te veel op een klokje in een
+      werkbalk lijkt, is dit de volgende.
+    </p>
+  </div>
+
+  <p class="footnote" style="margin-top:26px">
+    De <strong>datumstempel (4)</strong> heeft het beste gebaar van allemaal en valt af op
+    perspectief; de <strong>zandloper (5)</strong> heeft het beste beeld en valt af omdat de
+    laadindicator hem al gebruikt. Beide zijn het waard om vast te leggen, want het zijn
+    precies de twee waar iemand over een half jaar opnieuw op uitkomt.
+  </p>
+  <p class="footnote">
+    Alle tien zijn hierboven getekend in de tokens van het album zelf, op de achtergrond van
+    <code>.game-stage</code>, op 68px — de middenmaat van de <code>clamp(52px, 7vw, 74px)</code>
+    die de verzegelde versie nu heeft. Er is geen enkele nieuwe kleurwaarde gebruikt.
+  </p>
+
+</div>
+</body>
+</html>

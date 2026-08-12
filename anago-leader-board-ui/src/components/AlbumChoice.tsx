@@ -35,6 +35,32 @@ const REST_MS = 460;
 /** Which slot the row centres on. Five books, so the middle one is index 2. */
 const CENTRE_INDEX = 2;
 
+/**
+ * The name, cut into words, each letter keeping the position it has in the whole name —
+ * that position is what the stamping run counts, so it has to survive the split.
+ *
+ * Split rather than laid out as a flat run of letters because every letter is its own
+ * inline-block, and a line break is allowed between any two of them: "Anneloes Ernest"
+ * wrapped as "ANNELOES ERNES / T" while the name was going on and only snapped to the
+ * right break once the album took the cover over and set it as plain text.
+ */
+const splitIntoWords = (name: string): { char: string; index: number }[][] => {
+  const words: { char: string; index: number }[][] = [];
+  let word: { char: string; index: number }[] = [];
+
+  Array.from(name).forEach((char, index) => {
+    if (char.trim().length === 0) {
+      if (word.length > 0) words.push(word);
+      word = [];
+      return;
+    }
+    word.push({ char, index });
+  });
+
+  if (word.length > 0) words.push(word);
+  return words;
+};
+
 type Phase = 'choosing' | 'clearing' | 'centring' | 'lifting' | 'stamping' | 'resting';
 
 interface AlbumChoiceProps {
@@ -97,7 +123,9 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
     [],
   );
 
+  // The flat run still drives the timing — one beat per character, spaces included.
   const letters = stampName ? Array.from(stampName) : [];
+  const words = stampName ? splitIntoWords(stampName) : [];
   const picked = pickedIndex === null ? null : COVERS[pickedIndex];
 
   const choose = (cover: CoverId, index: number) => {
@@ -224,17 +252,26 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
             <div className="album__cover">
               <div className="album__cover-kicker">Verzamelalbum van</div>
               <div className="album__cover-title">
-                {letters.map((letter, index) => (
-                  <span
-                    // Position is the identity: the same letter turns up twice in plenty
-                    // of names, so it cannot be the key.
-                    key={index}
-                    className={`choice__letter${index < stamped ? ' choice__letter--set' : ''}`}
-                  >
-                    {/* Hard space: every character is its own inline-block, so an
-                        ordinary one between two words collapses to nothing. */}
-                    {letter === ' ' ? ' ' : letter}
-                  </span>
+                {words.map((word, wordIndex) => (
+                  <React.Fragment key={wordIndex}>
+                    {/* An ordinary space, and the only place the line is allowed to
+                        break — the word itself is one unbreakable box. */}
+                    {wordIndex > 0 ? ' ' : null}
+                    <span className="choice__word">
+                      {word.map(({ char, index }) => (
+                        <span
+                          // Position is the identity: the same letter turns up twice in
+                          // plenty of names, so it cannot be the key.
+                          key={index}
+                          className={`choice__letter${
+                            index < stamped ? ' choice__letter--set' : ''
+                          }`}
+                        >
+                          {char}
+                        </span>
+                      ))}
+                    </span>
+                  </React.Fragment>
                 ))}
               </div>
               <div className="album__cover-rule" />

@@ -5,8 +5,6 @@ import '../styles/ledger.css';
 interface SigningLedgerProps {
   /** Every active player, gate or no gate. */
   players: SelectablePlayer[];
-  /** How many games a player needs before they can own a collection. */
-  minGames: number;
   onChoose: (player: SelectablePlayer) => void;
 }
 
@@ -26,11 +24,19 @@ interface SigningLedgerProps {
  * name rather than pick it off a sanctioned list. Turning this into a roster of clickable
  * names would throw that away for nothing.
  *
- * Under-gate players are listed but struck through, with how far off they are. Leaving
- * them out was the first version and it is worse: a name that simply is not there cannot
- * explain itself, so the four newest colleagues would have concluded the page was broken.
+ * **Every name on it can be signed, and none of them carries a game count.** Under-gate
+ * players used to be listed struck through with "nog 2 wedstrijden" beside them, and both
+ * halves of that were wrong here. The gate belongs on the far side of the signature, where
+ * it is a padlocked album with your own number on it (`LockedAlbum`) — not on the page
+ * whose only job is asking who you are, where it greys out exactly the newest colleagues
+ * and offers them nothing to click. And a games column turns a register into a
+ * leaderboard: this page is not where you find out how much anybody has played.
+ *
+ * Listing them at all is still deliberate, and it is the reason the type-ahead is backed
+ * by `GET api/players?activeOnly=true` rather than by the card pool, which excludes them
+ * by definition. A name that simply is not there cannot explain itself.
  */
-const SigningLedger: React.FC<SigningLedgerProps> = ({ players, minGames, onChoose }) => {
+const SigningLedger: React.FC<SigningLedgerProps> = ({ players, onChoose }) => {
   const [query, setQuery] = useState('');
   const blurTimer = useRef<number | null>(null);
   const [focused, setFocused] = useState(false);
@@ -46,8 +52,8 @@ const SigningLedger: React.FC<SigningLedgerProps> = ({ players, minGames, onChoo
     return players.filter((p) => p.name.toLowerCase().includes(needle)).slice(0, 8);
   }, [players, query]);
 
+  /* No gate check. Signing in always works — see the note above the component. */
   const choose = (player: SelectablePlayer) => {
-    if (player.numberOfGames < minGames) return;
     onChoose(player);
     setQuery('');
   };
@@ -65,11 +71,12 @@ const SigningLedger: React.FC<SigningLedgerProps> = ({ players, minGames, onChoo
           <p className="ledger__blurb">
             Schrijf je naam op de regel hiernaast. Dan halen we je album erbij.
           </p>
-          <div className="ledger__rule" />
-          <p className="ledger__blurb ledger__blurb--fine">
-            Vanaf {minGames} gespeelde wedstrijden kun je kaarten verzamelen — en sta je
-            zelf op een kaart.
-          </p>
+          {/*
+            No fine print about the games gate. It was answering a question nobody has
+            asked yet — the gate only concerns you once you have signed, and that is now
+            a screen of its own that says it with your own numbers on it. The rule above
+            it went with it: a divider with nothing under it is furniture.
+          */}
         </div>
 
         <div className="ledger__page ledger__page--right">
@@ -109,31 +116,20 @@ const SigningLedger: React.FC<SigningLedgerProps> = ({ players, minGames, onChoo
             where the header picker needed a floating menu.
           */}
           <ul className="ledger__names">
-            {matches.map((player) => {
-              const short = player.numberOfGames < minGames;
-              const togo = minGames - player.numberOfGames;
-
-              return (
-                <li key={player.id}>
-                  <button
-                    type="button"
-                    className={`ledger__name${short ? ' ledger__name--short' : ''}`}
-                    onMouseDown={() => {
-                      if (blurTimer.current) window.clearTimeout(blurTimer.current);
-                    }}
-                    onClick={() => choose(player)}
-                    disabled={short}
-                  >
-                    <span className="ledger__name-text">{splitName(player.name).display}</span>
-                    <span className="ledger__name-note">
-                      {short
-                        ? `nog ${togo} ${togo === 1 ? 'wedstrijd' : 'wedstrijden'}`
-                        : `${player.numberOfGames} wedstrijden`}
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
+            {matches.map((player) => (
+              <li key={player.id}>
+                <button
+                  type="button"
+                  className="ledger__name"
+                  onMouseDown={() => {
+                    if (blurTimer.current) window.clearTimeout(blurTimer.current);
+                  }}
+                  onClick={() => choose(player)}
+                >
+                  <span className="ledger__name-text">{splitName(player.name).display}</span>
+                </button>
+              </li>
+            ))}
 
             {searching && matches.length === 0 ? (
               <li className="ledger__empty">

@@ -1,12 +1,235 @@
 import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Card, CardPlayer, toCard } from '../mock/cardMock';
+import { Card, CardPlayer, splitName, toCard } from '../mock/cardMock';
 import PlayerCard, { ownedLabel } from './PlayerCard';
 import useIsMobile from '../hooks/useIsMobile';
 import { albumLeather } from '../utils/albumLeather';
-import { playCoverTurn, playPageTurn } from '../utils/sounds';
+import { ms, prefersReducedMotion } from '../utils/animationSpeed';
+import { playCoverTurn, playPageTurn, playRarePayoff, playRebind } from '../utils/sounds';
 import '../styles/album.css';
 
 const SLOTS_PER_PAGE = 6;
+
+/**
+ * Lines per checklist page, in two columns of twenty.
+ *
+ * **A fixed count, and it has to be.** Page composition cannot depend on the
+ * viewport: the reading position is stored as a leaf index, so if a phone
+ * paginated the list differently from a desktop, the same stored position would
+ * land on a different page on each. So this is sized to the *smaller* of the two
+ * pages — a short phone gets `--page-h` down around 386px — and the desktop book
+ * simply sets the same forty lines more airily, via a line height derived from
+ * the page height in album.css.
+ *
+ * Twenty per column rather than the ~23 that would fit is deliberate slack: names
+ * are Dutch and a long one wrapping would push a column past the trim.
+ */
+const CHECKLIST_ROWS_PER_PAGE = 40;
+
+/**
+ * Ticks drawn by hand, three of them, so the list is not forty identical marks.
+ *
+ * Paths rather than a glyph, and **deliberately not a handwriting font**: the
+ * stacks that look right on Windows (`Segoe Script`) fall back through generic
+ * `cursive`, which is Comic Sans on most of the machines this runs on. A stroke
+ * with round caps is a pencil mark in any browser and needs no font at all.
+ */
+const TICKS = [
+  'M1.5 5.8 L4.2 8.6 L10.8 1.4',
+  'M1 6.4 L4.6 9 L11.2 1',
+  'M2 5.4 L4 8.8 L10.4 1.8',
+];
+
+/**
+ * Which tick a card gets, and how far off square it sits.
+ *
+ * Hashed from the player id, so it is **stable**: the same card carries the same
+ * mark across re-renders and reloads. `Math.random()` here would have the ticks
+ * twitching every time the page turned, which is the one thing a mark made once
+ * in pencil cannot do.
+ */
+const handMark = (id: string): { tick: string; tilt: number } => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) | 0;
+  const seed = Math.abs(hash);
+  return { tick: TICKS[seed % TICKS.length], tilt: ((seed >> 3) % 9) - 4 };
+};
+
+/* ------------------------------------------------------------------ *
+ * The re-binding ceremony
+ *
+ * The book being taken away and returned bound in the icon edition: it shuts, the
+ * new binding is drawn across the board out of the hinge, and it settles. Four beats
+ * and no words — see `RebindPhase`.
+ *
+ * **Every number here is HALF its real length**, because `--anim` is 2 and every
+ * duration in album.css multiplies by it, exactly as `ms()` does to these timers.
+ * Getting that wrong is the standing failure on this page — a ceremony at twice the
+ * speed of the book it hands back to reads as a glitch rather than a sequence.
+ *
+ * This lives inside `Album` rather than in a component swapped in beside it, the way
+ * `AlbumChoice` is. Three reasons, and the first is decisive: the book has to be seen
+ * to *shut*, and only the real one can do that — it owns the leaf state, the
+ * `.album--closed` transform and the cover's own turn sound. A stand-in would have to
+ * reproduce a shut book's exact 3D state to hand back motionlessly, which `AlbumChoice`
+ * only gets away with because it never has to match an *open* book. And the new cover
+ * layer has to live on the real cover regardless, since the book keeps that binding
+ * afterwards; building it twice is how the two drift apart.
+ * ------------------------------------------------------------------ */
+
+/** The board going over. Matches `.album__leaf`'s own transition, which does the work. */
+const SHUT_MS = 620;
+/** Held shut, nothing moving. A press has a pause before it. */
+const REBIND_SETTLE_MS = 200;
+/**
+ * The room going dark and the book running up to full light.
+ *
+ * The ramp only. It was 2700 and did the ramp *and* the wait in one beat, on a curve slow
+ * enough to fill the length — which meant the book spent most of the build dim. Splitting
+ * the wait out let this go back to being a rise, and put the waiting somewhere it can have
+ * something in it.
+ */
+const CHARGE_MS = 900;
+
+/**
+ * Held at full light, and **this is where the rings come on, one at a time.**
+ *
+ * The longest beat in the ceremony, and the one doing the work the ramp used to be asked to
+ * do. A build needs something to accumulate; brightness alone tops out and then has nowhere
+ * left to go, so the accumulation is the orbits arriving rather than the light rising.
+ *
+ * The three land at 0, 0.5 and 1.0 seconds and take 0.42 to fade in, so the last one is up
+ * by about 1.4 — and the rest of this beat is the pause with all three turning, which is the
+ * thing the climax breaks. That pause is why this is 2200 rather than 1600: at the shorter
+ * length the third ring had barely arrived before the bloom took it.
+ *
+ * Nothing about the cover changes across it — `charging` and `holding` set the same filter,
+ * so the transition runs once and the peak simply stays.
+ */
+const HOLD_MS = 2200;
+/**
+ * The whole page blooming white. The book changes inside this.
+ *
+ * **Half again as long, and it is the hold that got longer, not the arrival.** The two
+ * transitions that run inside this beat — the cover's last push to white at 180ms and the
+ * page bloom's own fade-in at 200ms — are deliberately left alone. They are the "land fast"
+ * half of the rule the charge obeys the other half of: the flash has to arrive quickly, and
+ * then it is worth holding. Stretching them instead would have softened the climax rather
+ * than extended it.
+ *
+ * So the white now arrives in the same ~200ms and sits for roughly 310 rather than 160.
+ */
+const BLOOM_MS = 900;
+/** The bloom fading off what it left behind. */
+const RESOLVE_MS = 1100;
+/** The bound book, sitting on the table. */
+const REBIND_REST_MS = 520;
+/** Fading off, so the pack opener does not cut in on the last frame. */
+const HAND_MS = 320;
+
+/**
+ * The re-binding, as an evolution rather than a wipe.
+ *
+ * The first version drew the new binding across the board with a `clip-path`, which was
+ * honest about *what* was happening and far too small for *when* it happens — once in a
+ * collection's life. The room goes dark, the book goes white, gold flies around it in
+ * orbits, the whole page blooms, and the book is lying there bound when the bloom clears.
+ *
+ * **There is no alternating flicker**, and the reason is worth keeping because it is the
+ * obvious thing to reach for. In the games the flicker works because the two forms have
+ * *different silhouettes*; here they are the same rectangle — a leather book and a
+ * half-bound one have identical outlines — so there would be nothing to alternate, and a
+ * white silhouette hides the only thing that actually changes. The rings carry that energy
+ * instead.
+ *
+ * **The change itself is hidden.** The icon binding is simply present from `blooming`
+ * onward, with no transition, because by then the whole page is white and there is nothing
+ * to see it happen against. That deletes the entire `clip-path` mechanism the wipe needed —
+ * a swap you cannot see needs no animation, and hiding the cut is what the bloom is for.
+ */
+type RebindPhase =
+  | 'shutting'
+  | 'settling'
+  | 'charging'
+  | 'holding'
+  | 'blooming'
+  | 'resolving'
+  | 'resting'
+  | 'handing'
+  /**
+   * Over. The book is bound, visible, and the reader's again.
+   *
+   * **A terminal phase rather than clearing the state back to null**, because null would take
+   * the icon binding off the cover with it — `showBinding` reads the phase, and on the paths
+   * where nothing was written to the server (the test panel's, and a failed claim) `icons` is
+   * still false. So the ceremony has to end somewhere that means "bound" rather than
+   * "nothing happening".
+   *
+   * And it has to be its own phase rather than resting on `handing`, which is the bug this
+   * fixed: `handing` fades the album to nothing on its way to the pack opener, so an album
+   * left sitting in it is an album that has vanished. Nobody saw that on the real path,
+   * where the opener replaces the book on the next frame anyway.
+   */
+  | 'done';
+
+/**
+ * From here on the book *is* the icon edition — dark ink on ivory boards.
+ *
+ * Not before `blooming`, and that is not cosmetic: the printing goes bronze with the binding,
+ * and bronze type on the leather cover it has not replaced yet is dark on dark. The light is
+ * what makes the swap invisible, so the swap has to wait for the light.
+ */
+const BOUND_PHASES = new Set<RebindPhase>([
+  'blooming',
+  'resolving',
+  'resting',
+  'handing',
+  'done',
+]);
+
+/**
+ * The rings of gold that fly around the book.
+ *
+ * Three of them, each tilted and yawed differently so they read as orbits rather than as
+ * three circles drawn on top of each other — `.album` already carries `perspective`, so a
+ * ring turned out of the page really is foreshortened rather than faked.
+ *
+ * One runs the other way. Two rings both spinning clockwise look like one thick ring; a
+ * counter-rotation is what makes the space between them legible.
+ *
+ * Radii are fractions of `--page-w` — the **shut** book, which is what is on the table for
+ * the whole ceremony — so the orbits scale with it rather than being pinned to a pixel size
+ * that only suits a desktop. Above 0.5 is an orbit that clears the cover's edge, so all
+ * three of these pass outside the book at their widest.
+ *
+ * `in` is when each one arrives, in seconds, applied as a `transition-delay`. They come on
+ * **one at a time, and only during the hold** — all three appearing together read as a light
+ * being switched on rather than as something gathering, and the hold is the beat that has to
+ * do the gathering now that the brightness tops out before it.
+ */
+const REBIND_RINGS = [
+  { tilt: 74, yaw: 0, radius: 0.72, spin: 1.5, beads: 16, size: 5, reverse: false, in: 0 },
+  { tilt: 62, yaw: 58, radius: 0.92, spin: 2.1, beads: 20, size: 4, reverse: true, in: 0.5 },
+  { tilt: 84, yaw: -34, radius: 0.58, spin: 1.1, beads: 12, size: 6, reverse: false, in: 1 },
+] as const;
+
+/**
+ * The top of the payoff ladder — the full D-minor chord, all four voices.
+ *
+ * `playRarePayoff` clamps to its own range, so this is a statement of intent rather than a
+ * bound: nothing in the game is rarer than the moment this plays under, so nothing should
+ * out-sound it. The card that comes out of the packet a few seconds later gets its own
+ * payoff at whatever level it earns, which will usually be less.
+ */
+const REBIND_PAYOFF = 4;
+
+/*
+ * The scattered grains that used to be here are gone.
+ *
+ * They were thrown outward from the book on individual bearings, which is a firework — it
+ * happens once and it is over, and nothing about it says the book is being worked on. Rings
+ * that keep going round say it for as long as they are turning, which is what the beat before
+ * the bloom needs to fill.
+ */
 
 /**
  * Where the reader left off, so the album reopens where they closed it.
@@ -58,18 +281,49 @@ interface Slot {
   count: number;
 }
 
+/**
+ * One printed line of the checklist at the back.
+ *
+ * `number` is the card's place in the book counted over slots only, so padding
+ * pages never shift it, and `page` is where that slot is printed — which is what
+ * lets a row turn the book to it.
+ */
+interface ChecklistEntry {
+  playerId: string;
+  name: string;
+  number: number;
+  count: number;
+  page: number;
+}
+
 /** A slot plus which page it is printed on, for anything navigating the book. */
 export interface AlbumSlotRef extends Slot {
   page: number;
 }
 
 interface AlbumPage {
-  kind: 'cover' | 'slots';
-  title: string;
-  subtitle?: string;
-  /** Cover only: the line above the name. */
+  kind: 'cover' | 'endpaper' | 'foreword' | 'slots' | 'checklist';
+  /**
+   * Cover only, both of them — a slots page prints nothing but its cards and its
+   * page number, so it sets neither. Optional for that reason: `title` was
+   * required back when every page carried a running head.
+   *
+   * There was a `subtitle` too, carrying the cover's tally. It went with the
+   * tally; nothing else ever set it.
+   */
+  title?: string;
+  /** The line above the name. */
   kicker?: string;
   slots: Slot[];
+  /** Checklist pages only: the lines printed on this one. */
+  entries?: ChecklistEntry[];
+  /**
+   * Set on the **last** checklist page only, which is where the tally is written.
+   *
+   * `total` is printed with the list (it is how many there are, which the press
+   * knows) and `owned` is the figure a hand fills into the blank.
+   */
+  tally?: { owned: number; total: number };
 }
 
 /* ------------------------------------------------------------------ *
@@ -77,63 +331,86 @@ interface AlbumPage {
  * ------------------------------------------------------------------ */
 
 /**
- * Page 0 is the front cover, so leaf 0 carries [cover | first page of players].
+ * Page 0 is the front cover, so leaf 0 is the front **board**: cover on the front,
+ * endpaper on the back.
  *
  * That gives the book a genuinely closed state at `flipped === 0` — which is
  * where a first-time visitor starts, and which the back arrow can always return
  * to. Without a cover page, `flipped === 0` already showed an open spread and
  * there was nothing to open.
  *
- * No blank inside-cover behind it, deliberately: it would cost a page, and on
- * mobile (one page per swipe) it would be an empty swipe between the cover and
- * the first players.
+ * **Leaf 0 used to carry [cover | first page of players], and that was the bug.**
+ * Opening the book landed you on a spread whose left-hand side was the *back of the
+ * cover* with six card slots printed on it — one physical sheet doing duty as both
+ * the board and the first page, which is a thing no book does. The reason given for
+ * it was that an inside cover costs a page and would be an empty swipe on mobile.
+ * That reason was sound and the fix answers it: the page is not empty, it carries
+ * the **voorwoord**. So:
+ *
+ *     0  cover          leaf 0 front   the board, outside
+ *     1  endpaper       leaf 0 back    the board, inside — no print on it
+ *     2  foreword       leaf 1 front   the voorwoord
+ *     3  first slots    leaf 1 back    cards start on a spread of their own
+ *     …
+ *     E  endpaper       last leaf      the back board, inside
+ *
+ * Both endpapers are the leather of the binding rather than paper, which is what
+ * makes the boards read as boards at every spread — see `.album__endpaper`.
+ *
+ * The final endpaper has to land on an **even** index so it is a leaf *front*: that
+ * puts it on the right-hand side of the last spread, which is where the inside of a
+ * back board is. An odd `pages.length` therefore takes one blank sheet first, and a
+ * blank leaf at the end of the text block is what a real book has there too.
  */
 const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
   const pages: AlbumPage[] = [];
 
   if (sections.length > 0) {
-    const total = sections.reduce((sum, s) => sum + s.players.length, 0);
-    const owned = sections.reduce(
-      (sum, s) => sum + s.players.filter((p) => (s.counts.get(p.id) ?? 0) > 0).length,
-      0,
-    );
     /*
      * The cover carries whose album it is, which is why the page header above the
      * stage no longer repeats it. On a real album that line is the whole front.
+     *
+     * **And it carries nothing else — the tally is gone.** It used to read
+     * "<owned> / <total> spelers" under the name, which is a number that changes
+     * every time a packet is opened, blocked into a cover in gold foil. Foil is
+     * struck once when the book is bound and never rewritten, so a live figure
+     * there was the least physically defensible thing in the whole album. A count
+     * belongs where a hand can write it: the checklist at the back.
      */
     pages.push({
       kind: 'cover',
       kicker: owner ? 'Verzamelalbum van' : undefined,
       title: owner ?? 'Verzamelalbum',
-      subtitle: `${owned} / ${total} spelers`,
       slots: [],
     });
+
+    /* The other side of the same board, and then the voorwoord facing it. */
+    pages.push({ kind: 'endpaper', slots: [] });
+    pages.push({ kind: 'foreword', slots: [], title: owner });
   }
 
-  sections.forEach((section, sectionIndex) => {
-    const owned = section.players.filter((p) => (section.counts.get(p.id) ?? 0) > 0).length;
+  /*
+   * The checklist's lines, gathered as the slots pages are laid out rather than
+   * walked again afterwards. Same reason `albumSlotOrder` is built from
+   * `buildPages`: two passes over the roster are two things that can disagree,
+   * and here the thing they would disagree about is which page a number is on.
+   */
+  const entries: ChecklistEntry[] = [];
 
-    /*
-     * The running head names the album and its owner, not the section. A section
-     * name on every page was a heading for a distinction the reader cannot act on.
-     * So it survives only as a qualifier on the counter, and only where it is not
-     * the default.
-     *
-     * As of the legends interleave the collection page passes a single section, so
-     * the qualifier never renders. The machinery is kept because it costs nothing
-     * and a second section is a plausible future — a set, a season — but nothing
-     * here should be tuned for a case that does not currently occur.
-     */
-    const head = owner ? `Verzamelalbum · ${owner}` : 'Verzamelalbum';
-    const tally =
-      sectionIndex === 0
-        ? `${owned}/${section.players.length}`
-        : `${section.title} ${owned}/${section.players.length}`;
-
+  /*
+   * Nothing else is computed per section any more.
+   *
+   * There used to be a running head ("Verzamelalbum · <naam>") and a tally, with
+   * the section title folded into the tally as a qualifier for the second and
+   * later sections. The page no longer prints a head at all — see `PageFace` for
+   * why — so the owner, the section title and the owned count are all unused
+   * here, and `section.title` now only reaches the reader via the cover.
+   */
+  sections.forEach((section) => {
     /*
      * Start each section at the left of a spread, so two sections never share one —
      * a spread with a different heading on each side looks like a mistake. Inert
-     * while there is only one section, which is the case since legends were
+     * while there is only one section, which is the case since icons were
      * interleaved rather than appended.
      *
      * Leaf i holds [page 2i, page 2i+1], and at `flipped = f` the spread shows
@@ -143,7 +420,7 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
      * only later ones can need padding.
      */
     if (pages.length % 2 === 0) {
-      pages.push({ kind: 'slots', title: '', slots: [] });
+      pages.push({ kind: 'slots', slots: [] });
     }
 
     for (let i = 0; i < section.players.length; i += SLOTS_PER_PAGE) {
@@ -152,21 +429,86 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
         card: toCard(player),
         count: section.counts.get(player.id) ?? 0,
       }));
-      pages.push({
-        kind: 'slots',
-        title: head,
-        subtitle: tally,
-        slots,
+
+      /* Read before the push, so it is the index this page is about to take. */
+      const pageIndex = pages.length;
+      slots.forEach((slot) => {
+        entries.push({
+          playerId: slot.card.player.id,
+          /*
+           * The name without the nickname.
+           *
+           * Stored names carry one in quotes (`Petar "beetje gepiel" Drandarov`),
+           * and a checklist is a column of forty lines about 90px wide — the one
+           * place in the album with the least room for the longest part of a name.
+           * `splitName` is the same helper the card face and the initials use, so
+           * the list cannot start disagreeing with them about what a name is.
+           *
+           * The nickname is not lost: it is on the back of the card, which is
+           * where it was put for this reason.
+           */
+          name: splitName(slot.card.player.name).display,
+          /* Counted over slots, so a padding page cannot shift a number. */
+          number: entries.length + 1,
+          count: slot.count,
+          page: pageIndex,
+        });
       });
+
+      pages.push({ kind: 'slots', slots });
     }
   });
 
-  /*
-   * No padding to an even page count. A half-empty last leaf renders its missing
-   * back as a blank page anyway, and padding to fill it only ever added a spread
-   * you could turn to that had nothing on either side. What keeps that spread
-   * unreachable is `maxFlipped`, not the page count being even.
-   */
+  /* ---------------------------------------------------------------- *
+   * The checklist at the back
+   *
+   * The conventional last page of a sticker album: every collectable listed and
+   * numbered, ticked off as you get it. It is also the one page in the book where
+   * a number that changes is physically honest — see the tally in `PageFace`.
+   *
+   * It starts on a LEFT-hand page for the same reason a section does: a spread
+   * with cards on one side and a list on the other reads as a mistake. An odd
+   * index is the left-hand page, so an even `pages.length` needs one blank first.
+   * ---------------------------------------------------------------- */
+  if (entries.length > 0) {
+    if (pages.length % 2 === 0) {
+      pages.push({ kind: 'slots', slots: [] });
+    }
+
+    const owned = entries.filter((entry) => entry.count > 0).length;
+
+    for (let i = 0; i < entries.length; i += CHECKLIST_ROWS_PER_PAGE) {
+      const rows = entries.slice(i, i + CHECKLIST_ROWS_PER_PAGE);
+      const last = i + CHECKLIST_ROWS_PER_PAGE >= entries.length;
+      pages.push({
+        kind: 'checklist',
+        slots: [],
+        entries: rows,
+        /* One tally for the whole album, at the foot of the final page of it. */
+        tally: last ? { owned, total: entries.length } : undefined,
+      });
+    }
+  }
+
+  /* ---------------------------------------------------------------- *
+   * The back board
+   *
+   * The inside of the back cover, closing the book the way the endpaper at page 1
+   * opens it. It must be a leaf **front** — an even index — so it lands on the
+   * right-hand side of the last spread, which is the side a back board is on.
+   *
+   * The blank that an odd count needs is the last sheet of the text block, which is
+   * blank in a real book too. It replaces the older "no padding to an even page
+   * count" rule: that rule existed because padding bought a spread with nothing on
+   * either side, and this pads *toward* something rather than for symmetry.
+   * ---------------------------------------------------------------- */
+  if (pages.length > 0) {
+    if (pages.length % 2 === 1) {
+      pages.push({ kind: 'slots', slots: [] });
+    }
+    pages.push({ kind: 'endpaper', slots: [] });
+  }
+
   return pages;
 };
 
@@ -208,27 +550,262 @@ const PageFace: React.FC<{
    */
   visible: boolean;
   onCardOpen?: (playerId: string) => void;
-}> = ({ page, index, visible, onCardOpen }) => {
+  /** Turns the book to a page. The checklist's rows are what use it. */
+  onGoToPage?: (page: number) => void;
+  /**
+   * Draw the icon binding.
+   *
+   * **Not the same question as "is this book bound in it".** It has to be true for the
+   * length of the re-binding as well, while the server's answer is still parked in the
+   * page's ref and `iconsUnlocked` is therefore still false. Rendering it off the unlocked
+   * flag alone was the bug that made the ceremony invisible: the layer only appeared once
+   * the state landed, which is *after* the wipe that was supposed to bring it in, so all
+   * that ever played was the book shutting.
+   */
+  binding?: boolean;
+}> = ({ page, index, visible, onCardOpen, onGoToPage, binding }) => {
   if (!page) return <div className="album__page" />;
 
   if (page.kind === 'cover') {
     return (
       <div className="album__cover">
+        {/*
+          The icon binding: ivory boards, with the chosen stain kept as the four corners.
+
+          A half-bound book, so the leather it was bound in is still what carries the
+          spine — which `.album__binding` behind the book already draws, and is why there
+          is no strip down this face. There was one, at 18%, and it was wrong twice over:
+          it doubled the spine the book already has, and it merged with the two left-hand
+          corners into a single brown mass that read as a letter strip rather than as a
+          binding.
+
+          **Its own element, and revealed by a transitioned `clip-path`.** A `background`
+          built out of custom properties cannot be transitioned (see albumLeather.ts),
+          which is the same trap that made `.album__binding` a separate element rather than
+          a background on the book. Clipping sidesteps it entirely, and a wipe out of the
+          hinge reads as the book being re-cased rather than as one cover dissolving into
+          another — which is what an opacity crossfade would have given.
+        */}
+        {binding ? <div className="album__cover-icons" /> : null}
+
         {page.kicker ? <div className="album__cover-kicker">{page.kicker}</div> : null}
         <div className="album__cover-title">{page.title}</div>
+        {/*
+          The rule now closes the cover instead of dividing it: it used to have the
+          tally under it (see `buildPages`), so with that gone it reads as a
+          flourish under the name, which is what foil rules do on real bindings.
+
+          `.album__cover-sub` still exists in album.css — AlbumChoice uses it for
+          the static "nog geen kaarten" on the unbound books, which is a printed
+          line rather than a counter and so has no reason to go.
+        */}
         <div className="album__cover-rule" />
-        <div className="album__cover-sub">{page.subtitle}</div>
+
+        {/*
+          **Nothing says "iconen" on the cover, and nothing should.** A blocked word was
+          tried and removed: the binding is what tells you the book holds them, and a
+          caption under it is the cover explaining itself. It is the same objection that
+          removed the `legende` pill from the card face — a label rather than material —
+          and the reason nothing here prints the word "icoon" either.
+        */}
       </div>
     );
   }
 
+  /*
+   * The inside of a board: leather, and **nothing printed on it at all**.
+   *
+   * It is the one face in the book that is not paper, which is exactly its job — it
+   * is what tells you the thing you just opened has boards. Both ends use it: page 1
+   * behind the cover, and the last page as the inside of the back board.
+   */
+  if (page.kind === 'endpaper') {
+    return <div className="album__endpaper" aria-hidden="true" />;
+  }
+
+  /*
+   * The voorwoord, facing the front endpaper.
+   *
+   * It exists to pay for the endpaper. An inside cover on its own would have cost a
+   * page and, on mobile, been a swipe with nothing on it — which is precisely why
+   * there was no inside cover before. A voorwoord is the page a real album puts
+   * exactly here, so the spread earns itself: board on the left, a word on the right.
+   */
+  if (page.kind === 'foreword') {
+    return (
+      <div className="album__page album__page--foreword">
+        <div className="album__foreword">
+          <h2 className="album__foreword-title">Voorwoord</h2>
+          <p>
+            Er hoeft maar iemand “potje?” te zeggen en het ritueel begint vanzelf.
+            Vier mensen verzamelen, de optocht richting de tafel, Chwazi openen, vingers erop en kijken wie met wie
+            opgescheept zit. Daarna volgt meestal precies waarvoor je gekomen bent:
+            een paar minuten tafelvoetbal, een hoop onzin en iets meer fanatisme dan
+            strikt noodzakelijk.
+          </p>
+          <p>
+            En natuurlijk gaat het allang niet meer alleen om de stand. 
+            Er zijn goals die met echte doelpalen nooit hadden gezeten, 
+            ballen die via de bunda van de keeper alsnog binnenvallen, 'Pietjes', 'Mark-ies' en 
+            langzaam rollende ballen die met “psst psst” en driftig wijzen 
+            de juiste hoek in worden gewenst. 
+            Aan het einde van de dag groeit “nog één potje” bovendien verrassend 
+            makkelijk uit tot een complete rotatie.
+          </p>
+          <p>
+            Na genoeg wedstrijden krijgt bijna iedere speler vanzelf een eigen
+            verhaal. Een favoriete positie, een beruchte signature-move, een irritant trekje
+            of simpelweg een reputatie die groter is geworden dan de resultaten
+            rechtvaardigen. Al die spelers, verhalen en eigenaardigheden verdienen
+            eigenlijk een plek bij elkaar.
+          </p>
+          <p>
+            En precies daar is dit verzamelalbum voor. Door te spelen vul je het
+            stukje bij beetje met de mensen die de tafel maken tot wat hij is. Bekende
+            gezichten verschijnen, lege silhouetten verdwijnen en langzaam ontstaat er
+            een verzameling van iedereen die ooit rond de tafel stond en zijn sporen
+            heeft achtergelaten.
+          </p>
+          <p>
+            Of een compleet album ook betekent dat je beter bent geworden aan tafel,
+            laten we in het midden.
+          </p>
+          <p>Veel verzamelplezier.</p>
+          <p className="album__foreword-sign">Het Tafelvoetbalcomité</p>
+        </div>
+
+        <div className="album__page-number">{index}</div>
+      </div>
+    );
+  }
+
+  /* ---------------------------------------------------------------- *
+   * The checklist
+   *
+   * The one page in the album that legitimately carries a heading: it is a
+   * printed list, and a list without a head is not a list. That does not reopen
+   * the bare slots page — the argument there was that the head repeated what the
+   * cover already said, and "CHECKLIST" says something the cover does not.
+   *
+   * Two hands on this page, and keeping them apart is the whole idea:
+   *
+   *   the press   numbers, names, the leader dots, the empty boxes, the total
+   *   the reader  the ticks, the doubles figures, the tally in the blank
+   *
+   * The press's marks are the paper's own brown ink. The reader's are graphite.
+   * Nothing here claims printed ink rewrote itself — the marks appear because you
+   * put them there, in your own book.
+   * ---------------------------------------------------------------- */
+  if (page.kind === 'checklist') {
+    const rows = page.entries ?? [];
+
+    return (
+      <div className="album__page album__page--list">
+        <div className="album__list-head">
+          <span className="album__list-title">Checklist</span>
+          {/* Printed with the list: how many there are is what the press knows. */}
+          {page.tally ? (
+            <span className="album__list-total">{page.tally.total} spelers</span>
+          ) : null}
+        </div>
+
+        <ol className="album__list">
+          {rows.map((entry) => {
+            const has = entry.count > 0;
+            const { tick, tilt } = handMark(entry.playerId);
+            return (
+              <li key={entry.playerId} className="album__entry">
+                {/*
+                  A row is a button because a checklist is a thing you look
+                  things up in: it turns the book to the page that slot is
+                  printed on. Conventional rather than an addition — and it is
+                  what makes the numbering worth printing.
+                */}
+                <button
+                  type="button"
+                  className="album__entry-row"
+                  tabIndex={visible ? 0 : -1}
+                  onClick={() => onGoToPage?.(entry.page)}
+                  aria-label={`Nummer ${entry.number}, ${entry.name} — ${ownedLabel(
+                    entry.count,
+                  )}. Ga naar pagina ${entry.page}.`}
+                >
+                  <span className="album__entry-nr">{entry.number}</span>
+                  <span className="album__entry-name">{entry.name}</span>
+                  {/* Leader dots, as a printed list has between name and mark. */}
+                  <span className="album__entry-leader" />
+                  <span className="album__entry-box">
+                    {has ? (
+                      <svg
+                        className="album__tick"
+                        viewBox="0 0 12 10"
+                        style={{ transform: `rotate(${tilt}deg)` }}
+                        aria-hidden="true"
+                        focusable="false"
+                      >
+                        <path d={tick} />
+                      </svg>
+                    ) : null}
+                  </span>
+                  {/*
+                    Doubles, noted beside the tick the way you would note them in
+                    a book you were keeping — and the reason a checklist is also a
+                    swap list. Only past one: "1" written next to a tick would be
+                    saying the same thing twice.
+                  */}
+                  <span className="album__entry-dupe">
+                    {entry.count > 1 ? entry.count : ''}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+
+        {/*
+          The tally, and the one number in the album that is allowed to change.
+          It works because the page is printed as a FORM: "Verzameld: ____ van 24"
+          comes off the press with the blank empty, and the figure in the blank is
+          written in. That is why this had to come off the cover, where the same
+          number was blocked in gold foil — foil is struck once and never rewritten.
+
+          Only the current figure is written. A lineage of struck-through earlier
+          figures is the honest way to show a tally being kept, but it is real data
+          or it is nothing: inventing plausible past numbers would be fabricating a
+          history. The genuine one is derivable from `CardInstance` timestamps, and
+          that is a backend errand, not a render.
+        */}
+        {page.tally ? (
+          <div className="album__tally">
+            <span className="album__tally-label">Verzameld:</span>
+            <span className="album__tally-written">{page.tally.owned}</span>
+            <span className="album__tally-label">van {page.tally.total}</span>
+          </div>
+        ) : null}
+
+        <div className="album__page-number">{index}</div>
+      </div>
+    );
+  }
+
+  /*
+   * **No running head, and nothing printed on the page but the folio.**
+   *
+   * It used to carry "Verzamelalbum · <naam>" with the tally opposite, above a
+   * 2px rule. Every word of it was already known: the cover carries whose album
+   * it is — that is what a cover is for, and it is the same argument that took
+   * the owner off the header above the stage — and the tally is on the cover too.
+   * So the head repeated, twelve times, a line the reader had just read.
+   *
+   * Dropping it also removes the last thing competing with the cards for the top
+   * of the page. What is left is the paper, the mounts and the page number, which
+   * is the whole of what an album page needs.
+   *
+   * `title` and `subtitle` survive on `AlbumPage` for the **cover only** — do not
+   * take a slots page's word for either being set.
+   */
   return (
     <div className="album__page">
-      <div className="album__page-header">
-        <span className="album__page-title">{page.title}</span>
-        {page.subtitle ? <span className="album__page-sub">{page.subtitle}</span> : null}
-      </div>
-
       {/*
         Each card sits in its own slot rather than directly in the grid. The slot
         is what the page is designed *around*: it draws the mount the card is
@@ -332,6 +909,42 @@ interface AlbumProps {
    * separate close-time handling, and the 620ms leaf transition is never seen.
    */
   focusPlayerId?: string | null;
+  /**
+   * Bound in the icon edition — ivory boards with the chosen stain at the corners.
+   *
+   * Server truth off `album.iconsUnlocked`, read on every render like `cover`, so a book
+   * that was re-bound in a previous session is simply drawn that way with no ceremony and
+   * nothing to persist here.
+   */
+  icons?: boolean;
+  /**
+   * Run the re-binding ceremony: shut the book, draw the new binding on, block the word.
+   *
+   * Raise it at the moment the claim is sent, not when it answers — the beats are what the
+   * reader is watching, and a fast server must not be able to finish the sequence early.
+   */
+  rebinding?: boolean;
+  /**
+   * Whether something replaces the album when the ceremony ends.
+   *
+   * True on the real path, where the pack opener takes over — and the closing fade exists
+   * for exactly that, so the opener does not cut in at full brightness on the frame after
+   * the last one.
+   *
+   * False when the ceremony is being watched on its own, and then the fade is **skipped
+   * rather than played**: with nothing replacing the book, fading it out only to leave it
+   * there means fading it straight back in, which reads as a fault rather than as an ending.
+   */
+  handsOver?: boolean;
+  /**
+   * The ceremony is over and the book is shut in its new binding.
+   *
+   * The page's cue to apply the collection the claim answered with, which is why this is
+   * separate from the request resolving. The set roughly grows by half on unlock, and
+   * applying it here means that happens behind a closed cover — so the book is never seen
+   * to gain cards, and the cover's own tally never changes in view.
+   */
+  onRebound?: () => void;
 }
 
 const Album: React.FC<AlbumProps> = ({
@@ -343,6 +956,10 @@ const Album: React.FC<AlbumProps> = ({
   footer,
   onCardOpen,
   focusPlayerId,
+  icons,
+  rebinding,
+  handsOver = true,
+  onRebound,
 }) => {
   const isMobile = useIsMobile();
   const pages = useMemo(() => buildPages(sections, owner), [sections, owner]);
@@ -383,7 +1000,7 @@ const Album: React.FC<AlbumProps> = ({
   const touchStartX = useRef<number | null>(null);
 
   /*
-   * The album grows when legends unlock, and could shrink if the pool did, so a
+   * The album grows when the icons unlock, and could shrink if the pool did, so a
    * restored position can point past the end. Clamp after the pages are known
    * rather than at read time.
    */
@@ -406,6 +1023,178 @@ const Album: React.FC<AlbumProps> = ({
   useEffect(() => {
     if (isMobile ? mobilePage > 0 : flipped > 0) setEverOpened(true);
   }, [isMobile, flipped, mobilePage]);
+
+  /* ---------------------------------------------------------------- *
+   * The re-binding ceremony
+   * ---------------------------------------------------------------- */
+
+  const [rebindPhase, setRebindPhase] = useState<RebindPhase | null>(null);
+  const rebindTimers = useRef<number[]>([]);
+
+  const clearRebindTimers = useCallback(() => {
+    rebindTimers.current.forEach(window.clearTimeout);
+    rebindTimers.current = [];
+  }, []);
+
+  useEffect(() => clearRebindTimers, [clearRebindTimers]);
+
+  /**
+   * Jump to the end: shut, bound, handed back.
+   *
+   * Both the reduced-motion path and the click-to-skip path, because they want the same
+   * thing. **The end state, never a mid-point** — a ceremony frozen part-way reads as a
+   * hang rather than as a shorter ceremony, which is the rule the pack opener already
+   * follows.
+   *
+   * Guarded on the phase so it cannot fire twice: the skip click and the last timer can
+   * both land, and `onRebound` applying a collection twice would be harmless but the
+   * second `playCoverTurn` would not.
+   */
+  const finishRebind = useCallback(() => {
+    if (rebindPhase === null || rebindPhase === 'done') return;
+
+    clearRebindTimers();
+    /* Straight to the end, skipping the hand-over fade with it: a reader who clicked to cut
+       the ceremony short does not then want to watch the book dissolve. */
+    setRebindPhase('done');
+    onRebound?.();
+  }, [rebindPhase, clearRebindTimers, onRebound]);
+
+  useEffect(() => {
+    if (!rebinding) {
+      /* Nothing to unwind: the phase only ever ends on a finished state, and the classes it
+         adds are inert. Clearing it here would un-bind the cover for a frame if the parent
+         lowered the flag before the state landed. */
+      return;
+    }
+
+    /*
+     * Shut it first, whatever else happens. `setMoving(0)` is what puts the cover leaf
+     * above the stack for its rotation — without it the board turns *behind* the pages it
+     * is closing over.
+     */
+    setFlipped(0);
+    setMoving(0);
+    setMobilePage(0);
+
+    if (prefersReducedMotion()) {
+      setRebindPhase('done');
+      playCoverTurn();
+      onRebound?.();
+      return;
+    }
+
+    const at = (delay: number, run: () => void) => {
+      rebindTimers.current.push(window.setTimeout(run, delay));
+    };
+
+    setRebindPhase('shutting');
+    playCoverTurn();
+
+    const shut = ms(SHUT_MS);
+    at(shut, () => setRebindPhase('settling'));
+
+    /*
+     * The build: the room goes dark, the book goes white, and the rings spin up around it.
+     *
+     * One sound across the charge *and* the bloom rather than one per beat, because they are
+     * one gesture — the thing gathering and then letting go — and two sounds would put a seam
+     * exactly where it must not be. `ms()` is applied here and not inside, so the build
+     * tracks the multiplier the visual is running at.
+     */
+    const settled = shut + ms(REBIND_SETTLE_MS);
+    at(settled, () => {
+      setRebindPhase('charging');
+      /* One sound across the rise, the hold *and* the bloom — they are one gesture, and a
+         seam anywhere in it would be audible exactly where it must not be. */
+      playRebind(ms(CHARGE_MS + HOLD_MS + BLOOM_MS));
+    });
+
+    at(settled + ms(CHARGE_MS), () => setRebindPhase('holding'));
+
+    /*
+     * The accent, and it is single: the whole page blooms white and the chord lands on the
+     * same frame. The book becomes the icon edition here too — inside the bloom, where there
+     * is nothing to see it happen against, which is the entire reason the bloom is here
+     * rather than a wipe on the cover.
+     */
+    const bloomed = settled + ms(CHARGE_MS) + ms(HOLD_MS);
+    at(bloomed, () => {
+      setRebindPhase('blooming');
+      playRarePayoff(REBIND_PAYOFF);
+    });
+
+    at(bloomed + ms(BLOOM_MS), () => setRebindPhase('resolving'));
+
+    /* The board settling, as the bloom lets go of it. */
+    const resolved = bloomed + ms(BLOOM_MS) + ms(RESOLVE_MS);
+    at(resolved, () => {
+      setRebindPhase('resting');
+      playCoverTurn();
+    });
+
+    /*
+     * A beat of the bound book on an ordinary table, and then the album fades rather than
+     * being cut away. Handing straight over from `resting` is what made this land as a
+     * snap: the pack opener mounted on the frame after the last one of the ceremony, so
+     * the book was replaced at full brightness with no gap at all.
+     */
+    const rested = resolved + ms(REBIND_REST_MS);
+
+    /* Nothing follows, so nothing fades: end on the bound book rather than dissolving it and
+       putting it straight back. See `handsOver`. */
+    if (!handsOver) {
+      at(rested, () => {
+        setRebindPhase('done');
+        onRebound?.();
+      });
+
+      return clearRebindTimers;
+    }
+
+    at(rested, () => setRebindPhase('handing'));
+    at(rested + ms(HAND_MS), () => {
+      /*
+       * Both in the same tick, and React batches them into one render — which is what stops
+       * the album flashing back to full opacity for a frame on its way out. On the real path
+       * `onRebound` mounts the pack opener, so that render has no album in it at all; on the
+       * test panel's path nothing else changes and `done` is what leaves the bound book on
+       * the table instead of the invisible one `handing` would have left.
+       */
+      setRebindPhase('done');
+      onRebound?.();
+    });
+
+    return clearRebindTimers;
+    /* `onRebound` is deliberately not a dependency: the page rebuilds it on most renders,
+       and re-running this would restart the ceremony from the top mid-sequence. */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rebinding, clearRebindTimers, handsOver]);
+
+  /**
+   * The ceremony is running and the book is not the reader's.
+   *
+   * `resting` and `handing` count as running: the book is still shut, still being handed
+   * over, and a click on it should still skip rather than turn a page. Only `done` is out.
+   */
+  const rebindingNow = rebindPhase !== null && rebindPhase !== 'done';
+
+
+  /**
+   * Whether the cover is the icon edition yet.
+   *
+   * Two things have to be true of this and they pull in opposite directions. `icons` alone is
+   * not enough — it comes off the server's answer, which is parked until the ceremony ends,
+   * so during the re-binding it is still false and the book would change only *after* the
+   * light that is supposed to hide the change. But "any phase" is too eager: this class also
+   * carries the cover's ink, which goes bronze, and bronze type on the leather cover it has
+   * not replaced yet is dark on dark.
+   *
+   * So: from the bloom, when the whole page is white and there is nothing to see the
+   * swap against. See `BOUND_PHASES`.
+   */
+  const showBinding =
+    icons === true || (rebindPhase !== null && BOUND_PHASES.has(rebindPhase));
 
   /*
    * Follow the card viewer: whatever it is showing, the book turns to.
@@ -433,6 +1222,36 @@ const Album: React.FC<AlbumProps> = ({
       return target;
     });
   }, [focusPlayerId, pages, isMobile, maxFlipped]);
+
+  /**
+   * Turn straight to a page. The checklist's rows are what use it.
+   *
+   * **With the page-turn sound**, unlike the `focusPlayerId` effect above: that
+   * one turns the book behind the card viewer's scrim, where a turn nobody can see
+   * is unexplained noise. Here the reader is looking at the book and asked for a
+   * page, so the book should sound like it is turning to it.
+   */
+  const goToPage = useCallback(
+    (page: number) => {
+      if (isMobile) {
+        setMobilePage((current) => {
+          const next = Math.min(Math.max(page, 0), pages.length - 1);
+          if (next !== current) playTurnSound(current, next);
+          return next;
+        });
+        return;
+      }
+
+      const target = Math.min(flippedForPage(page), maxFlipped);
+      setFlipped((current) => {
+        if (current === target) return current;
+        setMoving(target > current ? current : target);
+        playTurnSound(current, target);
+        return target;
+      });
+    },
+    [isMobile, maxFlipped, pages.length],
+  );
 
   const turn = useCallback(
     (delta: number) => {
@@ -472,6 +1291,8 @@ const Album: React.FC<AlbumProps> = ({
    */
   useEffect(() => {
     if (focusPlayerId) return;
+    /* The book is being re-bound and is not the reader's to turn until it is handed back. */
+    if (rebindingNow) return;
 
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -491,7 +1312,10 @@ const Album: React.FC<AlbumProps> = ({
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [focusPlayerId, turn]);
+    /* `rebindingNow` has to be here, not just read in the body: the listener is torn down
+       and rebuilt when it changes, which is what gives the reader their arrows back the
+       moment the book is handed over. */
+  }, [focusPlayerId, turn, rebindingNow]);
 
   /**
    * Unflipped leaves stack lowest-index-on-top so leaf `flipped` shows on the
@@ -537,6 +1361,22 @@ const Album: React.FC<AlbumProps> = ({
   const closed = isMobile ? mobilePage === 0 : flipped === 0;
 
   /*
+   * There is no fore-edge state any more, and the whole apparatus it needed went with
+   * it: `EDGE_MIN`, `EDGE_RANGE`, `paperLeaves`, the live/settled leaf counts,
+   * `stackWidth`, `edgeStyle`, and the `settledFlipped` timer that held a width back by
+   * one flip so a pile would gain its leaf on landing.
+   *
+   * All of it existed to draw page edges in the board overhang, and that region is board
+   * — the pastedown is page-sized like every other sheet, so nothing paper-coloured
+   * belongs beyond the trim. See the note where the drawing used to be in album.css.
+   *
+   * The three-beat rule it implemented is worth remembering if a fore-edge ever comes
+   * back as a hairline at the trim: a leaf leaves the pile it is lifted off at once and
+   * joins the other one on landing, which is `min(live, settled)` on one side and
+   * `paperLeaves - max(live, settled)` on the other.
+   */
+
+  /*
    * The line above the book, and the only chrome the album has.
    *
    * Three things can be there, in order of precedence:
@@ -557,18 +1397,75 @@ const Album: React.FC<AlbumProps> = ({
       : `pagina ${mobilePage} / ${sheetCount}`
     : spreadLabel();
 
-  const label = hint && closed && !everOpened ? hint : pageLabel;
+  /*
+   * The one line above the book is where this album's discoverability lives, so it is also
+   * where the ceremony says what is happening to it — there is nowhere else, and a book
+   * that shuts itself and changes colour with the label still reading "gesloten" reads as a
+   * fault. It keeps its box either way, so nothing shifts when it changes.
+   */
+  const label = rebindingNow
+    ? 'Je album wordt opnieuw gebonden…'
+    : hint && closed && !everOpened
+      ? hint
+      : pageLabel;
 
   return (
     <>
+      {/*
+        The room going dark around the book.
+
+        **Outside `.album`, and it has to be.** `.album` carries `perspective`, which makes it
+        a containing block for `position: fixed` descendants — a vignette rendered inside it
+        would be pinned to the book rather than to the window, and then clipped by the stage's
+        `overflow: hidden` on top of that. Out here its only ancestors are ordinary flow.
+
+        Kept mounted for the whole ceremony rather than swapped in and out, so the fade has
+        something to transition from; `--dark` on the phase classes is what moves.
+      */}
+      {rebindingNow ? (
+        <>
+          <div className={`rebind-dim rebind-dim--${rebindPhase}`} aria-hidden="true" />
+          {/*
+            The climax: the whole page blooms white, not just the book.
+
+            Out here with the dim and fixed for the same two reasons — `.album` carries
+            `perspective`, which would make it the containing block and pin a full-screen
+            layer to the book, and the stage's `overflow: hidden` would clip whatever was
+            left. It has to cover the window, because the point is that everything goes.
+
+            It also does the work: the binding swaps underneath this, so the change happens
+            in the one frame where there is nothing to see it against.
+          */}
+          <div className={`rebind-bloom rebind-bloom--${rebindPhase}`} aria-hidden="true" />
+        </>
+      ) : null}
+
       <div className="album__nav-label">{label}</div>
 
-      <div className="album-row">
+      <div className={`album-row${rebindingNow ? ' album-row--rebinding' : ''}`}>
         <div
           className={[
             'album',
             isMobile ? 'album--mobile' : '',
             closed && !isMobile ? 'album--closed' : '',
+            /*
+              `showBinding`, not `icons`: the class carries the cover's ink as well as the
+              settled clip, and the ink has to be right for the whole ceremony — the wipe
+              is putting ivory under type that was coloured for leather. The phase rules
+              out-specify the settled clip on purpose; see album.css.
+            */
+            showBinding ? 'album--icons' : '',
+            /*
+              Two separate classes doing two separate jobs, and splitting them is what let
+              the CSS drop a growing chain of `:not()`s.
+
+              `album--rebind` means **running** — it is what makes the book inert and the
+              cursor a pointer, so it comes off at `done`. The phase class is just which
+              beat, and stays on afterwards because `done` is a real state the cover is
+              drawn from.
+            */
+            rebindingNow ? 'album--rebind' : '',
+            rebindPhase ? `album--rebind-${rebindPhase}` : '',
           ]
             .filter(Boolean)
             .join(' ')}
@@ -580,8 +1477,15 @@ const Album: React.FC<AlbumProps> = ({
           style={albumLeather(cover)}
           onTouchStart={isMobile ? onTouchStart : undefined}
           onTouchEnd={isMobile ? onTouchEnd : undefined}
-          /* Clicking the cover opens it, which is what one does to a book. */
-          onClick={closed ? () => turn(1) : undefined}
+          /*
+            Clicking the cover opens it, which is what one does to a book — except during
+            the re-binding, where the click skips to the end instead. Same contract as the
+            pack opener: a ceremony must always be escapable, and the way out lands on the
+            finished state rather than stopping where it was.
+          */
+          onClick={
+            rebindingNow ? finishRebind : closed ? () => turn(1) : undefined
+          }
         >
         <div className="album__book">
           {!isMobile ? (
@@ -589,6 +1493,31 @@ const Album: React.FC<AlbumProps> = ({
               <div className="album__binding" />
               <div className="album__backing album__backing--left" />
               <div className="album__backing album__backing--right" />
+
+              {/*
+                The inside of the spine — the hollow the two halves bend down into.
+                Last of the three, because it is the only one drawn *over* the pages:
+                there is no gap at the gutter to put it in, so it lands on the 22px
+                inner margin where nothing is printed. See album.css for why widening
+                the book to open a real gap is not on the table.
+              */}
+              <i className="album__spine" aria-hidden="true" />
+
+              {/*
+                The caps: the head and tail of the spine, sitting in the board overhang.
+
+                Everything that is a hard edge lives here rather than on `.album__spine`
+                — the hinge grooves, the hollow, the headband. The overhang is the only
+                place an open book lets you see past the paper into the case, so it is
+                the only place that hardware can be drawn without it becoming a line
+                ruled across a page.
+              */}
+              <i className="album__spinecap album__spinecap--head" aria-hidden="true">
+                <i className="album__headband album__headband--head" />
+              </i>
+              <i className="album__spinecap album__spinecap--tail" aria-hidden="true">
+                <i className="album__headband album__headband--tail" />
+              </i>
             </>
           ) : null}
 
@@ -607,6 +1536,8 @@ const Album: React.FC<AlbumProps> = ({
                       index={index}
                       visible={index === mobilePage}
                       onCardOpen={onCardOpen}
+                      onGoToPage={goToPage}
+                      binding={showBinding}
                     />
                   </div>
                 );
@@ -617,7 +1548,15 @@ const Album: React.FC<AlbumProps> = ({
                   className={[
                     'album__leaf',
                     leaf < flipped ? 'album__leaf--flipped' : '',
+                    /*
+                      The two boards, which are bigger leaves than the pages: leaf 0
+                      carries the cover and its pastedown, the last one carries the back
+                      board. Both take the overhang that used to be drawn on the binding
+                      — see `.album__leaf--cover` in album.css for why it has to belong
+                      to the thing that rotates.
+                    */
                     leaf === 0 ? 'album__leaf--cover' : '',
+                    leaf === leafCount - 1 ? 'album__leaf--back' : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -632,6 +1571,8 @@ const Album: React.FC<AlbumProps> = ({
                       index={leaf * 2}
                       visible={leaf === flipped}
                       onCardOpen={onCardOpen}
+                      onGoToPage={goToPage}
+                      binding={showBinding}
                     />
                   </div>
                   <div className="album__face album__face--back">
@@ -640,6 +1581,7 @@ const Album: React.FC<AlbumProps> = ({
                       index={leaf * 2 + 1}
                       visible={leaf === flipped - 1}
                       onCardOpen={onCardOpen}
+                      onGoToPage={goToPage}
                     />
                   </div>
                 </div>
@@ -680,6 +1622,53 @@ const Album: React.FC<AlbumProps> = ({
                 disabled={atEnd}
                 aria-label="Volgende pagina"
               />
+            </>
+          ) : null}
+
+          {/*
+            The book going white, and the gold flying around it.
+
+            Siblings of `.album__book` for exactly the reason the turn strips above are: the
+            book is `preserve-3d`, so anything inside it joins the 3D scene and gets depth
+            sorted against the turning leaves — the flare would end up *between* the pages.
+            Out here they are overlays pinned to the book's own box via `--book-w`.
+
+            The rings genuinely are orbits rather than circles drawn on top of each other:
+            `.album` already carries `perspective`, so tilting one out of the page
+            foreshortens it, and each ring's beads pass behind the book as well as in front.
+          */}
+          {rebindingNow ? (
+            <>
+              <div className="album__rings" aria-hidden="true">
+                {REBIND_RINGS.map((ring, r) => (
+                  <div
+                    key={r}
+                    className={`album__ring${ring.reverse ? ' album__ring--reverse' : ''}`}
+                    style={
+                      {
+                        '--tilt': `${ring.tilt}deg`,
+                        '--yaw': `${ring.yaw}deg`,
+                        '--radius': ring.radius,
+                        '--spin': `${ring.spin}s`,
+                        '--ring-in': `${ring.in}s`,
+                      } as React.CSSProperties
+                    }
+                  >
+                    {Array.from({ length: ring.beads }, (_, b) => (
+                      <span
+                        key={b}
+                        className="album__bead"
+                        style={
+                          {
+                            '--bead-at': `${(360 / ring.beads) * b}deg`,
+                            '--bead-size': `${ring.size}px`,
+                          } as React.CSSProperties
+                        }
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
             </>
           ) : null}
         </div>

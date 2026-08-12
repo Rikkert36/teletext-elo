@@ -17,7 +17,7 @@ public sealed record PlayerStats(
     /// the scale says nothing about you until you have played.
     ///
     /// Expressed once here because it is computed in three places - the leaderboard rows,
-    /// the per-game old/new ratings, and the all-time-high a legend's card is rated on -
+    /// the per-game old/new ratings, and the all-time-high an icoon's card is rated on -
     /// and those must not be allowed to drift apart.
     /// </summary>
     public int VisibleRating => (int)Math.Round(Rating - Std);

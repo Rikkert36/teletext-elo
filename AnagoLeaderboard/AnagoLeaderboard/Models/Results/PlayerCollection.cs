@@ -35,14 +35,23 @@ public class PlayerCollection
     public DateTime CreatedAt { get; set; }
 
     /// <summary>
-    /// When the active set was completed, or null while it has not been.
+    /// When the collector claimed the icons, or null while they have not.
     ///
     /// A permanent latch rather than a recomputed flag: once you have finished the set you
-    /// keep the legends, so a new joiner or somebody crossing the games gate afterwards
-    /// cannot un-complete it. Written by <see cref="Services.PackService.Claim"/> when a
-    /// claim completes the active set, and by hand from the development-only legends route.
+    /// keep the icons, so a new joiner or somebody crossing the games gate afterwards cannot
+    /// un-complete it.
+    ///
+    /// <strong>Completing the active set does not write this.</strong> It makes the unlock
+    /// claimable, and the collector claims it themselves at
+    /// <c>PUT api/collections/{playerId}/icons</c> - the book closing and being re-bound is
+    /// the payoff for three months of collecting, and a latch that fires the instant the
+    /// last card is filed spends it inside a pack reveal where nobody is looking for it.
+    ///
+    /// Living on this row rather than on the player is what ties it to the album: emptying
+    /// the collection deletes this row, so the unlock goes with the binding and a book that
+    /// does not exist cannot be holding the icons.
     /// </summary>
-    public DateTime? LegendsUnlockedAt { get; set; }
+    public DateTime? IconsUnlockedAt { get; set; }
 
     public static PlayerCollection Create(string playerId, string cover) =>
         new()
@@ -50,6 +59,6 @@ public class PlayerCollection
             PlayerId = playerId,
             Cover = cover,
             CreatedAt = DateTime.Now,
-            LegendsUnlockedAt = null
+            IconsUnlockedAt = null
         };
 }

@@ -785,6 +785,69 @@ export const playFoilStamp = (): void => {
   });
 };
 
+/**
+ * The book being re-cased: the icon binding drawn across the board.
+ *
+ * **Takes its length from the caller**, the same contract as `playRareRise` — a musical
+ * hit should not stretch, but a build must, or it finishes before the thing it is under
+ * and the last third of the visual plays in silence.
+ *
+ * Three rules it exists to obey.
+ *
+ * - **Something accumulates.** The grains are biased *late* (`bias` below 1 pushes them
+ *   toward the end) and the arc brightens at 0.82 rather than at the middle, so the beat
+ *   is still gathering when it hands over. A cloud at a constant rate discharges nothing,
+ *   and the eye and the ear agree about that immediately.
+ * - **No pitch anywhere.** Every note in this file belongs to the D-minor payoff ladder,
+ *   and a pitched riser here would either join that chord or fight it. This is friction
+ *   and air — leather, glue and board — so there is nothing for it to be out of key with.
+ * - **No low end.** The weight in this sequence belongs to the board landing, which is
+ *   `playCoverTurn` firing after this ends. A boom in here would spend the arrival early,
+ *   and two impacts a beat apart read as a stumble rather than as an ending.
+ */
+export const playRebind = (durationMs: number): void => {
+  const seconds = Math.max(0.25, durationMs / 1000);
+
+  /*
+   * The paste and the leather under the bone folder. Grain count scales with the length
+   * so the *density* is what stays constant — a fixed count over a longer beat thins out
+   * and stops reading as contact.
+   */
+  playGrains({
+    count: Math.round(seconds * 26),
+    spread: seconds,
+    grainMs: [5, 22],
+    hz: [320, 2200],
+    gain: 0.03,
+    q: 2.2,
+    bias: 0.58,
+  });
+
+  /* The board itself, brightening as the binding closes over it. */
+  playSwish({
+    duration: seconds,
+    fromHz: 300,
+    peakHz: 1650,
+    toHz: 900,
+    gain: 0.05,
+    q: 0.8,
+    peakAt: 0.82,
+    space: 0.22,
+  });
+
+  /* A thin skin of fibre on top, late, so the last third has the most detail in it. */
+  playGrains({
+    count: Math.round(seconds * 18),
+    spread: seconds * 0.5,
+    grainMs: [3, 11],
+    hz: [1800, 6400],
+    gain: 0.014,
+    q: 2.8,
+    bias: 0.5,
+    delay: seconds * 0.5,
+  });
+};
+
 /* ------------------------------------------------------------------ *
  * The reveal
  *

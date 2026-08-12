@@ -165,7 +165,7 @@ const CardViewer: React.FC<CardViewerProps> = ({ slots, index, onIndex, onClose 
             </div>
           )}
 
-          {slot.card.player.isLegend ? <div className="viewer__flag">legende</div> : null}
+          {slot.card.player.isIcon ? <div className="viewer__flag">icoon</div> : null}
 
           <div className={`viewer__owned${empty ? ' viewer__owned--none' : ''}`}>
             {ownedLabel(slot.count)}

@@ -85,6 +85,16 @@ public class CardRatingCalculator
 
     public int MinGames { get; }
 
+    /// <summary>
+    /// The overall a player on the very bottom anchor prints, and the top of the scale.
+    ///
+    /// Exposed so that anything validating an overall - a gift's floor, for instance - reads the
+    /// range off the scale rather than repeating 40 and 99, which are configurable.
+    /// </summary>
+    public int OverallFloor => Round(_anchors[0].Overall);
+
+    public int OverallCap => _overallCap;
+
     public CardRatingCalculator(IConfiguration configuration)
     {
         var section = configuration.GetSection("Cards");
@@ -115,7 +125,7 @@ public class CardRatingCalculator
     /// <summary>
     /// The number printed in the corner of the card.
     ///
-    /// For a legend this is fed their all-time-high visible rating rather than their
+    /// For an icoon this is fed their all-time-high visible rating rather than their
     /// current one, which is the whole difference between an icoon and an ordinary card.
     /// </summary>
     public int OverallFor(int visibleRating)

@@ -14,6 +14,7 @@ namespace AnagoLeaderboard.Database
         public DbSet<Game> Games => Set<Game>();
         public DbSet<PlayerCollection> PlayerCollections => Set<PlayerCollection>();
         public DbSet<PackClaim> PackClaims => Set<PackClaim>();
+        public DbSet<PackGift> PackGifts => Set<PackGift>();
         public DbSet<CardInstance> CardInstances => Set<CardInstance>();
 
         public async Task Clear()
@@ -93,7 +94,14 @@ namespace AnagoLeaderboard.Database
                     .HasForeignKey(c => c.GameId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                // These two indexes *are* the double-claim guard. Two tabs racing means one
+                // Withdrawing a present takes the claims it caused with it, and through them the
+                // cards - the same rule as a deleted game, for the same reason.
+                claim.HasOne<PackGift>()
+                    .WithMany()
+                    .HasForeignKey(c => c.GiftId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                // These three indexes *are* the double-claim guard. Two tabs racing means one
                 // insert fails, and that failure is the 409 - there is no separate check to
                 // forget to write.
                 claim.HasIndex(c => new { c.PlayerId, c.Source, c.GameId }).IsUnique();
@@ -104,6 +112,39 @@ namespace AnagoLeaderboard.Database
                 claim.HasIndex(c => new { c.PlayerId, c.ClaimDate })
                     .IsUnique()
                     .HasFilter($"\"{nameof(PackClaim.Source)}\" = '{nameof(PackSource.Daily)}'");
+
+                // One present, once. It needs no filter and no date, for the two halves of the
+                // same reason: GiftId is null on every game and daily claim and SQLite treats
+                // those NULLs as distinct, and a gift stands open for days so keying it on the
+                // day would let it be opened again every morning.
+                claim.HasIndex(c => new { c.PlayerId, c.GiftId }).IsUnique();
+
+                // The set-completion packet, once per player and once ever.
+                //
+                // Filtered, and on the player *alone* - no date and no second column. The first
+                // index above does not cover it: GameId and GiftId are both null on an Icons
+                // claim, and SQLite treats NULLs as distinct, so two of them would insert
+                // happily. Including ClaimDate would be worse than useless - it would offer the
+                // packet again tomorrow, which is an unlimited supply of guaranteed icoons at one
+                // a night.
+                claim.HasIndex(c => c.PlayerId)
+                    .IsUnique()
+                    .HasFilter($"\"{nameof(PackClaim.Source)}\" = '{nameof(PackSource.Icons)}'");
+            });
+
+            modelBuilder.Entity<PackGift>(gift =>
+            {
+                gift.HasKey(g => g.Id);
+
+                // Required: every present is addressed to somebody, because "everybody" is expanded
+                // into one row per player when the gift is given rather than stored as a null.
+                // Cascading is right for the same reason it is on a claim - a player deleted as a
+                // mistake should not leave presents addressed to them.
+                gift.HasOne<Player>()
+                    .WithMany()
+                    .HasForeignKey(g => g.PlayerId)
+                    .IsRequired()
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<CardInstance>(card =>

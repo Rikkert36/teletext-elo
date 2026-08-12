@@ -23,11 +23,18 @@ export interface CardPlayer {
   id: string;
   /** Full name as stored, nickname and all. */
   name: string;
-  /** For a legend this is their all-time high, not their current rating. */
+  /** For an icoon this is their all-time high, not their current rating. */
   visibleRating: number;
   /** Only used for the MIN_GAMES gate copy — never on the card. */
   numberOfGames: number;
-  isLegend: boolean;
+  /**
+   * Drives the icoon colourway.
+   *
+   * Read off the live pool, so it follows the subject's *current* standing — a
+   * player going out of service turns the card already in your book into an
+   * icoon, the same way a zilver card becomes goud when their form improves.
+   */
+  isIcon: boolean;
   /**
    * The 40-99 number printed in the corner, as the server computed it.
    *
@@ -74,25 +81,47 @@ export interface RevealedCard extends Card {
 }
 
 export interface Pack {
-  /** Synthetic and stable: `game:{gameId}` or `daily:{yyyy-MM-dd}`. */
+  /** Synthetic and stable: `game:{gameId}`, `daily:{yyyy-MM-dd}` or `gift:{giftId}`. */
   id: string;
-  /** 1, 3 or 5. */
+  /** 1, 3 or 5 for anything earned; a gift may be any size up to 10. */
   size: number;
   /** Why it is owed, shown on the wrapper. */
   reason: string;
   /** Opponents whose tickets are doubled for this pack's draw. */
   doubledPlayerIds: string[];
   /**
-   * Never set by the server today — real packs are never tier- or
-   * player-guaranteed, the only choice is size.
+   * A floor on the overall of the one card in it, or absent for an ordinary draw —
+   * which is every earned pack, since the only choice a game makes is the size.
+   * Only a gift ever carries one.
    *
-   * Kept because the packet still knows how to print and colour a forced one (see
-   * `packPrint` and `packFoil`), and the gift endpoint that hands somebody a
-   * specific pack is the next thing to be built.
+   * The number itself, not a tier and not a ceremony level. It is the form both of
+   * those reduce to (75 is "goud or better", and the ceremony's steps *are*
+   * 75/80/85/90), it says things neither can — a tier cannot separate 75–79 from
+   * 80–84 — and it means the wrapper prints the same number the draw was made
+   * against rather than one looked up from a table that could drift.
+   *
+   * The packet prints it instead of a count and is foiled orange for it: a wrapper
+   * that is lying to you about the odds should look like it. See `packPrint` and
+   * `packFoil`.
+   *
+   * **`null` on the wire, not absent.** Every earned pack carries it explicitly as
+   * null, so `=== undefined` is not the test — read it through `packFloor`, which is
+   * the one place that decides whether a packet has a floor at all. Getting this
+   * wrong prints `null+` on every game packet and foils them all orange.
    */
-  guaranteeTier?: Tier;
-  guaranteePlayerId?: string;
-  guaranteeLevel?: number;
+  minimumOverall?: number | null;
+  /**
+   * The one card in it is drawn from the icons rather than from the actives.
+   *
+   * True for the set-completion packet and nothing else. It is not a floor and cannot be
+   * expressed as one — icoons run right across the tiers, so any `minimumOverall` that
+   * caught all of them would catch most of the actives too.
+   *
+   * Two things read it: the wrapper prints `icoon` and is foiled gold rather than orange,
+   * and `CollectionPage` runs the album's re-binding *before* opening it, because the
+   * book has to be able to hold an icoon before one can come out of a packet.
+   */
+  guaranteesIcon?: boolean;
 }
 
 /**
@@ -229,15 +258,70 @@ export const toCard = (player: CardPlayer): Card => ({
  * ------------------------------------------------------------------ */
 
 /**
- * Splits a stored name into card-sized pieces. Names carry nicknames in quotes
- * (`Petar "beetje gepiel" Drandarov`), which are far too long for a card face
- * but too good to throw away — so they land on the back of the card instead.
+ * Every way a stored name can carry a nickname: `"…"`, `'…'` or `:…:`.
+ *
+ * **Matched pairs, one alternative each, rather than one character class for both
+ * ends.** `/["':](.+?)["':]/` would have accepted `"beetje gepiel:` — a name typed
+ * with one delimiter changed halfway would still parse, and would parse *wrongly*
+ * on the day somebody fixed only one of the two.
+ *
+ * `[^"]+` rather than `.+?` for the same reason: the body of a nickname cannot
+ * contain the delimiter that ends it, and saying so is what stops a name with two
+ * separate quoted parts being read as one long nickname spanning the gap.
+ *
+ * **Global, because a name can carry more than one.** `Petar "beetje gepiel" :de
+ * muur: Drandarov` is two marks in two notations, and a non-global regex strips the
+ * first and leaves the second sitting in the display name — where it would then be
+ * printed on the card face and in the checklist, which is the whole thing this
+ * helper exists to prevent. No capture groups: with `g` they are unavailable from
+ * `String.match` anyway, and the body is recovered by dropping the one-character
+ * delimiter from each end.
+ *
+ * Sharing one `g` regex across calls is safe *here* — both `String.match` and
+ * `String.replace` reset `lastIndex` when the flag is set. It would not be with
+ * `test` or `exec`, which carry the index between calls.
+ *
+ * Known limit, unchanged by adding `:` — an apostrophe inside a surname is a
+ * delimiter as far as this is concerned, so `Sean O'Neill Jan O'Brien` reads
+ * `Neill Jan O` as a nickname. It needs two of them in one name to go wrong, which
+ * is why it has never bitten; the fix is to require whitespace before the opening
+ * mark, and it should be made deliberately rather than as a side effect of this.
+ */
+const NICKNAME = /"[^"]+"|'[^']+'|:[^:]+:/g;
+
+/**
+ * Splits a stored name into card-sized pieces. Names carry nicknames in quotes or
+ * colons (`Petar "beetje gepiel" Drandarov`, `Petar :beetje gepiel: Drandarov`),
+ * which are far too long for a card face but too good to throw away — so they land
+ * on the back of the card instead.
+ *
+ * Everything that needs a name without its nickname goes through here — the card
+ * face, the initials, the checklist at the back of the album — so there is one
+ * answer to "what is this player called" and adding a delimiter is a one-line
+ * change in one place.
  */
 export const splitName = (name: string): { display: string; nickname?: string } => {
-  const match = name.match(/["'](.+?)["']/);
-  const nickname = match?.[1]?.trim();
-  const display = name.replace(/["'].+?["']/, '').replace(/\s+/g, ' ').trim();
+  /*
+   * Every mark, in the order they were written, with its delimiters dropped. More
+   * than one is joined rather than the extras being thrown away: somebody who has
+   * earned two nicknames has earned two nicknames, and the card back is the one
+   * surface with room for them.
+   */
+  const nickname =
+    (name.match(NICKNAME) ?? [])
+      .map((mark) => mark.slice(1, -1).trim())
+      .filter(Boolean)
+      .join(' · ') || undefined;
 
+  /*
+   * Replaced with a SPACE, not nothing: `Petar"beetje gepiel"Drandarov` typed
+   * without spaces around the mark would otherwise come out as `PetarDrandarov`.
+   * The `\s+` collapse then takes care of the doubles that leaves behind.
+   */
+  const display = name.replace(NICKNAME, ' ').replace(/\s+/g, ' ').trim();
+
+  /* A name that is *only* a nickname keeps the original, so nothing ever renders a
+     blank card face. */
   return { display: display || name, nickname };
 };
 
@@ -275,25 +359,49 @@ export const silhouetteUrl = (playerId: string): string =>
  * Nothing else. Not "kaarten", not why it was granted — the wrapper carries the
  * badge and this number and that is all, so the number has to stand on its own.
  *
- * A forced packet shows its guarantee instead (`80+` for `guaranteeLevel: 2`);
- * those are always single cards, so no count is lost. They are the only ones that
- * ever print anything but a number, and the only orange ones (see `packFoil`) — a
- * wrapper that is lying to you about the odds should look like it. Nothing sets
- * those fields today; the gift endpoint is what brings them back.
+ * A gift with a floor shows that instead (`80+`); those are always single cards, so
+ * no count is lost. They are the only ones that ever print anything but a number,
+ * and the only orange ones (see `packFoil`) — a wrapper that is lying to you about
+ * the odds should look like it.
  *
- * The thresholds come from `CEREMONY_STEPS`, so the print cannot drift from the
- * levels a guarantee actually targets.
+ * The floor arrives as the overall itself rather than as a level to be looked up, so
+ * what is printed here is by construction the number the server drew against.
+ */
+/*
+ * The set-completion packet prints **no number and no word.** It carries a hexagon mark
+ * instead — see `PackFace`.
+ *
+ * A first pass printed `icoon` here. It was the only word on any wrapper, it needed its own
+ * smaller type size to fit five letters where the others put one to three characters, and it
+ * ran into the objection that removed the `legende` pill from the card face: a label rather
+ * than material. Nothing else on a packet spells out what is inside it, and this should not
+ * either. There is also no number that would do the job — `1` is the daily freebie and a
+ * floor would be a lie, since an icoon can be brons.
  */
 export const packPrint = (pack: Pack): string => {
-  const floor =
-    pack.guaranteeLevel === undefined ? undefined : CEREMONY_STEPS[pack.guaranteeLevel - 1]?.from;
-
-  if (floor !== undefined) return `${floor}+`;
-  if (pack.guaranteeTier) return TIER_LABELS[pack.guaranteeTier];
-  if (pack.guaranteePlayerId) return '1';
-
-  return `${pack.size}`;
+  const floor = packFloor(pack);
+  return floor === undefined ? `${pack.size}` : `${floor}+`;
 };
+
+/**
+ * The set-completion packet, and the single test for it.
+ *
+ * Its own predicate rather than a `=== true` at each site, for the same reason
+ * `packFloor` exists: three things branch on it — the print, the foil and the page's
+ * decision to re-bind first — and they must not come to different answers.
+ */
+export const isIconPack = (pack: Pack): boolean => pack.guaranteesIcon === true;
+
+/**
+ * The floor on a packet, if it has one. The single test for "is this guaranteed".
+ *
+ * It exists because the answer is not `=== undefined`: the server sends
+ * `minimumOverall: null` on every earned pack rather than leaving the field out, so a
+ * strict check reads every game packet as guaranteed. Both callers — the print and the
+ * foil — go through here so there is one place to get that right.
+ */
+export const packFloor = (pack: Pack): number | undefined =>
+  pack.minimumOverall ?? undefined;
 
 /** Initials for the fallback portrait when a player has no avatar on disk. */
 export const initialsFor = (name: string): string => {

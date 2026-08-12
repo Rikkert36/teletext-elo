@@ -120,16 +120,11 @@
   max-width: 34ch;
 }
 
-.ledger__blurb--fine {
-  font-size: 11px;
-  color: #85765a;
-}
-
-.ledger__rule {
-  margin: 16px 0 4px;
-  height: 1px;
-  background: linear-gradient(90deg, #bfae8b, rgba(191, 174, 139, 0));
-}
+/*
+ * No fine print and no rule under the blurb. Both were there to carry the games gate,
+ * which has moved to the far side of the signature — see `LockedAlbum`. A divider with
+ * nothing after it is the one piece of screen furniture this page had.
+ */
 
 /* ---------------------------------------------------------------- *
  * The right page: the line you write on
@@ -214,11 +209,15 @@
   min-height: 0;
 }
 
+/*
+ * One written name per line and nothing else on it. There used to be a games count in a
+ * second column on the right, which made a register look like a standings table — and for
+ * under-gate players it was the gate, greying out the line. Both live on the locked album
+ * now, which is a place rather than a footnote.
+ */
 .ledger__name {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
   width: 100%;
   padding: 5px 2px;
   border: none;
@@ -231,8 +230,8 @@
   transition: background-color calc(90ms * var(--anim, 1)) ease;
 }
 
-.ledger__name:hover:not(:disabled),
-.ledger__name:focus-visible:not(:disabled) {
+.ledger__name:hover,
+.ledger__name:focus-visible {
   /* A pencil tick beside the line, not a filled row: paper does not highlight. */
   background: rgba(122, 97, 50, 0.12);
   outline: none;
@@ -242,31 +241,6 @@
   font-family: "Segoe Script", "Bradley Hand", "Lucida Handwriting", Georgia, serif;
   font-style: italic;
   font-size: clamp(14px, 1.5vw, 18px);
-}
-
-.ledger__name-note {
-  flex: none;
-  font-size: 10px;
-  letter-spacing: 0.5px;
-  color: #8b7c5f;
-}
-
-/*
- * Under the games gate: listed, struck through, and told how far off they are.
- *
- * Listed rather than filtered out, deliberately. A name that is simply absent cannot
- * explain itself, and the players this affects are exactly the newest colleagues — the
- * ones with the least reason to assume the page is working correctly.
- */
-.ledger__name--short {
-  cursor: not-allowed;
-  color: #9a8f78;
-}
-
-.ledger__name--short .ledger__name-text {
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-  text-decoration-color: rgba(154, 143, 120, 0.8);
 }
 
 .ledger__empty {
@@ -434,13 +408,6 @@
   .ledger__page--left,
   .ledger__page--right {
     padding: clamp(14px, 4vw, 22px);
-  }
-
-  /* The heading and the blurb keep their place; only the fine print goes, since the
-     same fact is repeated on the struck-through lines anyway. */
-  .ledger__blurb--fine,
-  .ledger__rule {
-    display: none;
   }
 
   .ledger__page--right {

@@ -20,17 +20,25 @@ import {
   Pack,
   RevealedCard,
   SelectablePlayer,
-  Tier,
   toCard,
 } from '../mock/cardMock';
 import { CoverId } from '../utils/albumLeather';
 import { getSpeed, setSpeed } from '../utils/animationSpeed';
 import { isMuted, setMuted } from '../utils/sounds';
 
-/** The album as an object: which leather, and since when. Null until one is chosen. */
+/**
+ * The album as an object: how it is bound, and what it is bound to hold. Null until one
+ * has been chosen off the table.
+ *
+ * The icons latch lives here rather than on `CollectionState` because it is a fact about
+ * *this binding* — a half-bound book is the visible record of it. So emptying the
+ * collection takes the unlock with the album, and `album: null` cannot carry a stale one.
+ */
 export interface AlbumBinding {
   cover: CoverId;
   createdAt: string;
+  /** Whether this book holds the icons. Drives the half-binding and `icons` shipping. */
+  iconsUnlocked: boolean;
 }
 
 export interface CollectionState {
@@ -63,11 +71,13 @@ export interface CollectionState {
    * gone at midnight because "today's games" is the query.
    */
   packs: Pack[];
-  legendsUnlocked: boolean;
-  /** The full pool, so missing cards can render as silhouettes. */
+  /** The full active pool, so missing cards can render as silhouettes. */
   pool: CardPlayer[];
-  /** Legend pool, empty until unlocked. */
-  legends: CardPlayer[];
+  /**
+   * The icon pool, empty until unlocked — not a secret, but sending it early would put
+   * icoons in the album's slot order, which is built from exactly this list.
+   */
+  icons: CardPlayer[];
 }
 
 /** How many copies of one player's card the collector holds. */
@@ -80,14 +90,14 @@ export interface OwnedCardCount {
  * `GET /api/cards/pool` — every player a pack can contain.
  *
  * Read-only, and no longer needed by the collection page: `GET /api/collections/{id}`
- * carries the pool and the legends itself, because the book is one object and cannot be
+ * carries the pool and the icons itself, because the book is one object and cannot be
  * drawn from a partial response. This survives as the cheap way to look at the pool on
  * its own, and both call the same service so the two cannot disagree.
  */
 export interface CardPoolResponse {
   minGames: number;
   actives: CardPlayer[];
-  legends: CardPlayer[];
+  icons: CardPlayer[];
 }
 
 export interface CardsClient {
@@ -109,12 +119,17 @@ export interface CardsClient {
   emptyCollection(playerId: string): Promise<CollectionState>;
   /**
    * Opens the pack: rolls it, files the cards into the collection, and reports for each
-   * one whether it filled an empty slot.
+   * one whether it filled an empty slot — **together with the collection they landed
+   * in**, so no refetch is needed.
+   *
+   * That is not only a saved round trip. A refetch is a second full leaderboard replay
+   * inside one user action, and it leaves a window in which the reveal has finished but
+   * the shelf still shows a packet that no longer exists.
    *
    * The pack is claimed for the player named here whoever asked, so this cannot steal
    * anybody's cards — only the surprise of their reveal.
    */
-  revealPack(playerId: string, packId: string): Promise<RevealedCard[]>;
+  revealPack(playerId: string, packId: string): Promise<PackReveal>;
   /**
    * Everyone who can be signed in as.
    *
@@ -124,11 +139,42 @@ export interface CardsClient {
    */
   getSelectablePlayers(): Promise<SelectablePlayer[]>;
   /**
-   * Flips the legends latch by hand. **Development only**, and the test panel is its
+   * Claims the icons: the collector has the whole active set and has picked up the packet
+   * that comes with it.
+   *
+   * A real call in every environment, and the only thing that latches the unlock. **It has
+   * to land before the packet is claimed**, or the roll has no icons to draw from — which
+   * is why the page fires this first and opens the packet on the ceremony's end rather
+   * than doing both at once.
+   *
+   * The server re-checks the set rather than trusting the client, so this rejects with 409
+   * if the page has gone stale; treat that as "refetch", not as "retry".
+   */
+  claimIcons(playerId: string): Promise<CollectionState>;
+  /**
+   * Sets the latch without earning it. **Development only**, and the test panel is its
    * only caller: earning it means completing the active set, which is a three-month
    * proposition, so there would otherwise be no way to look at an icoon in a book.
+   *
+   * Separate from `claimIcons` on purpose. They are not the same act — one is the feature
+   * and the other is a bypass that 404s in production — and one method taking a `force`
+   * flag would let a UI path reach the bypass by passing the wrong argument.
    */
-  setLegendsUnlocked(playerId: string, unlocked: boolean): Promise<CollectionState>;
+  forceIcons(playerId: string, unlocked: boolean): Promise<CollectionState>;
+  /**
+   * Presents a pack to named players, or to everybody.
+   *
+   * The one call that brings a pack into existence rather than deriving one, and the
+   * only place it is allowed: a present is the one pack nothing can be derived from,
+   * because nobody played a game to earn it.
+   *
+   * It answers with the gift ids and **not** a collection, for two reasons. A gift to
+   * everybody has no single collection to answer with, and the giver is usually not the
+   * recipient. So a page that has just given *itself* a packet has to refetch — which
+   * costs a leaderboard replay, and is the right trade for something done by hand a few
+   * times a month rather than a thousand times a year.
+   */
+  giftPack(options: GrantOptions): Promise<GiftResult>;
 }
 
 const api = (path: string): string => `${window.TAFELVOETBAL_SERVER_URL}${path}`;
@@ -182,6 +228,17 @@ interface RevealedCardResponse {
   copies: number;
 }
 
+interface PackRevealResponse {
+  cards: RevealedCardResponse[];
+  state: CollectionState;
+}
+
+/** What opening a pack answers: the cards, and the collection they landed in. */
+export interface PackReveal {
+  cards: RevealedCard[];
+  state: CollectionState;
+}
+
 export const httpCardsClient: CardsClient = {
   async getCollection(playerId) {
     return request<CollectionState>(`/api/collections/${playerId}`);
@@ -203,16 +260,19 @@ export const httpCardsClient: CardsClient = {
     // Encoded because a pack id carries a colon and, for a game pack, a GUID. Safe in a
     // path segment either way, but the id is constructed rather than opaque and the next
     // source of one need not be.
-    const drawn = await request<RevealedCardResponse[]>(
+    const reveal = await request<PackRevealResponse>(
       `/api/collections/${playerId}/packs/${encodeURIComponent(packId)}/claim`,
       { method: 'POST' },
     );
 
-    return drawn.map((card) => ({
-      ...toCard(card.player),
-      isNew: card.isNew,
-      copies: card.copies,
-    }));
+    return {
+      cards: reveal.cards.map((card) => ({
+        ...toCard(card.player),
+        isNew: card.isNew,
+        copies: card.copies,
+      })),
+      state: reveal.state,
+    };
   },
 
   async getSelectablePlayers() {
@@ -227,41 +287,76 @@ export const httpCardsClient: CardsClient = {
       .sort((a, b) => a.name.localeCompare(b.name, 'nl'));
   },
 
-  async setLegendsUnlocked(playerId, unlocked) {
+  async claimIcons(playerId) {
+    return request<CollectionState>(`/api/collections/${playerId}/icons`, { method: 'PUT' });
+  },
+
+  async forceIcons(playerId, unlocked) {
     return request<CollectionState>(
-      `/api/collections/${playerId}/legends?unlocked=${unlocked}`,
+      `/api/collections/${playerId}/icons?unlocked=${unlocked}&force=true`,
       { method: 'PUT' },
     );
+  },
+
+  async giftPack(options) {
+    // Sent as given, including the absences: an omitted `playerIds` is what says "everybody"
+    // and an omitted `size` is what says "this is a guaranteed single", so filling either in
+    // here would take the choice away from the caller and make the server's refusal of an
+    // ambiguous request unreachable.
+    return request<GiftResult>('/api/collections/gifts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(options),
+    });
   },
 };
 
 /**
- * What it takes to hand somebody a pack.
+ * What it takes to hand somebody a pack. `POST api/collections/gifts`.
  *
- * Nothing implements this yet — packs are derived from real games, so the only way to
- * conjure one is a row that says so, and `POST api/collections/gifts` is the next slice.
- * The shape is here because the test panel's buttons are already written against it and
- * because it is the contract that slice has to honour: a size, a reason for the wrapper,
- * and the guarantees that make a ceremony level reachable on demand instead of on a ~3%
- * roll. `PackService.Roll` is where the guarantees have to land.
+ * Two axes and no more. **Who** is a list of players, or — by leaving the list out —
+ * everybody. **What** is either a count of ordinary cards or a floor on the overall, never
+ * both: those are the two products, and a guaranteed packet is always a single card. The
+ * server refuses a request that sets neither or both rather than picking one, because either
+ * choice would be a guess about which the caller meant.
  */
 export interface GrantOptions {
-  size: number;
-  reason: string;
-  guaranteeTier?: Tier;
-  guaranteePlayerId?: string;
-  guaranteeLevel?: number;
-  doubledPlayerIds?: string[];
+  /** The recipients. Omitted or empty means the whole office. */
+  playerIds?: string[];
+  /** How many ordinary cards. Exactly one of this and `minimumOverall`. */
+  size?: number;
+  /**
+   * A floor on the overall of the single card in it — 75 for "goud or better", and
+   * 75/80/85/90 for the four ceremony levels.
+   *
+   * A floor rather than a target: the weighting still applies inside the qualifying band,
+   * so 75+ hands out far more 75s than 90s. If nobody clears it the draw falls through to
+   * the whole pool rather than failing.
+   */
+  minimumOverall?: number;
+  /** Shown on the wrapper. Optional; presents get a default rather than a blank label. */
+  reason?: string;
+}
+
+/** What giving answers with: the rows that were written. */
+export interface GiftResult {
+  /** One per named recipient, or a single id when it went to everybody. */
+  giftIds: string[];
+  /**
+   * Whether it went to the whole office. Worth having explicitly — `giftIds` has one entry
+   * either way when a single player was named, so its length is not a headcount.
+   */
+  everybody: boolean;
 }
 
 /* ------------------------------------------------------------------ *
  * Debug controls.
  *
- * What is left of the test panel's back end. Granting a pack used to live here,
- * writing into a session-local sandbox; packs are the server's now, so the panel's
- * pack buttons are gone until the endpoint that hands somebody a specific pack
- * exists. Emptying a collection and flipping the legends latch are both real calls
- * on `CardsClient`, because both are rows.
+ * What is left of the test panel's back end, and it is down to the two things that
+ * genuinely are client-side. Granting a pack used to live here, writing into a
+ * session-local sandbox; it is `giftPack` on `CardsClient` now, alongside emptying a
+ * collection and forcing the icons latch — all three are rows, so none of them can be
+ * faked in the browser without the real state and the fake one drifting apart.
  * ------------------------------------------------------------------ */
 
 export const mockDebug = {

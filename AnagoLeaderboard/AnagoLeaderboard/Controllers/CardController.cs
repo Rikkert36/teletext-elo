@@ -16,7 +16,7 @@ namespace AnagoLeaderboard.Controllers
         }
 
         /// <summary>
-        /// Every player a pack can contain: actives on their current rating, legends on
+        /// Every player a pack can contain: actives on their current rating, icons on
         /// their all-time high.
         ///
         /// The collection endpoint will carry this same set, since the album has to draw

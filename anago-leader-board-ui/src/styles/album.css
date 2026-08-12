@@ -14,18 +14,65 @@
  */
 
 /**
- * Sizing is driven by viewport HEIGHT first, then width.
+ * Sizing is driven by viewport HEIGHT first, then width, and then by the table.
  *
  * A purely width-driven book grew taller than the viewport on shorter screens,
- * which pushed the page controls below the fold. Taking the smaller of the two
+ * which pushed the page controls below the fold. Taking the smaller of the
  * budgets keeps the whole spread on screen without scrolling.
  *
  * The height term is written as `Xvh * 0.78` against a `/ 0.78` page height, so
  * the two cancel and **the page ends up exactly Xvh tall**. That makes the number
  * directly comparable to anything else competing for vertical space: it went 56
- * -> 59 when the Actief/Legendes tab strip was removed, which was ~32px, or about
- * 3vh at a typical desktop height. Grow it further only by what you free up
- * elsewhere, or the page controls go back under the fold.
+ * -> 59 when the Actief/Iconen tab strip was removed, which was ~32px, or about
+ * 3vh at a typical desktop height, 59 -> 63 when the footer row went — a 22px row
+ * plus its 24px margin, so ~46px — and **63 -> 70 when the test panel moved off
+ * the bottom of the table and into the right margin**, which was the last
+ * horizontal band under the book and worth ~83px, or ~8.6vh at 960. Grow it
+ * further only by what you free up elsewhere, or the page controls go back under
+ * the fold.
+ *
+ * 70 is the ceiling rather than a round number, and the arithmetic is worth
+ * keeping. Everything above and below the spread is **fixed px**, not vh: the
+ * navbar (64 + 16 margin), the stage's own padding (36 + 40), the nav-label row
+ * (~25) and `.album`'s 4px a side — about 189px, plus the stage's two vh-clamped
+ * margins, so ~227 in total. Fitting means `k·H + 227 <= H`, i.e. `k <= 1 −
+ * 227/H`: 0.70 at a 760px-tall viewport, which is a 1536×864 laptop at Windows'
+ * 125% scaling and the shortest window worth designing for. 72 would fit 1080
+ * and overflow that.
+ *
+ * **The third term is the table**, and it is what makes the packets on the shelf
+ * exactly as wide as the cards on the page while keeping two of them side by side.
+ * The shelf lies in the margin the book leaves in the middle of a fixed-width slab,
+ * so:
+ *
+ *     (stage inner − 2·--page-w) / 2   >=   --shelf-gap + shelf column + 16px
+ *
+ *     shelf column = 2·--album-card-w + --pack-gap + 2·--shelf-pad + --shelf-bar
+ *
+ * with `--album-card-w = (--page-w − 72px) / 3` from the grid below. Substituting the
+ * second into the first and solving for `--page-w` gives the term as written — the
+ * widest page whose own margin still holds the pile.
+ *
+ * That direction is the point. It used to run the other way: the book took
+ * `min(40vw, 63vh·0.78, 560px)` and the *packets* were then shrunk to whatever two
+ * of them could fit in what was left, which put them at 61–100% of a card depending
+ * on how tall the window was. Now the packet is a card by definition, two of them
+ * are non-negotiable, and the book is what gives way. It gives way by less than the
+ * table gained: `--stage-w` went 1740 → 1860 in the same pass, which is what turns
+ * this from "the same book you already had" into ~8% more of one. See the
+ * `--stage-w` note in game.css for what that costs the slab.
+ *
+ * The 560px cap this term replaces is gone with it: the table is the cap now, and at
+ * 1920 wide it lands on a 507px page against a 340px margin.
+ *
+ * Every token in it (`--stage-w`, `--stage-pad`, `--shelf-gap`, `--pack-gap`,
+ * `--shelf-pad`, `--shelf-bar`) is on `:root` in game.css and every one is
+ * viewport-relative or a literal, so this resolves in CSS with nothing measured.
+ * **Do not make any of them depend on `--album-card-w` or `--page-w`** — that closes
+ * the loop and CSS drops the whole custom property as invalid at computed-value time.
+ *
+ * The 40vw term is untouched: it only binds on a window that is wide *and* short,
+ * which has no height to spare.
  */
 .album-row {
   display: flex;
@@ -55,11 +102,54 @@
  * has to know how wide the book is from outside `.album`.
  */
 :root {
-  --page-w: min(40vw, calc(59vh * 0.78), 520px);
+  /*
+   * The third term is the table — the widest page whose own margin still holds two
+   * card-width packets side by side. It is the header's inequality solved for
+   * `--page-w`:
+   *
+   *     0.6 × (stage inner / 2 − --shelf-gap − --pack-gap − 2·--shelf-pad
+   *            − --shelf-bar + 32px)
+   *
+   * distributed over the bracket. The `+ 32px` inside it is the 48px of
+   * padding-and-gap the grid takes out of a page before two of its slots are measured,
+   * less the 16px `--shelf-room` holds back for the page's own scrollbar; `+ 16px`
+   * rather than the `+ 19.2px` that would come out exactly, so the solve lands a few px
+   * *inside* the margin instead of on its edge. That slack is deliberate: at equality,
+   * sub-pixel rounding on either side is enough to drop the pile to one column, which
+   * is the whole thing this is here to prevent. `.album-side` spends 2px of it asking
+   * for a fraction more than two packets need, for the same reason.
+   */
+  --page-w: min(
+    40vw,
+    calc(70vh * 0.78),
+    calc(
+      0.3 * (var(--stage-w, 1860px) - 2 * var(--stage-pad, 34px)) -
+        0.6 * var(--shelf-gap, 26px) - 0.6 * var(--pack-gap, 12px) -
+        1.2 * var(--shelf-pad, 13px) - 0.6 * var(--shelf-bar, 14px) + 16px
+    )
+  );
   --page-h: calc(var(--page-w) / 0.78);
   --page-pad-x: 22px;
   --album-card-w: calc((var(--page-w) - var(--page-pad-x) * 2 - 28px) / 3);
   --book-w: calc(var(--page-w) * 2);
+}
+
+/*
+ * Stacked: the margins are gone, so the term that reserves one of them has to go too.
+ *
+ * This is game.css's breakpoint, repeated — the same duplication `.album--mobile` and
+ * `useIsMobile` already live with, and for the same reason: that file decides the
+ * *layout* stacks, this one sizes the book that layout is built around. If one moves
+ * the other has to. Leaving the term in would keep charging the book for a shelf that
+ * is above it in flow rather than beside it, and it is exactly *how much* it charges
+ * that sets the breakpoint at 1450 — see the media query at the foot of game.css. The
+ * `560px` cap comes back with it: with no margin to solve against, the book is back on
+ * the pair of viewport terms and needs something to stop it on a large window.
+ */
+@media (max-width: 1450px) {
+  :root {
+    --page-w: min(40vw, calc(70vh * 0.78), 560px);
+  }
 }
 
 /*
@@ -68,10 +158,15 @@
  * `.album--mobile` is applied by `useIsMobile`, which is MUI's `down('sm')` —
  * exactly this query. The two must stay in step: the class styles the book, this
  * sizes anything outside it that has to agree with the book.
+ *
+ * The height term took the same footer dividend, 58 -> 61, and the width terms are
+ * left alone: on a phone `80vw` is what binds (312px at 390 wide, against 353 from
+ * the height term), so this only shows up on a portrait tablet — which is exactly
+ * where there is height to give.
  */
 @media (max-width: 599.95px) {
   :root {
-    --page-w: min(80vw, calc(58vh * 0.72), 380px);
+    --page-w: min(80vw, calc(61vh * 0.72), 380px);
     --page-h: calc(var(--page-w) / 0.72);
     /* Same page padding, tighter gaps — see `.album--mobile .album__slots`. */
     --album-card-w: calc((var(--page-w) - var(--page-pad-x) * 2 - 16px) / 3);
@@ -88,6 +183,21 @@
   padding: 4px 0;
   /* Containing block for the page-turn strips. */
   position: relative;
+
+  /*
+   * How far the boards stand proud of the paper — a binding's *squares*.
+   *
+   * Three things read it and all three have to agree. The **boards** grow by it
+   * (`.album__leaf--cover`), which is where the overhang comes from. The **pastedowns**
+   * are inset by it, because a glued sheet is page-sized and the board is bigger — so
+   * this is exactly the band of bare leather beyond the page trim. And the **spine caps**
+   * sit in it, because the overhang is the only place an open book lets you see into the
+   * case.
+   *
+   * Nothing paper-coloured is drawn in that band. A fore-edge went there three times and
+   * was wrong all three; see the note above `.album__page--foreword` for why.
+   */
+  --board-out: 9px;
 }
 
 .album__book {
@@ -106,6 +216,19 @@
  * Its own element rather than a background on `.album__book`, because the closed
  * book has to hide it and bring it back on a delay — and `background` between
  * `none` and a gradient does not transition, while an element's opacity does.
+ *
+ * **It does not overhang. The boards do that.**
+ *
+ * It used to be `--board-out` bigger than the book on every side, which was the first
+ * answer to "the boards should be larger than the pages": one static rectangle, no odd
+ * leaf sizes, and the back board covered for free. It is the wrong answer, and the
+ * reason is worth keeping. The overhang belongs to two objects that *move* — the boards
+ * — so drawing it on a rectangle that does not left the shut book with no squares at
+ * all and forced the whole case to appear once the cover had landed. See
+ * `.album__leaf--cover` for where it lives now.
+ *
+ * What is left here is the case behind the text block: the leather at the gutter, and
+ * the drop shadow the whole object throws on the table.
  */
 .album__binding {
   position: absolute;
@@ -166,6 +289,299 @@
 }
 
 /* ---------------------------------------------------------------- *
+ * The fore-edge used to live here, as a pair of elements pinned just outside the book
+ * box. It is drawn on the boards own faces now - see `.album__endpaper::after` - and
+ * the elements are gone with it.
+ *
+ * Both dead ends are worth naming, because both are tempting. A strip outside the box
+ * works only while the boards are page-sized, and once the boards took their overhang
+ * they covered it. Lowering the boards depth to get the strip back in front then broke
+ * the shut book, because depth outranks `z-index` in a 3D context and the pages sorted
+ * straight through the closed cover. A stack physically lies *on* the board, so drawing
+ * it on the board removes the ordering question instead of answering it.
+ * ---------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------- *
+ * The spine, seen from the inside
+ *
+ * With the boards standing proud there is leather at the head, the tail and both
+ * fore-edges — and nothing at the gutter, which is the one place an open book most
+ * obviously has a spine. This is that: the hollow the two halves bend down into.
+ *
+ * **Drawn on top of the pages, and it has to be — there is no gap to put it in.**
+ * The two halves are exactly `--page-w` each and meet at the centre, so nothing
+ * behind them is visible at the gutter. Widening the book to open a real gap is not
+ * available either: `--page-w` is the term the card grid, the checklist and the
+ * shelf's packet width are all derived from, and the leaf model rotates about one
+ * origin, so a gap cannot be opened on one side without closing it on the other.
+ *
+ * What makes an overlay acceptable is where it lands: `--page-pad-x` gives every page
+ * a 22px inner margin with nothing printed in it, and this reaches ~17px into each
+ * side. So it darkens paper and never a card. It is the same bargain the turn strips
+ * struck on the outer margin.
+ *
+ * Mostly gradient, deliberately. A solid band would be a bar lying across the spread;
+ * a darkness that gathers at the fold and fades out over ~17px each way is the paper
+ * curving away from the light, which is what you actually see. Only the middle 2px is
+ * opaque leather — the fold itself — with one hairline of sheen down it, because the
+ * fold is the one part of the gutter that catches the lamp.
+ *
+ * It runs into the head and tail overhang (`--board-out`), so the leather at the top
+ * and bottom of the gutter is continuous with the case rather than stopping at the
+ * paper's edge.
+ *
+ * Known cost: a leaf turning through the gutter passes *behind* this. At the gutter a
+ * turning page is edge-on and a few pixels wide, so it is close to invisible — but it
+ * is a cheat, and if it ever shows, the fix is to fade the spine out while `moving`
+ * is set rather than to move it behind the leaves, where it cannot be seen at all.
+ * ---------------------------------------------------------------- */
+
+.album__spine {
+  position: absolute;
+  top: calc(var(--board-out) * -1);
+  bottom: calc(var(--board-out) * -1);
+  left: 50%;
+  /*
+   * 22px, down from 40.
+   *
+   * At 40 it was the **widest** dark thing on the spread, and a gutter should be the
+   * narrowest: the fold of a book is a line, not a region. Worse, the wings were
+   * duplicating work — every page already carries `inset 12px 0 24px` toward the spine
+   * (see `.album__face--front .album__page`), so two soft falloffs were stacking into
+   * one broad wash with no defined edge anywhere in it.
+   *
+   * The division of labour now: **the pages own the falloff, this owns the fold.**
+   */
+  width: 22px;
+  margin-left: -11px;
+  transform: translateZ(2px);
+  pointer-events: none;
+  /*
+   * **Over the paper: shading only. Not one hard line.**
+   *
+   * This element used to carry the hinge grooves and a 2px leather core as well, and
+   * both were mistakes of the same kind. It spans the full height of the spread, so a
+   * hard edge anywhere in it is a line *drawn on the paper* — the grooves read as two
+   * pencil rules flanking the gutter on every card page, and the leather core ran on
+   * past the board's outline into the overhang, cutting across the very edge it should
+   * have been part of.
+   *
+   * A gradient cannot make that mistake. Darkness gathering at the fold and fading out
+   * both ways is the paper curving away from the light, which is all you can actually
+   * see of a spine when paper is covering it.
+   *
+   * **The hardware moved to the caps below**, into the head and tail overhang — which
+   * is exactly where a real open book lets you see past the paper into the case.
+   *
+   * The stops are deliberately steep: most of the alpha is inside the middle ~2px and
+   * the wings are almost nothing by the time they reach the edges. That gives the fold
+   * a **defined core** — which is what makes it read as a crease rather than a dim
+   * area — while still being a gradient, so there is no hard edge for the eye to catch
+   * as a line ruled on the paper. Losing the old 2px leather core left nothing at the
+   * centre and the whole thing went soft; this replaces it without the hard stop.
+   */
+  background: linear-gradient(
+    90deg,
+    rgba(30, 18, 6, 0) 0%,
+    rgba(30, 18, 6, 0.08) 32%,
+    rgba(25, 14, 4, 0.3) 44%,
+    rgba(14, 8, 2, 0.62) 50%,
+    rgba(25, 14, 4, 0.3) 56%,
+    rgba(30, 18, 6, 0.08) 68%,
+    rgba(30, 18, 6, 0) 100%
+  );
+  /*
+   * **Half a flip, not none and not a whole one.** Both ends were wrong for the same
+   * reason: the gutter does not exist until the cover is out of it. A full-flip delay
+   * put the spine there after the page had already landed; no delay at all put it there
+   * on the first frame, while the cover was still lying flat across it.
+   *
+   * At the midpoint the cover is edge-on at the spine — the one instant the hollow
+   * genuinely opens — so that is when this arrives, discretely, and when it goes again
+   * on the way shut. `310ms` is `SHUT_MS / 2`, against the same `--anim` knob the leaf
+   * multiplies by, so the two cannot drift.
+   */
+  transition: opacity 0s linear calc(310ms * var(--anim, 1));
+}
+
+/* ---------------------------------------------------------------- *
+ * The spine caps: head and tail
+ *
+ * The only place the case is genuinely visible on an open book. Above the text block
+ * and below it, the boards overhang by `--board-out` — and looking into that gap you
+ * see the hollow, the hinge grooves and the headband. On the paper you see none of
+ * those, because paper is in the way.
+ *
+ * Each cap is leather, so it sits **inside** the binding's own overhang rather than on
+ * top of it: same gradient, same tokens, and the grooves are the only thing that reads
+ * as different. That is what makes the spine part of the outline instead of a stripe
+ * laid across it.
+ * ---------------------------------------------------------------- */
+
+/*
+ * **It paints no leather of its own. That is the whole rule here.**
+ *
+ * The cap had `linear-gradient(180deg, hi, mid)` as its ground, which looks harmless
+ * and is not: the binding runs that same gradient over the *whole book height*, so
+ * down at the tail it has long since reached `--leather-mid`, while a 9px cap runs the
+ * full `hi → mid` inside itself and arrives at its own top edge still on `--leather-hi`.
+ * A lighter patch on darker leather, with a seam round it — the spine reading as
+ * something laid on top of the case's outline instead of as part of it.
+ *
+ * Painting nothing cannot go wrong. The binding's leather shows straight through, at
+ * whatever value its own gradient has reached at that height, on all five stains, and
+ * the cap only ever *removes* light: the grooves and the hollow are darkening, and the
+ * headband is the single bright thing it is allowed.
+ *
+ * It also stops 1px short of the outer edge, so the outermost pixel of leather and the
+ * brass rule outside it run unbroken across the head and the tail. The silhouette of
+ * the case is never touched by this.
+ */
+.album__spinecap {
+  position: absolute;
+  left: 50%;
+  /*
+   * The same 22px as the fold, so the case agrees with itself about how thick it is.
+   *
+   * At 40px the grooves sat ±10px from the fold, describing a spine ~20px across — a
+   * book two and a half times thicker than the 8px the fore-edge reports for the same
+   * text block. One of the two had to be lying and it was this one: the fore-edge is
+   * derived from the real leaf count. The grooves now land at ±5.5px, which puts the
+   * spine at ~11px: the text block plus its two boards, which is what a spine is.
+   */
+  width: 22px;
+  margin-left: -11px;
+  height: calc(var(--board-out) - 1px);
+  transform: translateZ(2px);
+  pointer-events: none;
+  background:
+    /*
+     * The hinge grooves: the channel the covering leather is creased into where each
+     * board hinges on the spine — the French joint. One dark line at the fold says
+     * "two sheets meet here"; a line with a groove either side says "a spine with
+     * boards on it", which is the whole difference between a case and a fold.
+     */
+    linear-gradient(
+      90deg,
+      transparent 0 23%,
+      rgba(12, 7, 2, 0.5) 24%,
+      rgba(12, 7, 2, 0.5) 26%,
+      transparent 27% 73%,
+      rgba(12, 7, 2, 0.5) 74%,
+      rgba(12, 7, 2, 0.5) 76%,
+      transparent 77% 100%
+    ),
+    /* The hollow between them: an open gap under the boards, so it goes darker. */
+    radial-gradient(ellipse 58% 150% at 50% 50%, rgba(10, 6, 2, 0.5), transparent 72%);
+  /*
+   * **Half a flip, not none and not a whole one.** Both ends were wrong for the same
+   * reason: the gutter does not exist until the cover is out of it. A full-flip delay
+   * put the spine there after the page had already landed; no delay at all put it there
+   * on the first frame, while the cover was still lying flat across it.
+   *
+   * At the midpoint the cover is edge-on at the spine — the one instant the hollow
+   * genuinely opens — so that is when this arrives, discretely, and when it goes again
+   * on the way shut. `310ms` is `SHUT_MS / 2`, against the same `--anim` knob the leaf
+   * multiplies by, so the two cannot drift.
+   */
+  transition: opacity 0s linear calc(310ms * var(--anim, 1));
+}
+
+.album__spinecap--head {
+  top: calc(var(--board-out) * -1);
+}
+
+.album__spinecap--tail {
+  bottom: calc(var(--board-out) * -1);
+}
+
+/* ---------------------------------------------------------------- *
+ * Headbands (kapitaal)
+ *
+ * The little striped cord glued across the head and tail of a spine, above the text
+ * block and under the leather's turn-in. **It is the single most recognisable tell of
+ * a cased book** — a saddle-stitched or perfect-bound one has nothing there, because
+ * there is no hollow to cap. Two of them, head and tail.
+ *
+ * They live in the board overhang, which is why `.album__spine` runs out to
+ * `--board-out` at both ends rather than stopping at the paper: without that there is
+ * nowhere for a headband to be that is not on top of a page.
+ *
+ * Striped with the cover's own foil colour against a dark core, at 2px a stripe. Real
+ * ones are two silks wound round a cord, and at this size two colours alternating is
+ * all that survives.
+ * ---------------------------------------------------------------- */
+
+/*
+ * A child of the cap, so it can only ever be inside the overhang: the headband is the
+ * one piece of this that would look worst floating on a page, and making it impossible
+ * beats remembering not to.
+ *
+ * Tucked against the text block — the bottom of the head cap, the top of the tail one
+ * — because that is where the cord is glued: over the folded sheets, under the turn-in.
+ * It stops ~4px short of the grooves on either side, so the boards still read as
+ * continuous past it.
+ */
+.album__headband {
+  position: absolute;
+  /* 27% of a 22px cap is ~6px a side, so the band spans ~10px — inside the grooves at
+     ±5.5px, which is exactly the width of spine it is glued across. */
+  left: 27%;
+  right: 27%;
+  height: 3px;
+  /*
+   * Dimmer than the cover's foil. It is silk in a shadowed gap, not gold blocked on a
+   * board in the light, and at full `--foil` it was the brightest thing on the whole
+   * spread — which is how a 3px detail ended up being what the eye went to.
+   */
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(230, 201, 138, 0.72) 0 2px,
+    rgba(92, 65, 22, 0.9) 2px 4px
+  );
+  /* Set into the gap rather than sitting on it: the shadow is inside, not under. */
+  box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.6);
+}
+
+/* Against the text block: the bottom of the head cap, the top of the tail one — over
+   the folded sheets and under the turn-in, which is where the cord is glued. */
+.album__headband--head {
+  bottom: 0;
+}
+
+.album__headband--tail {
+  top: 0;
+}
+
+/*
+ * There is deliberately no leather core and no sheen line down the gutter. Both were
+ * here, both were 1–2px hard verticals running the height of the spread, and on paper
+ * that is a drawn line rather than a seen edge. See the note on the element above.
+ */
+
+/* ---------------------------------------------------------------- *
+ * The spine when the book is shut: gone, and back at the first frame of the flip
+ *
+ * **A shut book gets none of this.** The hollow, the joints and the headband are things
+ * you see by looking *into* an open case; face-on, a closed book shows a board and, at
+ * most, the spine edge-on as a hairline. It was briefly compressed into an 11px sliver
+ * on the cover's hinge to avoid it appearing later — which just drew a spine's worth of
+ * detail at a size and angle where none of it is visible, and put a line down the cover.
+ *
+ * The reveal is what needed fixing, not the hiding — and it took two goes to land on the
+ * right moment. A full-flip delay put the spine there *after* the page had already come
+ * down. Removing the delay put it there on the very first frame, while the cover was
+ * still lying flat across the gutter. It arrives at the **midpoint**, which is the one
+ * instant the cover stands edge-on at the spine and the hollow genuinely opens — see the
+ * transition on `.album__spine`.
+ * ---------------------------------------------------------------- */
+
+.album--closed .album__spine,
+.album--closed .album__spinecap {
+  opacity: 0;
+}
+
+/* ---------------------------------------------------------------- *
  * The closed book
  *
  * `flipped === 0` means no leaf has turned, so the only thing showing is the
@@ -179,13 +595,21 @@
  * already carries its own leather, so the only thing missing is the drop shadow,
  * which moves to the leaf for the duration.
  *
- * **They come back only once the cover has finished falling.** Hiding is
- * immediate, but revealing waits out the full 620ms leaf flip, because the cover
- * lands on top of exactly the area they occupy. Without the delay they snapped to
- * full opacity the instant the book started opening, so you watched the empty
- * inside cover — "TAFELVOETBAL" and all — sit there while the cover fell into it.
- * A 0s duration on a delay makes the change discrete, which is what is wanted:
- * nothing should be seen fading, it should simply already be there underneath.
+ * **The two of them come back on different timing, and they have to.** Hiding is
+ * immediate for both. Revealing is not:
+ *
+ *   - **The inside covers wait out the whole flip.** The cover lands on exactly the
+ *     area they occupy, and without the delay they snapped to full opacity the instant
+ *     the book started opening — so you watched the empty inside cover,
+ *     "TAFELVOETBAL" and all, sit there while the cover fell into it. A 0s duration on
+ *     a delay makes the change discrete, which is what is wanted: nothing should be
+ *     seen fading, it should simply already be there underneath.
+ *   - **So does the binding, and it no longer costs anything.** It briefly faded in
+ *     over the first stretch of the fall, to stop the leather *appearing* around an
+ *     already-open book. That was treating the symptom: the binding was carrying the
+ *     board overhang, so hiding it hid the squares. Now the boards carry their own
+ *     (see `.album__leaf--cover`), this rectangle sits entirely behind the text block,
+ *     and when it comes back is invisible either way.
  * ---------------------------------------------------------------- */
 
 .album--closed {
@@ -232,6 +656,37 @@
   transform: rotateY(-180deg);
 }
 
+/* ---------------------------------------------------------------- *
+ * The two boards are leaves, and they are bigger than the pages
+ *
+ * **The board that flips has to be the thing that carries the board's edge.** Before
+ * this, the leather overhang was drawn once by `.album__binding` — a static rectangle
+ * behind the whole book — while the cover that swings was page-sized like every other
+ * leaf. Those two can never agree: a shut book had no squares at all, and the case had
+ * to *appear* around it once the cover had landed. Fading that in only turned a pop
+ * into a smear; the mismatch was structural.
+ *
+ * So leaf 0 and the last leaf are the real boards: `--board-out` wider than a page and
+ * that much taller at each end, which is exactly the squares of a cased binding. The
+ * cover's edge is now part of the object that rotates, so there is nothing left to
+ * reveal — shut, the board's own overhang *is* the edge you see; opening, it travels
+ * with the board and arrives with it.
+ *
+ * The arithmetic is what lets the page stack be drawn on these faces. A leaf sits at
+ * `left: 50%` with its origin on the spine, so unflipped a board spans `[W, 2W + O]` — O
+ * past the book's right edge — and flipped it mirrors to `[-O, W]`, O past the left. In
+ * *local* coordinates both of those overhangs are the face's right-hand `O`, which is why
+ * one rule can put the fore-edge on all three faces that show one. See
+ * `.album__endpaper::after`.
+ * ---------------------------------------------------------------- */
+
+.album__leaf--cover,
+.album__leaf--back {
+  top: calc(var(--board-out) * -1);
+  width: calc(var(--page-w) + var(--board-out));
+  height: calc(var(--page-h) + var(--board-out) * 2);
+}
+
 .album__face {
   position: absolute;
   inset: 0;
@@ -256,27 +711,75 @@
   transform: rotateY(180deg) translateZ(1px);
 }
 
+/*
+ * **Every face sits at the same depth, boards included. Do not stagger them.**
+ *
+ * The boards were briefly put at `translateZ(0.25px)`, to get them *behind* a separate
+ * fore-edge element that they had started to overlap. It broke the shut book
+ * immediately: in a 3D rendering context depth beats `z-index`, so the pages — still at
+ * `1px` — sorted in front of a cover at `0.25px`, and the first page showed straight
+ * through the closed cover.
+ *
+ * Depth cannot express this at all, because a board's position relative to the pages is
+ * not constant: the front board is *on top of* the pile when the book is shut and
+ * *underneath* it once opened. That is exactly what `leafZ` already computes, and it can
+ * only do its job while every leaf is at the same depth. The page stack is drawn on the
+ * boards' own faces instead — see `.album__endpaper::after`.
+ */
+
 /* ---------------------------------------------------------------- *
  * The page itself
  * ---------------------------------------------------------------- */
 
 /*
- * A printed page, not a tinted rectangle.
+ * A printed page, not a tinted rectangle — but almost nothing is printed on it.
  *
- * Four layers, outermost first: a hairline keyline inset from the trim with a
- * second rule just inside it, a very faint ruled grid the card slots sit on, a
- * ghosted monogram in the middle of the leaf, and the aged paper itself. None of
- * it competes with the cards — everything is within a few percent of the paper
- * colour — but a page with nothing printed on it reads as a placeholder.
+ * What is left is the aged paper and a very faint ruled grid, and that is the
+ * whole page: **the cards and the folio are the only things on the leaf.**
+ *
+ * Three things were removed rather than tuned, and each one is a decision, not
+ * an omission:
+ *
+ *   - **The keyline.** A hairline inset from the trim with a companion rule, as
+ *     on a plate book. It drew a box around a page whose content already sits in
+ *     a grid, so it was a second frame inside the binding's own.
+ *   - **The ghosted monogram.** A giant serif "T" at 42% of the page width,
+ *     centred — which put it squarely behind the middle column of cards. The
+ *     lesson generalises: nothing decorative goes behind a card. If a page mark
+ *     ever comes back it belongs in a margin.
+ *   - **The running head.** See `PageFace` in Album.tsx.
+ *
+ * The rows keep `align-content: start`, so the slack that the head used to occupy
+ * collects below the cards along with the slack that was always there — with a little
+ * of it handed back to the top margin, which is why `padding-top` below is a fraction
+ * of the page height rather than a literal.
  */
 .album__page {
   height: 100%;
   box-sizing: border-box;
-  /* Horizontal padding via the shared variable: the turn strips are exactly it. */
-  padding: 18px var(--page-pad-x) 12px;
+  /*
+   * Horizontal padding via the shared variable: the turn strips are exactly it.
+   *
+   * The **top** margin is proportional to the page rather than the 18px literal it
+   * was, and it is doing one job: giving back a little of the slack that collects
+   * under the cards. Losing the running head freed ~40px inside the page and it all
+   * fell to the bottom, on top of the ~150px that was already there, which left the
+   * block sitting hard against the head of the page with a field of empty paper below
+   * it. ~5.5% of the page height is about double the old figure, so the top gets a
+   * breath without the rows leaving the top of the page.
+   *
+   * Not `align-content: center` on the rows, which is the other way to spend that
+   * slack: rows should fill a printed page from the top, and a partly filled last page
+   * would then float its single row halfway down the leaf.
+   */
+  padding: clamp(18px, calc(var(--page-h) * 0.055), 46px) var(--page-pad-x) 12px;
   position: relative;
   background:
-    /* Ruled grid, one line per card row. */
+    /* Ruled grid: three lines at the page's thirds. It does NOT line up with the
+       card rows — there are two of those — so it reads as ruling on the stock
+       rather than as a guide the mounts sit on. Now that the keyline and the
+       monogram are gone it is the only printed thing left in the paper, and the
+       one thing keeping it from being a flat tint. */
     repeating-linear-gradient(
       0deg,
       transparent 0 calc(33.33% - 1px),
@@ -290,40 +793,13 @@
   color: #3a3222;
 }
 
-/* The printed border: a keyline with a companion rule, as on a plate book. */
-.album__page::before {
-  content: "";
-  position: absolute;
-  inset: 8px;
-  z-index: 0;
-  pointer-events: none;
-  border: 1px solid rgba(107, 83, 37, 0.32);
-  box-shadow: inset 0 0 0 3px transparent, inset 0 0 0 4px rgba(107, 83, 37, 0.14);
-}
-
-/* Ghosted monogram, so the paper is never simply empty behind a missing card. */
-.album__page::after {
-  content: "T";
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  font-family: Georgia, "Times New Roman", serif;
-  /* Page-relative: `cq` units would resolve against the card, not the page. */
-  font-size: calc(var(--page-w) * 0.42);
-  line-height: 1;
-  color: rgba(107, 83, 37, 0.05);
-}
-
 /*
- * Printed matter is decoration and must stay behind the cards. Both pseudo
- * elements are positioned, and `::after` is the last child, so without this it
- * paints straight over the collection.
+ * The stacking context is kept even though the page no longer has pseudo
+ * elements to sit above: the ruled grid is a background layer and cannot paint
+ * over anything, but the two removed layers were both positioned, and anything
+ * printed on the paper in future will be too. This is the line that says
+ * decoration goes behind the collection.
  */
-.album__page-header,
 .album__slots,
 .album__page-number {
   position: relative;
@@ -339,32 +815,6 @@
 .album__face--back .album__page {
   box-shadow: inset -12px 0 24px -12px rgba(0, 0, 0, 0.45);
   border-radius: 3px 0 0 3px;
-}
-
-.album__page-header {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  border-bottom: 2px solid rgba(107, 83, 37, 0.45);
-  padding-bottom: 6px;
-  margin-bottom: 16px;
-  flex: none;
-}
-
-.album__page-title {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 15px;
-  font-weight: bold;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
-  color: #4a3a1c;
-}
-
-.album__page-sub {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 13px;
-  color: #7a6f56;
-  margin-left: auto;
 }
 
 .album__slots {
@@ -426,8 +876,23 @@
  * The fill is a translucent tint, so on top it reads as a die-cut edge on the
  * exact footprint without hiding who is missing.
  *
- * A dashed gilt rule rather than corner ticks: brackets plus a dashed rule read
- * as two ideas competing on one small rectangle.
+ * **A die-cut recess, not a drawn outline.** It was a 2px dashed gilt rule, chosen
+ * over corner ticks because brackets plus a dashed rule read as two ideas competing
+ * on one small rectangle. That reasoning still holds against ticks — but a dashed
+ * rule is a *drawing of* a place, and now that the page carries nothing else, the
+ * mount is very nearly the only furniture on it and can afford to be the real thing.
+ *
+ * Three layers make it a hole rather than a line, and each is doing one job:
+ *
+ *   border      a hairline where the cut meets the surface. 1px, not 2px: a cut
+ *               edge is a boundary, and 2px is a stroke somebody chose.
+ *   inset top   the shadow the paper's own thickness throws into the recess,
+ *               falling from above because the stage lights from above.
+ *   inset -1px  the bottom lip catching that same light, which is what stops the
+ *               whole thing reading as a grey smudge.
+ *
+ * The shadow stays tight on purpose. A wider blur greys the silhouette underneath,
+ * and the silhouette is the entire point of an empty slot.
  */
 .album__slot::before {
   content: "";
@@ -436,8 +901,11 @@
   z-index: 0;
   pointer-events: none;
   border-radius: 6px;
-  border: 2px dashed rgba(138, 112, 67, 0.55);
-  background: rgba(107, 83, 37, 0.05);
+  border: 1px solid rgba(107, 83, 37, 0.42);
+  background: rgba(107, 83, 37, 0.07);
+  box-shadow:
+    inset 0 2px 5px rgba(107, 83, 37, 0.3),
+    inset 0 -1px 0 rgba(255, 252, 240, 0.7);
 }
 
 .album__slot--empty::before {
@@ -483,6 +951,532 @@
   padding-top: 8px;
 }
 
+/* ---------------------------------------------------------------- *
+ * The checklist at the back
+ *
+ * **Two hands on one page, and every rule below belongs to one of them.**
+ *
+ *   the press   `#6b5325` brown — numbers, names, leader dots, boxes, the total
+ *   the reader  `--graphite` — the ticks, the doubles figures, the tally figure
+ *
+ * Keeping the two inks apart is the whole reason this page can carry a number that
+ * changes. The list is printed once and never alters; the marks are yours. Do not
+ * unify the palette — a graphite tick in the paper's own brown would read as
+ * *printed* to mean "you have this one", which is a printing press that knows what
+ * is in your album.
+ * ---------------------------------------------------------------- */
+
+.album__page--list {
+  /*
+   * The ruled grid comes off this page.
+   *
+   * Its three bands are spaced for the card grid — "one line per card row" — and
+   * behind a dense two-column list they are ruling that lines up with nothing.
+   * The list brings its own (leader dots, the column rule), so only the paper
+   * itself is kept. One property, and `background-color` from `.album__page`'s
+   * shorthand still shows through underneath.
+   */
+  background-image: radial-gradient(circle at 50% 0%, #fffcf0 0%, #e8e1c9 100%);
+
+  --graphite: #46474f;
+
+  /*
+   * **One font size for the whole page, and it is rounded to a whole pixel.**
+   *
+   * This is the fix for text that read as blurry. `--page-w` is a `min()` of
+   * viewport terms and so is almost always fractional — 442.3px on a 1440x900
+   * window — and a ratio of it gave font sizes like 9.29px. A fractional size is
+   * fine on a card title and is exactly where 8-11px body text goes soft, because
+   * the glyphs get rasterised between pixels. The page also sits inside the leaf's
+   * 3D context, which resamples it a second time.
+   *
+   * So the size is snapped down to an integer, and **everything on the page is a
+   * whole-number multiple of it** (`1em`, `2em`) rather than having its own ratio —
+   * which is what keeps the number column, the boxes and the tally on whole pixels
+   * too. Anything added here should follow that: no `1.15em`.
+   *
+   * The plain `10px` first is a fallback, not a leftover: `round()` is CSS Values 4,
+   * and a browser without it drops the second declaration at parse time and keeps
+   * the first rather than inheriting Tahoma at 16px.
+   */
+  font-size: 12px;
+  font-size: clamp(10px, round(down, calc(var(--page-w) * 0.023), 1px), 13px);
+}
+
+.album__list-head {
+  flex: none;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  border-bottom: 1px solid rgba(107, 83, 37, 0.4);
+  padding-bottom: 4px;
+  margin-bottom: 8px;
+}
+
+/*
+ * The one heading in the book, and it is not a running head.
+ *
+ * The slots pages lost theirs because it repeated what the cover said. This one
+ * names what the page is — a list has to — and it appears twice at most rather
+ * than on every leaf.
+ */
+.album__list-title {
+  font-family: Georgia, "Times New Roman", serif;
+  /* The one thing on the page allowed its own size, and rounded for the same
+     reason. Same fallback-then-round pattern as `.album__page--list`. */
+  font-size: 13px;
+  font-size: clamp(11px, round(down, calc(var(--page-w) * 0.03), 1px), 17px);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #4a3a1c;
+}
+
+/* Printed with the list: how many there are is what the press knows. */
+.album__list-total {
+  margin-left: auto;
+  font-family: Georgia, "Times New Roman", serif;
+  color: #8a7f64;
+}
+
+/*
+ * Two columns of twenty, filled down and then across, as a printed list is.
+ *
+ * **A grid with `1fr` rows rather than multicol, and specifically to avoid a magic
+ * number.** The first attempt derived a row height from the page height minus a
+ * constant for the page's furniture — `(var(--page-h) - 96px) / 20` — and the
+ * constant was simply wrong: the head, tally and folio come to ~104px on a desktop
+ * leaf and ~94px on a phone, so twenty rows overflowed and `.album__page`'s
+ * `overflow: hidden` quietly clipped the last one. Any constant here is a guess at
+ * the height of text nobody has measured yet.
+ *
+ * `grid-template-rows: repeat(20, 1fr)` sizes the rows from whatever height the
+ * list actually gets, so it is right at every page size by construction and stays
+ * right if the head or the tally changes. `grid-auto-flow: column` is what keeps
+ * the reading order down-then-across.
+ *
+ * **The 20 here is `CHECKLIST_ROWS_PER_PAGE / 2` in Album.tsx.** They have to
+ * agree: the component decides how many lines a page holds, this decides where
+ * they go, and a mismatch either clips rows or leaves a gap.
+ *
+ * A short last page leaves the remaining cells empty, which is what the back of a
+ * real album looks like — and the rows stay on the same pitch as a full page,
+ * because `1fr` sizes the track whether anything is in it or not.
+ */
+.album__list {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(20, 1fr);
+  grid-auto-flow: column;
+  column-gap: 14px;
+  /* The rule between the columns. `column-rule` is multicol only, so it is drawn:
+     a 1px vertical line down the middle, the width of the gutter's centre. */
+  background-image: linear-gradient(rgba(107, 83, 37, 0.18), rgba(107, 83, 37, 0.18));
+  background-size: 1px 100%;
+  background-position: 50% 0;
+  background-repeat: no-repeat;
+}
+
+/*
+ * A row is a button, stripped back to the printed line it has to look like.
+ *
+ * `width: 100%` with `text-align: left`, because a button is neither by default
+ * and a centred name in a ruled list is instantly wrong.
+ */
+.album__entry-row {
+  display: flex;
+  /* Centred in the row band the grid hands it, not baselined to the top of it. */
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: #4a3a1c;
+  font-family: Georgia, "Times New Roman", serif;
+  /* Inherited from the page, which is where the one rounded size lives. */
+  font-size: inherit;
+}
+
+/*
+ * Hovering warms the line rather than boxing it. The same deal the page-turn
+ * strips offer: light, not a UI state — nothing on this paper should look like a
+ * control until a hand is on it.
+ */
+.album__entry-row:hover {
+  color: #2f2410;
+}
+
+.album__entry-row:hover .album__entry-name {
+  text-decoration: underline;
+  text-decoration-color: rgba(107, 83, 37, 0.4);
+  text-underline-offset: 2px;
+}
+
+.album__entry-row:focus-visible {
+  outline: 1px solid var(--accent, #a9853c);
+  outline-offset: 1px;
+}
+
+/*
+ * Right-aligned numerals in a fixed gutter, so the names start on one line down
+ * the column however many digits the number has. `tabular-nums` is what stops a
+ * "1" being narrower than a "8" and wobbling the whole column.
+ */
+/* 2em, not 2.2em: a whole multiple of a whole-pixel size, so the name after it
+   starts on a whole pixel too. Two digits fit; a three-digit roster would want 3em. */
+.album__entry-nr {
+  flex: none;
+  width: 2em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #8a7f64;
+}
+
+.album__entry-name {
+  flex: none;
+  max-width: 62%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Leader dots. `flex: 1` so they stretch to whatever the name left over. */
+.album__entry-leader {
+  flex: 1;
+  min-width: 6px;
+  height: 0;
+  border-bottom: 1px dotted rgba(107, 83, 37, 0.35);
+}
+
+/* The printed box. Empty is the factory state, and most of them stay that way. */
+.album__entry-box {
+  flex: none;
+  position: relative;
+  width: 1em;
+  height: 1em;
+  border: 1px solid rgba(107, 83, 37, 0.45);
+  border-radius: 1px;
+}
+
+/*
+ * The tick: graphite, and drawn slightly larger than its box so it breaks the
+ * printed edge. That overhang is the tell — a mark that fits perfectly inside a
+ * printed box was printed with it, and this one was not.
+ */
+.album__tick {
+  position: absolute;
+  left: -12%;
+  top: -18%;
+  width: 124%;
+  height: 124%;
+  fill: none;
+  stroke: var(--graphite);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* Pencil is never quite opaque, and it sits on the paper rather than in it. */
+  opacity: 0.82;
+}
+
+/* Doubles, noted beside the tick in the same hand. */
+.album__entry-dupe {
+  flex: none;
+  width: 1em;
+  text-align: center;
+  font-style: italic;
+  font-variant-numeric: tabular-nums;
+  color: var(--graphite);
+  opacity: 0.75;
+}
+
+/*
+ * The tally, set as a form: printed label, blank, printed total. The figure in
+ * the blank is the only thing on the page that changes, and it changes because a
+ * hand wrote it there.
+ *
+ * The blank is a real ruled line — a figure floating between two printed words
+ * would look like a variable in a sentence rather than something filled in.
+ */
+.album__tally {
+  flex: none;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px;
+  padding-top: 6px;
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.album__tally-label {
+  color: #8a7f64;
+}
+
+.album__tally-written {
+  min-width: 3em;
+  text-align: center;
+  border-bottom: 1px solid rgba(107, 83, 37, 0.45);
+  font-style: italic;
+  font-variant-numeric: tabular-nums;
+  color: var(--graphite);
+  opacity: 0.85;
+  /*
+   * Written by hand, so it does not sit square to the rule it is written on — but
+   * **lifted a pixel rather than rotated.**
+   *
+   * A `rotate(-1.4deg)` said the same thing and was the blurriest text on the page:
+   * rotating a glyph resamples it, and this is the one figure the reader is meant to
+   * read. A whole-pixel translate does not resample at all, and a figure riding
+   * slightly high in its blank is just as much a hand that did not line up with the
+   * printing.
+   *
+   * This and the doubles figure remain the thinnest part of the illusion: an italic
+   * serif is not handwriting. That is the honest limit of having no script face —
+   * see `TICKS` in Album.tsx for why a font is not the answer.
+   */
+  transform: translateY(-1px);
+}
+
+/* ---------------------------------------------------------------- *
+ * The inside of a board
+ *
+ * Page 1 (behind the cover) and the last page (the back board). **The same leather
+ * as the outside, and nothing printed on it.** It is the only face in the book that
+ * is not paper, and that is its whole job: opening the cover onto leather is what
+ * tells you the thing has boards.
+ *
+ * Reading the same `--leather-*` tokens as `.album__cover` is the point — a stain
+ * chosen for the outside has to be the stain on the inside, or the board is two
+ * different objects front and back. The gradient runs the other way (`330deg`
+ * against the cover's `150deg`) because it *is* the other side of the same board.
+ *
+ * The inner shadow is the hinge: leather bending into the gutter goes dark there,
+ * and that shadow is most of what stops this reading as a flat brown rectangle.
+ * Which side the gutter is on depends on the face, so the two rules below take it
+ * from `.album__face--front` / `--back` rather than from the page number.
+ * ---------------------------------------------------------------- */
+
+.album__endpaper {
+  height: 100%;
+  box-sizing: border-box;
+  /* Containing block for the turn-in below, which would otherwise resolve against
+     `.album__face` — the same rectangle today, and not its job to stay that way. */
+  position: relative;
+
+  /*
+   * **Paper, not leather** — and the leather is the frame around it.
+   *
+   * It went leather first, on the reading that the inside of the cover should be the
+   * colour of the cover. On a cased book that is not what is there: the covering skin
+   * wraps the board's edges and folds over onto the inside, and a sheet of *paper* is
+   * then pasted down inside that fold. Only the turn-in is leather. Rendering the
+   * whole face in the stain made the album's largest surface a dark slab, and the
+   * attempt to rescue it by lightening (see the two abandoned goes in the git log —
+   * `color-mix` toward cream, which desaturates to grey, then a warm wash over the
+   * stain) was solving the wrong problem: the eye was not asking for lighter leather,
+   * it was asking for paper.
+   *
+   * Slightly deeper than the text block on purpose. Endpapers are a heavier stock
+   * than the pages they protect, and a hair of difference is what stops the front
+   * matter reading as a page that lost its printing.
+   */
+  /*
+   * The face itself is the **board**: leather, the same stain as the cover, because the
+   * covering skin wraps the edges and is turned in over them. The paper is the
+   * `::before` below, and it is page-sized — see there.
+   */
+  background: linear-gradient(
+    210deg,
+    var(--leather-hi, #5a4526) 0%,
+    var(--leather-mid, #35270f) 62%,
+    var(--leather-lo, #4a3820) 100%
+  );
+}
+
+/*
+ * The pastedown: **page-sized, because it is a page.**
+ *
+ * This is the whole correction. It used to fill the board with a 4px leather border
+ * round it — a turn-in — which quietly said the glued sheet was board-sized. It is not:
+ * it is one of the sheets, cut like the rest of them, and a board is bigger than a
+ * sheet. So the overhang is left as bare leather on every side the boards stand proud,
+ * and the paper occupies exactly the footprint the pages do.
+ *
+ * That is also what put a white strip in the fore-edge. If the paper reaches into the
+ * overhang then something paper-coloured is out there beyond the trim, and every attempt
+ * to draw page edges in that band was building on the same wrong premise. Beyond the
+ * trim there is board, and board is dark.
+ *
+ * `inset` is `O` on all four sides here, and **the gutter side is opened to 0 per face**
+ * below. It cannot be done in one rule, and assuming it could was a bug: a pastedown runs
+ * into the hinge, so the side that opens is the one at the *spine* — and which local edge
+ * that is depends on the face.
+ *
+ * `.album__face--back` carries `rotateY(180deg)`, so its local x is mirrored. Composing
+ * that with the leaf's own flip about the spine, a back face's local `x = 0` lands at
+ * world `-O` — the **outer** trim — and its local right edge lands on the gutter. A front
+ * face is the other way round. Writing `left: 0` for both therefore opened the outer edge
+ * on the left-hand board: paper flush to the trim with 9px of leather at the hinge, which
+ * is the mirror image of a real pastedown.
+ */
+.album__endpaper::before {
+  content: "";
+  position: absolute;
+  inset: var(--board-out);
+  background-color: #eee7d0;
+  background-image: radial-gradient(circle at 50% 0%, #f7f1de 0%, #e2d9bd 100%);
+  /* Glued, so: a hard edge where the paper stops, and gum darkening its border. No
+     drop shadow — a sheet with a shadow under it is a sheet lying loose on a board. */
+  box-shadow:
+    0 0 0 1px rgba(30, 18, 4, 0.4),
+    inset 0 0 4px 1px rgba(30, 18, 4, 0.16);
+}
+
+/* A back face is a left-hand page, so its hinge is on the right. */
+.album__face--back .album__endpaper {
+  border-radius: 3px 0 0 3px;
+  box-shadow: inset -16px 0 30px -14px rgba(0, 0, 0, 0.6);
+}
+
+/* A front face is a right-hand page: hinge on the left. */
+.album__face--front .album__endpaper {
+  border-radius: 0 3px 3px 0;
+  box-shadow: inset 16px 0 30px -14px rgba(0, 0, 0, 0.6);
+}
+
+/*
+ * The hinge shadow again, on the paper this time.
+ *
+ * The parent's inset shadow lands on the leather and stops there — an inset box-shadow
+ * paints under its element's children, so the pastedown covers it across its own
+ * footprint. Without this the paper is evenly lit right up to the gutter while the
+ * leather beside it darkens, which reads as the sheet being lit from somewhere the
+ * board is not.
+ */
+.album__face--back .album__endpaper::before {
+  /* Mirrored face: the gutter is its local RIGHT edge. */
+  right: 0;
+  box-shadow:
+    0 0 0 1px rgba(30, 18, 4, 0.4),
+    inset -14px 0 26px -14px rgba(0, 0, 0, 0.5),
+    inset 0 0 4px 1px rgba(30, 18, 4, 0.16);
+}
+
+.album__face--front .album__endpaper::before {
+  /* Unmirrored: the gutter is the local LEFT edge, which is the leaf's own origin. */
+  left: 0;
+  box-shadow:
+    0 0 0 1px rgba(30, 18, 4, 0.4),
+    inset 14px 0 26px -14px rgba(0, 0, 0, 0.5),
+    inset 0 0 4px 1px rgba(30, 18, 4, 0.16);
+}
+
+/* ---------------------------------------------------------------- *
+ * There is no fore-edge drawing, and there cannot be one.
+ *
+ * It had three homes — elements outside the book box, then the same elements at a
+ * staggered depth, then a band on the boards’ own faces — and every one of them was a
+ * different way of putting page edges in the board overhang. **That region is board.**
+ * The pastedown is a page and is page-sized like the rest, so beyond the trim there is
+ * nothing but the board’s leather: the sheets end where the pages end, and their cut
+ * edges face outward, away from a reader looking down at the spread. Drawing them there
+ * put a white strip between the page and the black edge that reads as one more sheet
+ * lying under the one you are on, which is exactly what it looked like.
+ *
+ * The book’s thickness is carried by the two things that can be seen from here: the
+ * boards standing proud of the paper, and the spine caps at head and tail. If a fore-edge
+ * is ever wanted again it has to be a hairline at the trim itself, drawn over the top
+ * page — a cheat like the gutter shading, not a band in the overhang.
+ * ---------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------- *
+ * The voorwoord
+ *
+ * Facing the front endpaper, and the reason the endpaper can exist at all: an inside
+ * cover on its own cost a page and, on mobile, was a swipe with nothing on it. This
+ * is the page a real album puts exactly here.
+ *
+ * It is a `.album__page`, so it takes the paper, the ruled grid and the folio from
+ * there and only sets its own type. Type only — no keyline, no ornament: the page
+ * next to it is a slab of leather, and that is contrast enough.
+ * ---------------------------------------------------------------- */
+
+.album__page--foreword {
+  justify-content: center;
+}
+
+.album__foreword {
+  position: relative;
+  z-index: 1;
+  /* No inset of its own: --page-pad-x is the margin, and a six paragraph
+     voorwoord needs the width more than it needs a second margin inside the
+     first. Every line it saves is a line the page does not have to find room
+     for, which is what lets the block centre instead of piling up at the top. */
+  padding: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  /*
+   * Rounded off the page width, as on the checklist, so the type stays crisp.
+   *
+   * Set a shade smaller than the rest of the book's prose: the voorwoord is six
+   * paragraphs and has to come in under the trim on the short phone page.
+   */
+  font-size: 11px;
+  font-size: clamp(10px, round(down, calc(var(--page-w) * 0.0245), 1px), 14px);
+  line-height: 1.55;
+  color: #4a3f2a;
+}
+
+.album__foreword p {
+  margin: 0 0 0.7em;
+  /* A measure, not the full page: prose set to the trim reads as a form. Wider
+     than it was, now that the block carries no padding of its own. */
+  max-width: 40em;
+}
+
+.album__foreword-eyebrow {
+  font-size: 0.8em;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #8a7f64;
+  margin-bottom: 0.35em !important;
+}
+
+.album__foreword-title {
+  font-size: 1.7em;
+  font-weight: bold;
+  letter-spacing: 1px;
+  margin: 0 0 0.4em;
+  color: #4a3a1c;
+}
+
+.album__foreword-rule {
+  width: 42%;
+  height: 1px;
+  margin: 0 0 0.85em;
+  background: linear-gradient(90deg, rgba(107, 83, 37, 0.55), transparent);
+}
+
+/* Signed off, so the page has a bottom as well as a top. */
+.album__foreword-sign {
+  font-style: italic;
+  color: #6f6448;
+}
+
 /*
  * Cover: the page you land on before the collection proper.
  *
@@ -503,6 +1497,9 @@
 .album__cover {
   height: 100%;
   box-sizing: border-box;
+  /* The containing block for `.album__cover-icons`, so the icon binding is clipped and
+     rounded to the cover rather than to whatever happens to be positioned above it. */
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -556,6 +1553,595 @@
   font-size: 11px;
   opacity: 0.85;
   line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------- *
+ * The icon binding, and the re-binding ceremony
+ *
+ * Completing the active set earns the icons, and claiming them re-binds the book:
+ * it shuts, the new binding is drawn across the board from the spine outward,
+ * `ICONEN` is blocked into it, and it settles. See `Album.tsx` for the beats.
+ *
+ * **Half-bound, not re-covered.** Ivory paper-covered boards with the chosen stain
+ * kept as the spine strip and the four corners — so the leather the reader picked in
+ * the opening ceremony is still what they see at the hinge, and the five stains stay
+ * one product line rather than converging on one white book. It also means
+ * `.album__binding` and `--board-edge` need no new rules at all: on a half-bound book
+ * the spine *is* the leather, so the outside of the book already agrees with itself.
+ *
+ * **Why this is a `clip-path` and not an opacity crossfade.** A `background` built out
+ * of custom properties cannot be transitioned — the reason `.album__binding` is its own
+ * element rather than a background on `.album__book` — so changing the cover's tokens
+ * would cut. The documented workaround was two stacked layers crossfaded on opacity.
+ * A clipped sibling is better here: a wipe travelling out from the spine reads as the
+ * book being re-cased, where a dissolve reads as one cover becoming another.
+ *
+ * `clip-path` is transitionable, `inset()` interpolates, and the layer is its own
+ * element — so none of the custom-property problem applies to it.
+ * ---------------------------------------------------------------- */
+
+.album__cover-icons {
+  position: absolute;
+  inset: 0;
+  border-radius: 0 3px 3px 0;
+  /*
+   * One `background` shorthand of stacked layers, and deliberately nothing here
+   * transitions: the whole layer is either clipped away or it is not.
+   *
+   * Order is top-most first. The corners sit over the spine strip, which sits over the
+   * boards, which is the order a binder assembles them in.
+   */
+  background:
+    /*
+     * Four corner pieces, and **no strip down the hinge.**
+     *
+     * There was one, at 18%, and it was wrong twice: `.album__binding` behind the book
+     * already draws the spine, so it doubled it — and on the left-hand edge it merged with
+     * the two corners on that side into one brown mass that read as a letter strip rather
+     * than as a binding. The corners alone say half-bound, which is the whole claim.
+     *
+     * 13%, down from 22%: at the larger size the triangles were the loudest thing on an
+     * otherwise quiet board, and a corner piece is a reinforcement rather than a panel.
+     * `--leather-lo` rather than `--mid`, because these sit on a pale ground where the
+     * darker end of the stain reads as leather instead of as paint.
+     *
+     * 45deg points the hypotenuse at the nearest corner.
+     */
+    linear-gradient(45deg, var(--leather-lo, #4a3820) 0 50%, transparent 50%) left bottom /
+      13% 13% no-repeat,
+    linear-gradient(135deg, var(--leather-lo, #4a3820) 0 50%, transparent 50%) left top / 13%
+      13% no-repeat,
+    linear-gradient(225deg, var(--leather-lo, #4a3820) 0 50%, transparent 50%) right top /
+      13% 13% no-repeat,
+    linear-gradient(315deg, var(--leather-lo, #4a3820) 0 50%, transparent 50%) right bottom /
+      13% 13% no-repeat,
+    /* The boards. Same 150deg light as the leather cover, so the two agree about where
+       the lamp is — the rule the whole stage is built on. */
+    linear-gradient(
+      150deg,
+      var(--board-hi, #f4efe2) 0%,
+      var(--board-mid, #e6dfcd) 55%,
+      var(--board-lo, #d8cfb8) 100%
+    );
+  /* The spine shadow the leather cover carries, so the hinge still has depth. */
+  box-shadow: inset 12px 0 24px -12px rgba(0, 0, 0, 0.55);
+  /*
+   * **No `translateZ`, and no `z-index`.** Both are tempting here and both are wrong.
+   *
+   * `.album__face` does not set `transform-style: preserve-3d`, so its contents are
+   * flattened into its plane and a `translateZ` on this would buy nothing — the 3D trap
+   * documented on `.album__face` applies to the face itself, not to what is inside it.
+   * Ordinary 2D painting order governs in here, and that is all this needs: an absolutely
+   * positioned box paints above the cover's in-flow background, and the printing below
+   * paints above this by being positioned and later in the document.
+   */
+}
+
+/*
+ * The printing sits above the binding.
+ *
+ * Positioned purely to join the same painting layer as `.album__cover-icons` — without
+ * it these are in-flow content, the absolutely-positioned binding paints over the whole
+ * lot, and the wipe erases the owner's name off their own cover on its way across.
+ */
+.album__cover-kicker,
+.album__cover-title,
+.album__cover-rule,
+.album__cover-sub {
+  position: relative;
+}
+
+/*
+ * Bound, and not in a ceremony: the binding is simply the cover. No transition, so a
+ * reload or a re-render cannot replay a wipe the reader has already seen.
+ */
+.album--icons .album__cover-icons {
+  clip-path: inset(0);
+  transition: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * The printing, on boards rather than on leather
+ *
+ * **Gold foil does not work on ivory, and this is the whole of the problem it caused.**
+ * `--foil` is `#e6c98a` — chosen to glow on `#35270f` leather — and on a `#f4efe2` board
+ * it has almost no contrast at all. The kicker sits at opacity 0.75 on top of that, so
+ * "Verzamelalbum van" was very nearly invisible on a re-bound cover.
+ *
+ * The fix is not a brighter gold, it is the right ink. A half-bound book's boards are
+ * paper, and paper takes **printed ink**, not hot foil — foil belongs on the leather
+ * spine, which is exactly where `--foil` still lives. So the cover's type goes to a deep
+ * bronze on this binding, and the emboss inverts with it: a dark shadow under dark type on
+ * a light ground reads as dirt, where a hairline of white below reads as pressed in.
+ *
+ * This does not break the brass-on-every-stain rule. That rule is about the five stains
+ * agreeing with each other, and these values are identical on all five.
+ * ---------------------------------------------------------------- */
+
+.album--icons .album__cover {
+  color: var(--board-ink, #6a5124);
+}
+
+/* Full strength, not 0.75. It had opacity to sit back from gold blocking on dark leather;
+   against ink on paper it is already the quieter of the two by size and weight alone. */
+.album--icons .album__cover-kicker {
+  opacity: 1;
+}
+
+.album--icons .album__cover-title {
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.album--icons .album__cover-rule {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--board-rule, #a98b4c) 50%,
+    transparent
+  );
+}
+
+/* ---------------------------------------------------------------- *
+ * The ceremony
+ *
+ * Phase classes drive it and the JS only owns the clock — the same division as the
+ * opening ceremony, and the reason the two cannot drift: every duration below is
+ * `calc(Xms * var(--anim, 1))` and every timer in `Album.tsx` goes through `ms()`.
+ *
+ * **There is no `clip-path` wipe any more, and the reason it went is worth keeping.** The
+ * first version drew the new binding across the board, which was legible and far too small
+ * for a moment that happens once in a collection's life — and it forced an awkward
+ * subtlety, because the gold type had to fade out and back in as the ivory arrived under
+ * it or it went invisible left to right. The white-out solves both: the change happens
+ * where nothing can see it, so it needs no animation of its own and the type can simply be
+ * the new ink from the frame the light peaks on.
+ * ---------------------------------------------------------------- */
+
+/*
+ * The book is not the reader's while it is being worked on. The strips are already
+ * unrendered (the book is shut), so this is the slots and the cover click, which the
+ * component repurposes as skip-to-end.
+ *
+ * **`album--rebind` means running, and comes off at `done`** — which is why there is no
+ * `:not()` chain here. There was one, and it grew a link per terminal phase; splitting
+ * "running" from "which beat" into two classes made it unnecessary. Getting this wrong is
+ * not subtle: leave the class on after the ceremony and every card in a freshly re-bound
+ * album is unclickable for the rest of the session.
+ */
+.album--rebind .album__slot,
+.album--rebind .album__turn {
+  pointer-events: none;
+}
+
+.album--rebind {
+  /* A click anywhere on the book skips to the finished state. */
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- *
+ * The book lighting up
+ *
+ * **The cover's own pixels go incandescent. Nothing is laid over it.**
+ *
+ * There was a white sheet here — an element the size of the cover, fading in on top of it —
+ * and that is exactly what it looked like: a rectangle appearing over the book rather than
+ * the book catching light. It also had to be positioned and sized by hand, which is how it
+ * came to be the width of the *open* spread over a book that is shut, hanging past both
+ * edges and not even centred on what it was lighting.
+ *
+ * A filter has neither problem. It acts on what the leaf already paints, so the leather, the
+ * foil and the blocked type blow out together, and there is nothing to align.
+ *
+ * `saturate(0)` comes **first**, and the order is not cosmetic. Filters apply left to right,
+ * and brightness alone on the bordeaux mid-tone clips the channels unevenly: (53, 39, 15)
+ * times nine lands on (255, 255, 120), which is yellow. Desaturating to grey first means all
+ * three channels clip together, and the result is white.
+ *
+ * The `drop-shadow`s ride on the end of the same chain, so the spill is computed from the
+ * brightened cover and follows its silhouette rather than being a box glow behind it.
+ * ---------------------------------------------------------------- */
+
+/*
+ * **The filter goes on `.album__cover` — the page content — and never on the leaf.**
+ *
+ * Putting it on `.album__leaf--cover` broke the book: a `filter` other than `none` forces
+ * the element to render as a flattened group, which takes its faces out of the 3D scene and
+ * so stops `backface-visibility: hidden` culling them. The page on the *back* of the cover
+ * leaf then showed through the shut book for the whole ceremony.
+ *
+ * That is the same trap the `.album__face` note describes from the other side: there, a face
+ * had too little 3D and its backface was ignored; here, a filter took the 3D away again.
+ * The rule that falls out of both: **nothing between `.album__book` and a face may take a
+ * filter, an opacity below 1, or anything else that groups.**
+ *
+ * `.album__cover` is safely inside a face and paints only 2D content, so filtering it is
+ * exactly the leather, the foil and the type going incandescent, and the 3D above it is
+ * untouched.
+ */
+.album--rebind .album__cover {
+  transition:
+    /*
+     * The length of the charge, so the rise fills the beat it runs in and arrives at pure
+     * white exactly as the hold begins. It used to be 2700 — the charge and the wait were
+     * one beat then, and the ramp had to be slow enough to cover both, which left the book
+     * dim for most of the build. The wait is its own beat now and has the rings in it.
+     */
+    filter calc(900ms * var(--anim, 1)) cubic-bezier(0.5, 0, 0.75, 0.5);
+}
+
+/*
+ * Up to **pure white** across the charge, and held there for the whole of the hold —
+ * leather, foil, blocked type and all.
+ *
+ * The two phases set the same value on purpose, so the transition runs once during the ramp
+ * and the peak then simply stays. Nothing about the cover changes across the hold; the rings
+ * arriving are what fills it.
+ *
+ * It was `saturate(0.3) brightness(2.8)`, which is a very bright *cream* book, and that left
+ * the beads visibly crossing in front of it — they are near-white, so anything short of
+ * white behind them shows them up as passing objects rather than as light.
+ *
+ * `saturate(0)` first, then enough brightness that even the darkest thing on the cover
+ * clips: the leather mid-tone `#35270f` desaturates to about 40, so ×8 takes it past 255 and
+ * everything lighter got there sooner. Anything less and the type stays legible as type.
+ */
+.album--rebind-charging .album__cover,
+.album--rebind-holding .album__cover {
+  filter: saturate(0) brightness(8)
+    drop-shadow(0 0 34px rgba(255, 250, 235, 0.55))
+    drop-shadow(0 0 80px rgba(246, 226, 168, 0.35));
+}
+
+/*
+ * **Every shadow on the cover has to go, and `brightness()` cannot do it.**
+ *
+ * A filter multiplies what is already painted, and black multiplied by eight is still
+ * black — so the blocked title's `text-shadow` and the cover's inset spine shadow survived
+ * a white-out completely intact. The result was a white book with the name still legible on
+ * it as two dark strokes and a dark band down the hinge, which is the opposite of the point.
+ *
+ * Killed outright for the two peak phases rather than lightened, because there is nothing
+ * for a shadow to describe on a surface that is emitting light.
+ */
+.album--rebind-charging .album__cover,
+.album--rebind-holding .album__cover,
+.album--rebind-charging .album__cover-icons,
+.album--rebind-holding .album__cover-icons {
+  box-shadow: none;
+}
+
+.album--rebind-charging .album__cover-kicker,
+.album--rebind-holding .album__cover-kicker,
+.album--rebind-charging .album__cover-title,
+.album--rebind-holding .album__cover-title,
+.album--rebind-charging .album__cover-sub,
+.album--rebind-holding .album__cover-sub {
+  text-shadow: none;
+}
+
+/*
+ * The book sits **above** the vignette while it is lit.
+ *
+ * `.album` carries `perspective`, so it is its own stacking context at `z-index: auto` —
+ * and `.rebind-dim` is a positioned sibling at 30, which put a 55%-black wash over the one
+ * thing in the frame that is supposed to be the light source. A white book rendered as
+ * middle grey, while the rings, which sit at 46 *inside* the album, came through bright.
+ * That mismatch is how it showed up.
+ *
+ * Above the dim, below the bloom — the bloom has to cover everything, book included.
+ */
+.album-row--rebinding {
+  position: relative;
+  z-index: 35;
+}
+
+/* The climax on the book itself. The page bloom takes it the rest of the way, so this only
+   has to get the cover to white. */
+.album--rebind-blooming .album__cover {
+  filter: saturate(0) brightness(9)
+    drop-shadow(0 0 60px rgba(255, 255, 255, 0.9))
+    drop-shadow(0 0 150px rgba(246, 222, 156, 0.6));
+  transition: filter calc(180ms * var(--anim, 1)) ease-out;
+}
+
+/*
+ * Letting go. Slower than it came on, which is the whole shape of the beat — a symmetrical
+ * fade reads as a camera flash rather than as something ending.
+ */
+.album--rebind-resolving .album__cover,
+.album--rebind-resting .album__cover,
+.album--rebind-handing .album__cover,
+.album--rebind-done .album__cover {
+  filter: none;
+  /* The full length of `resolving`, so the book comes back over the whole beat rather than
+     arriving early and waiting. Same length as the bloom and the dim — the three are one
+     gesture, and any of them finishing first would give the reveal a seam. */
+  transition: filter calc(1100ms * var(--anim, 1)) cubic-bezier(0.3, 0, 0.2, 1);
+}
+
+/* ---------------------------------------------------------------- *
+ * The rings of gold flying around the book
+ *
+ * Three orbits, each a ring of beads turning about the book's centre. **Real orbits, not
+ * circles drawn over the book**: `.album` already carries `perspective`, and each ring is
+ * tilted and yawed out of the page inside a `preserve-3d` parent, so a bead genuinely passes
+ * behind the boards on the far side of its travel and in front on the near side.
+ *
+ * That is also why they are here rather than as a scatter of grains flung outward, which is
+ * what this used to be. A burst happens once and is over; the beat before the bloom needs
+ * something that keeps going, and a ring that is still turning says the book is still being
+ * worked on for as long as it turns.
+ *
+ * One rotation per ring and one static transform per bead — the beads do not animate at all,
+ * so the whole field costs three animated elements however many beads are on them.
+ * ---------------------------------------------------------------- */
+
+.album__rings {
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  /* The shut book, same as the flare — see its note on why this is not `--book-w`. */
+  width: var(--page-w);
+  height: var(--page-h);
+  margin-left: calc(var(--page-w) / -2);
+  z-index: 46;
+  pointer-events: none;
+  transform-style: preserve-3d;
+}
+
+.album__ring {
+  position: absolute;
+  /* Centred on the book, and sized to nothing: the beads are placed by transform from this
+     one point, so its own box must not participate in layout. */
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  transform-style: preserve-3d;
+  animation: rebind-orbit calc(var(--spin, 1.6s) * var(--anim, 1)) linear infinite;
+  opacity: 0;
+  transition: opacity calc(420ms * var(--anim, 1)) ease-out;
+}
+
+.album__ring--reverse {
+  animation-direction: reverse;
+}
+
+/*
+ * **One at a time, and only in the hold.**
+ *
+ * The fade used to be on the container, so all three arrived together the instant the charge
+ * began — three orbits switching on as one object, which reads as a light coming on rather
+ * than as something gathering. Per-ring now, staggered by `--ring-in`.
+ *
+ * A `transition-delay` rather than three entrance keyframes, because each ring is *already*
+ * running an animation for its rotation: a second animation on the same element would have
+ * to restate the rotation every time either changed, and the two would drift apart the first
+ * time one of them was edited.
+ */
+.album--rebind-holding .album__ring {
+  opacity: 1;
+  transition: opacity calc(420ms * var(--anim, 1)) ease-out
+    calc(var(--ring-in, 0s) * var(--anim, 1));
+}
+
+/*
+ * **They go out with the bloom, not after it.**
+ *
+ * They used to stay lit through the bloom and only fade once `resolving` began, which meant
+ * they were still turning as the white receded and the dark table came back — three orbits
+ * going round a book that had already finished becoming something. The ceremony had
+ * resolved and the decoration had not.
+ *
+ * 200ms, matching the bloom's own fade *in*, so the white rises exactly as they leave and
+ * the fade itself is never seen. What clears is simply a table with a bound book on it.
+ */
+.album--rebind-blooming .album__ring {
+  opacity: 0;
+  transition: opacity calc(200ms * var(--anim, 1)) ease-in;
+}
+
+.album__bead {
+  position: absolute;
+  width: var(--bead-size, 5px);
+  height: var(--bead-size, 5px);
+  margin: calc(var(--bead-size, 5px) / -2) 0 0 calc(var(--bead-size, 5px) / -2);
+  border-radius: 50%;
+  /*
+   * **A white core, not a gold one.**
+   *
+   * It was `#fff8e2` fading to `#e6c98a` by 45% and out by 72%, which is a small warm dot —
+   * most of its area was semi-transparent gold, so against a black table it read as a speck
+   * rather than as light. The core is white now and holds to nearly 40% before the gold
+   * starts, and the fade runs to 82% so less of the bead is spent on nothing.
+   */
+  background: radial-gradient(
+    circle,
+    #ffffff 0%,
+    #fff6dc 38%,
+    #f0d79b 62%,
+    rgba(214, 178, 108, 0) 82%
+  );
+  /*
+   * And a halo, which is what actually makes a point of light look like one. Sized off the
+   * bead rather than in fixed pixels, so the big beads on the inner ring glow more than the
+   * small ones on the outer — the same reason their radii are fractions of `--page-w`.
+   *
+   * `box-shadow` rather than a `drop-shadow` filter: the element is already a circle, so the
+   * shape is right for free, and a filter on every one of forty-eight beads is real cost for
+   * a difference nobody could see at this size.
+   */
+  box-shadow:
+    0 0 calc(var(--bead-size, 5px) * 1.7) rgba(255, 248, 226, 0.95),
+    0 0 calc(var(--bead-size, 5px) * 3.6) rgba(230, 201, 138, 0.6);
+  /* Its place on the ring: turn to its own angle, then step out along the radius. A
+     fraction of `--page-w` — the *shut* book — so the orbits scale with the book and a
+     radius above 0.5 is one that clears the cover's edge. */
+  transform: rotateZ(var(--bead-at, 0deg))
+    translateX(calc(var(--page-w) * var(--radius, 0.7)));
+}
+
+/*
+ * The tilt and the yaw are inside the keyframe rather than on the element, and they have to
+ * be: an `animation` on `transform` replaces the property outright, so a static tilt
+ * declared on `.album__ring` would simply be overwritten the moment the spin started and
+ * every orbit would collapse into a flat circle.
+ */
+@keyframes rebind-orbit {
+  from {
+    transform: rotateX(var(--tilt, 70deg)) rotateY(var(--yaw, 0deg)) rotateZ(0deg);
+  }
+  to {
+    transform: rotateX(var(--tilt, 70deg)) rotateY(var(--yaw, 0deg)) rotateZ(360deg);
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * The room going dark
+ *
+ * Fixed, and rendered outside `.album` — see the note in `Album.tsx`. `.album` carries
+ * `perspective`, which would make it the containing block for this and pin a "full screen"
+ * layer to the book instead of to the window.
+ *
+ * It arrives with the light and leaves with it, so the two are one gesture rather than a
+ * dimmer and a lamp operated separately.
+ * ---------------------------------------------------------------- */
+
+.rebind-dim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 70% 60% at 50% 46%,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.9) 60%,
+    rgba(0, 0, 0, 0.97) 100%
+  );
+  opacity: 0;
+  /*
+   * The charge, exactly — the room finishes going dark as the book reaches full white, and
+   * then both hold together.
+   *
+   * On an ease-out where the cover is on an ease-in, and that difference is the point. The
+   * two are doing opposite jobs: the dark is the *setting* the light needs, so it wants to
+   * be established early; the light is the build, so it wants to gather late. Sharing a
+   * curve would leave the book brightening against a table that is still lit, which is the
+   * one arrangement where none of this reads.
+   */
+  transition: opacity calc(900ms * var(--anim, 1)) ease-out;
+}
+
+.rebind-dim--charging,
+.rebind-dim--holding,
+.rebind-dim--blooming {
+  opacity: 1;
+}
+
+/* Lifts on the same curve and over the same length the light releases on, so the table
+   comes back exactly as the book stops glowing. */
+.rebind-dim--resolving,
+.rebind-dim--resting,
+.rebind-dim--handing {
+  opacity: 0;
+  transition: opacity calc(1100ms * var(--anim, 1)) cubic-bezier(0.3, 0, 0.2, 1);
+}
+
+/* ---------------------------------------------------------------- *
+ * The bloom
+ *
+ * The climax, and the whole page goes — not just the book. Fixed and outside `.album` for
+ * the same two reasons as the dim: `perspective` would make `.album` its containing block
+ * and pin it to the book, and the stage's `overflow: hidden` would clip whatever survived.
+ *
+ * It also does the work. The binding swaps underneath this, in the one frame where the
+ * screen is white and there is nothing to see a change against — which is why the cover
+ * needs no wipe, no crossfade and no clip-path of its own.
+ *
+ * In fast, out slow. Symmetrical would read as a camera flash; a long release reads as
+ * light letting go of something, and it is the release that does the revealing.
+ * ---------------------------------------------------------------- */
+
+.rebind-bloom {
+  position: fixed;
+  inset: 0;
+  /* Above the book, which is lifted to 35 while it is lit. The bloom has to cover
+     everything, and the book most of all — it is what hides the swap. */
+  z-index: 40;
+  pointer-events: none;
+  background: #fff;
+  opacity: 0;
+  transition: opacity calc(1100ms * var(--anim, 1)) cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rebind-bloom--blooming {
+  opacity: 1;
+  transition: opacity calc(200ms * var(--anim, 1)) ease-in;
+}
+
+/* ---------------------------------------------------------------- *
+ * Handing over
+ *
+ * The last beat, and it exists because the pack opener used to mount on the frame after the
+ * ceremony's final one — the bound book was replaced at full brightness with no gap, which
+ * read as a cut rather than as an ending. The album fades instead, and `onRebound` fires at
+ * the end of the fade rather than at the start.
+ *
+ * Opacity only. The book must not move or resize, which rules out the scale that would
+ * otherwise be the obvious partner to a fade.
+ * ---------------------------------------------------------------- */
+
+.album--rebind-handing {
+  opacity: 0;
+  transition: opacity calc(320ms * var(--anim, 1)) ease-in;
+}
+
+/* ---------------------------------------------------------------- *
+ * Reduced motion
+ *
+ * The ceremony is skipped in JS — `prefersReducedMotion()` lands `Album` straight on
+ * the finished state — so all this has to do is make sure nothing here animates on the
+ * way to it. Killing the transitions rather than the sequence, exactly as the leaf and
+ * the mobile slide already do further down.
+ * ---------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .album__cover-icons,
+  .album__cover-kicker,
+  .album__cover-title,
+  .album__cover-rule,
+  .album__cover,
+  .rebind-dim,
+  .rebind-bloom,
+  .album--rebind-handing {
+    transition: none;
+  }
+
+  /* The orbits *are* the motion — stilling them would leave three rings of gold dots parked
+     on the book. Dropped entirely, exactly as the pack opener drops its own motes. */
+  .album__rings {
+    display: none;
+  }
 }
 
 /* ---------------------------------------------------------------- *
@@ -749,8 +2335,11 @@
   opacity: 0;
 }
 
+/* The endpaper is not a `.album__page` — it is a board, not paper — so it has to be
+   named here too or the boards are the one face on a phone with no edge. */
 .album--mobile .album__page,
-.album--mobile .album__cover {
+.album--mobile .album__cover,
+.album--mobile .album__endpaper {
   border-radius: 3px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
@@ -760,6 +2349,44 @@
 .album--mobile .album__slots {
   grid-template-columns: repeat(3, 1fr);
   gap: 12px 8px;
+}
+
+/*
+ * The checklist keeps its TWO columns on a phone, and gives the name the space.
+ *
+ * One column was the obvious alternative and it does not work: the row count per
+ * page is fixed at forty (it has to be — see `CHECKLIST_ROWS_PER_PAGE`), so a
+ * single column would have to fit all forty in one page height, which is ~7px a
+ * row. Two columns of twenty at ~14px is legible; the cost is a narrow line, and
+ * it is paid by the furniture rather than by the name: a tighter gutter, a smaller
+ * number column, and no leader dots.
+ *
+ * The dots are the right thing to lose. They are the most decorative element on
+ * the row and the only one carrying no information — dropping them hands ~14px
+ * straight to the name, which is what the reader is actually looking for.
+ */
+@media (max-width: 599.95px) {
+  .album__list {
+    column-gap: 8px;
+  }
+
+  .album__entry-row {
+    gap: 3px;
+  }
+
+  /* The number column keeps its 2em. It was narrowed to 1.8em here, which is a
+     fractional multiple of a whole-pixel font size — the exact thing that made this
+     text blurry — and it was buying 1.6px. The leader dots below fund the name. */
+
+  .album__entry-name {
+    max-width: none;
+    /* Takes the room the leader dots used to stretch into. */
+    flex: 1;
+  }
+
+  .album__entry-leader {
+    display: none;
+  }
 }
 
 /* ---------------------------------------------------------------- *

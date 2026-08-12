@@ -8,7 +8,7 @@ namespace AnagoLeaderboard.Models.Results;
 /// duplicate count) either comes off the name or comes from somewhere that is not the card.
 /// </summary>
 /// <param name="VisibleRating">
-/// For an ordinary card the player's current rating; for a legend their all-time high.
+/// For an ordinary card the player's current rating; for an icoon their all-time high.
 /// One field rather than two on purpose: the card does not care which it is, and nothing
 /// downstream should have to branch on it.
 /// </param>
@@ -18,9 +18,12 @@ namespace AnagoLeaderboard.Models.Results;
 /// weighting, so a client with its own copy could print an overall inconsistent with the
 /// odds the card was actually drawn at.
 /// </param>
-/// <param name="IsLegend">
-/// Drives the icoon colourway. Not a fifth tier - a legend has an ordinary tier like
+/// <param name="IsIcon">
+/// Drives the icoon colourway. Not a fifth tier - an icoon has an ordinary tier like
 /// anyone else, and it moves the metal of their icoon.
+///
+/// Read off the live pool, so this is what decides how a card is drawn - not the frozen
+/// flag on <see cref="CardInstance"/>, which is history. See that property for why.
 /// </param>
 public sealed record CardSubject(
     string Id,
@@ -28,4 +31,4 @@ public sealed record CardSubject(
     int VisibleRating,
     int Overall,
     int NumberOfGames,
-    bool IsLegend);
+    bool IsIcon);

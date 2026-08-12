@@ -271,6 +271,17 @@
   font-kerning: none;
 }
 
+/*
+ * One word, unbreakable. A break is allowed between any two inline-blocks, so a name set as
+ * loose letters wraps mid-word — and then jumps to the right break the moment the album
+ * takes the cover over and sets it as plain text. Keeping each word in one box means the
+ * ceremony wraps exactly where the finished book does, and the only break opportunities
+ * left are the real spaces the component renders between words.
+ */
+.choice__word {
+  white-space: nowrap;
+}
+
 .choice__letter {
   display: inline-block;
   /* Blocked, not faded in: it arrives slightly large and settles, the way a press lifts

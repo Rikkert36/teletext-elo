@@ -69,7 +69,7 @@ namespace UnitTests
             var stored = await _dbContext.PlayerCollections.SingleAsync();
             Assert.That(stored.PlayerId, Is.EqualTo(player.Id));
             Assert.That(stored.Cover, Is.EqualTo("navy"));
-            Assert.That(stored.LegendsUnlockedAt, Is.Null);
+            Assert.That(stored.IconsUnlockedAt, Is.Null);
         }
 
         [Test]
@@ -170,7 +170,7 @@ namespace UnitTests
             var gameService = new GameService(_dbContext);
             var leaderBoardService = new LeaderBoardService(gameService, _dbContext);
             var poolService = new CardPoolService(leaderBoardService, calculator);
-            var packService = new PackService(_dbContext, leaderBoardService, poolService, calculator);
+            var packService = new PackService(_dbContext, calculator);
             return new CollectionService(
                 _dbContext, leaderBoardService, poolService, calculator, packService);
         }
