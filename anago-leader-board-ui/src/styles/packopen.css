@@ -59,8 +59,10 @@
    * stretched opener therefore covers the margins and swallows every click aimed at a
    * packet, which is exactly what it did: the pile looked live and was not.
    *
-   * The sealed phase needs a wide click target for the wood beside the packet, and it
-   * takes it on `.opener__stage--table` below, bounded by the book's own width.
+   * Which matters more than it looks now that **this element is the click target** — the
+   * whole tabletop files the cards, or puts a sealed packet back (see `tableClick` in
+   * PackOpener). Its width is the row's, so it is a book wide and stops exactly where the
+   * shelf and the register begin.
    */
 }
 
@@ -732,6 +734,20 @@
  */
 .opener__stage {
   position: relative;
+  /*
+   * **Above the row, and it has to be.** Once the row scrolls, its clip box is lifted a whole
+   * stage's height by `padding-top` so a descending card is not cut off — see
+   * `.opener__revealed--scrolls` — and that invisible band lies right over this. Hit-testing
+   * follows paint order, so without this the band would take every click aimed at the packet
+   * and at the wood beside it.
+   *
+   * Safe for the ceremony's light layers, which are `position: fixed` children of this
+   * element at z-index 39–41: `.opener` is already a stacking context (game.css puts it at
+   * `z-index: 1`), so those were always resolved inside it rather than against the shelf.
+   * This nests one more context inside that one, and the whole stage group — vignette
+   * included — still paints above the row, the hint and the margins.
+   */
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -739,28 +755,18 @@
 }
 
 /*
- * The stage while the packet is still sealed, where the wood beside it is the way back
- * out — so the target has to *be* the table rather than the inch either side of the
- * packet, which is all the row would otherwise be.
+ * **There is no `.opener__stage--table` any more.** It widened the sealed phase's stage to
+ * the book so the wood beside the packet was a target worth aiming at, and the target is now
+ * the whole column — `.opener` carries the handler and is already book-wide, being as wide as
+ * the row inside it. See `tableClick` in PackOpener.
  *
- * **The book's width, not the column's.** The margins beside the book belong to the
- * packet shelf and the register, and they are absolutely positioned asides that this
- * would paint over and take the clicks from — `--book-w` is by construction the width
- * that stops short of both. `max-width` is for the stacked layout below 1450px, where the
- * book can be wider than the room the stage has.
+ * The rule it was carrying survives in `.opener__revealed`: **as wide as the book and no
+ * wider**, because the margins beside it hold the packet shelf and the register as absolutely
+ * positioned asides, and anything that spans further takes their clicks.
  *
- * No cursor and no hover state, deliberately. This is not a control disguised as wood, it
- * is the table; the line under the packet is what says you can put it down again, exactly
- * as it is what says you can open it in the first place. The album cover is the other
- * place this design allows itself that.
- *
- * Only ever the sealed phase. Past the tear there is nothing to put back, and a live click
- * target across the middle of a reveal is the hole the old exit button left open.
+ * No cursor and no hover on any of it, deliberately: it is not a control disguised as a
+ * table, it is the table. The cards on it get a pointer, and nothing else does.
  */
-.opener__stage--table {
-  width: var(--book-w);
-  max-width: 100%;
-}
 
 /**
  * The entrance and the flip live on separate elements, deliberately.
@@ -1750,10 +1756,10 @@
 .opener__revealed {
   display: flex;
   /*
-   * The book's width, not the column's: the margins beside it belong to the packet shelf
-   * and the register, which are absolutely positioned asides that a wider row would paint
-   * over and take the clicks from. Same rule and the same reason as
-   * `.opener__stage--table`.
+   * The book's width, not the column's: the margins beside it belong to the packet shelf and
+   * the register, which are absolutely positioned asides that a wider row would paint over
+   * and take the clicks from. It is also what gives `.opener` its width, and so what stops
+   * the tabletop's own click reaching into those margins.
    */
   width: var(--book-w);
   max-width: 100%;
@@ -1776,21 +1782,37 @@
  * permanently a scroller cuts off the card descending into it from the stage — the reveal's
  * FLIP starts that card up at the hero's position, well above this box, and it appeared from
  * behind an invisible edge instead of travelling. One packet never overflows (five cards at
- * a slot's width fit inside the book), so the ordinary reveal is now clipped by nothing at
- * all, exactly as it was before the row learned to hold more than one packet.
+ * a slot's width fit inside the book), so the ordinary reveal is clipped by nothing at all.
  *
  * The class is toggled from a layout effect in PackOpener, which measures the hand against
  * this box — before the FLIP effect runs, so the card being flown in is measured against
  * whichever state actually applies.
  *
- * Known cost: a card descending into an *already overflowing* row is still clipped at this
- * edge, which is the case where a second packet is opened onto a long row. Fixing that needs
- * the descent to escape the scroller — a fixed-position flight, like `PutAway`'s — or the
- * row to be a fan of overlapping cards rather than a scroller, which is the alternative that
- * was on the table when the scrollbar was chosen.
+ * **And where it does scroll, the clip box is lifted over the stage** rather than sitting on
+ * the row: `padding-top` grows it upward by the whole height of the packet stage and the
+ * negative `margin-top` gives that space straight back to the layout, so the row occupies
+ * exactly what it always did while clipping from far enough up that no descent is ever cut.
+ * The scrollbar and the cards do not move a pixel when the class goes on.
+ *
+ * Two things make that safe, and both are easy to undo by accident:
+ *
+ * - **`.opener__stage` carries a `z-index`**, because this padding band now lies over it and
+ *   hit-testing follows paint order — without it the invisible band would swallow every
+ *   click meant for the packet, or for the wood beside it.
+ * - **`overflow-y: hidden` rather than left to compute**, so a card inverted up into the
+ *   padding can never be mistaken for scrollable content and hand the row a vertical bar.
  */
 .opener__revealed--scrolls {
+  /*
+   * The stage's own height plus the column's gap: the tallest thing that ever descends from
+   * up there is the riser, which is shorter than the packet the stage is sized for.
+   */
+  --descent: calc(var(--pack-h) + 24px);
+
   overflow-x: auto;
+  overflow-y: hidden;
+  padding-top: var(--descent);
+  margin-top: calc(-1 * var(--descent));
   /*
    * Room for the scrollbar so it cannot draw over the cards, taken back out of the layout
    * again — otherwise the column would grow by its height the moment a seventh card landed
@@ -1820,7 +1842,13 @@
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  margin: auto;
+  /*
+   * **`margin-inline`, not `margin`.** Vertical autos would centre the hand in the row's box,
+   * and once that box grows a stage's worth of `padding-top` to lift its clip (see
+   * `--scrolls`) it is no longer the height of a card — the cards would drift up into the
+   * padding. `align-items: flex-start` places them; these two only centre the row.
+   */
+  margin-inline: auto;
 }
 
 /*

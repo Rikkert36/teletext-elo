@@ -220,7 +220,10 @@
   .field .thin  { stroke-width: .13; }
   .field .med   { stroke-width: .18; }
   .field .heavy { stroke-width: .26; }
-  .field .fill  { fill: var(--press); stroke: none; opacity: .26; }
+  /* The figures. Solid, and nearly the weight of a line — a man on a rod is the
+     one mark that makes this a table rather than a pitch, and at .26 nobody
+     could see one. */
+  .field .fill  { fill: var(--press); stroke: none; opacity: 1; }
   body.no-field .field { display: none; }
 
   /* The drawing on its own. A table that is seven tenths hidden behind cards
@@ -823,54 +826,60 @@ function table() {
    * foot of the spread carried a doubled rule nothing else in the drawing had.
    * ---------------------------------------------------------------- */
   /*
-   * Three widths, and they have to STEP.
+   * A CABINET, not a marked surface. This is the decision the drawing turns on.
    *
-   * The mouth started the same width as the goal area, which drew two stacked
-   * rectangles of identical width either side of the goal line — a doubled box,
-   * not a goal. 36 for the penalty area, 24 for the goal area, 12 for the mouth
-   * reads as one thing narrowing to an opening, which is what it is.
+   * The first versions drew the table the way the reference photograph shows
+   * it: a playing surface with its markings — penalty area, goal area, the D,
+   * corner arcs, centre circle. Shown the result cold, a reader called it "an
+   * association football pitch, seen from above… immediate and unambiguous",
+   * and named exactly those markings as what gave it away. They were right, and
+   * the fault is not in the drawing but in the choice of subject. **A foosball
+   * table's markings ARE football's.** Drawing them accurately can only ever
+   * produce a pitch; every one of them is a mark the thing it must not be
+   * mistaken for also has.
+   *
+   * What a pitch cannot have is the object: walls with thickness, rods threaded
+   * through those walls, men on the rods, handles out in the margin, and a goal
+   * that is a SLOT in a wall rather than two boxes painted on grass. So the
+   * markings are gone — all of them — and what is left is the furniture.
+   *
+   * The wall is two lines and that is the point: a single hairline round a
+   * rectangle is a touchline, and two lines 2.5 apart is a side of something.
    */
-  const GOAL_L = 28, GOAL_R = 40, GOAL_D = 4;
+  const GOAL_L = 28, GOAL_R = 40, GOAL_D = 4.5, WALL = 2.5;
+  const OX = -WALL, OY = -WALL, OR2 = W + WALL;
 
-  p.push(stroke(line(0, 0, GOAL_L, 0), 11, 'heavy', { steps: 14, amp: 0.14 }));
-  p.push(stroke(line(GOAL_R, 0, W, 0), 12, 'heavy', { steps: 14, amp: 0.14 }));
+  /* Inner face of the wall — the playing surface, open at the halfway end. */
+  p.push(stroke(line(0, 0, GOAL_L, 0), 11, 'heavy', { steps: 12, amp: 0.13 }));
+  p.push(stroke(line(GOAL_R, 0, W, 0), 12, 'heavy', { steps: 12, amp: 0.13 }));
   p.push(stroke(line(0, 0, 0, HALF), 13, 'heavy', { steps: 30, amp: 0.3 }));
   p.push(stroke(line(W, 0, W, HALF), 14, 'heavy', { steps: 30, amp: 0.3 }));
-  /* The halfway line — the field's own fourth side, and drawn once. */
-  p.push(stroke(line(0, HALF, W, HALF), 15, 'heavy', { steps: 30, amp: 0.28 }));
 
-  /* The goal, standing off the back of the table. Three sides; the fourth is
-     the gap in the goal line above. */
-  p.push(stroke(line(GOAL_L, 0, GOAL_L, -GOAL_D), 21, 'heavy', { steps: 8, amp: 0.09, over: 0.05 }));
-  p.push(stroke(line(GOAL_L, -GOAL_D, GOAL_R, -GOAL_D), 22, 'heavy', { steps: 12, amp: 0.1, over: 0.03 }));
-  p.push(stroke(line(GOAL_R, -GOAL_D, GOAL_R, 0), 23, 'heavy', { steps: 8, amp: 0.09, over: 0.05 }));
+  /* Outer face. The wall stops at the halfway line because this is half a
+     table — the drawing is cut there, not closed there. */
+  p.push(stroke(line(OX, OY, GOAL_L, OY), 16, 'med', { steps: 12, amp: 0.12 }));
+  p.push(stroke(line(GOAL_R, OY, OR2, OY), 17, 'med', { steps: 12, amp: 0.12 }));
+  p.push(stroke(line(OX, OY, OX, HALF), 18, 'med', { steps: 30, amp: 0.28 }));
+  p.push(stroke(line(OR2, OY, OR2, HALF), 19, 'med', { steps: 30, amp: 0.28 }));
 
-  /* ---------------------------------------------------------------- *
-   * The markings, all a weight below the surface
-   *
-   * Shallower than a football pitch's, because a table's are: the boxes on the
-   * reference take about a sixth of the half, not the quarter the first version
-   * gave them, and a deep box is most of why this read as a pitch.
-   * ---------------------------------------------------------------- */
-  const BOX_D = 10, AREA_D = 4, SPOT = 7, D_R = 7;
+  /*
+   * The goal: a slot cut clean through the end wall, and the trough behind it.
+   * One aperture, not two concentric boxes — that difference is most of what
+   * separates this drawing from a penalty area.
+   */
+  p.push(stroke(line(GOAL_L, 0, GOAL_L, -GOAL_D - WALL), 21, 'heavy', { steps: 10, amp: 0.1 }));
+  p.push(stroke(line(GOAL_R, 0, GOAL_R, -GOAL_D - WALL), 23, 'heavy', { steps: 10, amp: 0.1 }));
+  p.push(stroke(line(GOAL_L, -GOAL_D - WALL, GOAL_R, -GOAL_D - WALL), 22, 'heavy',
+    { steps: 12, amp: 0.11, over: 0.03 }));
 
-  p.push(box(16, 0, 36, BOX_D, 41, 'thin', { steps: 20, amp: 0.11 }));
-  p.push(box(22, 0, 24, AREA_D, 45, 'thin', { steps: 14, amp: 0.09 }));
-  p.push(stroke(arc(MID, SPOT, 0.45, 0, 6.283), 47, 'med', { steps: 12, amp: 0.05 }));
-
-  /* The D: only the part outside the box, which is all that is printed. Its
-     ends are where the circle round the spot crosses the front of the box. */
-  const dx = Math.sqrt(D_R * D_R - (BOX_D - SPOT) ** 2);
-  const a0 = Math.atan2(BOX_D - SPOT, -dx);
-  p.push(stroke(arc(MID, SPOT, D_R, a0, Math.PI - a0), 51, 'thin', { steps: 20, amp: 0.09 }));
-
-  p.push(stroke(arc(0, 0, 2.5, 0, Math.PI / 2), 61, 'thin', { steps: 10, amp: 0.07 }));
-  p.push(stroke(arc(W, 0, 2.5, Math.PI / 2, Math.PI), 63, 'thin', { steps: 10, amp: 0.07 }));
-
-  /* The centre circle coming up out of the halfway line — a half circle,
-     because this is half a table. */
-  p.push(stroke(arc(MID, HALF, 9, Math.PI, 2 * Math.PI), 73, 'thin', { steps: 28, amp: 0.11 }));
-  p.push(stroke(arc(MID, HALF, 0.45, 0, 6.283), 75, 'med', { steps: 12, amp: 0.05 }));
+  /*
+   * Serve holes in the side wall — the one detail on a real table that belongs
+   * to no pitch at all, and cheap to draw. Two a side, on the halves.
+   */
+  [0.34, 0.66].forEach((f, k) => {
+    p.push(stroke(arc(OX + WALL / 2, HALF * f, 1.1, 0, 6.283), 91 + k, 'thin', { steps: 14, amp: 0.06 }));
+    p.push(stroke(arc(OR2 - WALL / 2, HALF * f, 1.1, 0, 6.283), 95 + k, 'thin', { steps: 14, amp: 0.06 }));
+  });
 
   /* ---------------------------------------------------------------- *
    * The rods
@@ -886,20 +895,30 @@ function table() {
     const gx = rod.dir < 0 ? near - GRIP : near;
     p.push(box(gx, rod.y - 1.4, GRIP, 2.8, seed + 10, 'thin', { steps: 10, amp: 0.07 }));
 
-    /* The men, seen from above. Filled for the near team, outlined for the far
-       one — one ink cannot do two strips. */
+    /*
+     * The men, and they are SOLID — every one of them.
+     *
+     * They were outlines, and the outlines lost: shown the page cold, a reader
+     * listing every mark they could make out did not see a single figure, and
+     * called their absence "the single decisive omission… bare horizontal lines
+     * with no beads on them are pitch rules, not rods". They were right. A
+     * figure on a rod is a small dense mark, and at watermark weight an outline
+     * of one is nothing at all.
+     *
+     * **The near/far distinction went with the outlines**, and it is no loss:
+     * which player a rod belongs to is already said by the margin its handle
+     * comes out of, and saying it twice cost the men their legibility. One ink,
+     * one kind of mark.
+     */
     rod.men.forEach((x, k) => {
       const s = seed + 20 + k * 3;
-      const rx = 1.8, ry = 2.3;
+      const rx = 1.65, ry = 2.15;
       const body = (t) => {
         const a = t * 6.283 - Math.PI / 2;
         return [x + rx * Math.cos(a), rod.y + ry * Math.sin(a)];
       };
-      if (rod.near) {
-        const [d] = hand(body, s, { steps: 34, amp: 0.06, passes: 1 });
-        p.push(`<path class="fill" d="${d}Z"/>`);
-      }
-      p.push(stroke(body, s + 1, 'med', { steps: 34, amp: 0.07, passes: rod.near ? 1 : 2 }));
+      const [d] = hand(body, s, { steps: 30, amp: 0.07, passes: 1 });
+      p.push(`<path class="fill" d="${d}Z"/>`);
     });
   });
 

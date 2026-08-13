@@ -501,10 +501,10 @@ const CollectionPage: React.FC = () => {
     setRevealing(false);
     /*
      * And the table goes with it. Both callers mean "the row is over": a sealed packet put
-     * back has nothing on the table behind it (with cards there, putting the packet down
-     * files them instead — see `putDown`), and the reduced-motion path has just had its
-     * cards put in the book without a row being drawn at all. Leaving it set would put
-     * filed cards back on the table the next time a packet was opened.
+     * back has nothing on the table behind it (with cards there, a click on the table files
+     * them instead — see `tableClick` in PackOpener), and the reduced-motion path has just
+     * had its cards put in the book without a row being drawn at all. Leaving it set would
+     * put filed cards back on the table the next time a packet was opened.
      */
     stopPlacing();
   };

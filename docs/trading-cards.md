@@ -3294,15 +3294,31 @@ horizontal clip alone — so a row that is permanently a scroller cuts the top o
 descending into it from the stage. The reveal's FLIP starts that card at the hero's position,
 well above the row, and it appeared from behind an invisible edge instead of travelling. One
 packet never overflows (five cards at a slot's width fit inside the book), so the ordinary
-reveal is clipped by nothing at all. `PackOpener` measures the hand against the row in a layout
-effect declared **above** the FLIP effect, so the class is settled before the flight is
+reveal is clipped by nothing at all, and where the row *does* scroll the clip box is lifted
+over the stage — see the bullets below. `PackOpener` measures the hand against the row in a
+layout effect declared **above** the FLIP effect, so the class is settled before the flight is
 measured, and toggles it imperatively — a state update would apply a commit too late.
 
-- Known cost: a card descending into an *already overflowing* row is still clipped at that
-  edge, which is a second packet opened onto a long row. Fixing it needs the descent to escape
-  the scroller — a fixed-position flight like `PutAway`'s — or the row to be a fan of
-  overlapping cards rather than a scroller, which is the alternative that was on the table when
-  the scrollbar was chosen.
+- **And where it does scroll, the clip box is lifted over the stage.** `padding-top` grows it
+  upward by the whole height of the packet stage and a negative `margin-top` hands that space
+  straight back to the layout, so the row occupies exactly what it always did while clipping
+  from far enough up that no descent is ever cut — including the case that made this necessary,
+  a second packet opened onto a row that is already long. The cards and the scrollbar do not
+  move a pixel when the class goes on: `content-box` sizing (there is no global `box-sizing`
+  reset in this project) means `min-height` still describes one card, and in the flex column
+  the item's outer size comes to exactly that.
+  - **`.opener__stage` needs its `z-index` for this**, because the padding band lies over it
+    and hit-testing follows paint order — without it the invisible band takes every click
+    aimed at the packet or the wood beside it. Safe for the ceremony's fixed light layers:
+    `.opener` is already a stacking context, so they were never resolved against the shelf.
+  - **`.opener__hand` uses `margin-inline: auto`, not `margin: auto`.** Vertical autos would
+    centre the cards in a box that is now a stage taller than they are, and they would drift
+    up into the padding.
+  - **`overflow-y: hidden` rather than left to compute**, so a card inverted up into the
+    padding cannot be mistaken for scrollable content and earn the row a vertical bar.
+  - The alternative was the descent escaping the scroller altogether — a fixed-position
+    flight like `PutAway`'s — which is a rewrite of the reveal's FLIP for a clip that can be
+    moved out of the way in five declarations.
 - The scrollbar gets 16px of bottom padding and the same negative margin, so it cannot draw
   over the cards and cannot change the column's height when it appears.
 - **It measures only when the row's contents change, and that is not an optimisation.** It

@@ -458,6 +458,9 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 
+# Claude Code, personal permissions only — the project has no shared settings file
+.claude/settings.local.json
+
 # VS Code files for those working on multiple tools
 .vscode/*
 !.vscode/settings.json

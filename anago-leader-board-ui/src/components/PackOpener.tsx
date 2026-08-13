@@ -597,6 +597,12 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    */
   const stalled = useRef(false);
   /**
+   * The table has been handed over. Latched, because the whole tabletop is the target and the
+   * row inside it is one too, so one click can reach `putAway` twice — and the second would
+   * measure boxes the cards have already left.
+   */
+  const filed = useRef(false);
+  /**
    * Where the card is on screen, in viewport pixels, for the stage bloom and
    * vignette to centre themselves on.
    *
@@ -913,6 +919,14 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    * at the edge instead, which reads as a card coming off the end of the pile.
    */
   const putAway = useCallback(() => {
+    /*
+     * Once. The table is clickable in more than one place now — the row for the keyboard, the
+     * tabletop around it for everything else, and both bubble to the same handler — and a
+     * second hand-over would measure boxes the cards have already left.
+     */
+    if (filed.current) return;
+    filed.current = true;
+
     const row = [...table, ...cardsRef.current];
 
     /*
@@ -1312,32 +1326,42 @@ const PackOpener: React.FC<PackOpenerProps> = ({
   const canFile = (phase === 'sealed' || phase === 'done') && table.length + cards.length > 0;
 
   /**
-   * Putting the packet down, which means two different things.
+   * **A click on the table, which is anywhere in the middle of it.**
    *
-   * With an empty table it is the way back to the album — the packet goes back on the
-   * shelf and nothing has happened. With cards already on the table it is "I have stopped
-   * opening", which is the same decision as clicking the cards, so it files them. Both are
-   * the same gesture on the same object: the packet is put down.
+   * There is nothing to aim at and nothing telling you to: the cards are lying there and
+   * putting them away is the only thing this screen can do with them, so the target is the
+   * whole tabletop rather than the row, the wood beside the packet, or a control. Only the
+   * packet itself is carved out of it — it stops the click from propagating — and the shelf
+   * and the register are outside this component entirely, so a packet you reach for on the
+   * pile is never a click on the table.
+   *
+   * It means two things and they are the same decision from the reader's side:
+   *
+   * - **cards on the table** — file them, which is "I have stopped opening";
+   * - **a sealed packet and nothing else** — put it back on the shelf, the way out to the
+   *   album. Only reachable before the tear, which is the whole of what makes it coherent:
+   *   up to then nothing has happened to the packet.
+   *
+   * Mid-reveal it does nothing at all. The cards are still coming out of the packet.
    */
-  const putDown = () => {
-    if (table.length > 0) putAway();
-    else onPutBack();
+  const tableClick = () => {
+    if (canFile) putAway();
+    else if (phase === 'sealed') onPutBack();
   };
 
   /*
-   * The keyboard's half of both.
+   * And the keyboard's half of it.
    *
-   * The exit was a real button and so was in the tab order for free; a stretch of table
-   * and a row of cards are not, and losing it must not cost a keyboard reader the way out.
+   * The exit was a real button and so was in the tab order for free; a tabletop is not, and
+   * losing it must not cost a keyboard reader the way out. The row itself is the labelled
+   * target — see the render — and this is the same gesture without having to find it.
    *
-   * Registered per render rather than once, so `phase` is never stale. A listener that
-   * still thought the packet was sealed would put back a packet that was already open.
+   * Registered per render rather than once, so `phase` is never stale. A listener that still
+   * thought the packet was sealed would put back a packet that was already open.
    */
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (phase === 'sealed') putDown();
-      else if (canFile) putAway();
+      if (event.key === 'Escape') tableClick();
     };
 
     window.addEventListener('keydown', onKey);
@@ -1469,7 +1493,14 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    */
 
   return (
-    <div className="opener">
+    /*
+      **The table takes the click, wherever on it you happen to click.** The cards are lying
+      there and putting them away is the only thing this screen does with them, so there is
+      nothing to aim at and nothing that says so — see `tableClick`, and the note over the
+      hint line for why no line explains it. The packet on the stage is the only thing that
+      does something else, and it stops the click itself.
+    */
+    <div className="opener" onClick={tableClick}>
       {/*
         Three rows in one column, always: the stage, the table, and the line under it. Only
         the stage changes with the phase — the other two are rendered once, below.
@@ -1481,26 +1512,16 @@ const PackOpener: React.FC<PackOpenerProps> = ({
         `min-height` — one card, whether it holds any or not — is the third; see packopen.css.
       */}
       {phase === 'sealed' ? (
-        /*
-          The stretch of table the packet is lying on, and it is the way to put it down:
-          click the wood beside it and the packet goes back on the shelf — or, with cards
-          already on the table, it files them, because putting the packet down when you
-          have a row in front of you *is* "I have stopped opening". See `putDown`.
-
-          **Only while it is sealed**, which is what makes it a coherent rule rather than
-          an escape hatch — up to the tear nothing has happened, so putting the packet
-          down is a real thing to do to it. Past the tear the cards are the thing to act
-          on.
-
-          `--table` stretches the row across the middle of the layout so the target is
-          the table rather than the two inches either side of the packet; see
-          packopen.css.
-        */
-        <div className="opener__stage opener__stage--table" onClick={putDown}>
+        <div className="opener__stage">
           <div
             className="pack"
             style={foil}
-            /* Or the wood underneath would put down the packet you just opened. */
+            /*
+              **The one thing carved out of the table's click.** Everything else in this
+              column puts the packet down or files the cards — see `tableClick` on the root
+              — so without this the wood underneath would put back the packet you just
+              opened.
+            */
             onClick={(e) => {
               e.stopPropagation();
               start();
@@ -1730,13 +1751,15 @@ const PackOpener: React.FC<PackOpenerProps> = ({
         replacing it — and it is why the row is rendered here rather than inside the phase
         branches, where it was three separate elements that happened to look alike.
 
-        Clicking it files everything on it. The row is the record of what you opened, so
-        the click is a decision with a real alternative beside it — the shelf is live —
-        rather than a "continue". See the beat 6 block.
+        Clicking it files everything on it — though so does clicking anywhere else on the
+        table, which is where the handler lives. **What this carries is the *named* target**:
+        `role="button"` with a label, so a keyboard reader has something to reach and
+        something that says what it does, where the tabletop is only a convenience for a
+        mouse. No `onClick` of its own; the click reaches the root by bubbling.
 
-        `role="button"` over a row of cards rather than a button element around them: it
-        has to stay the flex row the reveal's FLIP lands in, and a button's own box would
-        be a second layout for the cards to arrive in.
+        `role="button"` over a row of cards rather than a button element around them: it has
+        to stay the flex row the reveal's FLIP lands in, and a button's own box would be a
+        second layout for the cards to arrive in.
       */}
       <div
         className="opener__revealed"
@@ -1744,7 +1767,6 @@ const PackOpener: React.FC<PackOpenerProps> = ({
         role={canFile ? 'button' : undefined}
         tabIndex={canFile ? 0 : undefined}
         aria-label={canFile ? 'Leg de kaarten in je album' : undefined}
-        onClick={canFile ? putAway : undefined}
         onKeyDown={
           canFile
             ? (e) => {
@@ -1782,22 +1804,17 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       </div>
 
       {/*
-        Kept for its box, and empty except while a packet is lying there sealed: the line
-        is a spacer as much as a caption, and dropping the element would shorten the column
-        at the tear and again at the ending.
+        **This line says nothing, and it is kept for its box.** It is a spacer as much as it
+        ever was a caption: the column's heights are reserved to the pixel, and dropping the
+        element would shorten it at the tear and again at the ending.
 
-        It says what can be done and never what happened — the cards are the record of
-        that. See the note above the return.
+        Everything it used to carry is gone, each for the same reason. "klik op het pakje"
+        told you to click a packet lying alone in the middle of a bare table. "toegevoegd aan
+        je album" and "2 nieuwe kaarten voor je album" reported a count the row in front of
+        you *is*. "klik op de kaarten om ze in je album te leggen" explained a gesture that is
+        now the whole tabletop — there is nothing to aim at, so there is nothing to be told.
       */}
-      <div className="opener__hint">
-        {phase === 'sealed'
-          ? canFile
-            ? 'klik op het pakje, of op de kaarten om ze in je album te leggen'
-            : 'klik op het pakje — of ernaast om het terug te leggen'
-          : phase === 'done'
-            ? 'klik op de kaarten om ze in je album te leggen'
-            : ' '}
-      </div>
+      <div className="opener__hint">&nbsp;</div>
     </div>
   );
 };
