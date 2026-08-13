@@ -115,11 +115,11 @@ const CollectionPage: React.FC = () => {
   /**
    * The album was bound a moment ago, in this session.
    *
-   * Only the book's invitation line uses it. Session state rather than something derived
-   * from `album.createdAt`, because the question is not "is this album new" but "did you
-   * just watch this book being made" — somebody returning tomorrow to a book they never
-   * opened is a different case, and the album answers that one itself off its saved
-   * position.
+   * It is what makes the book open itself on the voorwoord. Session state rather than
+   * something derived from `album.createdAt`, because the question is not "is this album
+   * new" but "did you just watch this book being made" — somebody returning tomorrow to a
+   * book they never opened is a different case, and one whose book should stay shut until
+   * they open it, which the album gets right on its own off its saved position.
    */
   const [justBound, setJustBound] = useState(false);
   /**
@@ -293,6 +293,13 @@ const CollectionPage: React.FC = () => {
        but the opener would be layered under a viewer left mounted over it. */
     setViewing(null);
     setRevealing(false);
+    /*
+     * The binding is behind you the moment you reach for a packet, and this has to be lowered
+     * *here* rather than left to expire with the session: the opener unmounts the album, so a
+     * book still marked just-bound would open itself on the voorwoord again on the way back,
+     * throwing away the page you were on.
+     */
+    setJustBound(false);
 
     /*
      * The set-completion packet has a ceremony in front of it.
@@ -1121,12 +1128,11 @@ const CollectionPage: React.FC = () => {
                 handsOver={rebindHandsOver}
                 onRebound={handleRebound}
                 /*
-                  The last beat of the opening sequence, and the only one that is words.
-                  Both actions, because both are undiscoverable: the cover is the button,
-                  and the page edges are the only other control on the book. The album drops
-                  it the moment the cover is turned.
+                  The last beat of the opening sequence: the book opens itself on the
+                  voorwoord. Which page that is, and how long it lies shut first, is the
+                  album's to decide — this only says the reader watched it being bound.
                 */
-                hint={justBound ? 'Je album ligt klaar! Open het en begin je verzameling!' : undefined}
+                justBound={justBound}
                 onCardOpen={(id) => {
                   const found = slotOrder.findIndex((s) => s.card.player.id === id);
                   if (found >= 0) setViewing(found);

@@ -1491,37 +1491,44 @@ the book appear.
   A hot foil press is a small dry tick. The one heavy sound is `playCoverTurn`, and it
   lands *after* the name rather than under it. Spaces take no block and make no sound.
 
-#### The sequence ends on an invitation, not an open book
+#### The sequence ends by opening the book on the voorwoord
 
-The ceremony hands over a **shut** book, and then the line above it says *"Klik op de
-kaft en blader langs de randen"* until you open it.
+The ceremony hands over a **shut** book, it lies on the table for `JUST_BOUND_OPEN_MS`
+(420 base, 840ms real), and then the cover swings open onto the voorwoord and stops there.
 
-Opening it automatically was tried first and is wrong, even though it looks better for
-two seconds. The album's whole navigation is undiscoverable by design — no arrows beside
-the book, and deliberately nothing drawn on the page-turn strips — so the first thing a
-new owner does has to *teach* that, and a book that opens itself teaches nothing. It also
-spends the cover-turn flip at a moment when the reader did not ask for it, which is the
-one gesture the album most needs them to learn.
+**This reverses the invitation line that used to be here, and the argument it was made
+against is worth keeping**, because it is the thing this has to answer. The album's whole
+navigation is undiscoverable by design — no arrows beside the book, nothing drawn on the
+page-turn strips — so a new owner has to *learn* that the cover is the button, and the
+objection to opening the book automatically was that it spends the cover turn at a moment
+the reader did not ask for it and teaches nothing. The answer is that a gesture performed
+in front of you is not nothing: the turn the book makes here is the same one a click makes,
+on the same hinge, with the same `playCoverTurn` under it, and having watched the cover open
+once is a better account of "the cover opens" than a sentence about it. The old line is gone
+along with `hint`, `everOpened` and the effect that latched it.
 
-So the invitation goes in the one place the design has already assigned to
-discoverability: the single line above the book. It names **both** controls, because both
-are invisible — the cover is the button, and the page edges are the only other one.
-
-- It replaces `gesloten`, which was fine for a returning reader and useless for a new one:
-  it names the state instead of offering the way out of it.
-- It clears itself **the moment the book is opened, by any route** — cover click, turn
-  strip, arrow key, swipe, or the card viewer turning to a card. Watched off the book's
-  position rather than hooked into `turn()`, so "any route" stays true without a list
-  somebody has to remember to extend.
-- It does **not** come back when the book is shut again. "You have not worked out how to
-  open this" cannot become true a second time.
-- `.album__nav-label` now reserves a line's height. The label sits above the book, so a
-  string longer than `gesloten` would otherwise push the whole book down.
-
-Whether it should be a *first visit* hint rather than a *first book* hint is open: it is
-keyed on having just watched the binding, so somebody who returns tomorrow to a book they
-never opened gets `gesloten` and no help. The album already knows that from its saved
-position, so the fix is one condition if it turns out to matter.
+- **It opens onto the voorwoord specifically**, which is the page that exists for this — it
+  was added to pay for the front endpaper, and this is the spread it was written to be
+  found on. Landing on the first page of cards instead would open the book on a grid of
+  silhouettes, which is a book saying you have nothing.
+- **The page is found by `kind`, never assumed to be page 2.** `buildPages` pads with blank
+  `slots` pages, so a hard-coded index is one composition change away from opening the book
+  on nothing.
+- **The album decides where it opens; the page only says what happened.** `justBound` is a
+  boolean, not a page index — page composition belongs to `buildPages`, and an index handed
+  in from `CollectionPage` would be a second thing to keep in step with it.
+- **`CollectionPage` lowers `justBound` when a packet is opened**, and that is load-bearing
+  rather than tidiness: the opener *unmounts* the album, so a book still marked just-bound
+  would open itself on the voorwoord again on the way back and throw away the page you were
+  on. The album's own guard is a ref, and a ref does not survive the remount.
+- **Reduced motion turns to it with no wait**, per the rule the rest of this page follows:
+  land on the finished state, never play it stilled.
+- Somebody returning tomorrow to a book they never opened is a different case and gets a
+  shut book, because `justBound` is session state and their saved position is leaf 0. That
+  is deliberate — the ceremony is what earns the automatic opening, and there is none on a
+  reload.
+- `.album__nav-label` still reserves a line's height, which now only matters for keeping
+  `gesloten` and `pagina …` from moving the book.
 
 #### Getting back to the start of the story
 
@@ -1692,6 +1699,40 @@ needed no new rules at all. The boards are warm ivory rather than white (`--boar
 book, and they are identical on all five stains for the same reason the brass edge is.
 Emitted unconditionally from `albumLeather`, so there is no second code path to fall out of
 step.
+
+**The leather runs along all four edges, at the height the corners already arrive at.** Four
+corner pieces on a bare board read as four marks printed on it rather than as covering
+material, and the corners were already asking for the band: a `13% 13%` box on a board taller
+than it is wide is a tall rectangle, so the 45° cut cannot reach either far corner of it and
+leaves a flat run of leather standing at both ends of the head and the tail. That run is
+`6.5% × (H − W)` — 8.3px at a 420px page, 10.9px at 560px — and `--board-band: 10px` is it as
+a literal, since CSS cannot mix the two axes in one length and a band a pixel or two proud of
+the corners is invisible where a band a pixel or two shy of them is a step. Same `--leather-lo`
+as the corners, because a band even a shade off puts a seam exactly where the two meet.
+
+The band is on the cover's face, and the first attempt was **not**: a pseudo-element at
+`inset: -2px` on the shut cover leaf, turning the brass rule to stain for the length of each
+corner, on the reading that a corner piece wraps the board's edge. That is a real thing a
+binder does and it is invisible — 2px of leather inside an already dark olive rule, on a book
+500px wide. Worth knowing before reaching for it again: the note above `.album--icons
+.album__cover-icons` is what is left of it.
+
+**The brass is a hairline between the stain and the ivory, and nowhere else on this binding.**
+The 2px rule round the outside of the shut board came from the leather cover, where it is an
+edge of brass on a board covered in stain. Once the leather moved to the trim that same rule
+boxed in the outside of the very material it exists to edge — two lines a few pixels apart
+saying the same thing. So `.album--icons.album--closed .album__leaf--cover` restates the drop
+shadows without it, and the brass goes where a finisher would run a gilt line: along the inner
+edge of the covering material. **Drawn as an underlay, not as a frame** — the boundary is the
+band's inner edge on all four sides *and* the hypotenuse of every corner piece, so each of the
+eight leather layers is repeated beneath itself in `--board-edge`, grown by `--board-rule-w`
+(2px) and anchored to the same trim. What escapes at each edge *is* the outline, corners
+included, and it cannot drift out of step with the leather because it is the same eight
+shapes. **The corner boxes grow by `√2` more than the edges**, because growing a box by `n`
+moves a 45° edge only `n / √2` perpendicular to itself while a straight edge moves the whole
+`n` — without it the corners are drawn a lighter weight than the head and tail. This is not an
+exception to brass-on-every-stain: all five leather bindings have the rule, all five icon
+bindings have the hairline, and both sets are identical across the five.
 
 **The wipe is a `clip-path`, not the opacity crossfade the note above predicted.**
 `.album__cover-icons` is its own element painting the finished binding as one un-transitioned
@@ -1892,45 +1933,46 @@ rather than overruled** — the page is not empty, it carries the voorwoord:
   - **Open on the gutter side.** A pastedown runs into the hinge; there is no fold to
     see there, and drawing one boxed the paper in on the one side where a board is
     continuous. Which side that is comes off `.album__face--front` / `--back`.
-- **The boards have an edge of their own, at every spread.** The stack was paper only,
-  so a side holding nothing but a board had no edge at all — the leather overhang simply
-  showed through. That made the material immediately outside the page trim *flip* as you
-  turned: leather at the last spread, where the pastedown is glued to the board, and
-  cream one spread earlier. Same at the front. A board is not an absence of pages.
-  - **The strip is now exactly `--board-out`, and the paper divides it** rather than
-    extending it: the board's edge and the overhang are one object seen two ways, so the
-    strip *is* the leather band, with the paper stack taking the inner `--edge-w` and the
-    board's cut edge showing for the rest. Constant total width, and nothing can poke
-    past the binding.
-    - The first attempt added a separate `--edge-board` on top of the paper stack, which
-      came to 11px against a 9px overhang — page edges sticking out past the boards,
-      which is the one thing `--board-out` exists to prevent.
-  - The board edge is a touch lighter than the binding behind it, so it reads as a cut
-    edge catching the lamp rather than as more of the same leather field.
-  - **The paper edges are muted, not white.** They were `rgba(255,252,240,.92)`, which
-    is *brighter than the page beside them*, so a 7px stack read as a strip of white
-    paper rather than as the cut edges of the sheets you are looking at. A fore-edge
-    stands in the shadow of the board over it: barely lighter than the page at its lit
-    faces, properly dark between them. Widening the gap between the two values is what
-    turns a band back into edges.
-  - **The stack has ends.** The strip is one rectangle, so its hairlines all ran the
-    exact height of the page and stopped square — the one thing a fanned stack never
-    does. Deep shading at head and tail plus a 6px radius on the **outer** corners only
-    lets the outermost leaves fall away before the innermost, so the pile has ends
-    rather than being a cut-off ribbon. Done with shading and a radius rather than
-    `clip-path`: clipping flattens 3D content, and this element's half-pixel Z inside
-    `.album__book`'s `preserve-3d` is the only thing keeping it in front of the binding
-    and behind the pages — the same reason the binding is hidden rather than clipped.
-  - **`EDGE_RANGE` is 5, not 6, so the board edge is never thinner than 2px.** Every
-    pixel the paper takes is a pixel of board it covers; letting the stack reach 9px
-    would make the boards vanish exactly when the text block is thickest.
-- **The fore-edge counts paper leaves only, and can be nothing.** It was
-  `flipped / leafCount`, which counted the front board as a turned page: opening the
-  cover drew *cream page edges* on the left when nothing made of paper had moved. The
-  text block is `leafCount - 2` — and a side holding no leaves gets **zero width**, not
-  `EDGE_MIN`. A floor under both sides is what put a hairline of paper down the left
-  trim of the very first spread; zero is a real state at both ends of the book's
-  travel, not a degenerate one.
+- **The fore-edge is a hairline at the page’s own trim, and it took four homes to get
+  there.** It shows how thick the block is on each side, so the edge thins on the right as
+  it thickens on the left and you can see where you are without reading anything.
+  - **It is not in the board overhang, and that is the whole history of the feature.** It
+    lived there three times — as elements pinned outside the book box, the same elements
+    at a staggered depth, then a band on the boards’ faces — and each one was drawing page
+    edges on a strip that is *board*. A pastedown is page-sized like every other sheet, so
+    beyond the trim there is leather and nothing else. Every version read as one more pale
+    page lying under the one you were on, because that is what it was.
+    - The dead ends are worth keeping because each is individually tempting. Elements
+      outside the box work only while the boards are page-sized; once the boards took
+      their overhang they covered them. Lowering the boards’ depth to get the strip back
+      in front broke the shut book, since depth outranks `z-index` in a 3D context and the
+      pages sorted straight through the closed cover. And a band on the boards’ own faces
+      removed the ordering question but kept the wrong location.
+  - **What the top page can honestly show is its own edge**, so `.album__page::after` draws
+    it there. A deliberate cheat in the same category as the gutter shading — both are
+    drawn over a page’s own margin — and bounded the same way: `--page-pad-x` guarantees
+    22px with nothing printed in it, and 6px is the most this ever takes.
+  - **Shadow, not paper.** The band was cream at `rgba(255,252,240,.92)`, brighter than the
+    page beside it. At the trim what is actually there is the dark between one sheet and the
+    next, so this darkens rather than lightens — which is also what stops the “extra white
+    page” reading coming back.
+  - **A leaf in the air draws nothing.** Every page face draws the hairline, which is what
+    makes the top of each pile show one without anybody working out which page that is — so
+    the leaf mid-rotation carried a full pile’s worth across the gutter with it, the stack
+    appearing on the flipped page before it landed. `.album__leaf--moving` suppresses it:
+    one sheet’s thickness is nothing. **The class is gated on motion being enabled**,
+    because `moving` is cleared by the leaf’s own `transitionend`, which never fires when
+    the leaf has no transition — under reduced motion it would latch on for good.
+  - **Counted over paper leaves only, and it can be nothing.** It was `flipped / leafCount`,
+    which counted the front board as a turned page and drew page edges on the left of the
+    very first spread, where nothing made of paper had moved. The text block is
+    `leafCount - 2`, and a side holding no leaves gets **zero**, not `EDGE_MIN`: zero is a
+    real state at both ends of the book’s travel.
+  - **`EDGE_MIN + EDGE_RANGE` is 6px.** The old cap was 7 because the stack had to fit
+    inside `--board-out`; that constraint went with the overhang, and what bounds it now is
+    the page margin and the fact that an edge reads as an edge only while it is narrow.
+  - Not drawn on mobile: one page slides across, with no spine and no pile either side of
+    it, so a hairline there would claim a thickness the book does not have.
 - **The book is a cased hardcover, and the spine says so.** Worth settling in writing,
   because a sticker album is the one thing it is not: a Panini album is saddle-stitched
   card with no boards and nothing at the head of its spine. This album went the other

@@ -198,6 +198,34 @@
    * was wrong all three; see the note above `.album__page--foreword` for why.
    */
   --board-out: 9px;
+
+  /*
+   * How high the leather runs along the edges of the icon binding — see
+   * `.album__cover-icons`.
+   *
+   * **Not a chosen thickness: it is the run the corner pieces already leave.** Their boxes
+   * are `13% 13%`, which on a board taller than it is wide is a tall rectangle, and a 45°
+   * cut across one leaves leather standing at both ends of the head and the tail —
+   * `6.5% × (H − W)`, which comes to 8.3px at a 420px page and 10.9px at 560px. A literal
+   * of 10px rather than that expression, because CSS cannot mix the two axes in one length,
+   * and a band that disagreed with the corners by a pixel or two would be visible as a step
+   * where they meet — where a band that is a pixel or two *proud* of them is not.
+   *
+   * It is deliberately close to `--board-out` and has nothing to do with it. That is the
+   * board standing proud of the paper; this is covering material on the board's face.
+   */
+  --board-band: 10px;
+
+  /*
+   * How wide the brass hairline is where the leather meets the boards.
+   *
+   * It is the amount the underlay in `.album__cover-icons` grows by, and **the corner
+   * layers have to grow by `√2` more than the edges to come out the same width.** Growing a
+   * box by `n` moves a straight edge by `n`, but moves a 45° edge by only `n / √2`
+   * perpendicular to itself. At 1px the two were visibly different weights: a line along
+   * the head and a fainter one across the corner.
+   */
+  --board-rule-w: 2px;
 }
 
 .album__book {
@@ -815,6 +843,122 @@
 .album__face--back .album__page {
   box-shadow: inset -12px 0 24px -12px rgba(0, 0, 0, 0.45);
   border-radius: 3px 0 0 3px;
+}
+
+/* ---------------------------------------------------------------- *
+ * The fore-edge: the block's own edge, at the trim
+ *
+ * How thick the pile is on this side, drawn as a shaded hairline down the page's outer
+ * trim. Widths come from `--edge-l` / `--edge-r` on the book — see the fore-edge block in
+ * Album.tsx, which also owns the lift/land timing.
+ *
+ * **On the page, at the trim — not in the board overhang.** It was in the overhang three
+ * times over (elements outside the book box, the same elements at a staggered depth, a
+ * band on the boards' faces) and every one of them was drawing page edges on a strip that
+ * is *board*: a pastedown is page-sized like every other sheet, so beyond the trim there
+ * is leather and nothing else. Each version read as one more pale page lying under the one
+ * you were on, which is exactly what it was.
+ *
+ * A page can honestly show its own edge, so it does. This is a cheat in the same category
+ * as the gutter shading — both are drawn over a page's own margin — and it is bounded the
+ * same way: `--page-pad-x` guarantees 22px with nothing printed in it, and 6px of that is
+ * the most this ever takes.
+ *
+ * **Shadow, not paper.** The old band was cream and therefore looked like a sheet. Looking
+ * down at the trim of the top sheet, what is actually there is the dark between it and the
+ * ones below, so this darkens rather than lightens — which is also what stops the "extra
+ * white page" reading coming back.
+ *
+ * `z-index: 0` keeps it above the paper and below the cards, which are at 1. It cannot
+ * take a click, being a pseudo element, but the margin it sits in is the turn strip's hit
+ * area and that has been expensive once, so `pointer-events: none` is stated anyway.
+ * ---------------------------------------------------------------- */
+
+.album__page::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: var(--edge-w, 0px);
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    /*
+     * The pile rolling away at head and tail. Without it every sheet ends square at the
+     * same height, which is the one thing a fanned block never does.
+     */
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.34) 0%,
+      rgba(0, 0, 0, 0.16) 3%,
+      transparent 9%,
+      transparent 91%,
+      rgba(0, 0, 0, 0.16) 97%,
+      rgba(0, 0, 0, 0.34) 100%
+    ),
+    /* The sheet edges: the dark between one sheet and the next, every 2px. */
+    repeating-linear-gradient(
+      90deg,
+      rgba(78, 64, 36, 0.22) 0 1px,
+      transparent 1px 2px
+    ),
+    /* And the block sitting in its own shade, deepest at the trim. */
+    linear-gradient(90deg, rgba(78, 64, 36, 0.16), rgba(78, 64, 36, 0.05));
+  /*
+   * No transition on the width. The timing is `settledFlipped` in Album.tsx, and a width
+   * driven by a custom property does not reliably start one in any case — adding one back
+   * would either do nothing or compose into a double delay.
+   */
+}
+
+/*
+ * **A leaf in the air has no pile, so it draws no edge.**
+ *
+ * Every page face draws the fore-edge, which is what makes the top of each pile show one
+ * without anybody having to work out which page that is. The exception is the leaf
+ * currently rotating: it belongs to neither side while it travels, and without this it
+ * carried a full pile's worth of hairline across the gutter — the stack appearing on the
+ * flipped page before the page had landed.
+ *
+ * It also completes the lift/land beats rather than duplicating them. The two stationary
+ * piles get their widths from `--edge-l` / `--edge-r`, which already drop at the click and
+ * gain on the landing; this is the third party in that transaction, the sheet in between,
+ * and it shows nothing because one sheet's thickness is nothing.
+ */
+.album__leaf--moving .album__page::after {
+  display: none;
+}
+
+/* A front face is the right-hand page, so its trim is on the right; a back face is the
+   left-hand page. No `rotateY` to reason about here, unlike `.album__endpaper::before` —
+   a page face is not mirrored, only the boards' backs are. */
+.album__face--front .album__page::after {
+  right: 0;
+  --edge-w: var(--edge-r, 0px);
+  border-radius: 0 3px 3px 0;
+}
+
+.album__face--back .album__page::after {
+  left: 0;
+  --edge-w: var(--edge-l, 0px);
+  border-radius: 3px 0 0 3px;
+  /* Mirrored, so the shade deepens toward the other side. */
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(0, 0, 0, 0.34) 0%,
+      rgba(0, 0, 0, 0.16) 3%,
+      transparent 9%,
+      transparent 91%,
+      rgba(0, 0, 0, 0.16) 97%,
+      rgba(0, 0, 0, 0.34) 100%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(78, 64, 36, 0.22) 0 1px,
+      transparent 1px 2px
+    ),
+    linear-gradient(270deg, rgba(78, 64, 36, 0.16), rgba(78, 64, 36, 0.05));
 }
 
 .album__slots {
@@ -1615,6 +1759,74 @@
       13% 13% no-repeat,
     linear-gradient(315deg, var(--leather-lo, #4a3820) 0 50%, transparent 50%) right bottom /
       13% 13% no-repeat,
+    /*
+     * The four edges, in the same leather as the corners — head, tail and both sides.
+     *
+     * **The corner pieces were already asking for this and only half-drawing it.** A 13%
+     * box is 13% of the *width* across and 13% of the *height* down, and the board is
+     * taller than it is wide, so the 45° cut cannot reach either far corner of that box:
+     * it leaves a flat run of leather along the head and the tail, `6.5% × (H − W)`, which
+     * is 8–11px at every page size the desktop book takes. Four corners with a flat run at
+     * each end and bare board between them reads as four marks printed on a board. A band
+     * that continues at the height the corners already arrive at makes it one piece of
+     * covering material with the corners as its reinforcement, which is what it is.
+     *
+     * `--board-band` is that run, as a literal — see the note on it above. Same
+     * `--leather-lo` as the corners on purpose: a band even a shade off would put a seam
+     * exactly where the two meet, and this has to be one skin.
+     */
+    linear-gradient(var(--leather-lo, #4a3820), var(--leather-lo, #4a3820)) left top / 100%
+      var(--board-band) no-repeat,
+    linear-gradient(var(--leather-lo, #4a3820), var(--leather-lo, #4a3820)) left bottom / 100%
+      var(--board-band) no-repeat,
+    linear-gradient(var(--leather-lo, #4a3820), var(--leather-lo, #4a3820)) left top /
+      var(--board-band) 100% no-repeat,
+    linear-gradient(var(--leather-lo, #4a3820), var(--leather-lo, #4a3820)) right top /
+      var(--board-band) 100% no-repeat,
+    /*
+     * The brass, as a hairline where the leather meets the boards — and **that is the only
+     * place brass is on this binding.** It was a 2px rule right round the outside of the
+     * shut board, inherited from the leather cover, where it drew a box around a book whose
+     * outer edge is already the leather it is meant to be edging. Between the stain and the
+     * ivory it is doing a binder's job instead: the gilt line a finisher runs along the
+     * edge of the covering material, which is the one seam on the whole board.
+     *
+     * **Drawn as the leather grown by `--board-rule-w` and painted underneath, not as a
+     * frame.** The boundary is not a rectangle — it is the band's inner edge on all four
+     * sides *and* the hypotenuse of each corner piece — and chasing that with lines of its
+     * own would mean eight more layers that have to be kept in step with the eight above. An
+     * underlay is the same shape by construction: every layer below is one of the layers
+     * above, grown, so what escapes at each edge is the outline, corners included, and
+     * nothing can drift. The layers are anchored to the trim, so the growth is inward only
+     * and no brass reaches the outside of the board.
+     *
+     * The corner boxes grow by `√2` more than the edges, because growing a box by `n` moves
+     * a 45° edge by `n / √2` perpendicular to itself but a straight one by the whole `n` —
+     * see `--board-rule-w`.
+     *
+     * `--board-edge`, the same brass that was round the outside. It moved; it is not a new
+     * colour, and it is still identical on all five stains.
+     */
+    linear-gradient(45deg, var(--board-edge, #6b5325) 0 50%, transparent 50%) left bottom /
+      calc(13% + var(--board-rule-w) * 1.414) calc(13% + var(--board-rule-w) * 1.414)
+      no-repeat,
+    linear-gradient(135deg, var(--board-edge, #6b5325) 0 50%, transparent 50%) left top /
+      calc(13% + var(--board-rule-w) * 1.414) calc(13% + var(--board-rule-w) * 1.414)
+      no-repeat,
+    linear-gradient(225deg, var(--board-edge, #6b5325) 0 50%, transparent 50%) right top /
+      calc(13% + var(--board-rule-w) * 1.414) calc(13% + var(--board-rule-w) * 1.414)
+      no-repeat,
+    linear-gradient(315deg, var(--board-edge, #6b5325) 0 50%, transparent 50%) right bottom /
+      calc(13% + var(--board-rule-w) * 1.414) calc(13% + var(--board-rule-w) * 1.414)
+      no-repeat,
+    linear-gradient(var(--board-edge, #6b5325), var(--board-edge, #6b5325)) left top / 100%
+      calc(var(--board-band) + var(--board-rule-w)) no-repeat,
+    linear-gradient(var(--board-edge, #6b5325), var(--board-edge, #6b5325)) left bottom / 100%
+      calc(var(--board-band) + var(--board-rule-w)) no-repeat,
+    linear-gradient(var(--board-edge, #6b5325), var(--board-edge, #6b5325)) left top /
+      calc(var(--board-band) + var(--board-rule-w)) 100% no-repeat,
+    linear-gradient(var(--board-edge, #6b5325), var(--board-edge, #6b5325)) right top /
+      calc(var(--board-band) + var(--board-rule-w)) 100% no-repeat,
     /* The boards. Same 150deg light as the leather cover, so the two agree about where
        the lamp is — the rule the whole stage is built on. */
     linear-gradient(
@@ -1658,6 +1870,38 @@
 .album--icons .album__cover-icons {
   clip-path: inset(0);
   transition: none;
+}
+
+/*
+ * **The edges are on the cover's own face, not on the board edge outside it.** A pseudo-
+ * element on `.album--closed .album__leaf--cover` at `inset: -2px` — the band the brass
+ * rule occupied — was tried first, on the reading that a corner piece wraps the board and
+ * so the *edge* of the shut book should go stain at the corners. It is a defensible thing
+ * for a binder to do and it is invisible: 2px of leather in a rule that is already a dark
+ * olive, on four runs of a book 500px wide, changes nothing you can see. The leather has
+ * to be on the face, at a height the eye can read, which is `--board-band` above.
+ */
+
+/*
+ * **No brass round the outside of a shut icon binding.** The rule comes off the leather
+ * cover, where it is right: an edge of brass on a board covered in stain. On this binding
+ * the leather has moved to the trim, so the same rule drew a box around the outside of the
+ * very material it exists to edge — two lines a few pixels apart saying the same thing, and
+ * the outer one boxing the book in. The brass is at the leather's inner edge instead; see
+ * the underlay in `.album__cover-icons`.
+ *
+ * **The leather cover keeps its rule, and this is not an exception to the brass-on-every-
+ * stain rule.** That rule is about the five stains agreeing with each other: all five
+ * leather bindings have the rule, all five icon bindings have the hairline, and the values
+ * are identical across both sets.
+ *
+ * The drop shadows are restated rather than inherited, because `box-shadow` is one
+ * declaration — dropping the ring means writing out what stays.
+ */
+.album--icons.album--closed .album__leaf--cover {
+  box-shadow:
+    0 26px 50px rgba(0, 0, 0, 0.65),
+    0 6px 14px rgba(0, 0, 0, 0.5);
 }
 
 /* ---------------------------------------------------------------- *
@@ -2342,6 +2586,14 @@
 .album--mobile .album__endpaper {
   border-radius: 3px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+/* No fore-edge on a phone. One page slides across, there is no spine and no pile either
+   side of it, so a hairline at the trim would be claiming a thickness the book does not
+   have here. The desktop-only fore-edge element this replaced was never rendered on
+   mobile either. */
+.album--mobile .album__page::after {
+  display: none;
 }
 
 /* Three columns, not two: six slots in two columns needs ~790px of page height

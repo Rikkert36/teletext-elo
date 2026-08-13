@@ -209,7 +209,7 @@ const BOUND_PHASES = new Set<RebindPhase>([
 const REBIND_RINGS = [
   { tilt: 74, yaw: 0, radius: 0.72, spin: 1.5, beads: 16, size: 5, reverse: false, in: 0 },
   { tilt: 62, yaw: 58, radius: 0.92, spin: 2.1, beads: 20, size: 4, reverse: true, in: 0.5 },
-  { tilt: 84, yaw: -34, radius: 0.58, spin: 1.1, beads: 12, size: 6, reverse: false, in: 1 },
+  { tilt: 84, yaw: -34, radius: 0.66, spin: 1.1, beads: 12, size: 6, reverse: false, in: 1 },
 ] as const;
 
 /**
@@ -232,6 +232,16 @@ const REBIND_PAYOFF = 4;
  */
 
 /**
+ * How long a just-bound book lies shut before it opens itself. See `justBound`.
+ *
+ * **Half its real length**, like every timing on this page — `--anim` is 2 and `ms()`
+ * doubles it, so this is 840ms of a book on the table. Long enough to be a pause and not so
+ * long that the reader reaches for the cover first, which would be the ceremony and the
+ * reader turning the same page at once.
+ */
+const JUST_BOUND_OPEN_MS = 420;
+
+/**
  * Where the reader left off, so the album reopens where they closed it.
  *
  * Stored as a leaf index — what the desktop book is in terms of — with mobile
@@ -243,8 +253,9 @@ const REBIND_PAYOFF = 4;
  * **Keyed per owner.** It used to be one global key, which meant two things: opening a
  * colleague's album landed you on *your* page in it, and — worse — an album that had
  * just been bound in the opening sequence opened halfway through, at the one moment the
- * shut cover is the entire point. A fresh owner has no entry and so starts closed,
- * which is exactly what the ceremony hands over to.
+ * shut cover is the entire point. A fresh owner has no entry and so starts closed, which is
+ * exactly what the ceremony hands over to — and `justBound` opens it from there, so the
+ * first spread is arrived at rather than restored.
  */
 const leafKey = (owner?: string): string =>
   `tafelvoetbal.cards.albumLeaf${owner ? `.${owner}` : ''}`;
@@ -885,18 +896,21 @@ interface AlbumProps {
    */
   cover?: string;
   /**
-   * Replaces the label above the book while it is shut and has not been opened yet.
+   * This book was bound a moment ago and the reader watched it happen.
    *
-   * For the end of the opening ceremony. The sequence hands over a shut book — which is
-   * right, a book being bound is a closed object — but that leaves a new owner looking at
-   * something with no visible way in, and this album deliberately has **no chrome**: no
-   * arrows beside it, and nothing drawn on the page-turn strips. The line above the book is
-   * the one place that carries discoverability, so it is where the invitation goes.
+   * The book then **opens itself on the voorwoord**, after a beat lying shut — see
+   * `JUST_BOUND_OPEN_MS`. The caller says what just happened; which page that lands on is
+   * the album's business, because page composition is (`buildPages` can pad, and a page
+   * index handed in from outside would be a second thing to keep in step with it).
    *
-   * Clears itself the moment the book is opened, rather than on a timer or a flag from
-   * above: the hint exists to get you in, and once you are in it is answered.
+   * It replaces an invitation line that used to sit above the shut book. The argument for
+   * that line was real — the album has **no chrome**, so nothing on screen says the cover is
+   * a button — and the answer is that the ceremony now performs the gesture instead of
+   * describing it: the cover turn a new owner sees here is the same one their click makes.
+   * What it opens onto is the voorwoord, which is the page that explains the album, and
+   * which existed for exactly this spread.
    */
-  hint?: string;
+  justBound?: boolean;
   /** Rendered under the book, e.g. the page controls' surroundings. */
   footer?: ReactNode;
   /** A card was clicked. Opens it in the viewer. */
@@ -952,7 +966,7 @@ const Album: React.FC<AlbumProps> = ({
   owner,
   ownerId,
   cover,
-  hint,
+  justBound,
   footer,
   onCardOpen,
   focusPlayerId,
@@ -988,15 +1002,6 @@ const Album: React.FC<AlbumProps> = ({
   /** Mobile page index and the direction it arrived from. */
   const [mobilePage, setMobilePage] = useState(() => readLeaf(ownerId) * 2);
 
-  /**
-   * Whether this book has been open at any point since it was mounted.
-   *
-   * Only the `hint` uses it, and only to stop the invitation coming back when a reader
-   * shuts the book again. A one-way latch rather than a check on the current position,
-   * because "you have not worked out how to open this" is not a thing that can become true
-   * again once it has been false.
-   */
-  const [everOpened, setEverOpened] = useState(() => readLeaf(ownerId) > 0);
   const touchStartX = useRef<number | null>(null);
 
   /*
@@ -1013,16 +1018,6 @@ const Album: React.FC<AlbumProps> = ({
   useEffect(() => {
     writeLeaf(isMobile ? Math.floor(mobilePage / 2) : flipped, ownerId);
   }, [isMobile, flipped, mobilePage, ownerId]);
-
-  /*
-   * Latch the hint off as soon as the book is open, by any route — the cover click, a turn
-   * strip, an arrow key, a swipe, or the card viewer turning to a card. Watching the
-   * position rather than hooking `turn()` is what makes that "any route" rather than a list
-   * of routes somebody has to remember to extend.
-   */
-  useEffect(() => {
-    if (isMobile ? mobilePage > 0 : flipped > 0) setEverOpened(true);
-  }, [isMobile, flipped, mobilePage]);
 
   /* ---------------------------------------------------------------- *
    * The re-binding ceremony
@@ -1253,6 +1248,64 @@ const Album: React.FC<AlbumProps> = ({
     [isMobile, maxFlipped, pages.length],
   );
 
+  /* ---------------------------------------------------------------- *
+   * The first opening
+   *
+   * A book that was just bound opens itself on the voorwoord. See `justBound` for why the
+   * invitation line it replaces went.
+   * ---------------------------------------------------------------- */
+
+  /**
+   * Whether the cover has already been turned by this, so it happens once.
+   *
+   * A ref rather than state: nothing drawn depends on it, and a re-render here would be one
+   * in the middle of the cover's own transition. It has to outlive the effect because
+   * `goToPage` changes identity whenever the pages do — without it, a collection landing a
+   * tick later would re-run this and turn a book that is already open.
+   */
+  const opened = useRef(false);
+
+  useEffect(() => {
+    if (!justBound || opened.current) return;
+
+    /*
+     * Found rather than assumed to be page 2. It is page 2 today, but `buildPages` is allowed
+     * to pad and the page it pads with is a blank `slots` one, so a hard-coded index is one
+     * composition change away from opening the book on nothing.
+     */
+    const page = pages.findIndex((p) => p.kind === 'foreword');
+    if (page < 0) return;
+
+    opened.current = true;
+
+    /* Land on it, never play it stilled — the rule every sequence on this page follows. */
+    if (prefersReducedMotion()) {
+      goToPage(page);
+      return;
+    }
+
+    /*
+     * A beat of the shut book on the table before the cover moves — the same pause a press
+     * has before it, and what keeps this a gesture of its own rather than the binding
+     * ceremony running straight on into a page turn.
+     */
+    let turned = false;
+    const timer = window.setTimeout(() => {
+      turned = true;
+      goToPage(page);
+    }, ms(JUST_BOUND_OPEN_MS));
+
+    /*
+     * Unlatched again only if the turn never happened, which is what makes the latch safe to
+     * set before the wait: a re-run inside the beat starts it over rather than dropping it,
+     * and one after the turn finds the book already opened and leaves it alone.
+     */
+    return () => {
+      window.clearTimeout(timer);
+      if (!turned) opened.current = false;
+    };
+  }, [justBound, pages, goToPage]);
+
   const turn = useCallback(
     (delta: number) => {
       if (isMobile) {
@@ -1360,36 +1413,111 @@ const Album: React.FC<AlbumProps> = ({
   /** Shut, showing only the front cover. Where a first visit starts. */
   const closed = isMobile ? mobilePage === 0 : flipped === 0;
 
-  /*
-   * There is no fore-edge state any more, and the whole apparatus it needed went with
-   * it: `EDGE_MIN`, `EDGE_RANGE`, `paperLeaves`, the live/settled leaf counts,
-   * `stackWidth`, `edgeStyle`, and the `settledFlipped` timer that held a width back by
-   * one flip so a pile would gain its leaf on landing.
+  /* ---------------------------------------------------------------- *
+   * The fore-edge: how thick the block is on each side
    *
-   * All of it existed to draw page edges in the board overhang, and that region is board
-   * — the pastedown is page-sized like every other sheet, so nothing paper-coloured
-   * belongs beyond the trim. See the note where the drawing used to be in album.css.
+   * Two numbers, handed to the CSS as `--edge-l` / `--edge-r` on the book, which draws
+   * them as a shaded hairline at each page's own trim (`.album__page::after`).
    *
-   * The three-beat rule it implemented is worth remembering if a fore-edge ever comes
-   * back as a hairline at the trim: a leaf leaves the pile it is lifted off at once and
-   * joins the other one on landing, which is `min(live, settled)` on one side and
-   * `paperLeaves - max(live, settled)` on the other.
+   * **It is at the trim and not in the board overhang, and that is the whole history of
+   * this feature.** It lived in the overhang three times — as elements outside the book
+   * box, the same elements at a staggered depth, then a band on the boards' faces — and
+   * every one of those was putting page edges on a strip that is *board*. A pastedown is
+   * page-sized like every other sheet, so beyond the trim there is nothing but leather,
+   * and every version read as one more pale page lying under the one you were on. What
+   * the top page can honestly show is its own edge, so that is where the drawing went.
+   * ---------------------------------------------------------------- */
+
+  /**
+   * `EDGE_MIN` is the thinnest a stack that *exists* may be; `+ EDGE_RANGE` is the widest
+   * it ever gets, so 6px at most.
+   *
+   * The old cap was 7px because the stack had to fit inside `--board-out`. That
+   * constraint went with the overhang; what bounds it now is `--page-pad-x` (22px of
+   * margin with nothing printed in it) and the fact that an edge reads as an edge only
+   * while it is narrow. Six is comfortably inside both.
    */
+  const EDGE_MIN = 2;
+  const EDGE_RANGE = 4;
+
+  /**
+   * The leaf count the stack is drawn from, one page turn behind `flipped`.
+   *
+   * A pile gains its leaf when the leaf *lands*, and CSS cannot say that here: the
+   * obvious `transition: width 0s linear <flip>` never fires, because a width that
+   * changes only because a `var()` it references changed does not reliably start a
+   * transition. Holding the state back instead is exact and depends on nothing.
+   *
+   * `SHUT_MS` is already documented as matching `.album__leaf`'s own transition, and
+   * `ms()` scales it by the same `--anim` knob the CSS multiplies by, so the two cannot
+   * drift. Rapid clicks restart the timer, so the stack settles once after the last turn
+   * rather than stepping through the ones it missed — which is what a handful of pages
+   * dropped in quick succession does anyway.
+   */
+  const [settledFlipped, setSettledFlipped] = useState(flipped);
+
+  useEffect(() => {
+    /* No flip to wait for, so no wait — or the stack freezes a turn behind. */
+    if (prefersReducedMotion()) {
+      setSettledFlipped(flipped);
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => setSettledFlipped(flipped), ms(SHUT_MS));
+    return () => window.clearTimeout(timer);
+  }, [flipped]);
 
   /*
-   * The line above the book, and the only chrome the album has.
+   * **Counted over the paper leaves only — the two boards are not pages.** Leaf 0 is the
+   * front board and the last leaf is the back board, so the text block is
+   * `leafCount - 2`, and the first turn that puts paper on the left is the second one.
+   * Counting the boards is what once drew page edges on the left of the very first
+   * spread, where nothing made of paper had moved.
+   */
+  const paperLeaves = Math.max(leafCount - 2, 0);
+
+  /*
+   * **A leaf leaves its pile at once and joins the other on landing.** Three beats: the
+   * pile it is lifted off loses it immediately, the page travels, the pile it lands on
+   * gains it. So the two sides are read at different moments — `flipped` is where the
+   * book is going, `settledFlipped` where the last page actually came down.
    *
-   * Three things can be there, in order of precedence:
+   * `min` on the left and `max` on the right is the whole of that, in both directions
+   * and with no test for which way we are turning. Going forward `flipped` runs ahead,
+   * so `min` holds the left until the page lands while `max` drops the right at once;
+   * going back `settledFlipped` is the higher one and the two roles swap by themselves.
    *
-   *   hint      an invitation, while a book that has never been opened is shut
-   *   gesloten  the shut book, once it has been opened at least once
-   *   pagina …  where you are
+   * **Mid-flight the two sum to one less than `paperLeaves`, and that is correct** — the
+   * leaf in the air is on neither pile. Making them add up puts the beats back in
+   * lockstep, which is the thing this exists to avoid.
+   */
+  const liveLeft = Math.min(Math.max(flipped - 1, 0), paperLeaves);
+  const settledLeft = Math.min(Math.max(settledFlipped - 1, 0), paperLeaves);
+  const leftLeaves = Math.min(liveLeft, settledLeft);
+  const rightLeaves = paperLeaves - Math.max(liveLeft, settledLeft);
+
+  /**
+   * **No leaves, no stack.** A side holding nothing but a board gets zero, not
+   * `EDGE_MIN`: there are no page edges to show, and zero is a real state at both ends
+   * of the book's travel rather than a degenerate one.
+   */
+  const stackWidth = (leaves: number): number =>
+    leaves === 0 || paperLeaves === 0 ? 0 : EDGE_MIN + EDGE_RANGE * (leaves / paperLeaves);
+
+  const edgeStyle = {
+    '--edge-l': `${stackWidth(leftLeaves)}px`,
+    '--edge-r': `${stackWidth(rightLeaves)}px`,
+  } as React.CSSProperties;
+
+  /*
+   * The line above the book, and the only chrome the album has. It says where you are and
+   * nothing else — `gesloten` for the shut book, `pagina …` for a spread.
    *
-   * `gesloten` on its own was fine for a returning reader and useless for a new one: it
-   * names the state instead of offering the way out of it, in front of an album that
-   * deliberately has no arrows and nothing drawn on its turn strips. The hint is answered
-   * by opening the book, which is the only thing it asks for — so it cannot linger, and a
-   * reader who shuts the book again gets the plain label rather than being told twice.
+   * **There used to be an invitation in front of both**, shown while a just-bound book had
+   * never been opened, on the argument that the album has no arrows and nothing drawn on its
+   * turn strips so the line is the only place discoverability can live. That argument was
+   * answered by doing rather than saying: the book now opens itself on the voorwoord the
+   * first time, which performs the cover turn instead of describing it. See `justBound`.
    */
   const pageLabel = isMobile
     ? mobilePage === 0
@@ -1398,16 +1526,11 @@ const Album: React.FC<AlbumProps> = ({
     : spreadLabel();
 
   /*
-   * The one line above the book is where this album's discoverability lives, so it is also
-   * where the ceremony says what is happening to it — there is nowhere else, and a book
-   * that shuts itself and changes colour with the label still reading "gesloten" reads as a
-   * fault. It keeps its box either way, so nothing shifts when it changes.
+   * Blank for the length of the ceremony: a book that shuts itself and changes colour with
+   * the label still reading "gesloten" reads as a fault. It keeps its box either way, so
+   * nothing shifts when it changes.
    */
-  const label = rebindingNow
-    ? 'Je album wordt opnieuw gebonden…'
-    : hint && closed && !everOpened
-      ? hint
-      : pageLabel;
+  const label = rebindingNow ? '' : pageLabel;
 
   return (
     <>
@@ -1487,7 +1610,12 @@ const Album: React.FC<AlbumProps> = ({
             rebindingNow ? finishRebind : closed ? () => turn(1) : undefined
           }
         >
-        <div className="album__book">
+        {/*
+          `edgeStyle` rides on the book, not on the pages that use it: every page face
+          draws its own trim hairline, and a custom property here is the one place all of
+          them can read the two widths from.
+        */}
+        <div className="album__book" style={edgeStyle}>
           {!isMobile ? (
             <>
               <div className="album__binding" />
@@ -1557,6 +1685,23 @@ const Album: React.FC<AlbumProps> = ({
                     */
                     leaf === 0 ? 'album__leaf--cover' : '',
                     leaf === leafCount - 1 ? 'album__leaf--back' : '',
+                    /*
+                      In the air, and therefore not on either pile.
+
+                      Only this suppresses the trim hairline (see album.css): the fore-edge
+                      is drawn by every page face, so without it the leaf mid-rotation
+                      carries a pile's worth of edge across the gutter with it — the stack
+                      arriving on the flipped page before the page has landed. A sheet in
+                      flight has one sheet's thickness, which is nothing.
+
+                      Gated on motion being on. `moving` is cleared by the leaf's own
+                      `transitionend`, which never fires when the leaf has no transition —
+                      so under reduced motion the class would latch on for good and that
+                      leaf's pages would lose their edge permanently.
+                    */
+                    moving === leaf && !prefersReducedMotion()
+                      ? 'album__leaf--moving'
+                      : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
