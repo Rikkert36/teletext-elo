@@ -139,11 +139,10 @@
 }
 
 /*
- * The rule is on the wrapper and not on the input, because the nib sits at the left of
- * the line and a border on the field would run underneath it. The line also has to keep
- * its box when the field is focused — a rule that thickens on focus moves the baseline
- * and the whole page twitches — so the active state is a colour change and a glow, never
- * a width change.
+ * The rule is on the wrapper and not on the input, because the line has to keep its box
+ * when the field is focused — a rule that thickens on focus moves the baseline and the
+ * whole page twitches — so the active state is a colour change and a glow, never a width
+ * change.
  */
 .ledger__line {
   position: relative;
@@ -158,22 +157,6 @@
 
 .ledger__line--active {
   border-bottom-color: #7a6132;
-}
-
-/* The pen resting on the line. Ink-blue, so it is the one non-paper colour here. */
-.ledger__nib {
-  flex: none;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-top: 9px solid #2c3d63;
-  opacity: 0.55;
-  transition: opacity calc(120ms * var(--anim, 1)) ease;
-}
-
-.ledger__line--active .ledger__nib {
-  opacity: 1;
 }
 
 /*
@@ -356,29 +339,6 @@
 
 .ledger-corner--striking .ledger-corner__name::after {
   transform: scaleX(1);
-}
-
-/*
- * What clicking does, said in words.
- *
- * The page-turn strips get away with no caption because a page edge under a cursor can only
- * mean one thing. A ledger with your name on it is genuinely ambiguous — it could as easily
- * mean "look at this" — and guessing wrong costs you the page you were on. So it is named,
- * quietly, and it comes up on hover.
- */
-.ledger-corner__action {
-  display: block;
-  margin-top: 6px;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 10px;
-  letter-spacing: 1px;
-  color: #9a8f78;
-  transition: color calc(140ms * var(--anim, 1)) ease;
-}
-
-.ledger-corner:hover:not(:disabled) .ledger-corner__action,
-.ledger-corner:focus-visible:not(:disabled) .ledger-corner__action {
-  color: #6a5c42;
 }
 
 /* Mid-strike: no longer offering anything, and it must not lift back up. */

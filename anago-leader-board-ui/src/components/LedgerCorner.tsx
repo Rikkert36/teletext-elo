@@ -66,20 +66,11 @@ const LedgerCorner: React.FC<LedgerCornerProps> = ({ name, onSignOut }) => {
       disabled={striking}
       title="Streep je naam door en schrijf iemand anders in"
     >
-      <span className="ledger-corner__label">Ingeschreven</span>
+      <span className="ledger-corner__label">Aangemeld</span>
 
       <span className="ledger-corner__line">
-        <span className="ledger__nib" aria-hidden="true" />
         <span className="ledger-corner__name">{name}</span>
       </span>
-
-      {/*
-        Named rather than left to the object alone. The turn strips get away with no caption
-        because a page edge under a cursor can only mean one thing; a ledger with your name
-        on it could as easily mean "look at this" as "leave", and guessing wrong here costs
-        you the page you were on.
-      */}
-      <span className="ledger-corner__action">uitschrijven</span>
     </button>
   );
 };

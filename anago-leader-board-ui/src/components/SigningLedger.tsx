@@ -85,11 +85,10 @@ const SigningLedger: React.FC<SigningLedgerProps> = ({ players, onChoose }) => {
           </label>
 
           {/*
-            The line is drawn by the wrapper, not by the input's border: the pen has to
-            sit on the rule at the left of it, and a border would run underneath the nib.
+            The line is drawn by the wrapper, not by the input's border: the rule has to
+            keep its own box so the active state can recolour it without moving the field.
           */}
           <div className={`ledger__line${focused ? ' ledger__line--active' : ''}`}>
-            <span className="ledger__nib" aria-hidden="true" />
             <input
               id="ledger-name"
               className="ledger__input"

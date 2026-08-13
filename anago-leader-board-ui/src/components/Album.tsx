@@ -296,15 +296,14 @@ interface Slot {
  * One printed line of the checklist at the back.
  *
  * `number` is the card's place in the book counted over slots only, so padding
- * pages never shift it, and `page` is where that slot is printed — which is what
- * lets a row turn the book to it.
+ * pages never shift it. There was a `page` here too — where that slot is printed,
+ * for when a row was a button that turned the book to it; it went with the button.
  */
 interface ChecklistEntry {
   playerId: string;
   name: string;
   number: number;
   count: number;
-  page: number;
 }
 
 /** A slot plus which page it is printed on, for anything navigating the book. */
@@ -404,7 +403,7 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
    * The checklist's lines, gathered as the slots pages are laid out rather than
    * walked again afterwards. Same reason `albumSlotOrder` is built from
    * `buildPages`: two passes over the roster are two things that can disagree,
-   * and here the thing they would disagree about is which page a number is on.
+   * and here they would disagree about which number is against which name.
    */
   const entries: ChecklistEntry[] = [];
 
@@ -441,8 +440,6 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
         count: section.counts.get(player.id) ?? 0,
       }));
 
-      /* Read before the push, so it is the index this page is about to take. */
-      const pageIndex = pages.length;
       slots.forEach((slot) => {
         entries.push({
           playerId: slot.card.player.id,
@@ -462,7 +459,6 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
           /* Counted over slots, so a padding page cannot shift a number. */
           number: entries.length + 1,
           count: slot.count,
-          page: pageIndex,
         });
       });
 
@@ -561,8 +557,6 @@ const PageFace: React.FC<{
    */
   visible: boolean;
   onCardOpen?: (playerId: string) => void;
-  /** Turns the book to a page. The checklist's rows are what use it. */
-  onGoToPage?: (page: number) => void;
   /**
    * Draw the icon binding.
    *
@@ -574,7 +568,7 @@ const PageFace: React.FC<{
    * that ever played was the book shutting.
    */
   binding?: boolean;
-}> = ({ page, index, visible, onCardOpen, onGoToPage, binding }) => {
+}> = ({ page, index, visible, onCardOpen, binding }) => {
   if (!page) return <div className="album__page" />;
 
   if (page.kind === 'cover') {
@@ -727,20 +721,14 @@ const PageFace: React.FC<{
             return (
               <li key={entry.playerId} className="album__entry">
                 {/*
-                  A row is a button because a checklist is a thing you look
-                  things up in: it turns the book to the page that slot is
-                  printed on. Conventional rather than an addition — and it is
-                  what makes the numbering worth printing.
+                  A printed line and nothing else. The row used to be a button
+                  that turned the book to the page that slot is printed on, and
+                  it came out: a name on this paper that lights up and answers a
+                  click is the one thing on the page reading as a control rather
+                  than as print, which is the argument that keeps the rest of the
+                  album bare. Looking a card up is what turning pages is for.
                 */}
-                <button
-                  type="button"
-                  className="album__entry-row"
-                  tabIndex={visible ? 0 : -1}
-                  onClick={() => onGoToPage?.(entry.page)}
-                  aria-label={`Nummer ${entry.number}, ${entry.name} — ${ownedLabel(
-                    entry.count,
-                  )}. Ga naar pagina ${entry.page}.`}
-                >
+                <div className="album__entry-row">
                   <span className="album__entry-nr">{entry.number}</span>
                   <span className="album__entry-name">{entry.name}</span>
                   {/* Leader dots, as a printed list has between name and mark. */}
@@ -767,7 +755,17 @@ const PageFace: React.FC<{
                   <span className="album__entry-dupe">
                     {entry.count > 1 ? entry.count : ''}
                   </span>
-                </button>
+                  {/*
+                    The mark is a drawn tick and the doubles figure is a bare
+                    numeral, so the row's state was carried by the button's
+                    `aria-label`. With the button gone it is spelled out here
+                    instead — printed off-screen, the same `ownedLabel` the card
+                    and the viewer use, so the three cannot start disagreeing.
+                  */}
+                  <span className="album__entry-state">
+                    {ownedLabel(entry.count)}
+                  </span>
+                </div>
               </li>
             );
           })}
@@ -1219,7 +1217,8 @@ const Album: React.FC<AlbumProps> = ({
   }, [focusPlayerId, pages, isMobile, maxFlipped]);
 
   /**
-   * Turn straight to a page. The checklist's rows are what use it.
+   * Turn straight to a page. The first opening is what uses it — the checklist's
+   * rows used to as well, before they went back to being print.
    *
    * **With the page-turn sound**, unlike the `focusPlayerId` effect above: that
    * one turns the book behind the card viewer's scrim, where a turn nobody can see
@@ -1664,7 +1663,6 @@ const Album: React.FC<AlbumProps> = ({
                       index={index}
                       visible={index === mobilePage}
                       onCardOpen={onCardOpen}
-                      onGoToPage={goToPage}
                       binding={showBinding}
                     />
                   </div>
@@ -1716,7 +1714,6 @@ const Album: React.FC<AlbumProps> = ({
                       index={leaf * 2}
                       visible={leaf === flipped}
                       onCardOpen={onCardOpen}
-                      onGoToPage={goToPage}
                       binding={showBinding}
                     />
                   </div>
@@ -1726,7 +1723,6 @@ const Album: React.FC<AlbumProps> = ({
                       index={leaf * 2 + 1}
                       visible={leaf === flipped - 1}
                       onCardOpen={onCardOpen}
-                      onGoToPage={goToPage}
                     />
                   </div>
                 </div>

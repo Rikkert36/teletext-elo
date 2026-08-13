@@ -1339,9 +1339,13 @@ this table applies to every control.
 - **The strike is drawn, not switched on.** A pen crossing out a name is a stroke with a
   direction and a duration; `line-through` appearing all at once is a state change, and the
   difference is the whole beat. A `scaleX` on a pseudo-element, so it costs no layout.
-- **It is captioned** (`uitschrijven`), which the page-turn strips deliberately are not.
-  A page edge under a cursor can only mean one thing; a ledger with your name on it could
-  as easily mean "look at this", and guessing wrong costs you the page you were on.
+- **It carries no caption.** It was captioned (`uitschrijven`) on the reasoning that a
+  ledger with your name on it could as easily mean "look at this" as "leave". The caption
+  was dropped: it was the one piece of interface copy left on a table that otherwise
+  explains itself, and the hover title carries the same sentence for anyone who waits.
+  The pen nib that sat on the line went with it, here and on the signing ledger — a
+  CSS triangle reads as a UI marker, not as a pen, and the handwriting already says
+  "someone wrote this".
 - **Stood down during a reveal and during the binding ceremony**, exactly as the shelf is:
   you cannot sign yourself out with a card in the air, and a way to abandon a book halfway
   through having your name blocked into it is not a thing to offer.
@@ -1892,22 +1896,22 @@ rather than overruled** — the page is not empty, it carries the voorwoord:
     case to appear once the cover had landed. Fading it in only turned a pop into a
     smear — the mismatch was structural, not a timing problem. The cover's edge has to
     be part of the object that rotates.
-  - The arithmetic lines up with the fore-edge, which is what makes the two agree rather
-    than merely coexist. A leaf sits at `left: 50%` with its origin on the spine, so a
-    board spans `[W, 2W + O]` unflipped and mirrors to `[-O, W]` flipped — exactly the
-    strips `.album__foreedge` occupies, verified on both sides.
-  - **A board's faces sit at `translateZ(0.25px)`, not `1px`.** The boards now reach into
-    the strip the fore-edge draws in, and at equal depth the board covered the page stack
-    completely. The strip cannot simply be raised, because above `1px` it also clears the
-    *pages* and the stack shows through a turning leaf. `0.25px` gives the one order that
-    is true of a book: **board < page edges < pages.**
+  - A leaf sits at `left: 50%` with its origin on the spine, so a board spans `[W, 2W + O]`
+    unflipped and mirrors to `[-O, W]` flipped. Verified on both sides.
+  - **Every face stays at `translateZ(1px)`, boards included.** They were briefly staggered
+    to `0.25px`, to sit behind a fore-edge element they had started to overlap, and it broke
+    the shut book at once: depth outranks `z-index` in a 3D rendering context, so the pages
+    sorted in front of the cover and the first page showed straight through it. Depth cannot
+    express this at all — a board is *on top of* the pile when shut and *underneath* it when
+    open — which is what `leafZ` is for, and `leafZ` only works while the depths are equal.
   - `.album__binding` is back to `inset: 0`. What is left of its job is the leather at the
     gutter and the drop shadow the object throws on the table, both of which sit behind
     the text block — so when it returns after a shut is now invisible either way, and it
     shares the inside covers' discrete reveal again.
-- **`--board-out` and the fore-edge are coupled.** The leaf stack sits inside the
-  leather overhang, so `EDGE_MIN + EDGE_RANGE` in Album.tsx (8px) must stay under it.
-  A stack wider than the boards is page edges poking out past the binding.
+- **`--board-out` is read by three things and they have to agree**: the boards grow by it,
+  the pastedowns are inset by it (a glued sheet is page-sized), and the spine caps sit in
+  it. Nothing paper-coloured is drawn in that band — see the fore-edge note below for the
+  three separate attempts that got that wrong.
 - **The pastedown is paper. The leather is the frame around it.** On a cased book the
   covering skin wraps the board's edges and folds onto the inside, and a sheet of paper
   is pasted down *inside* that fold — only the turn-in is leather.
@@ -2176,16 +2180,26 @@ unify the palette**: a tick in the paper's own brown would read as *printed* to 
   most machines this runs on.
   - The tick is drawn **124% of its box and offset**, so it breaks the printed edge.
     A mark that fits neatly inside a printed box was printed with it.
-- **The rows are the index.** Clicking one turns the book to that card's page, via a
-  new `goToPage` — which, unlike the `focusPlayerId` effect, **does** play the page
-  turn: that one turns the book behind the card viewer's scrim where an unseen turn
-  is unexplained noise, and this one is a reader asking the book for a page.
+- **The rows are not clickable, and that is settled.** They were: a row was a
+  `<button>` that turned the book to that card's page, on the reasoning that a
+  checklist is a thing you look things up in. It came out. A name that warms and
+  underlines under the cursor and answers a click is the one thing in the album
+  reading as a *control* rather than as print, and that is the same argument that
+  keeps the slots page bare and the page turns on the book's own edge. Looking a card
+  up is what turning pages is for. What went with the button: `onGoToPage` on
+  `PageFace`, `page` on `ChecklistEntry`, and the hover/focus rules plus the button
+  resets on `.album__entry-row`. `goToPage` itself stays — the **first opening** uses
+  it, and it is still the one page turn that plays the sound, unlike the
+  `focusPlayerId` effect which turns the book behind the card viewer's scrim where an
+  unseen turn is unexplained noise.
 - **It starts on a left-hand page**, by the same padding trick sections use, because
   a spread with cards on one side and a list on the other reads as a mistake.
-- **Real content, so real semantics**: an `<ol>`, with the mark `aria-hidden` and
-  the state in the row's label via the shared `ownedLabel`, plus the same
-  `visible`-gated `tabIndex` the slots use — or tabbing walks every checklist row on
-  every leaf currently rotated away.
+- **Real content, so real semantics**: an `<ol>`, with the mark `aria-hidden` and the
+  state carried in a clipped `.album__entry-state` span via the shared `ownedLabel` —
+  a tick and a bare numeral say nothing to a reader who cannot see them, and with no
+  button there is no `aria-label` to hang it on. Nothing on the page is focusable any
+  more, so the `visible`-gated `tabIndex` the rows used to need is gone with them (the
+  slots still need theirs).
 
 The three open questions from the plan all resolved without new plumbing:
 `maxFlipped` already derives from `pages.length` so appended pages are reachable;
@@ -2928,7 +2942,7 @@ way round they finish:
   the flip is the only beat that needs to know what the card is. A face-down card is a
   card you are waiting on; a torn wrapper with nothing under it is a page that has hung.
 
-Four things fell out of it, all of them in the component:
+Three things fell out of it, all of them in the component:
 
 - **`waiting` shares the whole of `revealing`'s markup** rather than getting a branch of
   its own. A separate branch is a separate element, so the riser would unmount and
@@ -2941,9 +2955,6 @@ Four things fell out of it, all of them in the component:
   long over; `CEREMONY_LEAD_MS` — the beat where a rare card sits looking like any other
   — has just been held for longer than it asks for, by the network. The turn is what
   happens next, which is the point: the flip *is* the answer arriving.
-- **A skip that lands before the cards do is held, not swallowed.** Finishing on an empty
-  hand would report a pack of nothing while the server was still filling it, so the click
-  is remembered and honoured the moment the roll lands.
 - **`onFailed` is now a required prop.** A refusal used to leave the packet sealed and the
   page stranded behind an exit button that hides itself for the length of a reveal —
   wrong, but invisibly so. Something has visibly begun now, so it has to visibly end: the
@@ -3370,10 +3381,9 @@ it in `PackOpener.tsx`:
 - **No `title` for the whole beat.** A native tooltip naming the player is
   precisely what is being written on, and the cursor is already sitting on the
   card because that is where the packet was.
-- **Reduced motion and the skip both land on the finished card.** Neither ever
-  enters the reveal: reduced motion and fast mode jump straight from the click to
-  the results grid, and a click mid-reveal clears every pending timer and does the
-  same. Cards there carry no `reveal` prop at all, so they render exactly as they
+- **Reduced motion lands on the finished card.** It never enters the reveal:
+  reduced motion and fast mode jump straight from the click to the results grid.
+  Cards there carry no `reveal` prop at all, so they render exactly as they
   do in the album. The `prefers-reduced-motion` block in card.css is a second
   guard behind that, and it resolves to the *finished* state — a card with its
   name on — rather than to a nameless one.
@@ -3478,8 +3488,9 @@ rush. `revealMs: 1700` is *derived*, not chosen: a nine-cell card spends 25% of
 its motion on the first wait, which at the settled ×2 is ~860ms. Change `ease`
 and it has to be re-derived or the weight goes. The beat runs ~3.4s real, about
 4.4s post-flip for a new card and ~24s for a five-new-card pack — far past the
-original "under two seconds" target, and a deliberate trade. Click-to-skip covers
-the impatient case and the long version gets rarer as the album fills.
+original "under two seconds" target, and a deliberate trade. Nothing covers the
+impatient case any more (see "The reveal is watched, not skipped"); the long
+version simply gets rarer as the album fills.
 
 Schedules are **normalised**, so a seven-cell card and an eleven-cell card take
 exactly as long as each other. Same rule that made the beat's length independent
@@ -3912,8 +3923,30 @@ which is deleted.
 
 ### Pacing: two knobs, and everything derives from them
 
-At three games a day this plays ~1,000 times a year, so it must be skippable and
-brisk. A click anywhere always jumps to the end state.
+At three games a day this plays ~1,000 times a year, so it must be brisk.
+
+#### The reveal is watched, not skipped
+
+**There is no click-to-skip, and no "n / 5" counter under the stage.** Both were
+there and both came out: a click anywhere used to land on the results grid, and the
+hint line counted the pack down while advertising the escape.
+
+The counter went because it turns a reveal into a queue — you read "2 / 5" and start
+waiting for 5 rather than looking at the card in front of you. The skip went with it
+because the two were the same offer, and because an opening you are being invited to
+cut short is one the pacing above cannot justify: every number in this section is
+tuned for a beat that gets watched.
+
+What this costs is real and was accepted: **a 90+ holds for over five seconds before
+it turns and nothing shortens it.** If that ever stops being tolerable the answer is
+to lower `DEFAULT_CEREMONY_MS`, not to put the click back.
+
+`fastMode` — the test panel's `snel openen` — is the only remaining bypass, and it is
+not reader-facing. Reduced motion still lands straight on the results grid.
+
+The hint element is kept for the revealing phase, rendering `&nbsp;`. It is a spacer
+as much as a caption; removing it shortens the column at the tear and again at the
+results.
 
 - **`DEFAULT_SCALE`** (`utils/animationSpeed.ts`) is a duration multiplier,
   **settled at 2**. Published to CSS as `--anim`; every CSS duration is
@@ -3945,9 +3978,9 @@ brisk. A click anywhere always jumps to the end state.
   | 4 | 90+ | 5320ms | 3960ms |
 
   A 90+ now holds for over five seconds before it turns. That is a long time for
-  something that plays ~1,000 times a year, and it is only tolerable because a
-  click skips straight to the end state — if the skip ever stops working, this
-  number is the first thing to reconsider.
+  something that plays ~1,000 times a year, and since the skip was removed there
+  is nothing to shorten it — so **this is the first number to reconsider** if the
+  wait ever stops being worth it.
 
 One knob for both sound and visual is deliberate: a slider that only slowed the
 audio would drift out of step with the glow, and the riser has to *end* exactly

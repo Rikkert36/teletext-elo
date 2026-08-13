@@ -1230,10 +1230,13 @@
 }
 
 /*
- * A row is a button, stripped back to the printed line it has to look like.
+ * A row is a printed line, and nothing about it responds to a hand.
  *
- * `width: 100%` with `text-align: left`, because a button is neither by default
- * and a centred name in a ruled list is instantly wrong.
+ * It used to be a button that turned the book to the card's page, with a hover
+ * that warmed the line and underlined the name. All of it came out: it was the one
+ * thing on this paper reading as a control, which is the same argument that keeps
+ * the rest of the album bare. The reset rules a button needed (`border`, `background`,
+ * `font: inherit`, `text-align: left`) went with it.
  */
 .album__entry-row {
   display: flex;
@@ -1242,13 +1245,6 @@
   gap: 4px;
   width: 100%;
   height: 100%;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
   color: #4a3a1c;
   font-family: Georgia, "Times New Roman", serif;
   /* Inherited from the page, which is where the one rounded size lives. */
@@ -1256,23 +1252,17 @@
 }
 
 /*
- * Hovering warms the line rather than boxing it. The same deal the page-turn
- * strips offer: light, not a UI state — nothing on this paper should look like a
- * control until a hand is on it.
+ * The row's state in words, for a reader who cannot see a drawn tick — it was the
+ * button's `aria-label` before the button went. Clipped rather than
+ * `display: none`, which would take it out of the accessibility tree too.
  */
-.album__entry-row:hover {
-  color: #2f2410;
-}
-
-.album__entry-row:hover .album__entry-name {
-  text-decoration: underline;
-  text-decoration-color: rgba(107, 83, 37, 0.4);
-  text-underline-offset: 2px;
-}
-
-.album__entry-row:focus-visible {
-  outline: 1px solid var(--accent, #a9853c);
-  outline-offset: 1px;
+.album__entry-state {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /*

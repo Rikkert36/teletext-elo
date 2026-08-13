@@ -47,9 +47,11 @@ import '../styles/packopen.css';
  *
  * So 320 + 140 + 820 + 340 = 1620 base, about **3.2s real** at the settled ×2,
  * against a duplicate's 1.68s. Past the "under two seconds" target the design
- * started with, and a deliberate trade for a reveal worth watching:
- * click-to-skip keeps it tolerable at roughly a thousand openings a year, and
- * the trade unwinds on its own as the album fills and fewer cards are new.
+ * started with, and a deliberate trade for a reveal worth watching. There is no
+ * longer a way out of it mid-run — the click-to-skip this used to lean on is
+ * gone — so the trade only unwinds on its own, as the album fills and fewer
+ * cards are new. `fastMode` (the test panel's `snel openen`) is the one bypass
+ * left, and it is not a reader-facing one.
  *
  * For the record, because it is the reason the trade was worth arguing about at
  * all: the shard family that lost ran 2340 base — **4.7s** per new card and
@@ -516,8 +518,8 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    */
   const [motesOut, setMotesOut] = useState(false);
   /**
-   * True when the results grid was arrived at by the final FLIP rather than by a
-   * skip. Suppresses the grid's own entrance animation, which would fight it.
+   * True when the results grid was arrived at by the final FLIP rather than by the
+   * fast path. Suppresses the grid's own entrance animation, which would fight it.
    */
   const [settledByFlip, setSettledByFlip] = useState(false);
 
@@ -535,14 +537,6 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    * other half is `cardsRef`, which the tear timer reads. See `start`.
    */
   const stalled = useRef(false);
-  /**
-   * A skip that arrived while there was still nothing to skip *to*.
-   *
-   * Remembered rather than swallowed: the click means "I do not want to watch this",
-   * and that is just as true of a reveal that has not started yet. Honoured by
-   * `rollLanded`, which then goes straight to the results.
-   */
-  const skipped = useRef(false);
   /**
    * Where the card is on screen, in viewport pixels, for the stage bloom and
    * vignette to centre themselves on.
@@ -737,8 +731,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
      * to land costs nothing and keeps the drain visible.
      *
      * Its own timer rather than the shared `after` helper: scoped to the effect, so
-     * the cleanup cancels it on a skip or an unmount without touching the reveal's
-     * timeline.
+     * the cleanup cancels it on an unmount without touching the reveal's timeline.
      */
     const timer = window.setTimeout(
       () => setMotesOut(true),
@@ -1043,7 +1036,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       }
     });
 
-    if (fastMode || prefersReducedMotion() || skipped.current) {
+    if (fastMode || prefersReducedMotion()) {
       setLanded(drawn.length);
       finish();
       return;
@@ -1117,24 +1110,6 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       stalled.current = true;
       setPhase('waiting');
     });
-  };
-
-  /** Clicking anywhere mid-animation lands immediately on the end state. */
-  const skip = () => {
-    if (phase !== 'tearing' && phase !== 'waiting' && phase !== 'revealing') return;
-
-    /*
-     * The roll is still out, so there is no end state to land on yet — and finishing
-     * on an empty hand would report a pack of nothing while the server was still
-     * filling it. Held instead, and honoured the moment the cards arrive.
-     */
-    if (cardsRef.current.length === 0) {
-      skipped.current = true;
-      return;
-    }
-
-    setLanded(cardsRef.current.length);
-    finish();
   };
 
   /** This packet's colourway. Derived from the pack id, so it matches its tile. */
@@ -1254,7 +1229,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       : `${newCount === 1 ? '1 nieuwe kaart' : `${newCount} nieuwe kaarten`} toegevoegd aan je album`;
 
   return (
-    <div className="opener" onClick={skip}>
+    <div className="opener">
       {/*
         The wrapper lives *in* the stage, and the empty revealed row is rendered
         under it — so the sealed, tearing and revealing phases are all the same
@@ -1508,18 +1483,11 @@ const PackOpener: React.FC<PackOpenerProps> = ({
           </div>
 
           {/*
-            Blank while waiting, like the tear's, rather than "1 / 0". The counter is
-            a fact about a pack that has been rolled, and there is not one yet.
+            Kept, and deliberately empty. The line is a spacer as much as a caption —
+            every other phase has one, and dropping the element here would shorten the
+            column by its height at the tear and again at the results.
           */}
-          <div className="opener__hint">
-            {cards.length > 0 ? (
-              <>
-                {cursor + 1} / {cards.length} — klik om over te slaan
-              </>
-            ) : (
-              <>&nbsp;</>
-            )}
-          </div>
+          <div className="opener__hint">&nbsp;</div>
         </>
       ) : null}
 
