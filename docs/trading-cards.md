@@ -1,6 +1,37 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-12)
+## Where this stands (last updated 2026-08-13)
+
+**The last button on the table is gone, and the cards do its job.** A reveal ends with the
+row of cards still lying there and the shelf live over it, so there are two things on the
+table: another packet — which **adds its cards to the same row** — or this row, which you
+click to file. Filing drops the doubles off the bottom, stands the keepers aside, brings the
+book back, and puts them in **one at a time, lowest rated first**, turning to each card's
+page and leaving each slot alone for a beat before the book moves again. It ends open on the
+best card on the table.
+
+**The row waits because it is the record of what you opened**, and that took four goes to
+arrive at: a clickable results grid, a fore-edge compromise, a fully automatic version with a
+count under it, and this. The live shelf is what makes the click a decision rather than a
+"continue". Two things then make the filing read as one continuous thing rather than a screen
+change: **the cards never leave the screen** between the packet and the album, and **nothing
+resizes** — a card in the row is exactly `--album-card-w`, a slot's width, so the whole
+sequence is translation. The row scrolls once it outgrows the book. A sealed packet you have
+changed your mind about goes back on the shelf by clicking the wood beside it — or files the
+row, if there is one, because putting the packet down is the same decision.
+
+**The book also stopped snapping.** `goToPage` set `flipped` in one go, so a move of more
+than one leaf rotated every leaf in between on the same frame — which is not a page turn.
+It **riffles** now: one leaf at a time, each with its own sound, quicker per leaf
+(`RIFFLE_MS`, published as `--leaf-ms`) when several are queued. It only ever mattered once
+something walked the book across pages in view, which is what putting a pack away does.
+
+`PutAway` and `putaway.css` are new; `Album` gained `openAtPlayerId`, `turnToPlayerId`,
+`onTurned` and `holdSlots`; the opener gained `table` and renders one row across every phase;
+`.game-button--away`, `.opener__results` and `opener-settle` are deleted. The pacing is
+deliberate — about nine seconds for three new cards. See "Putting the pack away, and the last
+button on the table", which records all four versions and why the row belongs to the sitting
+rather than to the packet, and "Riffling" under the album.
 
 **The table stopped negotiating its own sizes.** Three things on this page were sized by
 picking a number and letting whatever depended on it give way, and all three now run the
@@ -113,8 +144,11 @@ whole page. So:
 - On the page, the state is parked in a ref until the reveal ends rather than applied on
   arrival, or the book would quietly gain its new cards while you were still watching
   them come out of the packet. It carries the player id it belongs to, and **every** path
-  that ends a reveal applies it — including "terug naar het album", which previously left
-  a claimed packet on the shelf that 404'd when clicked.
+  that ends a reveal applies it — including the exit, which previously left a claimed
+  packet on the shelf that 404'd when clicked. (That exit was a button then. There is no
+  exit at all now — the reveal runs on into the cards being put in the book, see "Putting
+  the pack away" — and the guarantee is unchanged and load-bearing in a new way: the cards
+  have to be in the collection *before* they are flown into it.)
 
 **And the tear no longer waits for it.** The claim being a network call meant the packet
 sat in your hand for the length of a leaderboard replay before anything moved, which reads
@@ -1485,10 +1519,59 @@ the book appear.
 - **Nothing on the shelf has to be legible at the book's own scale.** The stain's name is
   set on the wood *under* the book rather than printed on it, and the covers are blocked
   blind — a series name and a rule, no owner. That is the whole reason a 36% book works.
-- **The finished book is its own element**, at exactly `--page-w × --page-h` and centred in
-  a well that reserves the album's footprint including the nav-label row. The shelf book
-  is a small flat approximation; the handover has to land on the real geometry or the
-  book jumps at the swap. The two crossfade.
+- **The finished book is its own element**, drawing the shut album's box rather than
+  growing the shelf book into it — that one is a small flat approximation, and the
+  handover has to land on the real geometry or the book jumps at the swap.
+- **The swap is hard: nothing crossfades and nothing is measured.** `AlbumChoice` simply
+  stops existing and `Album` renders in its place, so every box in the ceremony has to be
+  the album's own *to the pixel*, derived in CSS from the same tokens. Three of them, and
+  all three have been wrong:
+  - **The shut book is a board, not a page.** `--page-w + --board-out` wide and
+    `--page-h + 2 × --board-out` tall, centred on its first `--page-w` so the overhang
+    falls on the fore-edge, and sitting `--board-out` above the book's own top — which is
+    where a shut `.album` puts `.album__leaf--cover`. It was the paper's box, so the cover
+    grew 9px on three sides and rose 9px at the swap. This is what put `--board-out` on
+    `:root` rather than on `.album`: the ceremony has to draw the album's box while the
+    album is not mounted.
+  - **The label row above it** has to match `.album__nav-label` in every declaration, and
+    it got this wrong twice. First `min-height: 1.2em` against the label's
+    `calc(1.35em + 6px)` — 8px of reserve the album had and the ceremony did not, and the
+    book dropped 8px. Then both at `calc(1.35em + 6px)`, which is **24.891px, shorter than
+    a line box**: `line-height` inherits 1.5 from MUI's `CssBaseline`, so a filled row is
+    `1.5 × 14px + 6px` = 27px. That only matters because **a shut desktop book's label is
+    genuinely empty** — `spreadLabel()` returns `''` at `flipped === 0` (`gesloten` is the
+    mobile branch) — so it collapsed to the reserve while the ceremony's row, which carries
+    a non-breaking space, stood at a full line. The book jumped **up** 2.1px.
+    - The same 2.1px was in the album on its own, and had been all along: opening a shut
+      book gave the row `pagina 1 / …` and pushed the book back down. Nobody had spotted it
+      because it coincides with the cover swinging open.
+    - Both rules now state `line-height: 1.5` and reserve `calc(1.5em + 6px)`, so empty and
+      filled are the same height. The `line-height` is stated rather than inherited on
+      purpose: a reserve derived from a figure that lives in another package is a reserve
+      that silently goes short again.
+    - **Neither figure was found by reading the CSS**, and the second one survived a careful
+      read that "proved" the rows matched. They came out of a harness that renders both DOMs
+      against the real stylesheets and diffs `getBoundingClientRect()` — the discrepancy is
+      nowhere near the book, and 2px is small enough to disbelieve. Reach for the harness
+      earlier next time.
+  - **The well** reserves the album's footprint: `--page-h + 8px`, which is `.album`'s own
+    `padding: 4px 0` around a page. The padding is *inside* that figure because MUI's
+    `CssBaseline` puts the whole app in `box-sizing: border-box` — worth knowing before
+    "correcting" it, since it reads like a rule counting its padding twice. The boards
+    overhang out of the well, as they do out of `.album`.
+  - On a phone all of this is the paper's box again, because `.album--mobile` slides one
+    page at a time and has no board leaves at all.
+- **The cover is set unkerned, on both sides, and that lives on `.album__cover`.** The
+  ceremony renders the name as one inline-block per character — it has to, each letter
+  arrives on its own beat — and inline-blocks cannot kern across their boxes. So the
+  ceremony is unkerned whatever the album does, and `font-kerning: none` scoped to the
+  ceremony meant the album re-kerned the same name at the swap and every letter past the
+  first pair shifted. At `letter-spacing: 2px` on Georgia caps there is very little kerning
+  left to do, which is why it took a while to see.
+- **The stage carries no `border-radius`.** `.album__leaf--cover` has none — the brass
+  hairline is a box-shadow on a square board — while `.album__cover` inside it is rounded
+  `0 3px 3px 0`. A shut album is rounded leather with a square hairline just outside it. A
+  radius on the stage rounded the hairline too, and those two corners popped square.
 - **The name is stamped with `playFoilStamp`, which is new.** `playSlot` per letter was
   tried and is audibly wrong: eleven grains over 100ms plus a 130Hz boom, so at ~45ms a
   letter (base) the grains smear into a wash and the booms become a pitched pulse train.
@@ -1527,6 +1610,13 @@ along with `hint`, `everOpened` and the effect that latched it.
   on. The album's own guard is a ref, and a ref does not survive the remount.
 - **Reduced motion turns to it with no wait**, per the rule the rest of this page follows:
   land on the finished state, never play it stilled.
+- **A just-bound book ignores the saved reading position and mounts at leaf 0.** The
+  bookmark is keyed per owner and *outlives the album it describes* — `leegmaken` destroys
+  the book and not the bookmark — so binding a second album under the same name mounted it
+  already open, somewhere in the middle of the previous one. The ceremony handed a shut
+  cover over to a book lying open at page nine, and the beat this whole section is about
+  had nothing left to do. Read at mount only, which is enough: `justBound` is raised in the
+  same handler that swaps the ceremony out, so it is already true on the first render.
 - Somebody returning tomorrow to a book they never opened is a different case and gets a
   shut book, because `justBound` is session state and their saved position is leaf 0. That
   is deliberate — the ceremony is what earns the automatic opening, and there is none on a
@@ -2117,11 +2207,46 @@ plus a vertical falloff so it does not read as a flat ribbon of stripes.
     (`--edge-w`), and a property that changes because a `var()` it references changed
     does not reliably start a transition, so the width went on snapping at click.
   - So `settledFlipped` in Album.tsx holds the *state* back by one flip instead, on a
-    `setTimeout(ms(SHUT_MS))` — `SHUT_MS` is already documented as matching
-    `.album__leaf`'s transition and `ms()` scales it by the same `--anim` the CSS
-    multiplies by, so the two cannot drift. Reduced motion sets it straight through, or
-    the stack would freeze a turn behind a flip that never animates. **Do not add a
-    width transition back on top of this** — the two compose into a double delay.
+    `setTimeout(ms(leafMs))` — the leaf's own live duration, which `.album__leaf` reads as
+    `--leaf-ms` and which the riffle shortens (see "Riffling" below). It was a literal
+    `SHUT_MS`, which is right for a single turn and two leaves behind during a riffle.
+    `ms()` scales both by the same `--anim` the CSS multiplies by, so the two cannot
+    drift. Reduced motion sets it straight through, or the stack would freeze a turn
+    behind a flip that never animates. **Do not add a width transition back on top of
+    this** — the two compose into a double delay.
+
+#### Riffling: several leaves, one at a time
+
+**`goToPage` sets `flipped` in one go, and a jump of more than one leaf in view is not a
+page turn.** Every leaf in between changes class on the same frame, so they all rotate at
+once, and `setMoving` can only mark one of them — the rest keep the fore-edge hairline it
+exists to suppress. It reads as one turn and then a snap to the destination.
+
+That went unnoticed for as long as it did because `goToPage`'s only two callers could not
+hit it: the **first opening** is one leaf from a shut book, and `focusPlayerId` turns the
+book behind the card viewer's scrim, where nothing is seen. Putting a pack away is the
+first thing that walks the book across several pages **in view**.
+
+So `turnToPlayerId` walks: one leaf at a time, each a real turn with its own sound, and
+strictly sequential — one leaf in flight at any moment, because `moving` and the
+pile-splitting maths above can only describe one. Per leaf it uses `RIFFLE_MS` (280)
+rather than `SHUT_MS` (620) whenever more than one leaf is left to go, published to the
+CSS as `--leaf-ms` so the transition and the walk's own timer are the same number by
+construction. Three leaves are then ~1.7s rather than ~3.7s.
+
+- **One duration for the whole walk**, decided before the first leaf moves, so the leaves
+  of one riffle all turn at the same rate.
+- **`turn()` resets it to `SHUT_MS`.** A hand on the paper is always a full turn, and
+  `leafMs` is state that outlives the walk that set it — without the reset, every page the
+  reader turned after a pack had been put away would keep the riffle's clock for the rest
+  of the session. It is reset *there* rather than at the end of the walk because
+  `settledFlipped`'s timer is keyed on `leafMs`, and re-arming it the moment the last leaf
+  lands would leave the pile edges a beat behind the paper.
+- **The album reports arrival** (`onTurned`), and the placing sequence waits for that
+  instead of timing the turn. How long a move takes is a property of the distance — none,
+  one leaf, or five — so any caller guessing it either flies a card at a page still in the
+  air or pays a turn's worth of beat for a turn that never happened. It fires on every
+  path, including the ones with nothing to do, or a sequence waiting on it stalls.
 
 #### The checklist at the back — built
 
@@ -2308,6 +2433,20 @@ carrying.
     strip only ever the fallback. So the mobile widening (`clamp(34px, 11vw, 56px)`,
     justified by a thumb having no hover to hint with) is gone too — the fallback is
     the thing that gives way.
+  - **…but the hit area now reaches `--turn-reach` (18px) *outward*, past the trim.**
+    Bounding the box on the page margin also bounded it on the trim, which put the
+    hitbox's outer wall on the exact line a hand aims at: a click on the board's
+    overhang — visually part of the book — or a few px into the felt beside it hit
+    nothing, and the miss is in the direction where there is nothing else to hit.
+    `--board-out` of the 18px is that overhang, the rest is slack. Outward only, so
+    the inward boundary is still the card column and the paragraph above still holds.
+    It cannot grow much further: `--shelf-room` is built to leave `--shelf-gap + 16px`
+    (≥26px) between the book and whatever lies in either margin, so ~26px would start
+    eating the first packet.
+  - The *lit* band is still exactly the margin. The wash is on `::before`, inset back
+    by the reach, or the light would spill onto the felt and stop reading as a page
+    edge being lifted — and the focus ring moved onto that pseudo element for the same
+    reason, since an inset ring on a box wider than the book is still drawn outside it.
 
 **Left and right arrow keys turn the page too**, clamped at both ends like the
 strips. On the window rather than on the book: the strips are the only focusable
@@ -3010,7 +3149,10 @@ Four things had to follow from it:
   - The gold build's vignette is `position: fixed` and covers the shelf for free, but
     only on the ~28% of cards that get a ceremony and only once it has ramped. The
     dim has to hold for the other 72%.
-  - **"terug naar het album" stands down with it**, and did not at first. The exit sat
+  - **"terug naar het album" stood down with it**, and did not at first. (The exit is
+    gone entirely now — see "Putting the pack away, and the last button on the table".
+    What follows is why it had to hide, which is the argument its replacement inherits.)
+    The exit sat
     live under the opener while the pile beside it was dimmed and unclickable, which
     is a control contradicting the rule the shelf had just stated — and it was also a
     hole in that rule, since `revealing` is raised by `onStart` and lowered only by
@@ -3037,6 +3179,338 @@ vignette clears its hole at 45% of the *viewport* — so the card would drift ou
 its own spotlight on exactly the pulls the spotlight is for. Underneath is no better:
 the opener is 62vh and centred, so packets below it start off screen. The stacked
 layout keeps the old round trip, and loses nothing it had.
+
+### Putting the pack away, and the last button on the table
+
+**There is no "terug naar het album" any more, and no button anywhere on this page.** The
+exit was the last undisguised control left — the register in the margin had already taken
+the header's type-ahead, the turn strips had taken the page arrows, the cover click had
+taken "open" — and it was the only one whose replacement had to be invented rather than
+found. Everything above about hiding it for the length of a reveal (`.game-button--away`,
+`visibility`, the row keeping its box) is history: the rule stands and the element it was
+written for is gone.
+
+What replaces it is the cards themselves:
+
+1. the last card flies down into the row like every other one, and **the row stays**;
+2. the shelf brightens, and there are now two things on the table — another packet, or
+   this row. A second packet **adds its cards to the same row**;
+3. clicking the row files it: the doubles drop off the bottom and the keepers move out of
+   the middle to stand beside the book, together — **on a table with no book on it yet**;
+4. the book fades in, now that the middle is empty, and nothing else moves while it does;
+5. they go in **one at a time, lowest rated first** — the book turning to each card's page,
+   however many leaves that takes, the card crossing to its slot only once the paper has
+   landed, and the slot left alone for a beat before the book moves again;
+6. a beat with the finished book, and then the shelf brightens again.
+
+**The book is not on the table until step 4**, though it is mounted from step 3 — `PutAway`
+measures it to know where to stand the cards, so it has to be in the document from the first
+frame. It is `opacity: 0` until the middle is empty, because a book appearing underneath
+cards that are still moving is two things happening in one place. The fade is on `.album`
+and is a **group** fade: that element already carries `perspective`, so the whole book
+composites and then goes transparent as one image, and a dozen stacked leaves never show
+through each other. A transform would have been the nicer entrance and is not available — it
+would make `.album` a containing block for the fixed layers the re-binding hangs inside it.
+
+#### Why the row waits, which took four goes to get right
+
+**The row is the record of what you opened**, and that is the whole argument for it. It is
+static and it survives you looking away — a reader who was making coffee comes back to the
+packet's contents laid out in front of them. Nothing else on this page provides that: once
+the cards are in the book, the album marks nothing at all.
+
+The four versions, because every one of them is easy to re-propose:
+
+- **A results grid you clicked**, at a third card size after the hero and the row, with the
+  shelf inert beside it. The size was wrong and the inert shelf was worse: a screen that
+  waits for a click is a screen where something is on offer, so the one thing on offer was
+  a control with a dimmed table around it. `.opener__results`, `.opener__result`,
+  `opener-settle`, the `--settled` guard and `settledByFlip` all went with it — `done` now
+  renders the same row `revealing` does, so the last card's flight no longer spans a subtree
+  swap and nothing about the column changes at the moment the reveal ends.
+- **One landing shown properly and the rest absorbed into the book's fore-edge**, to avoid
+  paying for page turns. Deleted along with its `foreEdge` helper: the turns are the
+  sequence, not its overhead.
+- **Fully automatic**, filing itself the moment the reveal ended, with a held row and
+  "2 nieuwe kaarten voor je album" under it. No chore — and no record either. The line was a
+  receipt for a transaction the reader had just watched, and once the cards were in the book
+  the only trace of the packet was a few seconds of motion that may not have been seen.
+- **The row waits, and the shelf stays live over it.** Which is the version above, and the
+  difference from the first two is the *live shelf*: the click stops being a "continue" and
+  becomes a decision, because there is a real alternative next to it. Filing is what you do
+  when you have stopped opening, not a step between packets.
+
+So the shelf's own rule is what carries this, and it is worth restating: the pile brightening
+is the invitation. It brightens when the reveal ends, which is what makes "another packet"
+the peer of "file these".
+
+**`revealing` is back, and `handsFull` is derived from it.** The guard over the shelf and the
+register is `revealing || placing !== null` — two spans with a real pause between them, and a
+single stored flag could not describe that. `revealing` means what it always did (the tear to
+the last card settling); `placing` is non-null for the filing. Every path that unmounts the
+opener still has to lower `revealing`, or the shelf stays dimmed and inert for the rest of
+the session.
+
+#### The table, and who owns it
+
+The row belongs to the **sitting**, not to the packet, which is the one structural
+consequence of all this:
+
+- **`table` on the page holds the cards from *earlier* packets only**, and the opener draws
+  them ahead of its own. So nothing is ever counted twice, and the reveal's FLIP lands into a
+  row that already has cards in it — the ones already there slide as it grows, exactly as
+  they do within a single pack, because they are in `prevRects` like everything else.
+- **`openerCards` is a ref**, holding what the packet on the stage turned over. It joins
+  `table` at exactly one moment: when the reader reaches for the next packet. Moving it
+  earlier would draw every card twice, because that opener is still mounted and still drawing
+  them. Moving it later would lose them.
+- **Slot refs are keyed by position in the row**, not by position in the pack (`rowIndex`),
+  and so is `pendingFlip`.
+- **The row is rendered once, outside the phase branches.** It used to be three separate
+  elements that happened to look alike, one per phase; a row that survives a packet cannot be
+  one of those.
+- **`PutAway`'s `flying` is a row position, not a player id.** A row spanning two packets can
+  hold the same player twice — new in the first, a double in the second — so an id does not
+  identify a card on the table. It still identifies a *slot*, which is all the flight and
+  `held` need.
+- Every path that ends a row without filing it empties `table` (`stopPlacing`), or filed
+  cards reappear on the table the next time a packet is opened. `openPack` is the single
+  exception and says so.
+
+**The row scrolls, but only once it has to.** Two or three packets outgrow the width of the
+book, and the alternatives were wrapping — impossible inside a column whose height is reserved
+to the pixel — and shrinking the cards, which is exactly what the size parity below exists to
+prevent. So `.opener__revealed` is `var(--book-w)` wide (the shelf and the register are
+absolutely positioned in the margins beside it, and a wider row would take their clicks), and
+`.opener__hand` inside it carries `margin: auto`: that centres a row that fits and computes to
+zero on one that does not. `justify-content: center` cannot do that job — a centred overflow
+puts its own start before the scroll origin, where no browser will let you reach it. The reveal
+scrolls the row to its end as each card lands, or a card would be flown at a position nobody
+can see.
+
+**`overflow-x: auto` is on a class, and it has to be.** A scroll container clips *both* axes —
+`overflow-x: auto` computes `overflow-y` to `auto` as well, and CSS has no way to ask for a
+horizontal clip alone — so a row that is permanently a scroller cuts the top off the card
+descending into it from the stage. The reveal's FLIP starts that card at the hero's position,
+well above the row, and it appeared from behind an invisible edge instead of travelling. One
+packet never overflows (five cards at a slot's width fit inside the book), so the ordinary
+reveal is clipped by nothing at all. `PackOpener` measures the hand against the row in a layout
+effect declared **above** the FLIP effect, so the class is settled before the flight is
+measured, and toggles it imperatively — a state update would apply a commit too late.
+
+- Known cost: a card descending into an *already overflowing* row is still clipped at that
+  edge, which is a second packet opened onto a long row. Fixing it needs the descent to escape
+  the scroller — a fixed-position flight like `PutAway`'s — or the row to be a fan of
+  overlapping cards rather than a scroller, which is the alternative that was on the table when
+  the scrollbar was chosen.
+- The scrollbar gets 16px of bottom padding and the same negative margin, so it cannot draw
+  over the cards and cannot change the column's height when it appears.
+- **It measures only when the row's contents change, and that is not an optimisation.** It
+  ran on every render for one round, and reading `offsetWidth` forces a style and layout
+  flush — see the trap below, which it walked straight into.
+
+**A forced layout mid-reveal makes every unbatched commit real, and that is a bug waiting to
+happen.** `playCard` resets ten pieces of state, one of which is the cursor the riser is keyed
+on, and it runs from a timeout — which legacy `ReactDOM.render` does not batch. Normally that
+costs nothing: the commits are all in one task, so the browser computes style once and sees
+only the last of them, and the riser mounts already face-down. Put anything that flushes
+layout between them and each intermediate state becomes observable — the new riser mounts
+while `faceUp` and `portraitIn` still describe the card that has just gone, so the card being
+brought on **visibly rotated from face-up back to face-down and landed on its silhouette**,
+spoiling the pull it was about to make. It is the artefact `HANDOFF_MS` describes, one beat
+earlier, and a layout effect added for the scroller was enough to bring it back.
+
+`playCard` batches now, so it cannot recur whatever anybody measures later. The rule to carry
+forward: **anything reading layout while the opener is running has to earn it**, and the
+sequencing must not depend on the browser choosing to coalesce commits.
+
+#### Nothing resizes
+
+A card in the row is exactly `--album-card-w`, the width of a slot in the book, so the whole
+sequence is translation — the flight applies no scale at all. The row was briefly a flat 100px,
+smaller than a slot at every window size, so the cards ended the reveal too small to read and
+then had to *inflate* into the album, which reads as a transition between two screens rather
+than as a card being put where it goes. The row's `min-height` tracks the same variable, or it
+silently clips.
+
+**And the clone that flies has to size the card, not its wrapper.** `putaway.css` set
+`--card-width: 100%` on `.putaway__flight`, and it did nothing: `.card` declares
+`--card-width: 150px` on *itself*, and a custom property declared on an element beats one
+inherited from its parent. So every clone rendered at a flat 150px — wider than a slot at most
+window sizes — and the cards visibly grew as they left the table and shrank into their slots,
+which is the one thing this section exists to prevent. The rule is `.putaway__flight .card`,
+exactly as `.album__slots .card` is. **Anything that wants to size a card has to target the
+card.**
+
+#### One card at a time, and the book turns to each
+
+**Lowest rated first, working up.** The sequence climbs to the best card on the table and
+leaves the book open on it, which is the only ordering that ends on the thing worth ending
+on. The sort is stable, so equal ratings keep the order they came out of the packet.
+
+This is the expensive decision and it was taken deliberately. A page holds six slots, so
+several new cards are usually spread over several pages, and every one of those pages is
+turned to. The beats:
+
+| beat | base | real | when |
+| --- | --- | --- | --- |
+| `CLEAR_MS` | 420 | 840ms | a keeper moving aside, staggered by 70 |
+| `TOSS_MS` | 520 | 1040ms | a double dropping off the table, same stagger |
+| `PLACE_ARRIVE_MS` | 420 | 840ms | the book fading in on the cleared table |
+| the turn | — | 1240ms, or 560ms a leaf | reported by the album, not timed here |
+| `FLIGHT_MS` | 460 | 920ms | the card crossing to its slot |
+| `PLACE_SETTLE_MS` | 420 | 840ms | the card that just landed, left in its slot |
+| `PLACE_REST_MS` | 520 | 1040ms | the finished book, before the shelf comes back |
+
+So three new cards on three different pages run about nine seconds. **That is the intended
+pace**, not a cost being tolerated: the placing is the part where the album gains something,
+and the same argument that lets the reveal spend 3.2s on one card applies here. Nothing is
+rushed and nothing overlaps that should not — in particular a card sets off **only after the
+paper has landed**, and a card that has just landed is left in its slot before the book moves
+again.
+
+- **The turn is not timed by the page.** The album reports arrival through `onTurned`, and the
+  sequence waits for it. It used to compare *pages* and then wait a fixed `SHUT_MS`, which was
+  both conservative (two pages of one spread are already both on screen, so it paid for turns
+  that never happened) and simply wrong once a move could take several leaves — see "Riffling"
+  under the album. `PLACE_TURN_CAP_MS` is the net under it: a report that never came would
+  strand the page with its table dimmed, which is the same class of bug as an opener that
+  never reaches `onFinished`.
+- **`openAtPlayerId` for the first card, `turnToPlayerId` for the rest.** The album is
+  unmounted for the whole of the opener, so arriving already open on the first card's page is
+  free — `openAtPlayerId` is read in the `flipped` initialiser and outranks both the saved
+  reading position and `justBound`. `turnToPlayerId` is the audible sibling of
+  `focusPlayerId`: the viewer's turns happen behind a scrim where a page-turn sound is
+  unexplained noise, and these happen with the reader looking straight at the book. It is
+  **null through `settling`**, which is what makes the next card's id a change the album acts
+  on rather than a prop it has already seen.
+- **`bookArrived` checks the id as well as the phase.** The album reports the page it was
+  asked for, and a stale report — a turn finishing after the sequence has moved on — must not
+  launch the next card early.
+- **The page times only `settling` and `resting`**, one effect per beat, so its cleanup
+  cancels whatever is pending when the sequence is interrupted. `clearing` and `flying` are
+  `PutAway`'s and `turning` is the album's; all three report.
+- **The index advances in the `settling` beat, not on landing**, so the card that has just
+  arrived is still the current one for as long as it is being looked at.
+- **A row of nothing but doubles still runs the sequence** — there is a table to clear even
+  when there is nothing to place — and goes straight from `clearing` to `resting`. The only
+  hand-over that skips out entirely is an empty one, which is what reduced motion and
+  `snel openen` send.
+
+#### The doubles, and what the book keeps of them
+
+A double is not waste and nothing here calls it that: what the book keeps of one is a numeral
+beside its tick on the checklist, and **a checklist is also a swap list**. There is no second
+slot for it to go in, so off the table is where it goes — dropping, turning slightly and
+fading, which is the whole of the tell that it is being *dropped* rather than filed, with one
+`playPageTurn()` for the handful rather than one per card.
+
+**They stay in the row until it is filed**, which is why they are still there to be seen: the
+table is the record of what came out of the packets, doubles included. Tucking one behind the
+card already in its slot was the alternative, and it has nothing to show — the slot draws no
+count, so the card would fly into the book and simply cease to exist.
+
+The drop is a clone in the overlay like everything else, on an accelerating curve rather than
+the placing ease. It was an `opener-toss` keyframe inside the opener, which could not survive
+the hand-over that unmounts it — and being out here is what lets the doubles leave at the same
+moment the keepers move aside.
+
+#### The hand beside the book
+
+**Fixed-position clones, not the slots themselves.** This is the one real departure from the
+FLIP inside the opener, and it is not a preference: `.album` carries `perspective` and
+`.album__book` is `preserve-3d`, so a card animated inside the book joins the leaves' depth
+sort and a translate across the table is projected through the perspective on the way. A fixed
+overlay outside the book is flat viewport space, which is the space every rect in the sequence
+was measured in. `PutAway` mounts as the last child of the shell next to the card viewer — the
+same reasoning — and z-index 42 puts it over the turn strips (35) and under the viewer's scrim
+(45).
+
+- **Every transform is written against the clone's own layout box**, which is the rect the card
+  was lying in on the table: "where it should be now, less where it started". The clearing and
+  the flight are both written that way, so neither needs to know where the other left the card
+  — the transition runs from whatever transform is on the element.
+- **The starting rects are clamped into the row's box.** Once the row scrolls, a card can be
+  sitting outside it — the row clips, so the reader cannot see it — and a fixed clone started
+  from that rect would appear out over the margin where nothing was. Clamping starts it at the
+  edge, which reads as a card coming off the end of the pile.
+- **The hand is measured off the book, not the window.** The cards stand in the margin the
+  shelf and the register live in, both of which are set aside for the whole sequence, and the
+  fan is centred on the book's own middle so it sits at the height of the pages. Clamped to the
+  window edge for the stacked layout, where the book is nearly as wide as the screen.
+- **`FLIGHT_MS` is the opener's `SETTLE_MS`.** This *is* that motion one step further on: the
+  same card, the same hand, the same curve. They must not be tuned apart.
+- **The slots go on drawing as empty until their card arrives** (`Album`'s `holdSlots`,
+  `PageFace`'s `held`) — the one place the book is knowingly drawn behind the truth. The cards
+  are in the collection before the sequence starts and have to be, because a flight needs
+  something to land *into*; without this the hole is already filled by the time the card gets
+  there, and the beat is a card flying onto a copy of itself. **All of them are held from the
+  start** and released one at a time, so a page turned *through* on the way to a later card
+  does not show a card that is still in the hand.
+- **`data-slot-shown` is how a card finds out whether its own slot is on screen.** Every leaf
+  of the book is in the document at all times, so the element existing proves nothing. Stamped
+  from `PageFace`'s `visible`, which is the only thing that knows, and so covers the mobile
+  book (one page) and the desktop spread (two) without either being re-derived outside the
+  album. A zero-width rect is refused for the same reason the opener's FLIP refuses one.
+- **The clearing runs inside a `requestAnimationFrame`**: the clones have to be painted at
+  their start boxes before a transition can run from them, or the browser coalesces the two and
+  the cards simply appear where they were going.
+- **Each hand-off is one commit.** The hand-over and every landing arrive from timeouts or
+  callbacks, and `index.tsx` mounts with legacy `ReactDOM.render`, which does not batch those.
+  Unbatched, the opener unmounts a frame before the book is open, or a clone leaves a frame
+  before its slot fills and the hole blinks.
+- **No new sound.** `playPageTurn` once as the table is cleared — paper moving, the same weight
+  of event as a leaf turning, which is the argument the register already runs on — the book's
+  own turn sounds per leaf, and `playSlot` for each landing, which is the sound of a card being
+  put in its place.
+- **The book is inert for the sequence** (`.album-layout--placing`), not dimmed: it is the
+  thing being watched, it simply cannot be used while cards are going into it. What that stops
+  is a page turned out from under a card already aimed at a slot on it.
+- **Under reduced motion nothing is drawn here**, and `fastMode` takes the same door. The
+  opener reports nothing to file and the page puts the book back with the cards already in it —
+  landing on the finished state rather than playing it stilled, the rule every sequence here
+  follows. `snel openen` skipping it too is the same argument in reverse: the putting-away is
+  the last third of the ceremony, so a bypass has to bypass it.
+
+#### The sealed packet: click the wood beside it
+
+A packet you have picked up and changed your mind about still needs somewhere to go, and it is
+not the row — the row is for cards. **Clicking the wood beside a sealed packet puts it back on
+the shelf.**
+
+- With cards already on the table, putting the packet down means "I have stopped opening", so
+  it files them — the same decision as clicking the row, on the object you happen to be
+  holding. See `putDown`.
+- `.opener__stage--table` widens the row so the target is the table rather than the two inches
+  either side of the packet — and it is **`var(--book-w)` wide, not the column**. `.album-main`
+  is as wide as the whole layout, the shelf and the register are absolutely positioned asides
+  inside it, and `.opener` is in game.css's `z-index: 1` list: a stretched opener therefore
+  covers both margins and swallows every click aimed at a packet. That shipped for one
+  iteration, and the pile looked live while being unclickable. `--book-w` is by construction
+  the width that stops short of both.
+- The packet's own click stops propagating, or the wood underneath would put down the packet it
+  had just opened.
+- **Only ever the sealed phase.** Past the tear there is nothing to put back, and a live click
+  target across the middle of a reveal is the hole the old exit button left open.
+- No cursor and no hover on the wood, deliberately: it is not a control disguised as wood, it
+  is the table. The line under it is what says so, exactly as it is what says the packet can be
+  opened at all. The row gets a pointer, because that one is a hand reaching for cards —
+  scoped to `[role="button"]`, which the row carries only while there is something to file, so
+  the cursor cannot drift from the handler.
+- **Escape does both**, and the row takes Enter and Space. The exit was a real button and so
+  was in the tab order for free; a stretch of table and a row of cards are not, and a keyboard
+  reader must not lose the way out.
+
+**The line under the row says what can be done and never what happened** — the cards are the
+record of that. It went "toegevoegd aan je album" → "klik om ze in je album te leggen" →
+"2 nieuwe kaarten voor je album" → *"klik op de kaarten om ze in je album te leggen"*, and
+each step removed the same mistake: the page saying in words something the reader either
+already knows or is about to be shown. It names the alternative while a packet is lying there
+sealed, which is the one moment two things are on offer.
+
+One number moved with all this: `.opener`'s `min-height` was `min(62vh, --album-room − 30px)`,
+the 30 being the exit row. It takes the whole of `--album-room` now.
+
 
 ### The shelf was overlapping the book
 
@@ -3201,7 +3675,9 @@ albums already came to the same figure within a pixel, deliberately; that was tw
 components agreeing and is now one box they sit in.
 
 The opener is the occupant that had to give something up: its `min-height: 62vh` is now
-`min(62vh, --album-room − 30px)`, the 30 being the "terug naar het album" row. On a
+`min(62vh, --album-room − 30px)`, the 30 being the "terug naar het album" row. (That row
+is gone and the term with it — see "Putting the pack away". The solve below is why the
+opener reads `--album-room` at all, which has not changed.) On a
 960-tall window that still resolves to 62vh exactly, so the common case is untouched; the
 `min()` only bites where 62vh overshot the book, which on a 2000-tall window was by 590px
 of empty wood. **That was only safe because the ceremony's vignette and bloom centre on
@@ -3382,7 +3858,7 @@ it in `PackOpener.tsx`:
   precisely what is being written on, and the cursor is already sitting on the
   card because that is where the packet was.
 - **Reduced motion lands on the finished card.** It never enters the reveal:
-  reduced motion and fast mode jump straight from the click to the results grid.
+  reduced motion and fast mode jump straight from the click to the finished row.
   Cards there carry no `reveal` prop at all, so they render exactly as they
   do in the album. The `prefers-reduced-motion` block in card.css is a second
   guard behind that, and it resolves to the *finished* state — a card with its
@@ -3928,7 +4404,7 @@ At three games a day this plays ~1,000 times a year, so it must be brisk.
 #### The reveal is watched, not skipped
 
 **There is no click-to-skip, and no "n / 5" counter under the stage.** Both were
-there and both came out: a click anywhere used to land on the results grid, and the
+there and both came out: a click anywhere used to land on the finished row, and the
 hint line counted the pack down while advertising the escape.
 
 The counter went because it turns a reveal into a queue — you read "2 / 5" and start
@@ -3942,11 +4418,15 @@ it turns and nothing shortens it.** If that ever stops being tolerable the answe
 to lower `DEFAULT_CEREMONY_MS`, not to put the click back.
 
 `fastMode` — the test panel's `snel openen` — is the only remaining bypass, and it is
-not reader-facing. Reduced motion still lands straight on the results grid.
+not reader-facing. Reduced motion still lands straight on the finished row. **Both skip
+the putting-away as well**: the book comes back with the cards already in it and nothing
+crosses the table. `snel openen` means "skip the ceremony", and the putting-away is the
+last third of the ceremony — a bypass that skipped a 16-second reveal and then sat
+through eleven seconds of page turns would not be one.
 
 The hint element is kept for the revealing phase, rendering `&nbsp;`. It is a spacer
 as much as a caption; removing it shortens the column at the tear and again at the
-results.
+ending.
 
 - **`DEFAULT_SCALE`** (`utils/animationSpeed.ts`) is a duration multiplier,
   **settled at 2**. Published to CSS as `--anim`; every CSS duration is
@@ -4366,7 +4846,11 @@ presentation layer.
       while the shelf stacks above it.
     - Pick a leather → four books leave, one centres, the name foils in, the book lands
       **shut** on page one. Watch the handover frame: nothing under the table moves, and
-      the book must not shift down as the album takes over.
+      the book must not shift, resize or gain an edge as the album takes over — the
+      ceremony's book is the shut album's box, squares and all.
+    - Then `leegmaken` and bind a second one under the same name. It must land shut again:
+      the reading position is keyed per owner and outlives the album, so this is the path
+      that used to hand over to a book already lying open somewhere in the middle.
     - **Reload → straight to the album, with no flash of the ledger and no flash of the
       cover-choice table.** Two separate ordering bugs, both of which happened, and the
       pair of regressions to watch:

@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Het veld onder de pagina — de watermerktekening</title>
+<style>
+  /* ------------------------------------------------------------------ *
+   * The tabletop, lifted from `.game-stage` in game.css — the same copy
+   * rebind-object.html works on, and for the same reason: the spread has to be
+   * judged on the surface it will really lie on. A neutral grey ground flatters
+   * every version of this equally and settles nothing.
+   * ------------------------------------------------------------------ */
+  :root {
+    --grain-figure: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1400' height='1000'%3E%3Cfilter id='w' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004 0.048' numOctaves='3' seed='4'/%3E%3CfeColorMatrix type='matrix' values='.333 .333 .333 0 0 .333 .333 .333 0 0 .333 .333 .333 0 0 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='1400' height='1000' filter='url(%23w)'/%3E%3C/svg%3E");
+    --grain-tight: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1400' height='1000'%3E%3Cfilter id='w' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.011 0.55' numOctaves='2' seed='9'/%3E%3CfeColorMatrix type='matrix' values='.267 .267 .267 0 .1 .267 .267 .267 0 .1 .267 .267 .267 0 .1 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='1400' height='1000' filter='url(%23w)'/%3E%3C/svg%3E");
+
+    /* The album's own tokens, verbatim from albumLeather.ts (bordeaux, the
+       incumbent stain) and album.css. Nothing below is a guess at a colour. */
+    --leather-hi: #5a4526;
+    --leather-mid: #35270f;
+    --leather-lo: #4a3820;
+    --board-edge: #6b5325;
+    --foil: #e6c98a;
+    --foil-rule: #a9853c;
+
+    /* The press's brown and the reader's graphite — the two hands of the
+       checklist page, and the distinction the watermark has to sit inside. */
+    --press: #6b5325;
+    --graphite: #46474f;
+
+    --ink: #f6e3c6;
+    --ink-dim: #c3a281;
+    --accent-light: #eec18a;
+
+    /* The page geometry, as :root declares it in album.css. `--page-h` is
+       `--page-w / 0.78` there and here; `--page-pad-x` is 22px in both. */
+    --page-w: min(468px, calc((100vw - 150px) / 2));
+    --page-h: calc(var(--page-w) / 0.78);
+    --page-pad-x: 22px;
+    --board-out: 9px;
+
+    /* The one number this study exists to settle. */
+    --field-ink: 0.30;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0 0 90px;
+    font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--ink);
+    background-color: #4e1d12;
+    background-image:
+      radial-gradient(ellipse 56% 40% at 50% -6%, rgba(255, 216, 162, 0.26), transparent 72%),
+      var(--grain-tight),
+      var(--grain-figure),
+      radial-gradient(ellipse 112% 96% at 50% -8%, #833926 0%, #4c1c11 55%, #250c06 100%);
+    background-size: auto, 100% 100%, 100% 100%, auto;
+    background-repeat: no-repeat;
+    background-blend-mode: screen, overlay, soft-light, normal;
+    background-attachment: fixed;
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 40px 24px 0; }
+
+  h1, h2 {
+    font-family: Georgia, "Times New Roman", serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--ink);
+    text-shadow: 0 2px 3px rgba(0, 0, 0, 0.75);
+    margin: 0 0 6px;
+  }
+  h1 { font-size: 26px; }
+  h2 { font-size: 17px; margin-top: 44px; }
+
+  .lede { color: var(--ink-dim); max-width: 76ch; margin: 0 0 4px; }
+  .lede strong, p strong { color: var(--accent-light); }
+  p { max-width: 76ch; }
+  em { color: var(--accent-light); font-style: italic; }
+  code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.9em;
+    color: var(--accent-light);
+  }
+
+  hr {
+    border: 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.5);
+    box-shadow: 0 1px 0 rgba(255, 200, 140, 0.06);
+    margin: 34px 0;
+  }
+
+  table.rods {
+    border-collapse: collapse;
+    margin: 14px 0 4px;
+    font-size: 13px;
+    color: var(--ink-dim);
+  }
+  table.rods th {
+    text-align: left;
+    font-family: Georgia, serif;
+    font-weight: normal;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    font-size: 11px;
+    color: rgba(195, 162, 129, 0.75);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.45);
+    padding: 0 20px 4px 0;
+  }
+  table.rods td { padding: 3px 20px 3px 0; }
+  table.rods td:first-child {
+    font-family: Consolas, monospace;
+    color: var(--accent-light);
+  }
+
+  /* ================================================================== *
+   * The book
+   *
+   * Enough binding to judge a page on and no more: boards standing `--board-out`
+   * proud of the paper, the fore-edge hairline at each outer trim, and the
+   * gutter's shading. The leaf machinery is not reproduced — nothing here turns.
+   * ================================================================== */
+
+  .stage { display: flex; justify-content: center; margin: 26px 0 10px; }
+
+  .album {
+    position: relative;
+    padding: var(--board-out);
+    border-radius: 5px;
+    background:
+      linear-gradient(150deg, var(--leather-hi) 0%, var(--leather-mid) 46%, var(--leather-lo) 100%);
+    box-shadow:
+      0 0 0 1px var(--board-edge),
+      0 26px 44px rgba(14, 5, 2, 0.66);
+  }
+
+  .spread { position: relative; display: flex; }
+
+  /* ------------------------------------------------------------------ *
+   * The page — `.album__page`, reproduced
+   *
+   * The ruled thirds, the radial warmth and `#f4efdd` are the real background
+   * stack in album.css, in the real order. The watermark goes UNDER all of it,
+   * which is the whole question this page is asking: it has to be in the stock
+   * rather than on it.
+   * ------------------------------------------------------------------ */
+  .page {
+    position: relative;
+    width: var(--page-w);
+    height: var(--page-h);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: clamp(18px, calc(var(--page-h) * 0.055), 46px) var(--page-pad-x) 12px;
+    font-family: Tahoma, "MS Sans Serif", Verdana, sans-serif;
+    color: #3a3222;
+    background:
+      repeating-linear-gradient(
+        0deg,
+        transparent 0 calc(33.33% - 1px),
+        rgba(107, 83, 37, 0.07) calc(33.33% - 1px) 33.33%
+      ),
+      radial-gradient(circle at 50% 0%, #fffcf0 0%, #e8e1c9 100%),
+      #f4efdd;
+  }
+  .page--left  { border-radius: 3px 0 0 3px; box-shadow: inset -12px 0 24px -12px rgba(0,0,0,.45); }
+  .page--right { border-radius: 0 3px 3px 0;  box-shadow: inset  12px 0 24px -12px rgba(0,0,0,.45); }
+
+  /* The fore-edge, at the outer trim — the three background layers of
+     `.album__page::after`, at a settled pile's width. */
+  .page::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 6px;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(180deg, rgba(0,0,0,.34) 0%, rgba(0,0,0,.16) 3%, transparent 9%,
+        transparent 91%, rgba(0,0,0,.16) 97%, rgba(0,0,0,.34) 100%),
+      repeating-linear-gradient(90deg, rgba(78,64,36,.22) 0 1px, transparent 1px 2px),
+      linear-gradient(90deg, rgba(78,64,36,.16), rgba(78,64,36,.05));
+  }
+  .page--left::after  { left: 0;  border-radius: 3px 0 0 3px; transform: scaleX(-1); }
+  .page--right::after { right: 0; border-radius: 0 3px 3px 0; }
+
+  /* Shading only, not one hard line — the paper curving away at the fold. */
+  .gutter {
+    position: absolute;
+    top: 0; bottom: 0; left: 50%;
+    width: 84px;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 4;
+    background: linear-gradient(90deg,
+      rgba(46, 30, 8, 0) 0%, rgba(46, 30, 8, .14) 41%, rgba(46, 30, 8, .29) 50%,
+      rgba(46, 30, 8, .14) 59%, rgba(46, 30, 8, 0) 100%);
+  }
+
+  /* ------------------------------------------------------------------ *
+   * The watermark
+   * ------------------------------------------------------------------ */
+  .field {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: var(--field-ink);
+  }
+  .field svg { display: block; width: 100%; height: 100%; }
+  .field path { fill: none; stroke: var(--press); stroke-linecap: round; stroke-linejoin: round; }
+  /* In field units, and they have to be: one unit lands at about 7px on a
+     desktop leaf, so a hairline is .13 and not the .4 that reads as a crayon.
+     This is the number the first render got wrong by a factor of four. */
+  .field .thin  { stroke-width: .13; }
+  .field .med   { stroke-width: .18; }
+  .field .heavy { stroke-width: .26; }
+  .field .fill  { fill: var(--press); stroke: none; opacity: .26; }
+  body.no-field .field { display: none; }
+
+  /* The drawing on its own. A table that is seven tenths hidden behind cards
+     cannot be judged on whether it reads as a table, so the cards come off and
+     leave the paper and the plan. #bare in the URL starts here. */
+  body.no-cards .slots { visibility: hidden; }
+
+  /* ------------------------------------------------------------------ *
+   * Page furniture
+   * ------------------------------------------------------------------ */
+
+  /* `.album__list-head`, as built. */
+  .head {
+    flex: none;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    border-bottom: 1px solid rgba(107, 83, 37, 0.4);
+    padding-bottom: 4px;
+    margin-bottom: 8px;
+  }
+  .head span {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: clamp(11px, calc(var(--page-w) * 0.03), 17px);
+  }
+  .head__title, .head__range {
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #4a3a1c;
+  }
+  .head__range { font-variant-numeric: tabular-nums; }
+  .head__sep { color: #a2977c; }
+  .page--right .head { justify-content: flex-end; }
+
+  /* The corner tab. Sits in the head margin at the fore-edge side, notched at
+     its foot — a thumb tab bound in, not a badge laid on. */
+  .tab {
+    position: absolute;
+    top: 0;
+    width: 44px;
+    height: 40px;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    padding-bottom: 8px;
+    clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%);
+    background: linear-gradient(158deg, #4c5530 0%, #333c1c 100%);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 12px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: var(--foil);
+    font-variant-numeric: tabular-nums;
+  }
+  .page--left  .tab { left: 20px; }
+  .page--right .tab { right: 20px; }
+  body.no-tab .tab { display: none; }
+
+  /* `.album__slots` and `.album__slot`, verbatim. */
+  .slots {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px 14px;
+    justify-items: stretch;
+    align-content: start;
+  }
+  .slot { position: relative; aspect-ratio: 5 / 7; width: 100%; border-radius: 6px; }
+
+  /* The die-cut recess: hairline, the shadow the stock's own thickness throws
+     into the cut, and the lit bottom lip. */
+  .slot::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    border-radius: 6px;
+    border: 1px solid rgba(107, 83, 37, 0.42);
+    background: rgba(107, 83, 37, 0.07);
+    box-shadow:
+      inset 0 2px 5px rgba(107, 83, 37, 0.3),
+      inset 0 -1px 0 rgba(255, 252, 240, 0.7);
+  }
+  .slot--empty::before { z-index: 2; }
+
+  /* The trim frame. From the reference and NOT in album.css today: a printed box
+     inside the margin, which is what turns a sheet with things on it into a
+     designed page. It is the cheapest of the proposals here and the only one
+     that adds no words. */
+  .trim {
+    position: absolute;
+    inset: 12px;
+    z-index: 1;
+    pointer-events: none;
+    border: 1px solid rgba(107, 83, 37, 0.22);
+  }
+  body.no-trim .trim { display: none; }
+
+  /* `.album__page-number`, with the reference's flanking hairlines added — they
+     turn a loose numeral into a foot rule, and they are the same weight as the
+     trim so the two read as one system. */
+  .folio {
+    flex: none;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 12px;
+    color: #8a7f64;
+    padding-top: 8px;
+  }
+  .folio::before, .folio::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: rgba(107, 83, 37, 0.22);
+  }
+  body.no-rules .folio::before,
+  body.no-rules .folio::after { display: none; }
+  body.no-rules .folio { justify-content: center; }
+  body.no-folio .folio { visibility: hidden; }
+
+  /* ------------------------------------------------------------------ *
+   * The card — card.css, reduced to what a slot shows
+   * ------------------------------------------------------------------ */
+  .card {
+    --card-display: "Bahnschrift SemiCondensed", Bahnschrift, "DIN Condensed",
+      "DIN Alternate", "Agency FB", "Franklin Gothic Medium", "Segoe UI", Tahoma, sans-serif;
+    --facets:
+      linear-gradient(112deg, rgba(255,255,255,.16) 0 16%, transparent 16% 33%,
+        rgba(255,255,255,.09) 33% 45%, transparent 45%),
+      linear-gradient(58deg, rgba(255,255,255,.11) 0 20%, transparent 20% 54%,
+        rgba(255,255,255,.06) 54% 66%, transparent 66%);
+
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: 6px;
+    overflow: hidden;
+    container-type: inline-size;
+    /* No drop shadow in the album — a card is stuck down, not hovering. */
+    box-shadow: none;
+  }
+
+  .card--zilver {
+    --tier-a: #dde7f0; --tier-b: #8e9dae; --tier-ink: #2e240e;
+    background-image: var(--facets),
+      linear-gradient(160deg, #f6f8fa 0%, #bcc5ce 32%, #8b95a1 58%, #e6ecf1 100%);
+  }
+  .card--goud {
+    --tier-a: #fdeeb0; --tier-b: #c9a03a; --tier-ink: #2e240e;
+    background-image: var(--facets),
+      linear-gradient(160deg, #fbe9a3 0%, #dcb64a 32%, #b8901f 58%, #f7e293 100%);
+  }
+  /*
+   * A printed placeholder, not a dark card sitting in a bright album.
+   *
+   * **Opaque, and the watermark is why.** The album ships this at `opacity:
+   * 0.55`, which cost nothing while there was nothing underneath it. With a
+   * drawing in the paper, the touchline and a rod's grip print straight through
+   * the empty slots, and a rule bisecting a silhouette reads as a scratched
+   * mount rather than as paper showing through. That is a real consequence of
+   * the watermark for `.album__slot--empty .card`, not a fudge for this mockup:
+   * the tint has to become a colour if the field goes in.
+   */
+  .card--empty {
+    --tier-a: #e7ddc4; --tier-b: #cec2a2; --tier-ink: #8a7d5f;
+    background-image: linear-gradient(160deg, #ded4b9 0%, #cdc1a0 100%);
+  }
+
+  /* The static foil sheen. */
+  .card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    background: linear-gradient(115deg, transparent 32%, rgba(255,255,255,.17) 46%,
+      rgba(255,255,255,.04) 53%, transparent 66%);
+  }
+  .card--empty::after { display: none; }
+
+  .card__portrait {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    isolation: isolate;
+    -webkit-mask-image:
+      linear-gradient(to top, transparent 20%, #000 40%),
+      linear-gradient(135deg, transparent 10%, #000 32%);
+    mask-image:
+      linear-gradient(to top, transparent 20%, #000 40%),
+      linear-gradient(135deg, transparent 10%, #000 32%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  .card__portrait svg {
+    position: absolute;
+    bottom: -4%;
+    left: 50%;
+    transform: translateX(-50%);
+    height: 92%;
+  }
+  /* Standing in for the photograph: these are drawn, since this study has no
+     avatars on disk. The tier tint that `card__portrait::after` multiplies over
+     a real headshot is folded straight into the fill instead. */
+  .card__portrait .sil { fill: #3f3a2c; opacity: .72; }
+  .card--empty .card__portrait .sil { fill: #b3ac9c; opacity: .95; }
+
+  .card__header { position: absolute; top: 4%; left: 7.5%; z-index: 2; color: var(--tier-ink); }
+  .card__overall {
+    font-family: var(--card-display);
+    font-size: 20.5cqw;
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: .015em;
+    text-shadow: 0 1px 1px rgba(0,0,0,.14);
+  }
+  .card__name {
+    position: absolute;
+    left: 9%; right: 9%; bottom: 7%;
+    z-index: 2;
+    text-align: center;
+    font-family: var(--card-display);
+    font-size: 8.5cqw;
+    letter-spacing: .045em;
+    color: var(--tier-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-top: 1px solid rgba(0, 0, 0, .28);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .3);
+    padding-top: 3%;
+  }
+
+  /* ------------------------------------------------------------------ *
+   * Controls — chrome. Not part of the design.
+   * ------------------------------------------------------------------ */
+  .controls {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 20px;
+    margin: 18px auto 0;
+    padding: 10px 20px;
+    max-width: 1000px;
+    border-radius: 8px;
+    background: rgba(18, 9, 5, .88);
+    border: 1px solid rgba(230, 201, 138, .22);
+    font-size: 12px;
+    color: var(--ink-dim);
+  }
+  .controls label { display: flex; align-items: center; gap: 6px; white-space: nowrap; cursor: pointer; }
+  .controls input[type=range] { width: 108px; accent-color: var(--foil-rule); }
+  .controls select {
+    background: #241a10; color: var(--ink); border: 1px solid #5a4a2c;
+    border-radius: 4px; padding: 2px 5px; font: inherit;
+  }
+  .controls b { color: var(--accent-light); font-variant-numeric: tabular-nums; width: 30px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Het veld onder de pagina</h1>
+  <p class="lede">
+    The slots page was stripped to paper, mounts, cards and the folio, and the
+    watermark is the one thing that can go back into it without printing anything
+    <em>on</em> it. This is that drawing, settled: <strong>half a table, four rods,
+    drawn rather than plotted</strong> — with the spread around it built out of
+    album.css and card.css rather than approximated, so the ink strength can be
+    judged against the real mounts and the real metal.
+  </p>
+
+  <div class="stage">
+    <div class="album">
+      <div class="spread">
+
+        <section class="page page--left">
+          <div class="field" data-half="left"></div>
+          <div class="trim"></div>
+          <div class="tab" data-tab></div>
+          <div class="head">
+            <span class="head__title">Collectie</span>
+            <span class="head__sep">·</span>
+            <span class="head__range">68 – 72</span>
+          </div>
+          <div class="slots" data-slots="left"></div>
+          <div class="folio"><span>5</span></div>
+        </section>
+
+        <section class="page page--right">
+          <div class="field" data-half="right"></div>
+          <div class="trim"></div>
+          <div class="tab" data-tab></div>
+          <div class="head">
+            <span class="head__title">Collectie</span>
+            <span class="head__sep">·</span>
+            <span class="head__range">73 – 81</span>
+          </div>
+          <div class="slots" data-slots="right"></div>
+          <div class="folio"><span>6</span></div>
+        </section>
+
+      </div>
+      <div class="gutter"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <label>Veldinkt <input type="range" id="ink" min="0" max="60" value="30"><b id="inkv">.30</b></label>
+    <label>Hand <input type="range" id="wob" min="0" max="140" value="100"><b id="wobv">1.0</b></label>
+    <label><input type="checkbox" id="onoff" checked> Watermerk</label>
+    <label>Vlag
+      <select id="tabmode">
+        <option value="spread">vel — 03</option>
+        <option value="none">geen</option>
+        <option value="range">bereik</option>
+        <option value="folio">paginanummer</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="cards" checked> Kaarten</label>
+    <label><input type="checkbox" id="trim" checked> Kaderlijn</label>
+    <label><input type="checkbox" id="rules" checked> Voetlijnen</label>
+    <label><input type="checkbox" id="folio" checked> Folio</label>
+  </div>
+
+  <hr>
+
+  <h2>Why the fold is the halfway line</h2>
+  <p>
+    A foosball table is portrait and a spread is landscape, so the drawing has to be
+    turned one way or the other, and the choice is not free. Turning the
+    <em>table</em> — rods running down the page, goals at the two fore-edges — puts
+    eight vertical lines behind six cards and reads as a pitch again. Keeping the
+    table upright and turning the <em>crop</em> gives the arrangement above: goal end
+    at the head, rods running across, halfway line at the foot.
+  </p>
+  <p>
+    That makes <strong>the gutter the long axis of the field</strong>. The centre of
+    the goal, the penalty spot, the centre spot and the middle man on every odd rod
+    all fall on <code>x = 34</code>, which is the fold — so the fold is doing the one
+    thing a fold can do for a drawing, which is be the axis the markings are set out
+    from. The two halves are not mirrors: the handles alternate, so each leaf carries
+    a genuinely different half of one table. And it has to work that way, because
+    leaves turn independently and <strong>nothing may span the gutter as one
+    element</strong>. Both pages are handed the same marks and their viewBoxes do the
+    cropping, split at 34.
+  </p>
+
+  <h2>Half a table, four rods</h2>
+  <p>
+    Half, because a spread is half. The four rods are the first half of the real
+    1-2-3-5-5-3-2-1 order, at the real spacing — the surface is 120 × 68, so this is
+    68 across by 60 down and every figure below is in those units rather than in
+    pixels. It can be checked against a tape measure instead of against taste.
+  </p>
+
+  <table class="rods">
+    <tr><th>y</th><th>rod</th><th>figures</th><th>handle</th></tr>
+    <tr><td>7.5</td><td>keeper</td><td>1</td><td>links</td></tr>
+    <tr><td>22.5</td><td>verdediging</td><td>2</td><td>links</td></tr>
+    <tr><td>37.5</td><td>aanval, tegenstander</td><td>3</td><td>rechts</td></tr>
+    <tr><td>52.5</td><td>middenveld</td><td>5</td><td>links</td></tr>
+  </table>
+
+  <p>
+    The left/right alternation is the real one: a rod belongs to whoever's side its
+    handle comes out on, which is why the 3-bar in the middle is the opponent's and
+    reaches in from the other margin. <strong>The handles are what stop this reading
+    as a football pitch</strong> — they run out past the trim on both fore-edges, and
+    they are the only marks in the drawing that no pitch has. The men are bars across
+    the rod rather than dots, because that is a foosball figure seen from above; the
+    near team's are filled and the far team's outlined, since one ink cannot do two
+    strips.
+  </p>
+
+  <h2>Drawn, not plotted</h2>
+  <p>
+    The first version of this was exact SVG geometry, and exact was wrong. A perfect
+    vector diagram on aged stock reads as a screenshot of something else pasted under
+    the page; what the album wants is the drawing a printer would have made for it.
+    So every line here is <strong>stroked by hand</strong>: each primitive is a
+    parametric curve sampled with a smooth two-frequency wobble along its normal, laid
+    down twice with different phase, and corners overshoot the way a hand's do.
+  </p>
+  <p>
+    It is the same argument the checklist ticks already won — three drawn paths rather
+    than a glyph, hashed from the player id so the mark is stable. The wobble here is
+    seeded per element from a fixed table, so <strong>the drawing is identical on every
+    render and on every page</strong>. A field that re-sketched itself when the leaf
+    turned would be an animation, not a watermark. The <em>Hand</em> slider above is a
+    tuning control only; it is a constant in the real thing.
+  </p>
+  <p>
+    The end wall is <strong>hatched rather than filled</strong>, which is what a
+    section is in a technical drawing, and it is also the cheapest way to keep a solid
+    black band from landing directly under the running head. Everything is the press's
+    brown <code>#6b5325</code> and not <code>--graphite</code>: the two-hands rule on
+    the checklist page says graphite is the reader's, and the reader did not draw this.
+    It came off the press with the paper.
+  </p>
+
+  <h2>What is still open</h2>
+  <p>
+    <strong>The ink.</strong> The slider starts at .20. Below about .12 the rods stop
+    being legible under a filled row of cards and the drawing reads as a stain; above
+    about .30 the hatched wall starts competing with the head rule. The band worth
+    arguing over is narrow.
+  </p>
+  <p>
+    <strong>The tab.</strong> Off by default, because it has not been earned yet. The
+    selector runs the three candidates: a spread number, which is the one figure
+    nothing else on the page states and is honestly true of both halves; the rating
+    range, which the head already says four centimetres away; and the folio, which the
+    foot already says. Only the first says something new, and it is still a second
+    piece of furniture on a page that was deliberately emptied.
+  </p>
+  <p>
+    <strong>What it costs.</strong> Two <code>&lt;svg&gt;</code> per spread, built
+    once from a table of four rods and about twenty marks, at <code>z-index: 0</code>
+    under <code>.album__slots</code>. No library — the wobble is thirty lines of
+    parametric sampling, which is well inside the rule that keeps framer-motion and
+    friends out of this project.
+  </p>
+
+</div>
+
+<script>
+/* ==================================================================
+ * The half table
+ *
+ * Field units throughout: an ITSF surface is 120 x 68, so half of it is 68
+ * across by 60 down, and the fold is x = 34.
+ * ================================================================== */
+
+const W = 68;        /* the field, across the spread   */
+const HALF = 60;     /* half the length, head to foot  */
+const MID = W / 2;   /* the fold                       */
+
+/* How far a rod pokes out of the far side, the near side, and the length of the
+   grip block on the near side. */
+const OVER_FREE = 9, OVER_HANDLE = 15, GRIP = 7;
+
+/* The first half of 1-2-3-5-5-3-2-1. `dir` is which margin the handle comes out
+   of, which is the same thing as which player the rod belongs to. */
+const RODS = [
+  { y:  7.5, dir: -1, near: true,  men: [MID] },
+  { y: 22.5, dir: -1, near: true,  men: [22, 46] },
+  { y: 37.5, dir:  1, near: false, men: [13.5, MID, 54.5] },
+  { y: 52.5, dir: -1, near: true,  men: [10, 22, MID, 46, 58] },
+];
+
+/* The drawing's own box, which the two viewBoxes crop.
+ *
+ * The table's proportions are fixed by physics, so the only free choice here is
+ * the margin — and margin is cheap across a spread and expensive down a page.
+ * So the air is added in x, which fixes the scale at `--page-w / 64` and makes
+ * one field unit 1.22% of the page height.
+ *
+ * **The height is then solved so the goal end lands in the one clean band.** A
+ * slots page shows paper in exactly three places: a sliver above the cards, the
+ * gaps between them, and about 18% of the page height below the last row. The
+ * goal — mouth, goal area, the front of the box with its D, and the keeper's
+ * rod and grip — comes to 14 units, which is what that band holds. So `y` is
+ * chosen to put the halfway line just under the head rule and the back of the
+ * goal at 90% of the page, and everything diagnostic falls between the last
+ * card and the folio. See the flip in `draw`. */
+const BOX = { x: -30, y: -5.5, w: 128, h: 74 };
+
+/* ------------------------------------------------------------------
+ * The hand
+ *
+ * Every primitive is a parametric point function, sampled with a smooth wobble
+ * along its own normal and laid down twice. Two frequencies rather than white
+ * noise per point: white noise shivers, and a hand undulates.
+ *
+ * Seeded from a fixed table, never from Math.random(), for exactly the reason
+ * the checklist ticks are hashed from the player id — a mark that redraws itself
+ * on every render is an animation, not a mark.
+ * ------------------------------------------------------------------ */
+
+let WOBBLE = 1;
+
+const rng = (seed) => {
+  let s = (seed * 2654435761) >>> 0;
+  return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+};
+
+const n = (v) => Math.round(v * 100) / 100;
+
+/**
+ * @param pt    t in [0,1] -> [x, y]
+ * @param seed  fixed, so the drawing never moves
+ * @param o     steps, amp (in field units), passes, over (t overshoot per end)
+ */
+/* Every `amp` below is in field units and they are all small: a hand's wobble on
+ * a printed diagram is a fraction of a millimetre, and at ~7px to the unit
+ * anything over about .2 stops being a drawn line and becomes a wavy one. */
+function hand(pt, seed, o = {}) {
+  const { steps = 26, amp = 0.16, passes = 2, over = 0 } = o;
+  const w = amp * WOBBLE;
+  const out = [];
+
+  for (let p = 0; p < passes; p += 1) {
+    const r = rng(seed * 131 + p * 17 + 3);
+    const a = r() * 6.283, b = r() * 6.283, c = r() * 6.283;
+    /* Each pass wobbles by its own amount, so the two strokes separate and
+       rejoin rather than running parallel. */
+    const scale = w * (0.7 + r() * 0.7);
+    const t0 = -over, t1 = 1 + over;
+    let d = '';
+
+    for (let i = 0; i <= steps; i += 1) {
+      const t = t0 + ((t1 - t0) * i) / steps;
+      const [x, y] = pt(t);
+      const e = 0.004;
+      const [px, py] = pt(t - e);
+      const [qx, qy] = pt(t + e);
+      const dx = qx - px, dy = qy - py;
+      const L = Math.hypot(dx, dy) || 1;
+      /*
+       * Three terms, and the LOW one carries the drawing.
+       *
+       * The first version ran all three at frequency 1.6 and above, so a line
+       * 400px long got several small ripples that averaged out to straight —
+       * at 1:1 it read as plotted, and the hand was only visible on the little
+       * grip rectangles where one ripple spanned the whole side. A hand does
+       * not ripple along a rule; it bows away from it once and comes back.
+       *
+       * So 0.7 over t in [0,1] is barely half a cycle: one gentle bend across
+       * the whole primitive, whatever its length. The two faster terms are the
+       * texture on top of it, and they stay small — this is the line between a
+       * drawn line and a wavy one.
+       */
+      const j = scale * (
+        0.55 * Math.sin(t * 0.7 + c) +
+        0.42 * Math.sin(t * 4.3 + a) +
+        0.18 * Math.sin(t * 9.1 + b)
+      );
+      d += `${i ? 'L' : 'M'}${n(x - (dy / L) * j)} ${n(y + (dx / L) * j)}`;
+    }
+    out.push(d);
+  }
+  return out;
+}
+
+const line = (x1, y1, x2, y2) => (t) => [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t];
+const arc = (cx, cy, r, a0, a1) => (t) => {
+  const a = a0 + (a1 - a0) * t;
+  return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+};
+
+/* A drawn box: four strokes that overshoot at the corners, not one closed path.
+   A hand lifts the pen at a corner and starts the next side a little early. */
+function box(x, y, w, h, seed, cls, o = {}) {
+  const opt = { steps: 18, amp: 0.14, over: 0.04, ...o };
+  return [
+    [line(x, y, x + w, y), seed],
+    [line(x + w, y, x + w, y + h), seed + 1],
+    [line(x + w, y + h, x, y + h), seed + 2],
+    [line(x, y + h, x, y), seed + 3],
+  ]
+    .flatMap(([fn, s]) => hand(fn, s, opt))
+    .map((d) => `<path class="${cls}" d="${d}"/>`)
+    .join('');
+}
+
+const stroke = (fn, seed, cls, o) =>
+  hand(fn, seed, o).map((d) => `<path class="${cls}" d="${d}"/>`).join('');
+
+/* ------------------------------------------------------------------
+ * The drawing
+ * ------------------------------------------------------------------ */
+
+function table() {
+  const p = [];
+
+  /* ---------------------------------------------------------------- *
+   * The surface
+   *
+   * Four sides drawn one at a time rather than as a `box`, because the head of
+   * the table is not a continuous line: the goal is a GAP in it. That is the
+   * whole reading — a goal you can see into is what says "table" rather than
+   * "pitch", and it is the one mark a football pitch cannot have.
+   *
+   * It also fixes a real fault. The halfway line used to be drawn twice, once
+   * as the box's own bottom edge and once as its own stroke, which is why the
+   * foot of the spread carried a doubled rule nothing else in the drawing had.
+   * ---------------------------------------------------------------- */
+  /*
+   * Three widths, and they have to STEP.
+   *
+   * The mouth started the same width as the goal area, which drew two stacked
+   * rectangles of identical width either side of the goal line — a doubled box,
+   * not a goal. 36 for the penalty area, 24 for the goal area, 12 for the mouth
+   * reads as one thing narrowing to an opening, which is what it is.
+   */
+  const GOAL_L = 28, GOAL_R = 40, GOAL_D = 4;
+
+  p.push(stroke(line(0, 0, GOAL_L, 0), 11, 'heavy', { steps: 14, amp: 0.14 }));
+  p.push(stroke(line(GOAL_R, 0, W, 0), 12, 'heavy', { steps: 14, amp: 0.14 }));
+  p.push(stroke(line(0, 0, 0, HALF), 13, 'heavy', { steps: 30, amp: 0.3 }));
+  p.push(stroke(line(W, 0, W, HALF), 14, 'heavy', { steps: 30, amp: 0.3 }));
+  /* The halfway line — the field's own fourth side, and drawn once. */
+  p.push(stroke(line(0, HALF, W, HALF), 15, 'heavy', { steps: 30, amp: 0.28 }));
+
+  /* The goal, standing off the back of the table. Three sides; the fourth is
+     the gap in the goal line above. */
+  p.push(stroke(line(GOAL_L, 0, GOAL_L, -GOAL_D), 21, 'heavy', { steps: 8, amp: 0.09, over: 0.05 }));
+  p.push(stroke(line(GOAL_L, -GOAL_D, GOAL_R, -GOAL_D), 22, 'heavy', { steps: 12, amp: 0.1, over: 0.03 }));
+  p.push(stroke(line(GOAL_R, -GOAL_D, GOAL_R, 0), 23, 'heavy', { steps: 8, amp: 0.09, over: 0.05 }));
+
+  /* ---------------------------------------------------------------- *
+   * The markings, all a weight below the surface
+   *
+   * Shallower than a football pitch's, because a table's are: the boxes on the
+   * reference take about a sixth of the half, not the quarter the first version
+   * gave them, and a deep box is most of why this read as a pitch.
+   * ---------------------------------------------------------------- */
+  const BOX_D = 10, AREA_D = 4, SPOT = 7, D_R = 7;
+
+  p.push(box(16, 0, 36, BOX_D, 41, 'thin', { steps: 20, amp: 0.11 }));
+  p.push(box(22, 0, 24, AREA_D, 45, 'thin', { steps: 14, amp: 0.09 }));
+  p.push(stroke(arc(MID, SPOT, 0.45, 0, 6.283), 47, 'med', { steps: 12, amp: 0.05 }));
+
+  /* The D: only the part outside the box, which is all that is printed. Its
+     ends are where the circle round the spot crosses the front of the box. */
+  const dx = Math.sqrt(D_R * D_R - (BOX_D - SPOT) ** 2);
+  const a0 = Math.atan2(BOX_D - SPOT, -dx);
+  p.push(stroke(arc(MID, SPOT, D_R, a0, Math.PI - a0), 51, 'thin', { steps: 20, amp: 0.09 }));
+
+  p.push(stroke(arc(0, 0, 2.5, 0, Math.PI / 2), 61, 'thin', { steps: 10, amp: 0.07 }));
+  p.push(stroke(arc(W, 0, 2.5, Math.PI / 2, Math.PI), 63, 'thin', { steps: 10, amp: 0.07 }));
+
+  /* The centre circle coming up out of the halfway line — a half circle,
+     because this is half a table. */
+  p.push(stroke(arc(MID, HALF, 9, Math.PI, 2 * Math.PI), 73, 'thin', { steps: 28, amp: 0.11 }));
+  p.push(stroke(arc(MID, HALF, 0.45, 0, 6.283), 75, 'med', { steps: 12, amp: 0.05 }));
+
+  /* ---------------------------------------------------------------- *
+   * The rods
+   * ---------------------------------------------------------------- */
+  RODS.forEach((rod, i) => {
+    const seed = 100 + i * 40;
+    const near = rod.dir < 0 ? -OVER_HANDLE : W + OVER_HANDLE;
+    const far = rod.dir < 0 ? W + OVER_FREE : -OVER_FREE;
+    p.push(stroke(line(near, rod.y, far, rod.y), seed, 'med', { steps: 38, amp: 0.3, passes: 1 }));
+
+    /* The grip. An outline and nothing in it — a filled block at this weight
+       reads as a blot rather than as a handle. */
+    const gx = rod.dir < 0 ? near - GRIP : near;
+    p.push(box(gx, rod.y - 1.4, GRIP, 2.8, seed + 10, 'thin', { steps: 10, amp: 0.07 }));
+
+    /* The men, seen from above. Filled for the near team, outlined for the far
+       one — one ink cannot do two strips. */
+    rod.men.forEach((x, k) => {
+      const s = seed + 20 + k * 3;
+      const rx = 1.8, ry = 2.3;
+      const body = (t) => {
+        const a = t * 6.283 - Math.PI / 2;
+        return [x + rx * Math.cos(a), rod.y + ry * Math.sin(a)];
+      };
+      if (rod.near) {
+        const [d] = hand(body, s, { steps: 34, amp: 0.06, passes: 1 });
+        p.push(`<path class="fill" d="${d}Z"/>`);
+      }
+      p.push(stroke(body, s + 1, 'med', { steps: 34, amp: 0.07, passes: rod.near ? 1 : 2 }));
+    });
+  });
+
+  return p.join('');
+}
+
+function draw() {
+  const marks = table();
+  document.querySelectorAll('[data-half]').forEach((host) => {
+    const left = host.dataset.half === 'left';
+    const vb = left
+      ? `${BOX.x} ${BOX.y} ${MID - BOX.x} ${BOX.h}`
+      : `${MID} ${BOX.y} ${BOX.x + BOX.w - MID} ${BOX.h}`;
+    /* Each half is aligned to the fold, so the two meet there rather than each
+       centring itself in its own page. The same marks are handed to both and
+       the viewBox does the cropping — no mirroring, because the table is not
+       symmetric across its long axis: the handles alternate.
+     *
+     * **And the whole drawing is turned end for end.** `table()` builds the
+     * table the way the reference draws it, goal at the top; this puts the goal
+     * at the FOOT of the page, and that is the composition decision the drawing
+     * lives or dies by. Built the other way up, every diagnostic mark — the
+     * mouth, the box, the keeper, his grip — sat behind the first row of cards,
+     * and the only marks left on open paper were the halfway line and the
+     * centre circle, which are exactly the two that say *football pitch*. Turned
+     * over, the pitch-ish markings go behind the cards and the goal comes out
+     * into the open. A goal with a man on a rod in front of it is not something
+     * a pitch can be mistaken for.
+     *
+     * A transform rather than negated coordinates, so `table()` stays readable
+     * against the reference drawing and there is no sign to get wrong twice. */
+    host.innerHTML =
+      `<svg viewBox="${vb}" preserveAspectRatio="${left ? 'xMaxYMid' : 'xMinYMid'} meet">` +
+      `<g transform="translate(0,${HALF}) scale(1,-1)">${marks}</g></svg>`;
+  });
+}
+
+/* ==================================================================
+ * Filler cards — the names and ratings from the reference spread, so the two
+ * can be held side by side. Tiers come out of `tierFor`: 65+ silver, 75+ gold.
+ * ================================================================== */
+
+const SIL = '<svg viewBox="0 0 60 74"><path class="sil" d="M30 5c8.3 0 13.6 6.3 13.6 14.6S38.3 35 30 35s-13.6-7.1-13.6-15.4S21.7 5 30 5zm0 34c15.6 0 27 9.4 29 23v12H1V62c2-13.6 13.4-23 29-23z"/></svg>';
+
+const PAGES = {
+  left: [
+    [null, 'Jeroen van Geel'], [null, 'Rianne Melberg'], [69, 'Ewan Deeley'],
+    [71, 'Simon'], [71, 'Bo'], [null, 'Marie Versteeg'],
+  ],
+  right: [
+    [73, 'Yannick'], [null, 'Tanny'], [78, 'Nick'],
+    [79, 'Daan Verkade'], [null, 'Max Smedts'], [81, 'Mathijs'],
+  ],
+};
+
+const tierFor = (o) => (o >= 85 ? 'goudZeldzaam' : o >= 75 ? 'goud' : o >= 65 ? 'zilver' : 'brons');
+
+document.querySelectorAll('[data-slots]').forEach((host) => {
+  host.innerHTML = PAGES[host.dataset.slots].map(([overall, name]) => {
+    const empty = overall === null;
+    return `<div class="slot${empty ? ' slot--empty' : ''}">
+      <div class="card card--${empty ? 'empty' : tierFor(overall)}">
+        <div class="card__portrait">${SIL}</div>
+        <div class="card__header"><span class="card__overall">${empty ? '??' : overall}</span></div>
+        <div class="card__name">${name}</div>
+      </div>
+    </div>`;
+  }).join('');
+});
+
+/* ==================================================================
+ * Controls
+ * ================================================================== */
+
+const $ = (id) => document.getElementById(id);
+
+$('ink').oninput = (e) => {
+  const v = e.target.value / 100;
+  document.documentElement.style.setProperty('--field-ink', v);
+  $('inkv').textContent = v.toFixed(2).slice(1);
+};
+
+$('wob').oninput = (e) => {
+  WOBBLE = e.target.value / 100;
+  $('wobv').textContent = WOBBLE.toFixed(1);
+  draw();
+};
+
+$('onoff').onchange = (e) => document.body.classList.toggle('no-field', !e.target.checked);
+$('folio').onchange = (e) => document.body.classList.toggle('no-folio', !e.target.checked);
+$('cards').onchange = (e) => document.body.classList.toggle('no-cards', !e.target.checked);
+$('trim').onchange = (e) => document.body.classList.toggle('no-trim', !e.target.checked);
+$('rules').onchange = (e) => document.body.classList.toggle('no-rules', !e.target.checked);
+
+const TABS = { spread: ['03', '03'], range: ['68–72', '73–81'], folio: ['5', '6'] };
+
+$('tabmode').onchange = (e) => {
+  const mode = e.target.value;
+  document.body.classList.toggle('no-tab', mode === 'none');
+  if (mode === 'none') return;
+  document.querySelectorAll('[data-tab]').forEach((el, i) => {
+    el.textContent = TABS[mode][i];
+    el.style.fontSize = TABS[mode][i].length > 2 ? '9px' : '12px';
+  });
+};
+$('tabmode').onchange({ target: $('tabmode') });
+
+if (location.hash.includes('bare')) {
+  $('cards').checked = false;
+  document.body.classList.add('no-cards');
+}
+
+draw();
+</script>
+</body>
+</html>

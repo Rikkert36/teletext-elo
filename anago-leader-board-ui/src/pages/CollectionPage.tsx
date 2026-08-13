@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { unstable_batchedUpdates } from 'react-dom';
 import Album, { AlbumSection, albumSlotOrder } from '../components/Album';
 import AlbumChoice from '../components/AlbumChoice';
 import CardViewer from '../components/CardViewer';
@@ -8,6 +9,7 @@ import PackOpener from '../components/PackOpener';
 import LedgerCorner from '../components/LedgerCorner';
 import LockedAlbum from '../components/LockedAlbum';
 import PackTile from '../components/PackTile';
+import PutAway, { Placing } from '../components/PutAway';
 import SigningLedger from '../components/SigningLedger';
 import { CollectionState, GrantOptions, httpCardsClient } from '../clients/cardsClient';
 import {
@@ -19,10 +21,63 @@ import {
   splitName,
 } from '../mock/cardMock';
 import { CoverId } from '../utils/albumLeather';
+import { ms } from '../utils/animationSpeed';
 import { CURRENT_PLAYER_KEY as PLAYER_KEY } from '../utils/currentPlayer';
 import '../styles/game.css';
 
 const FAST_KEY = 'tafelvoetbal.cards.fastOpen';
+
+/* ------------------------------------------------------------------ *
+ * Putting a pack away, beat by beat
+ *
+ * The cards go in **one at a time, lowest rated first**, and the book turns to each
+ * one's page as its turn comes — so the sequence climbs towards the best card in the
+ * pack and ends with the book lying open on it.
+ *
+ * Every number below is a base duration doubled by `ms()`, and none of them is in a
+ * hurry: this is the end of a ceremony, not a transaction being confirmed. **The turn
+ * itself is not timed here** — the album reports when the book has arrived, because how
+ * long a move takes is a property of the distance and a guess either flies a card at a
+ * page still in the air or pays for a turn that never happened.
+ * ------------------------------------------------------------------ */
+
+/**
+ * The book being put back in front of you, once the table is clear.
+ *
+ * **It is not on screen before this.** The album is mounted for the whole of the filing —
+ * `PutAway` measures the book to know where to stand the cards — but it is invisible until
+ * the cards are out of the middle, because a book arriving underneath cards that are still
+ * moving is two things happening in one place. This is the fade, and it matches the
+ * `opacity` transition on `.album-layout--placing .album`.
+ */
+const PLACE_ARRIVE_MS = 420;
+/**
+ * The card that has just landed, left alone in its slot before the book moves again.
+ *
+ * The point of the whole sequence is that you see where each card went, so the page must
+ * not start turning out from under one the moment it arrives.
+ */
+const PLACE_SETTLE_MS = 420;
+/**
+ * After the last card, before the shelf comes back up.
+ *
+ * The shelf brightening is the invitation to open the next packet, and it should not
+ * arrive on the same frame as the last card. This is the beat where the book is simply
+ * a book with a new card in it.
+ */
+const PLACE_REST_MS = 520;
+/**
+ * How long the book is given to report that it has arrived, before the sequence gives up
+ * waiting and flies the card anyway.
+ *
+ * A safety net and nothing else: `onTurned` fires on every path the album has, including
+ * the ones with nothing to turn. But the flag that keeps the shelf out of play is lowered
+ * at the *end* of this sequence, so a report that never came would strand the page with a
+ * dimmed table and no way back — the same class of bug as an opener that never reaches
+ * `onFinished`. Generous, because it must never fire on a turn that is merely long: the
+ * longest honest move is the whole book at `RIFFLE_MS` a leaf.
+ */
+const PLACE_TURN_CAP_MS = 4000;
 
 /**
  * The test panel. Everything on it is real now: the pack buttons hand the signed-in
@@ -67,18 +122,84 @@ const CollectionPage: React.FC = () => {
   const [collection, setCollection] = useState<CollectionState | null>(null);
   const [openingPack, setOpeningPack] = useState<Pack | null>(null);
   /**
-   * True from the tear until the last card has settled — *not* for as long as the
-   * opener is mounted. A sealed packet lying on the stage is a decision you have not
-   * taken yet, so the pile beside it stays live and you can still change your mind.
+   * True from the tear until the last card has settled — *not* for as long as the opener
+   * is mounted. A sealed packet lying on the stage is a decision you have not taken yet,
+   * so the pile beside it stays live and you can still change your mind.
    *
-   * It is raised by the opener's `onStart` and lowered by its `onFinished`, so
-   * **every path that unmounts the opener has to lower it too**: an opener that is
-   * taken off screen never reaches `onFinished`, and the flag would then sit true
-   * for the rest of the session with the shelf dimmed and inert behind it. That is
-   * exactly what "terug naar het album" used to do. `closeOpener` is the one way
+   * It is raised by the opener's `onStart` and lowered by its `onFinished`, so **every
+   * path that unmounts the opener has to lower it too**: an opener that is taken off
+   * screen never reaches `onFinished`, and the flag would then sit true for the rest of
+   * the session with the shelf dimmed and inert behind it. `closeOpener` is the one way
    * out, and `choosePlayer` and `openPack` clear it for the same reason.
+   *
+   * **It ends where the reveal ends, and that is the point.** The row of cards then waits
+   * for the reader, with the shelf live over it — another packet, or file these. Filing
+   * raises the same guard again through `placing`; see `handsFull`.
    */
   const [revealing, setRevealing] = useState(false);
+  /**
+   * Cards lying on the table from packets opened **before** the one on the stage.
+   *
+   * The row survives one packet: it is the record of what you have opened in this
+   * sitting, and the reader files the lot when they have stopped. This holds the earlier
+   * packets only — the opener renders these ahead of its own cards — so nothing is ever
+   * counted twice.
+   */
+  const [table, setTable] = useState<RevealedCard[]>([]);
+  /**
+   * What the packet on the stage turned over, kept for the moment the reader reaches for
+   * the next one — at which point it joins `table`.
+   *
+   * A ref rather than state: nothing renders from it (the opener draws its own cards from
+   * its own state), and moving it into `table` while that opener is still mounted would
+   * draw every card twice.
+   */
+  const openerCards = useRef<RevealedCard[]>([]);
+  /**
+   * The new cards from the packet just closed, being put into the book one at a time.
+   *
+   * There is no exit button on this page and nothing to click at the end of a reveal.
+   *
+   * `all` is every card on the table, because clearing it is one gesture over all of them —
+   * the doubles go off the bottom and the keepers move aside together. `order` is the
+   * keepers' positions in that row, lowest rated first, and `index` is whose turn it is.
+   *
+   * The phase is which beat is running:
+   *
+   *   clearing   doubles off the table, keepers aside — and no book on it yet
+   *   arriving   the book fading in, now that the middle is empty
+   *   turning    the book going to this card's page, however many leaves that takes
+   *   flying     `PutAway` carrying this card into its slot
+   *   settling   the card that just landed, left alone in its slot
+   *   resting    the finished book, before the shelf comes back up
+   *
+   * `clearing` and `flying` are `PutAway`'s and `turning` is the album's; all three report
+   * when they are over. The page times `arriving`, `settling` and `resting`.
+   */
+  const [placing, setPlacing] = useState<{
+    all: Placing[];
+    order: number[];
+    index: number;
+    phase: 'clearing' | 'arriving' | 'turning' | 'flying' | 'settling' | 'resting';
+  } | null>(null);
+  /**
+   * Slots the book must go on drawing as empty, because their card has not arrived yet.
+   *
+   * All of them from the start, released one at a time as they land — so a page turned
+   * *through* on the way to a later card does not show a card that is still on the table.
+   */
+  const [held, setHeld] = useState<string[]>([]);
+  /**
+   * **Your hands are full** — from the tear until the cards are in the book.
+   *
+   * Two spans rather than one flag, because there is a real pause between them: a reveal,
+   * and then the filing the reader asks for. In between, the row waits and the shelf is
+   * *live* — that is what makes "another packet" the peer of "file these" rather than the
+   * only thing on offer being a control with a dimmed table around it.
+   *
+   * Derived rather than stored, so it cannot disagree with either half.
+   */
+  const handsFull = revealing || placing !== null;
   /** Index into `slotOrder` of the card being looked at, or null for none. */
   const [viewing, setViewing] = useState<number | null>(null);
   const [fastMode, setFastMode] = useState(() => read(FAST_KEY) === 'true');
@@ -237,6 +358,8 @@ const CollectionPage: React.FC = () => {
     write(PLAYER_KEY, next.id);
     setOpeningPack(null);
     setRevealing(false);
+    /* Somebody else's cards, mid-flight over somebody else's book. */
+    stopPlacing();
     // Somebody else's, now. The guard in `applyPendingCollection` would catch it anyway;
     // dropping it here means it never has to.
     pendingCollection.current = null;
@@ -293,6 +416,19 @@ const CollectionPage: React.FC = () => {
        but the opener would be layered under a viewer left mounted over it. */
     setViewing(null);
     setRevealing(false);
+    /*
+     * The packet just finished joins the table, and this is the one place that happens:
+     * reaching for the next packet is what makes the previous one's cards "already on the
+     * table" rather than "the ones the opener about to unmount is drawing". See
+     * `openerCards`.
+     *
+     * Read before `stopPlacing`, which empties the table — the one path where the row is
+     * carried forward rather than being over. Both land in one commit; this is an event
+     * handler.
+     */
+    const carried = [...table, ...openerCards.current];
+    stopPlacing();
+    setTable(carried);
     /*
      * The binding is behind you the moment you reach for a packet, and this has to be lowered
      * *here* rather than left to expire with the session: the opener unmounts the album, so a
@@ -351,21 +487,26 @@ const CollectionPage: React.FC = () => {
   }, []);
 
   /**
-   * Putting the opener away. The only way out of it.
+   * Putting the opener away with nothing to place: a sealed packet put back down, a pack
+   * of nothing but doubles, or a reader who has asked for less motion.
    *
-   * Clears `revealing` as well as the packet — see the flag's note. This used to be
-   * a bare `setOpeningPack(null)`, which meant that leaving mid-reveal unmounted the
-   * one component that would ever have lowered the flag, and the shelf stayed dimmed
-   * and unclickable until the page was reloaded.
-   *
-   * The button that calls it is hidden for the length of the reveal anyway, so this
-   * is now the guard rather than the fix — but the flag's lifetime should be a
-   * property of the page, not of a callback that may never arrive.
+   * Clears `handsFull` as well as the packet — see the flag's note. This used to be a
+   * bare `setOpeningPack(null)`, which meant that leaving mid-reveal unmounted the one
+   * component that would ever have lowered the flag, and the shelf stayed dimmed and
+   * unclickable until the page was reloaded.
    */
   const closeOpener = () => {
     applyPendingCollection(player?.id);
     setOpeningPack(null);
     setRevealing(false);
+    /*
+     * And the table goes with it. Both callers mean "the row is over": a sealed packet put
+     * back has nothing on the table behind it (with cards there, putting the packet down
+     * files them instead — see `putDown`), and the reduced-motion path has just had its
+     * cards put in the book without a row being drawn at all. Leaving it set would put
+     * filed cards back on the table the next time a packet was opened.
+     */
+    stopPlacing();
   };
 
   const toggleFast = () => {
@@ -509,10 +650,200 @@ const CollectionPage: React.FC = () => {
    * full leaderboard replay for one pack. It also left a window where the reveal had ended
    * but the shelf and the book were still the pre-claim ones.
    */
-  const handleFinished = useCallback(() => {
+  const handleFinished = useCallback((cards: RevealedCard[]) => {
     setRevealing(false);
     applyPendingCollection(player?.id);
+    /*
+     * And the packet's cards are now on the table. Parked rather than appended: this
+     * opener is still mounted and still drawing them, so they only join `table` when the
+     * reader reaches for the next packet. See `openerCards`.
+     */
+    openerCards.current = cards;
   }, [applyPendingCollection, player]);
+
+  /**
+   * The filing is over, or has been interrupted. Nothing is in the air and the table is
+   * clear.
+   *
+   * `held` must go with it or a slot whose card never arrived stays drawn as a hole for the
+   * rest of the session, and the table has to be emptied — those cards are in the book now,
+   * and a row that outlived its own filing would be flown into the album a second time.
+   */
+  const stopPlacing = useCallback(() => {
+    setPlacing(null);
+    setHeld([]);
+    setTable([]);
+    openerCards.current = [];
+  }, []);
+
+  /**
+   * **The reader has stopped opening.** The table gets cleared and what is kept goes in
+   * the book; the opener passes every card on the row and the box it is lying in, and
+   * everything after that is the book's.
+   *
+   * **Lowest rated first, working up.** The sequence climbs to the best card in the pack
+   * and the book is left lying open on it, which is the only ordering that ends on the
+   * thing worth ending on — the reveal already spends its ceremony that way. The sort is
+   * stable, so cards of equal rating stay in the order they came out of the packet.
+   *
+   * A pack of nothing but doubles still runs this: there is a table to clear even when
+   * there is nothing to place, and the sequence simply goes from `clearing` to `resting`.
+   * The only path that skips straight out is an empty hand-over, which is what reduced
+   * motion and `snel openen` send.
+   *
+   * `applyPendingCollection` is a formality by now: `handleFinished` applied it when the
+   * last card settled. It stays because the guarantee this path depends on is "the cards
+   * are in the collection before they are flown into it" — the flight needs a filled slot
+   * to land in and `held` is what hides it — and the call states that rather than assuming
+   * the order two callbacks fire in.
+   *
+   * One commit, via `unstable_batchedUpdates`: this arrives from a timeout inside the
+   * opener, and `index.tsx` mounts with legacy `ReactDOM.render`, which does not batch
+   * those. Unbatched, the opener would unmount a frame before the book was open on the
+   * right page, and the cards would be moving over a table with nothing on it.
+   */
+  const putAway = (revealed: { card: RevealedCard; from: DOMRect }[]) => {
+    /* Where each one is printed. A card with no slot in this book cannot be flown into
+       it — that is an icoon whose latch is shut, and it simply has nowhere to go. */
+    const all: Placing[] = revealed.flatMap(({ card, from }) => {
+      const slot = slotOrder.find((s) => s.card.player.id === card.player.id);
+      return slot ? [{ card, from, page: slot.page }] : [];
+    });
+
+    /* Nothing came over at all: reduced motion or `snel openen`. Exactly what the old
+       exit button did. */
+    if (all.length === 0) {
+      closeOpener();
+      return;
+    }
+
+    /*
+     * The keepers, as **positions in the row** rather than as cards.
+     *
+     * Positions because the row can hold the same player twice over two packets — new in
+     * the first, a double in the second — so a player id does not identify a card on the
+     * table. It still identifies a *slot*, which is all the flight and `held` need.
+     */
+    const order = all
+      .map((_, index) => index)
+      .filter((index) => all[index].card.isNew)
+      .sort((a, b) => all[a].card.overall - all[b].card.overall);
+
+    unstable_batchedUpdates(() => {
+      applyPendingCollection(player?.id);
+      setHeld(order.map((index) => all[index].card.player.id));
+      setPlacing({ all, order, index: 0, phase: 'clearing' });
+      setOpeningPack(null);
+      /*
+       * The row is being taken apart, so the table is empty from here — `PutAway` holds
+       * the cards from now on, and the opener that was drawing them is unmounted in this
+       * same commit. Leaving it set would put the row back on screen the moment the next
+       * packet was opened, with cards that are already in the book.
+       */
+      setTable([]);
+      openerCards.current = [];
+    });
+  };
+
+  /**
+   * The beats the page times, which are the two where nothing else is happening.
+   *
+   * One effect per beat rather than a chain of timers, so its cleanup cancels whatever is
+   * pending the moment the sequence is interrupted. `clearing` and `flying` are `PutAway`'s
+   * and `turning` is the album's — all three report, and the only thing kept for `turning`
+   * here is a cap in case the report never comes.
+   */
+  useEffect(() => {
+    if (!placing || placing.phase === 'clearing' || placing.phase === 'flying') {
+      return undefined;
+    }
+
+    if (placing.phase === 'resting') {
+      const timer = window.setTimeout(stopPlacing, ms(PLACE_REST_MS));
+      return () => window.clearTimeout(timer);
+    }
+
+    /*
+     * The book fading in on an empty table. Nothing else moves for the length of it: the
+     * cards have just been stood aside and the first one should not set off while the thing
+     * it is going into is still arriving.
+     */
+    if (placing.phase === 'arriving') {
+      const timer = window.setTimeout(
+        () =>
+          setPlacing((current) =>
+            current
+              ? { ...current, phase: current.order.length === 0 ? 'resting' : 'turning' }
+              : current,
+          ),
+        ms(PLACE_ARRIVE_MS),
+      );
+      return () => window.clearTimeout(timer);
+    }
+
+    /* The card that just landed, left alone before the book moves again. */
+    if (placing.phase === 'settling') {
+      const timer = window.setTimeout(
+        () =>
+          setPlacing((current) =>
+            current
+              ? { ...current, index: current.index + 1, phase: 'turning' }
+              : current,
+          ),
+        ms(PLACE_SETTLE_MS),
+      );
+      return () => window.clearTimeout(timer);
+    }
+
+    /*
+     * Waiting on the book, with a net under it. `bookArrived` is what normally moves this
+     * on; see `PLACE_TURN_CAP_MS` for why a missed report must not be able to strand the
+     * page with its table dimmed.
+     */
+    const timer = window.setTimeout(() => {
+      // eslint-disable-next-line no-console
+      console.warn('[kaarten] het album meldde de bladzijde niet — toch maar plaatsen');
+      setPlacing((current) =>
+        current && current.phase === 'turning' ? { ...current, phase: 'flying' } : current,
+      );
+    }, ms(PLACE_TURN_CAP_MS));
+    return () => window.clearTimeout(timer);
+  }, [placing, stopPlacing]);
+
+  /**
+   * The book is open on this card's page and standing still, so the card can go in.
+   *
+   * Guarded on the id as well as the phase: the album reports the page it was asked for,
+   * and a report for a card the sequence has already moved past — a stale turn finishing
+   * after an interruption — must not launch the next one early.
+   */
+  const bookArrived = (playerId: string) => {
+    setPlacing((current) => {
+      if (!current || current.phase !== 'turning') return current;
+      const placing = current.all[current.order[current.index]];
+      if (placing.card.player.id !== playerId) return current;
+      return { ...current, phase: 'flying' };
+    });
+  };
+
+  /**
+   * That card is in the book: let its slot fill, and give it a beat before the next.
+   *
+   * Called from inside `PutAway`'s own batched commit, so the slot filling, the clone
+   * unmounting and the next beat starting are one render. The index advances in the
+   * `settling` beat rather than here, so the card that has just arrived is still the
+   * current one for as long as it is being looked at.
+   */
+  const cardPlaced = () => {
+    const arrived = placing && placing.all[placing.order[placing.index]];
+    setHeld((current) => current.filter((id) => id !== arrived?.card.player.id));
+    setPlacing((current) => {
+      if (!current) return current;
+      return current.index + 1 >= current.order.length
+        ? { ...current, phase: 'resting' }
+        : { ...current, phase: 'settling' };
+    });
+  };
 
   /**
    * The claim was refused, and the wrapper is already torn.
@@ -536,9 +867,12 @@ const CollectionPage: React.FC = () => {
       pendingCollection.current = null;
       setOpeningPack(null);
       setRevealing(false);
+      /* The table goes with the opener: it is drawn by it, and the refetch below is about
+         to replace everything this row was a record of. */
+      stopPlacing();
       if (player) void refresh(player.id);
     },
-    [player, refresh],
+    [player, refresh, stopPlacing],
   );
 
   /**
@@ -708,6 +1042,7 @@ const CollectionPage: React.FC = () => {
     setRestoring(false);
     setJustBound(false);
     setError(null);
+    stopPlacing();
   };
 
   /**
@@ -727,6 +1062,8 @@ const CollectionPage: React.FC = () => {
     setRevealing(false);
     // The collection this describes is about to stop existing.
     pendingCollection.current = null;
+    // And so is the book the cards were being flown into.
+    stopPlacing();
 
     void client
       .emptyCollection(player.id)
@@ -845,7 +1182,19 @@ const CollectionPage: React.FC = () => {
           screen where it genuinely is not the subject, and leaving it under the
           reveal would put a second lit object inside the vignette.
         */
-        <div className={`album-layout${openingPack ? ' album-layout--opening' : ''}`}>
+        <div
+          className={[
+            'album-layout',
+            openingPack ? 'album-layout--opening' : '',
+            /* Cards are in the air: the book is out of play for as long as they are
+               going into it, and it fades in rather than cutting. See putaway.css. */
+            placing ? 'album-layout--placing' : '',
+            /* And it is not on the table at all until the cards are out of the middle. */
+            placing?.phase === 'clearing' ? 'album-layout--clearing' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           {/*
             No plate, no "Jouw pakjes" label, and nothing at all when there are none.
             The packets are objects lying next to the book — a titled panel around them
@@ -858,7 +1207,7 @@ const CollectionPage: React.FC = () => {
             is there or not. See `.album-layout` in game.css.
           */}
           {shelfPacks.length > 0 && !showChoice ? (
-            <aside className={`album-side${revealing ? ' album-side--set-aside' : ''}`}>
+            <aside className={`album-side${handsFull ? ' album-side--set-aside' : ''}`}>
               <div className="pack-shelf">
                 {shelfPacks.map((pack) => (
                   <PackTile key={pack.id} pack={pack} onOpen={openPack} />
@@ -885,7 +1234,7 @@ const CollectionPage: React.FC = () => {
           */}
           <aside
             className={`album-register${
-              revealing || creating ? ' album-register--set-aside' : ''
+              handsFull || creating ? ' album-register--set-aside' : ''
             }`}
           >
             <LedgerCorner name={ownerName ?? player.name} onSignOut={forgetPlayer} />
@@ -1077,32 +1426,28 @@ const CollectionPage: React.FC = () => {
                   onStart={() => setRevealing(true)}
                   onFinished={handleFinished}
                   onFailed={handleFailed}
+                  /*
+                    What is already lying on the table. The opener draws these ahead of its
+                    own cards, so a second packet extends the row rather than replacing it —
+                    and the reveal's FLIP lands into a row that already has cards in it.
+                  */
+                  table={table}
+                  onPutAway={putAway}
+                  onPutBack={closeOpener}
                   fastMode={fastMode}
                 />
                 {/*
-                  The way back, and it is **not offered while the reveal is
-                  running**. The shelf beside the opener already stands down for
-                  that window — you cannot pick up a second packet with your hands
-                  full — and a live exit next to it was the one control that
-                  contradicted that, as well as the one way to strand `revealing`
-                  true.
+                  **No exit row under the opener any more.** It was the last real button on
+                  the table, and everything it did now belongs to objects: a sealed packet
+                  is put down by clicking the wood beside it, and a row of cards is filed by
+                  clicking the cards. See `putAway`.
 
-                  Hidden rather than unmounted, and the row keeps its box. Removing
-                  it would shorten the column at the exact moment the first card is
-                  rising out of the wrapper, and everything about this stage is
-                  built so that nothing moves from the click to the last card — see
-                  `.opener__stage`'s note, and the `&nbsp;` the opener's own hint
-                  line renders during the tear for precisely this reason.
+                  What it was carrying is not lost. It had to be hidden for the length of a
+                  reveal, because the shelf beside it was inert and a live exit next to an
+                  inert pile contradicts it; its replacement cannot be offered early either,
+                  because it *is* the cards, and until they have landed there is nothing
+                  there to pick up.
                 */}
-                <div className="game-row" style={{ justifyContent: 'center' }}>
-                  <button
-                    type="button"
-                    className={`game-button${revealing ? ' game-button--away' : ''}`}
-                    onClick={closeOpener}
-                  >
-                    terug naar het album
-                  </button>
-                </div>
               </>
             ) : (
               <Album
@@ -1139,6 +1484,38 @@ const CollectionPage: React.FC = () => {
                 }}
                 /* Keeps the book on the spread of whatever the viewer is showing. */
                 focusPlayerId={viewingSlot?.card.player.id ?? null}
+                /*
+                  A pack is being put away. The book comes back **already open** on the
+                  page the first card goes on — read at mount, which is what makes it free:
+                  the album is unmounted for the whole of the opener, so there is no page to
+                  turn for the first one. After that `turnToPlayerId` turns it, audibly,
+                  card by card.
+
+                  `holdSlots` is every card that has not landed yet, so a page turned
+                  through on the way to a later card does not show one that is still on the
+                  table.
+                */
+                /* Optional all the way down: a table of nothing but doubles has a row to
+                   clear and no card to open the book on. */
+                openAtPlayerId={
+                  placing && placing.order.length > 0
+                    ? placing.all[placing.order[0]].card.player.id
+                    : undefined
+                }
+                /*
+                  Named only from the beat the book should start turning. Null through
+                  `clearing` — the cards are still moving out of the middle and the book has
+                  only just arrived — and null again through `settling`, which is what makes
+                  the *next* card's id a change the album acts on rather than the same prop
+                  it has already seen.
+                */
+                turnToPlayerId={
+                  placing && (placing.phase === 'turning' || placing.phase === 'flying')
+                    ? placing.all[placing.order[placing.index]].card.player.id
+                    : null
+                }
+                onTurned={bookArrived}
+                holdSlots={placing ? held : undefined}
               />
             )}
           </div>
@@ -1161,6 +1538,42 @@ const CollectionPage: React.FC = () => {
           index={viewing}
           onIndex={setViewing}
           onClose={() => setViewing(null)}
+        />
+      ) : null}
+
+      {/*
+        The cards standing beside the book and going into it, mounted out here for exactly
+        the reasons the viewer above is: `.album` carries `perspective`, so anything inside
+        it is a containing block away from being fixed and one depth sort away from ending
+        up between the leaves.
+
+        Mounted for the whole sequence, because it is holding the cards — they never leave
+        the screen between the packet and the album. Keyed on the first card, so a second
+        filing in the same sitting gets a fresh hand rather than one whose cards have
+        already been dealt into the book.
+
+        It is handed **every** card on the table: clearing it is one gesture over the whole
+        row, with the doubles going off the bottom and the keepers moving aside together.
+        `flying` is a position in that row rather than a player id, because a row spanning
+        two packets can hold the same player twice — new in the first, a double in the
+        second.
+      */}
+      {placing && player ? (
+        <PutAway
+          key={placing.all[0].card.player.id}
+          cards={placing.all}
+          flying={placing.phase === 'flying' ? placing.order[placing.index] : null}
+          onCleared={() =>
+            setPlacing((current) =>
+              current && current.phase === 'clearing'
+                ? /* The middle of the table is empty, so the book can be put back on it.
+                     Whether there is anything to place is the *arriving* beat's business —
+                     a row of nothing but doubles still gets its book back. */
+                  { ...current, phase: 'arriving' }
+                : current,
+            )
+          }
+          onLanded={cardPlaced}
         />
       ) : null}
     </GameShell>

@@ -132,6 +132,43 @@
   --page-pad-x: 22px;
   --album-card-w: calc((var(--page-w) - var(--page-pad-x) * 2 - 28px) / 3);
   --book-w: calc(var(--page-w) * 2);
+
+  /*
+   * How far the boards stand proud of the paper — a binding's *squares*.
+   *
+   * Three things inside the book read it and all three have to agree. The **boards** grow
+   * by it (`.album__leaf--cover`), which is where the overhang comes from. The
+   * **pastedowns** are inset by it, because a glued sheet is page-sized and the board is
+   * bigger — so this is exactly the band of bare leather beyond the page trim. And the
+   * **spine caps** sit in it, because the overhang is the only place an open book lets you
+   * see into the case.
+   *
+   * Nothing paper-coloured is drawn in that band. A fore-edge went there three times and
+   * was wrong all three; see the note above `.album__page--foreword` for why.
+   *
+   * **On `:root` rather than on `.album`, for the same reason `--page-w` is**: a shut book
+   * is `--page-w + --board-out` wide and `--page-h + 2 × --board-out` tall, and the cover
+   * ceremony has to draw that exact box while the album itself is not mounted. See
+   * `.choice__stage` in albumchoice.css — the handover is a hard swap, so a book that
+   * disagrees with it by the squares visibly jumps.
+   */
+  --board-out: 9px;
+
+  /*
+   * How far *outside* the book the page-turn strips still take a click.
+   *
+   * The strip is exactly the page's margin wide and stops on the trim, which put the
+   * hitbox's outer boundary on the one edge a hand aims at — a click on the board's
+   * overhang, or a few pixels into the felt beside it, hit nothing. This buys that back
+   * outward only, so the strip still touches no card: `--board-out` of it is the board
+   * standing proud of the paper (visually part of the book, and until now dead), and the
+   * rest is slack on the felt.
+   *
+   * It cannot grow much past this. The collection page lays the pack shelf in the margin
+   * beside the book with `--shelf-gap` (26px) between them, so anything from ~26px would
+   * start eating the first packet.
+   */
+  --turn-reach: 18px;
 }
 
 /*
@@ -184,20 +221,8 @@
   /* Containing block for the page-turn strips. */
   position: relative;
 
-  /*
-   * How far the boards stand proud of the paper — a binding's *squares*.
-   *
-   * Three things read it and all three have to agree. The **boards** grow by it
-   * (`.album__leaf--cover`), which is where the overhang comes from. The **pastedowns**
-   * are inset by it, because a glued sheet is page-sized and the board is bigger — so
-   * this is exactly the band of bare leather beyond the page trim. And the **spine caps**
-   * sit in it, because the overhang is the only place an open book lets you see into the
-   * case.
-   *
-   * Nothing paper-coloured is drawn in that band. A fore-edge went there three times and
-   * was wrong all three; see the note above `.album__page--foreword` for why.
-   */
-  --board-out: 9px;
+  /* `--board-out`, the squares, is on `:root` — the cover ceremony draws the shut book's
+     box from outside the album. See the note there. */
 
   /*
    * How high the leather runs along the edges of the icon binding — see
@@ -676,8 +701,19 @@
   height: var(--page-h);
   transform-origin: left center;
   transform-style: preserve-3d;
-  /* Scaled by the shared pacing knob — see utils/animationSpeed.ts. */
-  transition: transform calc(620ms * var(--anim, 1)) cubic-bezier(0.4, 0.05, 0.25, 1);
+  /*
+   * Scaled by the shared pacing knob — see utils/animationSpeed.ts.
+   *
+   * `--leaf-ms` is 620 for a single turn and shorter while the book is **riffling**: a
+   * jump of several pages is walked one leaf at a time (see `walkTo` in Album.tsx), and at
+   * a full turn each a three-leaf move would take four seconds. The default in the `var()`
+   * is the real number, so a book that never riffles never sets the property.
+   *
+   * Published by the component, which is also what times the walk against it. The two are
+   * the same number by construction rather than by agreement.
+   */
+  transition: transform calc(var(--leaf-ms, 620ms) * var(--anim, 1))
+    cubic-bezier(0.4, 0.05, 0.25, 1);
 }
 
 .album__leaf--flipped {
@@ -1147,6 +1183,18 @@
   font-size: clamp(10px, round(down, calc(var(--page-w) * 0.023), 1px), 13px);
 }
 
+/*
+ * Shared by the checklist and the slots pages.
+ *
+ * It carried the one heading in the book when only the checklist used it. A slots
+ * page now takes the same rule for "COLLECTIE · 75 – 80" — see `.album__list-range`
+ * for why that is not the running head coming back.
+ *
+ * The size is stated here rather than inherited because a slots page has no base
+ * size of its own to give it: `.album__page--list` sets one for the checklist and
+ * `.album__page` sets Tahoma at whatever the stage hands down. Same expression as
+ * the list's, so the checklist head computes to exactly what it did before.
+ */
 .album__list-head {
   flex: none;
   position: relative;
@@ -1160,22 +1208,61 @@
 }
 
 /*
- * The one heading in the book, and it is not a running head.
+ * The heading, and it is not a running head.
  *
- * The slots pages lost theirs because it repeated what the cover said. This one
- * names what the page is — a list has to — and it appears twice at most rather
- * than on every leaf.
+ * The slots pages lost theirs because it repeated what the cover said, word for
+ * word, twelve times over. "CHECKLIST" says something the cover does not, and so
+ * does the rating range beside "COLLECTIE" — see `.album__list-range`.
  */
-.album__list-title {
+/*
+ * All three parts of a heading are one size, stated once.
+ *
+ * Grouped rather than repeated three times because the rounded size is the kind of
+ * expression that has to stay identical everywhere it appears — three copies is
+ * three chances to retune two of them. (It also keeps `postcss-calc` to one
+ * complaint about `round()` instead of three; it cannot reduce the expression and
+ * says so, which is what the plain `13px` above each one is for.)
+ */
+.album__list-title,
+.album__list-range,
+.album__list-sep {
   font-family: Georgia, "Times New Roman", serif;
   /* The one thing on the page allowed its own size, and rounded for the same
      reason. Same fallback-then-round pattern as `.album__page--list`. */
   font-size: 13px;
   font-size: clamp(11px, round(down, calc(var(--page-w) * 0.03), 1px), 17px);
+}
+
+/*
+ * `.album__list-range` is the slots page's own heading: the lowest and highest
+ * overall printed on THIS leaf, set in the title rather than pushed to the far
+ * margin.
+ *
+ * Title weight, because it is half of the heading rather than a caption to it —
+ * "COLLECTIE · 75 – 80" is one line that reads as one thing. The separator is the
+ * only part allowed to be quiet.
+ *
+ * **This is what stops it being the running head that came off.** That line was
+ * the owner's name, which the cover already carried, so it repeated on every
+ * leaf. A range changes with the spread — it is the one thing about a slots page
+ * that is true of that page and no other, and the book is sorted ascending by
+ * rating, so it also tells you where in the book you are.
+ */
+.album__list-title,
+.album__list-range {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 2px;
   color: #4a3a1c;
+}
+
+/* So a page that runs 8–10 does not sit narrower than one that runs 75–80. */
+.album__list-range {
+  font-variant-numeric: tabular-nums;
+}
+
+.album__list-sep {
+  color: #a2977c;
 }
 
 /* Printed with the list: how many there are is what the press knows. */
@@ -1651,6 +1738,23 @@
   padding: 24px;
   border-radius: 0 3px 3px 0;
   box-shadow: inset 12px 0 24px -12px rgba(0, 0, 0, 0.7);
+  /*
+   * **Unkerned, because the opening ceremony blocks this name a letter at a time.**
+   *
+   * `AlbumChoice` renders the title as one inline-block per character — it has to, since
+   * each letter arrives on its own beat — and inline-blocks cannot kern across their
+   * boxes. So the ceremony is unkerned whatever this file says, and the only question is
+   * whether the album agrees with it. It did not: the handover is a hard swap, so the name
+   * you had just watched being pressed into the leather re-kerned and every letter past
+   * the first pair jumped a fraction sideways.
+   *
+   * On the whole cover rather than on the title, because the kicker above it is set from
+   * the same rules on both sides and had the same hairline shift.
+   *
+   * At `letter-spacing: 2px` on Georgia caps, what kerning is left to do is very little,
+   * which is exactly why the shift was small enough to live with for a while.
+   */
+  font-kerning: none;
 }
 
 /* "Verzamelalbum van", above the owner's name. Deliberately the smaller of the
@@ -1681,12 +1785,6 @@
   /* Its own token rather than `--foil`: the rule is a shade down from the blocking on
      every book, and sharing one value flattens the two together. */
   background: linear-gradient(90deg, transparent, var(--foil-rule, #a9853c) 50%, transparent);
-}
-
-.album__cover-sub {
-  font-size: 11px;
-  opacity: 0.85;
-  line-height: 1.5;
 }
 
 /* ---------------------------------------------------------------- *
@@ -1848,8 +1946,7 @@
  */
 .album__cover-kicker,
 .album__cover-title,
-.album__cover-rule,
-.album__cover-sub {
+.album__cover-rule {
   position: relative;
 }
 
@@ -2067,9 +2164,7 @@
 .album--rebind-charging .album__cover-kicker,
 .album--rebind-holding .album__cover-kicker,
 .album--rebind-charging .album__cover-title,
-.album--rebind-holding .album__cover-title,
-.album--rebind-charging .album__cover-sub,
-.album--rebind-holding .album__cover-sub {
+.album--rebind-holding .album__cover-title {
   text-shadow: none;
 }
 
@@ -2395,6 +2490,15 @@
  * 22px is a comfortable edge to hit, and on a phone swipe was always the primary
  * gesture with the strip only ever the fallback.
  *
+ * **The hit area is `--turn-reach` wider than the lit band, and only outward.** Stopping
+ * the box on the trim meant the hand had to land inside the book to turn a page: the
+ * board's own overhang and the felt just beyond it — where a thumb naturally goes, and
+ * the direction there is nothing to hit by mistake — did nothing. The extra width goes
+ * outward alone, so the inward boundary is still the card column and the reason for
+ * `--page-pad-x` above is untouched. The *lit* band stays the margin: the wash lives on
+ * the pseudo element, which is inset back by the reach, or the light would spill onto the
+ * felt and stop reading as an edge being lifted.
+ *
  * Pinned to the book rather than to `.album`, whose width is a flex result:
  * `50% ± --book-w/2` lands on the book's own edges whether the container hugs it
  * or is stretched wider, because the book is centred either way.
@@ -2410,8 +2514,8 @@
   /* Matches `.album`'s own top padding, so the strip spans exactly the page. */
   top: 4px;
   height: var(--page-h);
-  /* The page margin, and nothing of any card. See above. */
-  width: var(--page-pad-x);
+  /* The page margin plus the reach outside the book — nothing of any card. See above. */
+  width: calc(var(--page-pad-x) + var(--turn-reach));
   /* Above every leaf — `leafZ` tops out at leafCount + 2, never this. */
   z-index: 40;
   /*
@@ -2435,12 +2539,13 @@
   cursor: pointer;
 }
 
+/* Pulled `--turn-reach` off the book's edge, so the extra width is all outside it. */
 .album__turn--prev {
-  left: calc(50% - var(--book-w) / 2);
+  left: calc(50% - var(--book-w) / 2 - var(--turn-reach));
 }
 
 .album__turn--next {
-  right: calc(50% - var(--book-w) / 2);
+  right: calc(50% - var(--book-w) / 2 - var(--turn-reach));
 }
 
 /*
@@ -2458,11 +2563,15 @@
   border-radius: 3px;
 }
 
+/* Inset back off the outer edge by the reach: the button is wider than the book, the
+   light is not. The gradient starts on the trim, which is the edge it is lifting. */
 .album__turn--prev::before {
+  left: var(--turn-reach);
   background: linear-gradient(90deg, rgba(255, 249, 226, 0.5), transparent 88%);
 }
 
 .album__turn--next::before {
+  right: var(--turn-reach);
   background: linear-gradient(270deg, rgba(255, 249, 226, 0.5), transparent 88%);
 }
 
@@ -2481,8 +2590,14 @@
  * Keyboard reaches the turn too, and with no glyph on the strip the wash alone is
  * not a focus ring. Inset, because an outline outside the trim would float over
  * the felt beside the book.
+ *
+ * On the pseudo element rather than the button, now that the button is `--turn-reach`
+ * wider than the book: a ring on the button — inset or not — would be drawn out on the
+ * felt on one side. The pseudo element is exactly the margin, so a ring on it is a ring
+ * on the paper. It is only visible because `:focus-visible` also lifts the wash to full
+ * opacity; opacity applies to an element's outline as well as its background.
  */
-.album__turn:focus-visible {
+.album__turn:focus-visible::before {
   outline: 2px solid var(--accent, #a9853c);
   outline-offset: -3px;
 }
@@ -2497,13 +2612,24 @@
 }
 
 /*
- * The one piece of chrome the album has, and so the only place that can carry an
- * invitation — there are no arrows beside the book and nothing is drawn on the turn
- * strips. It says where you are, or, on a book that has never been opened, how to open it.
+ * The one piece of chrome the album has. It says where you are, and on a shut desktop book
+ * it says **nothing at all** — `spreadLabel()` returns an empty string at `flipped === 0`,
+ * and the re-binding blanks it too.
  *
- * `min-height` is reserved rather than left to the content: the label sits above the book,
- * so a line that grows pushes the whole book down, and the invitation is a good deal longer
- * than "gesloten".
+ * `min-height` is what holds the row open through that, because the label sits above the
+ * book and anything that changes its height moves the book. **So the reserve has to be at
+ * least one line box, and it was not**: `calc(1.35em + 6px)` is 24.891px against a real
+ * line's `1.5 × 14px + 6px` = 27px, so the row stood 2.109px short whenever it was empty
+ * and the whole book rode up by that much. Measured, twice: the book jumped up 2.1px as
+ * the cover ceremony handed over to a shut album, and back down 2.1px the moment that album
+ * was opened and the row gained `pagina 1 / …`.
+ *
+ * `line-height` is stated rather than inherited so the reserve can be written in terms of
+ * it. It inherits 1.5 from MUI's `CssBaseline` today, and a reserve derived from a figure
+ * that lives in another package is a reserve that silently goes short again.
+ *
+ * `.choice__label` in albumchoice.css is the same row during the opening ceremony and
+ * carries the same three declarations. They have to move together.
  */
 .album__nav-label {
   font-family: Georgia, "Times New Roman", serif;
@@ -2511,7 +2637,8 @@
   text-align: center;
   color: var(--accent-light, #e6c98a);
   padding-bottom: 6px;
-  min-height: calc(1.35em + 6px);
+  line-height: 1.5;
+  min-height: calc(1.5em + 6px);
 }
 
 /* ---------------------------------------------------------------- *

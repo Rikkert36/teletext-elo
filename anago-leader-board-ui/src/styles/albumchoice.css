@@ -13,8 +13,13 @@
  *    shelf as well. A transform also scales the cover's clamped type along with the box,
  *    which a width override does not: a rebuilt-narrow book gets full-size type and the
  *    name visibly shrinks at the handover.
- * 2. **The well keeps the album's exact footprint.** Label row plus `--page-h`, so nothing
- *    moves vertically when this component is swapped for the book.
+ * 2. **The handover is a hard swap, so every box here is the album's own to the pixel.**
+ *    Nothing crossfades and nothing measures anything: this component simply stops
+ *    existing and the book renders in its place, so any disagreement is a jump. Three
+ *    boxes have to match, and all three have been wrong at some point — the label row
+ *    above the book (`.choice__label`), the footprint the whole thing reserves
+ *    (`.choice__well`), and the shut book itself (`.choice__stage`). Each carries the
+ *    arithmetic at its own rule.
  * 3. **Every duration multiplies by `var(--anim, 1)`**, which is 2. So every number below
  *    is half its real length, matching `ms()` in the component. Miss it on one rule and
  *    that one beat runs at double speed.
@@ -38,20 +43,37 @@
   --picked-offset: 0;
 }
 
-/* Same metrics as `.album__nav-label`, and it keeps its box while the ceremony runs —
-   the component renders a space rather than nothing for exactly that reason. */
+/*
+ * Same metrics as `.album__nav-label` — this is that row, during the ceremony.
+ *
+ * **Every one of these declarations has to be that rule's, to the pixel.** `min-height`
+ * said `1.2em` against the label's `calc(1.35em + 6px)`, which is 8px of reserve the album
+ * had and the ceremony did not, and the book dropped 8px at the handover; then both were
+ * `1.35em + 6px`, which is *shorter than a line box*, so a shut album's empty label
+ * collapsed to the reserve while this row — which carries a non-breaking space — stood at a
+ * full line, and the book jumped up 2.1px instead. Both figures were measured off the two
+ * rendered rows rather than reasoned about, which is the only way this was ever going to
+ * come out: the discrepancy is nowhere near the book, and 2px is small enough to disbelieve.
+ *
+ * `line-height` is stated for the same reason it is on the album's rule — see there.
+ */
 .choice__label {
   font-family: Georgia, "Times New Roman", serif;
   font-size: 14px;
   text-align: center;
   color: var(--accent-light, #e6c98a);
   padding-bottom: 6px;
-  min-height: 1.2em;
+  line-height: 1.5;
+  min-height: calc(1.5em + 6px);
 }
 
 /*
  * The album's own footprint, reserved. `.album` is `padding: 4px 0` around a book of
  * `--page-h`, so this matches it and the handover is motionless.
+ *
+ * The padding is inside the `min-height`, because MUI's `CssBaseline` puts the whole app
+ * in `box-sizing: border-box` — worth knowing before "correcting" this to `--page-h`, as
+ * it reads like a rule that counts its padding twice and is not one.
  */
 .choice__well {
   position: relative;
@@ -223,20 +245,37 @@
 /* ---------------------------------------------------------------- *
  * The finished book
  *
- * At exactly `--page-w` by `--page-h`, centred in the same well, so what the album mounts
- * next occupies the identical box. Absolutely positioned rather than in flow: it overlaps
- * the row it replaces, which is what lets the two crossfade instead of one pushing the
- * other aside.
+ * **The shut album's box, to the pixel** — not the page's. Absolutely positioned rather
+ * than in flow: it overlaps the row it replaces, which is what lets the two crossfade
+ * instead of one pushing the other aside.
+ *
+ * Deriving that box is the whole of this rule, so it is worth writing out. A shut
+ * `.album` centres a `2 × --page-w` book and then slides it half a page left, and the
+ * cover leaf hangs off the spine at the book's centre — so the cover's left edge lands on
+ * the album's centre line less half a page. The leaf is a **board**, not a page: it is
+ * `--board-out` wider and that much taller at each end (see `.album__leaf--cover`), and
+ * the overhang is all on the fore-edge, which is the right-hand side. Hence a box that is
+ * centred on its first `--page-w` and overhangs to the right, sitting `--board-out` above
+ * the book's own top.
+ *
+ * It was `--page-w` by `--page-h` at `top: 4px` — the *paper's* box — which is a book
+ * missing its squares. At the swap the cover grew 9px on three sides and rose 9px, which
+ * is small, in the wrong direction, and instant.
+ *
+ * **No radius, and that is not an oversight.** `.album__leaf--cover` has none — the brass
+ * hairline is a box-shadow on a square board — while `.album__cover` inside it is rounded
+ * `0 3px 3px 0`. So a shut album shows rounded leather with a square hairline just outside
+ * it, and a hair of table showing between the two at the fore-edge corners. A radius here
+ * rounded the hairline as well and those two corners popped square at the swap.
  * ---------------------------------------------------------------- */
 
 .choice__stage {
   position: absolute;
-  top: 4px;
+  top: calc(4px - var(--board-out));
   left: 50%;
-  width: var(--page-w);
-  height: var(--page-h);
+  width: calc(var(--page-w) + var(--board-out));
+  height: calc(var(--page-h) + var(--board-out) * 2);
   margin-left: calc(var(--page-w) / -2);
-  border-radius: 3px;
   overflow: hidden;
   /* The shut album's own edge and shadow, from `.album--closed .album__leaf--cover`. */
   box-shadow:
@@ -265,11 +304,14 @@
  * reimplemented — it is literally the page the book will open from, so a second copy of
  * those rules would be two things to keep in step. It carries a right-hand page's radius
  * and spine shadow, which is correct: this is that page.
+ *
+ * **`font-kerning: none` used to be set here and is now on `.album__cover` itself**, which
+ * is the only way the two can agree. A name set as per-letter inline-blocks cannot kern
+ * across the boxes, so scoping the switch to the ceremony meant the album re-kerned the
+ * same name the instant it took the cover over and every letter after the first pair
+ * shifted. Turning it off on both sides costs a hair of fit on one or two pairs at 2px of
+ * tracking, where the alternative is the name visibly resetting itself.
  */
-.choice__stage .album__cover {
-  /* Per-letter spans, so kerning pairs must not shift as each one arrives. */
-  font-kerning: none;
-}
 
 /*
  * One word, unbreakable. A break is allowed between any two inline-blocks, so a name set as
@@ -321,6 +363,21 @@
     max-width: calc(var(--choice-w) * 3 + var(--choice-gap) * 2);
     row-gap: 14px;
     transform: none;
+  }
+
+  /*
+   * The squares come back off, because the phone book has none.
+   *
+   * `.album--mobile` slides one page at a time: the book is a single `--page-w` box, the
+   * cover is a `.album__slide` at `inset: 0` in it, and there are no board leaves at all.
+   * So on a phone the paper's box *is* the shut book's box — which is what this rule was
+   * before, and it is still right here and only here.
+   */
+  .choice__stage {
+    top: 4px;
+    width: var(--page-w);
+    height: var(--page-h);
+    border-radius: 3px;
   }
 }
 

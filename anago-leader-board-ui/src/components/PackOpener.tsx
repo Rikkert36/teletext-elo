@@ -101,6 +101,37 @@ const CEREMONY_LEAD_MS = 320;
 const SETTLE_MS = 460;
 
 /* ------------------------------------------------------------------ *
+ * Beat 6 — the row waits, and the reader decides
+ *
+ * **There is no exit button on this page.** The reveal ends and the cards stay on the
+ * table, and what is then on offer is two things: another packet off the shelf — which
+ * adds its cards to the same row — or filing what you have, which is a click on the
+ * cards themselves.
+ *
+ * That the row *waits* is the whole point of it. **It is the record of what you
+ * opened**, and it is static: a reader who looked away comes back to the packet's
+ * contents laid out in front of them, which nothing else on this page provides — once
+ * the cards are in the book, the album marks nothing. It also makes the click a
+ * decision rather than a chore, because there is a real alternative next to it. Both
+ * halves of that were arrived at the hard way:
+ *
+ * - **Automatic**, with the cards filing themselves the moment the reveal ended. No
+ *   chore, but the only trace of a packet was a few seconds of motion.
+ * - **A results grid** you clicked, at a third size, with the shelf inert beside it —
+ *   so the one thing on offer was a control with a dimmed table around it. That is what
+ *   the live shelf over the waiting row fixes: the pile brightening the moment the last
+ *   card lands is what makes "another packet" the peer of "file these".
+ * - **A held row with "2 nieuwe kaarten voor je album" under it**, which is the
+ *   receipt-for-a-transaction-you-watched version of the same idea. The count is gone;
+ *   the cards say it.
+ *
+ * Nothing leaves the row until it is filed — the doubles included, which is why they
+ * are still there to be seen. A double is not waste: the book records it as a numeral
+ * beside its tick on the checklist, and a checklist is also a swap list. Off the table
+ * is where a swap lives, and that happens when the rest go into the book, in `PutAway`.
+ * ------------------------------------------------------------------ */
+
+/* ------------------------------------------------------------------ *
  * The silhouette beat
  *
  * A new card turns over into its tier metal and its overall, with the player
@@ -445,6 +476,32 @@ interface PackOpenerProps {
    * "here is what you got", and an empty pack is a different statement from a refusal.
    */
   onFailed: (reason: unknown) => void;
+  /**
+   * Cards already lying on the table from earlier packets in this sitting.
+   *
+   * The row survives one packet: it is what you have opened, not what this packet held.
+   * Rendered ahead of this pack's own cards in the same row — see the render — so the
+   * reveal's FLIP lands into a row that already has cards in it, and the ones that were
+   * there slide as it grows, exactly as they do within a single pack.
+   */
+  table: RevealedCard[];
+  /**
+   * File the cards: **the reader's decision**, and one of two things on offer beside a
+   * finished row — another packet off the shelf, or this.
+   *
+   * It hands over every card on the table, each with the box it is lying in **now**, in
+   * viewport pixels, so the doubles can be seen leaving and the keepers can be flown into
+   * their slots from where the reader last saw them.
+   *
+   * Empty is a real answer and means "nothing to file, just put the book back" — a reader
+   * who has asked for less motion, or `snel openen`.
+   */
+  onPutAway: (placing: { card: RevealedCard; from: DOMRect }[]) => void;
+  /**
+   * The packet was put back down unopened. Only reachable while it is still sealed,
+   * which is the whole point of it: up to the tear nothing has happened yet.
+   */
+  onPutBack: () => void;
   fastMode: boolean;
 }
 
@@ -454,6 +511,9 @@ const PackOpener: React.FC<PackOpenerProps> = ({
   onStart,
   onFinished,
   onFailed,
+  table,
+  onPutAway,
+  onPutBack,
   fastMode,
 }) => {
   const [phase, setPhase] = useState<Phase>('sealed');
@@ -517,11 +577,10 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    * the ramp only ever reaches about a third — left it barely visible at all.
    */
   const [motesOut, setMotesOut] = useState(false);
-  /**
-   * True when the results grid was arrived at by the final FLIP rather than by the
-   * fast path. Suppresses the grid's own entrance animation, which would fight it.
+  /*
+   * No `putting` state any more. The cards leaving is `PutAway`'s, in an overlay that
+   * outlives this component, so there is nothing here to be in the middle of.
    */
-  const [settledByFlip, setSettledByFlip] = useState(false);
 
   const timers = useRef<number[]>([]);
   const cardsRef = useRef<RevealedCard[]>([]);
@@ -570,20 +629,83 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    */
   const heroRef = useRef<HTMLDivElement | null>(null);
   const heroRect = useRef<DOMRect | null>(null);
+  /**
+   * Every card in the row, keyed by its position **in the row** — so the cards already
+   * on the table from earlier packets occupy `0 .. table.length - 1` and this pack's own
+   * start after them. See the render, and `rowIndex`.
+   */
   const slotRefs = useRef(new Map<number, HTMLDivElement>());
   const pendingFlip = useRef<number | null>(null);
   /** Where the already-landed slots were before the row grew. */
   const prevRects = useRef(new Map<number, DOMRect>());
+  /** The row itself, for the scroll it needs once it outgrows its width. */
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  /** The cards inside it, which is what is measured against the row to decide that. */
+  const handRef = useRef<HTMLDivElement | null>(null);
 
   const setSlotRef = (index: number) => (el: HTMLDivElement | null) => {
     if (el) slotRefs.current.set(index, el);
     else slotRefs.current.delete(index);
   };
 
+  /** This pack's card `index`, as a position in the row. */
+  const rowIndex = (index: number): number => table.length + index;
+
+  /*
+   * Whether the row has to scroll, decided by measurement on every render.
+   *
+   * **It must not scroll while it fits**, and that is not an optimisation: a scroll
+   * container clips both axes — `overflow-x: auto` computes `overflow-y` to `auto` too — so a
+   * row that is permanently one cuts the top off the card descending into it from the stage.
+   * See `.opener__revealed--scrolls`.
+   *
+   * Imperative, and declared **above the FLIP effect** so it runs first: the class has to be
+   * on the element before that effect measures where a card is landing, or the first card to
+   * push the row past the book's width lands at a position the row no longer uses. A state
+   * update could not do that — it would apply a commit later — and the FLIP already writes
+   * classes directly for the same reason.
+   *
+   * **Only when the row's contents change, and that is not an optimisation.** Reading
+   * `offsetWidth` forces a style and layout flush, and this ran on *every* render: the
+   * reveal advances by ten separate commits inside one task (see `playCard`), which the
+   * browser is otherwise free to collapse into a single style computation. Flushing between
+   * them made the intermediate states real, and the card being brought on visibly rotated
+   * from face-up back to face-down before its silhouette beat. `playCard` batches now so
+   * that cannot recur, and this stays narrow anyway — nothing else here has any business
+   * forcing layout mid-reveal.
+   *
+   * The card and the row both scale with the viewport, so whether the cards fit is very
+   * nearly viewport-independent — a resize listener would earn nothing.
+   */
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    const hand = handRef.current;
+    if (!row || !hand) return;
+
+    /*
+     * `offsetWidth` against `clientWidth`, so the comparison cannot flap: a horizontal
+     * scrollbar takes height rather than width, so neither figure moves when the class goes
+     * on, and the state it decides cannot flip-flop between commits.
+     */
+    row.classList.toggle('opener__revealed--scrolls', hand.offsetWidth > row.clientWidth);
+  }, [table.length, landed]);
+
   useLayoutEffect(() => {
     const arriving = pendingFlip.current;
     if (arriving === null) return;
     pendingFlip.current = null;
+
+    /*
+     * Keep the newest card in view. The row scrolls once it holds more than a book's
+     * width of cards — two or three packets — and a card that landed outside the visible
+     * part of it would be flown at a position nobody can see.
+     *
+     * Before the measurement below and not after: this is a scroll, so it moves every
+     * slot in the row, and `to` has to be where the card ends up *after* it. The cards
+     * already in the row travel to their new positions like they do on any addition, so
+     * the shift is animated rather than jumped.
+     */
+    if (rowRef.current) rowRef.current.scrollLeft = rowRef.current.scrollWidth;
 
     if (prefersReducedMotion()) {
       prevRects.current.clear();
@@ -600,8 +722,8 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       /*
        * The arriving card travels from the big reveal card. Everything already in
        * the row travels too, because the row is centred and re-centres on every
-       * addition — and on the final hand-off the row becomes the results grid,
-       * which is a different layout at a different card size, so they all move.
+       * addition — including the cards from earlier packets, which is what makes a
+       * row that spans two packets grow as one row rather than two.
        */
       const from = index === arriving ? heroRect.current : prevRects.current.get(index);
       if (!from) return;
@@ -773,12 +895,70 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       : null;
   }, []);
 
+  /**
+   * Filing what is on the table: **every** card in the row, and the box it is lying in.
+   *
+   * Nothing moves here. The doubles leaving and the keepers standing aside happen
+   * together and outside this component, because the album is mounted in the same commit
+   * that unmounts the opener — so the one thing that can animate across that seam is the
+   * overlay `PutAway` owns.
+   *
+   * The rects are read at the moment of the hand-over, with every card sitting still. A
+   * card mid-transform has no box worth measuring, which is why nothing here is animated
+   * first.
+   *
+   * **Clamped into the row's own box.** Once the row scrolls, a card can be sitting
+   * outside it — the row clips, so the reader cannot see it — and a fixed clone started
+   * from that rect would appear out over the margin where nothing was. Clamping starts it
+   * at the edge instead, which reads as a card coming off the end of the pile.
+   */
+  const putAway = useCallback(() => {
+    const row = [...table, ...cardsRef.current];
+
+    /*
+     * Land on the finished state, never play it stilled — the rule every sequence on this
+     * page follows. With no motion there is nothing to animate, so the page is told there
+     * is nothing to file and simply puts the book back with the cards already in it.
+     *
+     * `fastMode` takes the same door. `snel openen` means "skip the ceremony", and the
+     * putting-away is the last third of the ceremony — a bypass that skipped a 16s reveal
+     * and then sat through ten seconds of page turns would not be one.
+     */
+    if (fastMode || prefersReducedMotion()) {
+      onPutAway([]);
+      return;
+    }
+
+    const box = rowRef.current?.getBoundingClientRect();
+
+    onPutAway(
+      row.flatMap((card, index) => {
+        const rect = slotRefs.current.get(index)?.getBoundingClientRect();
+        if (!rect) return [];
+        if (!box) return [{ card, from: rect }];
+
+        const left = Math.min(Math.max(rect.left, box.left), box.right - rect.width);
+        return [
+          {
+            card,
+            from: new DOMRect(left, rect.top, rect.width, rect.height),
+          },
+        ];
+      }),
+    );
+  }, [fastMode, onPutAway, table]);
+
   const finish = useCallback(() => {
     clearTimers();
     setPhase('done');
     setGlowing(false);
     playSlot();
     onFinished(cardsRef.current);
+    /*
+     * And that is the end of what this component does on its own. **Nothing is scheduled
+     * here**: the cards stay on the table and what happens next is the reader's — another
+     * packet, or filing them. See the beat 6 block.
+     */
   }, [clearTimers, onFinished]);
 
   /**
@@ -801,17 +981,36 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     const card = cardsRef.current[index];
     if (!card) return;
 
-    setCursor(index);
-    setHeroVisible(true);
-    setFaceUp(false);
-    setFlagged(false);
-    setPortraitIn(false);
-    setFlashing(false);
-    setGlowing(false);
-    setBlooming(false);
-    setCarrying(false);
-    setMotesOut(false);
-    setPhase('revealing');
+    /*
+     * **One commit, and it is load-bearing.** `index.tsx` mounts with legacy
+     * `ReactDOM.render`, which does not batch state set from a timeout — and this runs from
+     * one. Unbatched, `setCursor` commits on its own: the riser is keyed on the cursor, so a
+     * *new* element mounts while `faceUp` and `portraitIn` still describe the card that has
+     * just gone, which is to say face up with its face showing. The next commit takes
+     * `faceUp` away again, and `.opener__flip` has a transition on `transform` — so the card
+     * being brought on rotates from face-up back to face-down and lands on its silhouette,
+     * spoiling the pull it is about to make. It is the artefact `HANDOFF_MS` describes, one
+     * beat earlier.
+     *
+     * It was invisible for as long as nothing forced style between those commits: they are
+     * all in one task, and the browser is free to compute style once and see only the last
+     * of them. A `useLayoutEffect` that read `offsetWidth` on every render was enough to
+     * make every one of them real. Batching here does not depend on nobody ever doing that
+     * again.
+     */
+    unstable_batchedUpdates(() => {
+      setCursor(index);
+      setHeroVisible(true);
+      setFaceUp(false);
+      setFlagged(false);
+      setPortraitIn(false);
+      setFlashing(false);
+      setGlowing(false);
+      setBlooming(false);
+      setCarrying(false);
+      setMotesOut(false);
+      setPhase('revealing');
+    });
 
     /*
      * Hoisted above `advance`, which needs it: the lead and the hand-over both
@@ -978,7 +1177,8 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     prevRects.current.clear();
     slotRefs.current.forEach((el, i) => prevRects.current.set(i, el.getBoundingClientRect()));
     heroRect.current = heroRef.current?.getBoundingClientRect() ?? null;
-    pendingFlip.current = index - 1;
+    /* Row positions, not this pack's: the cards from earlier packets are ahead of ours. */
+    pendingFlip.current = rowIndex(index - 1);
 
     /*
      * `index.tsx` mounts with legacy `ReactDOM.render`, which does **not** batch
@@ -986,25 +1186,18 @@ const PackOpener: React.FC<PackOpenerProps> = ({
      * FLIP layout effect on its own. Everything here therefore has to land in a
      * single commit.
      *
-     * For the last card that was fatal. `setLanded` alone committed while the phase
-     * was still `revealing`, so the effect flew the card into the row it was about
-     * to leave and nulled `pendingFlip`; `setPhase('done')` then threw that DOM
-     * away and mounted the results grid with no FLIP pending. Every other card
-     * survived because its flight runs on elements that persist across the
-     * following commits — the last card is the only one whose flight spans a
-     * subtree swap, which is exactly why it was the only one that never moved.
-     *
-     * `--settled` then turns the grid's entrance animation off: a CSS animation
-     * outranks an inline style, so `opener-settle` would beat the inverted
-     * transform and nothing would move even once the FLIP does survive.
+     * For the last card that was fatal while `done` was a separate results grid:
+     * `setLanded` alone committed while the phase was still `revealing`, so the
+     * effect flew the card into the row it was about to leave and nulled
+     * `pendingFlip`; `setPhase('done')` then threw that DOM away and mounted the
+     * grid with no FLIP pending. The grid is gone — `done` renders the same row, so
+     * the last card's flight no longer spans a subtree swap — and the batching stays,
+     * because two commits still means two runs of the layout effect.
      */
     unstable_batchedUpdates(() => {
       setLanded(index);
       setHeroVisible(false);
-      if (isLast) {
-        setSettledByFlip(true);
-        finish();
-      }
+      if (isLast) finish();
     });
 
     if (!isLast) after(HANDOFF_MS, () => playCard(index));
@@ -1111,6 +1304,45 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       setPhase('waiting');
     });
   };
+
+  /**
+   * Whether there is anything on the table to be filed. Nothing is, mid-reveal: the cards
+   * are still coming out of the packet and the row is not a finished thing to act on.
+   */
+  const canFile = (phase === 'sealed' || phase === 'done') && table.length + cards.length > 0;
+
+  /**
+   * Putting the packet down, which means two different things.
+   *
+   * With an empty table it is the way back to the album — the packet goes back on the
+   * shelf and nothing has happened. With cards already on the table it is "I have stopped
+   * opening", which is the same decision as clicking the cards, so it files them. Both are
+   * the same gesture on the same object: the packet is put down.
+   */
+  const putDown = () => {
+    if (table.length > 0) putAway();
+    else onPutBack();
+  };
+
+  /*
+   * The keyboard's half of both.
+   *
+   * The exit was a real button and so was in the tab order for free; a stretch of table
+   * and a row of cards are not, and losing it must not cost a keyboard reader the way out.
+   *
+   * Registered per render rather than once, so `phase` is never stale. A listener that
+   * still thought the packet was sealed would put back a packet that was already open.
+   */
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (phase === 'sealed') putDown();
+      else if (canFile) putAway();
+    };
+
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   /** This packet's colourway. Derived from the pack id, so it matches its tile. */
   const foil = packFoil(pack);
@@ -1221,75 +1453,101 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       : null),
   } as React.CSSProperties;
 
-  /** Only the new ones actually changed the album, so that is what gets reported. */
-  const newCount = cards.filter((card) => card.isNew).length;
-  const outcome =
-    newCount === 0
-      ? 'geen nieuwe kaarten — allemaal dubbel'
-      : `${newCount === 1 ? '1 nieuwe kaart' : `${newCount} nieuwe kaarten`} toegevoegd aan je album`;
+  /*
+   * **The line under the row says what can be done and never what happened.**
+   *
+   * It read "2 nieuwe kaarten voor je album", and before that claimed "toegevoegd aan je
+   * album" — the page saying in words what nothing on screen did, about a write the server
+   * had made some time ago. Both are gone, and for the same reason: the reader has just
+   * watched every one of these cards turn over, and the row in front of them *is* the count.
+   * A line tallying it is a receipt for a transaction that was witnessed.
+   *
+   * What is left is the one thing the objects cannot say for themselves — that they can be
+   * acted on, and how. An all-doubles row says nothing about being all doubles, which is the
+   * right kind of silence: none of those cards got a reveal beat or a green rim, and that
+   * beat is what *means* new — see "New, not duplicate" in the design doc.
+   */
 
   return (
     <div className="opener">
       {/*
-        The wrapper lives *in* the stage, and the empty revealed row is rendered
-        under it — so the sealed, tearing and revealing phases are all the same
-        three-row column at the same heights.
+        Three rows in one column, always: the stage, the table, and the line under it. Only
+        the stage changes with the phase — the other two are rendered once, below.
 
-        Without both of those the column re-laid itself out at the tear: the
-        wrapper phase was shorter and had no row beneath it, so `justify-content:
-        center` put the packet lower than the stage it was about to become, and the
-        first card rose several dozen pixels above where you had just clicked. The
-        stage's fixed `--pack-h` is the other half of this — see packopen.css.
+        The column re-laid itself out at the tear when the wrapper phase was shorter and had
+        no row beneath it: `justify-content: center` put the packet lower than the stage it
+        was about to become, and the first card rose several dozen pixels above where you had
+        just clicked. The stage's fixed `--pack-h` is the other half of that, and the row's
+        `min-height` — one card, whether it holds any or not — is the third; see packopen.css.
       */}
       {phase === 'sealed' ? (
-        <>
-          <div className="opener__stage">
-            <div
-              className="pack"
-              style={foil}
-              onClick={start}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') start();
-              }}
-            >
-              <PackFace pack={pack} />
-            </div>
+        /*
+          The stretch of table the packet is lying on, and it is the way to put it down:
+          click the wood beside it and the packet goes back on the shelf — or, with cards
+          already on the table, it files them, because putting the packet down when you
+          have a row in front of you *is* "I have stopped opening". See `putDown`.
+
+          **Only while it is sealed**, which is what makes it a coherent rule rather than
+          an escape hatch — up to the tear nothing has happened, so putting the packet
+          down is a real thing to do to it. Past the tear the cards are the thing to act
+          on.
+
+          `--table` stretches the row across the middle of the layout so the target is
+          the table rather than the two inches either side of the packet; see
+          packopen.css.
+        */
+        <div className="opener__stage opener__stage--table" onClick={putDown}>
+          <div
+            className="pack"
+            style={foil}
+            /* Or the wood underneath would put down the packet you just opened. */
+            onClick={(e) => {
+              e.stopPropagation();
+              start();
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') start();
+            }}
+          >
+            <PackFace pack={pack} />
           </div>
-          <div className="opener__revealed" />
-          <div className="opener__hint">klik op het pakje</div>
-        </>
+        </div>
       ) : null}
 
       {phase === 'tearing' ? (
-        <>
-          <div className="opener__stage">
-            {/* Each half carries the whole face and its own `clip-path` cuts it,
-                so the printing tears with the foil instead of blinking out the
-                moment the wrapper is clicked. */}
-            <div className="pack pack--tearing" style={foil}>
-              <div className="pack__half pack__half--top">
-                <PackFace pack={pack} />
-              </div>
-              <div className="pack__half pack__half--bottom">
-                <PackFace pack={pack} />
-              </div>
+        <div className="opener__stage">
+          {/* Each half carries the whole face and its own `clip-path` cuts it,
+              so the printing tears with the foil instead of blinking out the
+              moment the wrapper is clicked. */}
+          <div className="pack pack--tearing" style={foil}>
+            <div className="pack__half pack__half--top">
+              <PackFace pack={pack} />
+            </div>
+            <div className="pack__half pack__half--bottom">
+              <PackFace pack={pack} />
             </div>
           </div>
-          <div className="opener__revealed" />
-          <div className="opener__hint">&nbsp;</div>
-        </>
+        </div>
       ) : null}
 
       {/*
-        One branch for both, and not for brevity: see the `Phase` union. `waiting` is
-        this same stage with `current` undefined — every light layer off, the flip not
-        yet turned, and a card back that is simply the front face not knowing what it
-        is yet. Splitting them would remount the riser at the moment the cards landed
-        and replay its entrance.
+        One branch for all three, and not for brevity.
+
+        `waiting` is this same stage with `current` undefined — every light layer off,
+        the flip not yet turned, and a card back that is simply the front face not
+        knowing what it is yet. Splitting it out would remount the riser at the moment
+        the cards landed and replay its entrance.
+
+        `done` is this same stage, standing empty. **There is no results grid**: the row
+        below is the ending, so the last card's flight lands where all the others did and
+        nothing about the column changes at the moment the reveal finishes. The empty
+        stage stays above it for the same reason it always did — `--pack-h` is reserved
+        whatever is standing in it, and the row must not move — and it is also where the
+        next packet appears if the reader reaches for one. See the beat 6 block.
       */}
-      {phase === 'revealing' || phase === 'waiting' ? (
+      {phase === 'revealing' || phase === 'waiting' || phase === 'done' ? (
         <>
           <div
             className={`opener__stage${isIcoon ? ' opener__stage--icoon' : ''}`}
@@ -1462,55 +1720,84 @@ const PackOpener: React.FC<PackOpenerProps> = ({
               {flashing ? <div className="opener__flash" /> : null}
             </div>
           </div>
-
-          <div className="opener__revealed">
-            {cards.slice(0, landed).map((card, i) => (
-              <div
-                key={`${card.player.id}-${i}`}
-                ref={setSlotRef(i)}
-                className={`opener__slot${card.isNew ? ' opener__slot--new' : ''}`}
-              >
-                {/*
-                  `eager` is load-bearing here, not a precaution. The slot is a
-                  *fresh* element — the FLIP inverts it onto the hero's rect rather
-                  than moving the hero itself — so a lazy portrait misses the first
-                  frame of the descent and the card blinks to bare metal. See the
-                  prop's note in PlayerCard.
-                */}
-                <PlayerCard card={card} eager />
-              </div>
-            ))}
-          </div>
-
-          {/*
-            Kept, and deliberately empty. The line is a spacer as much as a caption —
-            every other phase has one, and dropping the element here would shorten the
-            column by its height at the tear and again at the results.
-          */}
-          <div className="opener__hint">&nbsp;</div>
         </>
       ) : null}
 
-      {phase === 'done' ? (
-        <>
-          <div
-            className={`opener__results${settledByFlip ? ' opener__results--settled' : ''}`}
-          >
-            {cards.map((card, i) => (
-              <div
-                key={`${card.player.id}-${i}`}
-                ref={setSlotRef(i)}
-                className={`opener__result opener__slot${card.isNew ? ' opener__slot--new' : ''}`}
-                style={settledByFlip ? undefined : { animationDelay: `${i * 55}ms` }}
-              >
-                {/* Same again: reached by the final FLIP, so these mount fresh too. */}
-                <PlayerCard card={card} eager />
-              </div>
-            ))}
-          </div>
-          <div className="opener__hint">{outcome}</div>
-        </>
-      ) : null}
+      {/*
+        **The table, and it belongs to the sitting rather than to the packet.** One row for
+        every phase: the cards from earlier packets first, then whatever this one has
+        turned over so far. That is what makes a second packet add to the row instead of
+        replacing it — and it is why the row is rendered here rather than inside the phase
+        branches, where it was three separate elements that happened to look alike.
+
+        Clicking it files everything on it. The row is the record of what you opened, so
+        the click is a decision with a real alternative beside it — the shelf is live —
+        rather than a "continue". See the beat 6 block.
+
+        `role="button"` over a row of cards rather than a button element around them: it
+        has to stay the flex row the reveal's FLIP lands in, and a button's own box would
+        be a second layout for the cards to arrive in.
+      */}
+      <div
+        className="opener__revealed"
+        ref={rowRef}
+        role={canFile ? 'button' : undefined}
+        tabIndex={canFile ? 0 : undefined}
+        aria-label={canFile ? 'Leg de kaarten in je album' : undefined}
+        onClick={canFile ? putAway : undefined}
+        onKeyDown={
+          canFile
+            ? (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  putAway();
+                }
+              }
+            : undefined
+        }
+      >
+        {/*
+          An inner box, because the row scrolls once it holds more than a book's width of
+          cards. `margin: auto` on it centres a short row and collapses to nothing on a
+          long one, which is the one way to have both without a centred overflow clipping
+          its own start. See `.opener__hand` in packopen.css.
+        */}
+        <div className="opener__hand" ref={handRef}>
+          {[...table, ...cards.slice(0, landed)].map((card, i) => (
+            <div
+              key={`${card.player.id}-${i}`}
+              ref={setSlotRef(i)}
+              className={`opener__slot${card.isNew ? ' opener__slot--new' : ''}`}
+            >
+              {/*
+                `eager` is load-bearing here, not a precaution. The slot is a *fresh*
+                element — the FLIP inverts it onto the hero's rect rather than moving the
+                hero itself — so a lazy portrait misses the first frame of the descent and
+                the card blinks to bare metal. See the prop's note in PlayerCard.
+              */}
+              <PlayerCard card={card} eager />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/*
+        Kept for its box, and empty except while a packet is lying there sealed: the line
+        is a spacer as much as a caption, and dropping the element would shorten the column
+        at the tear and again at the ending.
+
+        It says what can be done and never what happened — the cards are the record of
+        that. See the note above the return.
+      */}
+      <div className="opener__hint">
+        {phase === 'sealed'
+          ? canFile
+            ? 'klik op het pakje, of op de kaarten om ze in je album te leggen'
+            : 'klik op het pakje — of ernaast om het terug te leggen'
+          : phase === 'done'
+            ? 'klik op de kaarten om ze in je album te leggen'
+            : ' '}
+      </div>
     </div>
   );
 };

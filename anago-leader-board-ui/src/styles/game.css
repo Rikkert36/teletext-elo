@@ -128,9 +128,10 @@
    * components agreeing and is now one box they both sit in.
    *
    * The opener is the one occupant that had a mind of its own — `min-height: 62vh`,
-   * which on a tall window is well past the book. It reads this instead, and the ~30px
-   * "terug naar het album" row is the difference; see `.opener` in packopen.css. That
-   * was only safe to do because the ceremony's vignette and bloom are centred on
+   * which on a tall window is well past the book. It reads this instead, and takes the
+   * whole of it: it used to leave ~30px for the "terug naar het album" row under it, and
+   * that row is gone — the way out is the results row inside the column. See `.opener` in
+   * packopen.css. Reading this at all was only safe because the ceremony's vignette and bloom are centred on
    * `--card-cx` / `--card-cy`, the card's *measured* position, so moving the opener's
    * box moves the spotlight with it. The `45%` in those gradients is a fallback, not
    * the alignment.
@@ -736,24 +737,18 @@
 }
 
 /*
- * A control that is not on offer for the moment, without its absence moving
- * anything. Used for "terug naar het album" for the length of a reveal.
+ * **There is no `.game-button--away` any more, and no exit button for it to hide.**
  *
- * `visibility` rather than `display: none` or an unmount, because the row has to
- * keep its box: the opener's whole layout is built so that nothing shifts between
- * the click on the wrapper and the last card landing, and a button vanishing out
- * of the column below it at the moment of the tear is exactly that shift. It is
- * the same reason `.opener__hint` renders a `&nbsp;` during the tear rather than
- * rendering nothing.
+ * It hid "terug naar het album" for the length of a reveal, with `visibility` so the row
+ * kept its box — a real fix for a real problem, and the whole thing is moot now that the
+ * way out of the opener is the results row itself. A control that only exists once the
+ * cards are on the table cannot be live while they are still coming out of the packet.
  *
- * It also takes the button out of the tab order and out of hit-testing for free,
- * which `opacity: 0` would not — and unlike the shelf beside it, this one does not
- * want to stay legible while it is out of play. A greyed-out exit invites the
- * click it is refusing; an absent one does not.
+ * The argument it was carrying is worth keeping, because the next thing on this page will
+ * want it: something taken off screen mid-sequence must keep its box, or the column
+ * changes height at the worst possible moment. `.opener__hint`'s `&nbsp;` during the tear
+ * is the surviving example.
  */
-.game-button--away {
-  visibility: hidden;
-}
 
 /*
  * The packets themselves live in packopen.css — see `.pack-shelf`, which sets

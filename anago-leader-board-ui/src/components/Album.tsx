@@ -1,4 +1,5 @@
 import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { unstable_batchedUpdates } from 'react-dom';
 import { Card, CardPlayer, splitName, toCard } from '../mock/cardMock';
 import PlayerCard, { ownedLabel } from './PlayerCard';
 import useIsMobile from '../hooks/useIsMobile';
@@ -77,7 +78,27 @@ const handMark = (id: string): { tick: string; tilt: number } => {
  * ------------------------------------------------------------------ */
 
 /** The board going over. Matches `.album__leaf`'s own transition, which does the work. */
-const SHUT_MS = 620;
+/**
+ * The cover and the leaves, both ways.
+ *
+ * Exported because the pack put-away sequences against it: a card is flown into its slot
+ * *after* the page carrying that slot has landed, and the page's own clock is this. A
+ * second copy of the number on the page would drift the moment this one was tuned.
+ */
+export const SHUT_MS = 620;
+
+/**
+ * Per leaf while **riffling** — walking several leaves in a row, which is what a card being
+ * put away on a page some distance off asks for.
+ *
+ * Under half a deliberate turn, because the leaves come one after another and three of them
+ * at `SHUT_MS` is nearly four seconds of paper. It is still a turn you can follow: the point
+ * of walking at all is that no page is ever arrived at without being turned to.
+ *
+ * Published to the CSS as `--leaf-ms`, which `.album__leaf`'s transition reads — the walk's
+ * own timer and the transition are therefore the same number by construction.
+ */
+const RIFFLE_MS = 280;
 /** Held shut, nothing moving. A press has a pause before it. */
 const REBIND_SETTLE_MS = 200;
 /**
@@ -325,6 +346,16 @@ interface AlbumPage {
   /** The line above the name. */
   kicker?: string;
   slots: Slot[];
+  /**
+   * Slots pages only: the lowest and highest overall printed on this leaf, for the
+   * head — see `.album__list-range`.
+   *
+   * Per page rather than per section on purpose. The book is one section sorted
+   * ascending by rating, so a page can straddle two tiers and a tier name in the
+   * head would sometimes be false; the range never is. Absent on a padding page,
+   * which has no cards to have a range of.
+   */
+  range?: { lo: number; hi: number };
   /** Checklist pages only: the lines printed on this one. */
   entries?: ChecklistEntry[];
   /**
@@ -462,7 +493,12 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
         });
       });
 
-      pages.push({ kind: 'slots', slots });
+      const overalls = slots.map((slot) => slot.card.overall);
+      pages.push({
+        kind: 'slots',
+        slots,
+        range: { lo: Math.min(...overalls), hi: Math.max(...overalls) },
+      });
     }
   });
 
@@ -541,6 +577,16 @@ export const albumSlotOrder = (sections: AlbumSection[], owner?: string): AlbumS
  */
 const flippedForPage = (page: number): number => Math.ceil(page / 2);
 
+/**
+ * Which page a player's slot is printed on, or -1.
+ *
+ * Found rather than computed, for the same reason `justBound` finds the voorwoord:
+ * `buildPages` pads, so a page index worked out from a position in `sections` is one
+ * composition change away from naming the wrong leaf.
+ */
+const pageOfPlayer = (pages: AlbumPage[], playerId: string): number =>
+  pages.findIndex((p) => p.slots.some((slot) => slot.card.player.id === playerId));
+
 /* ------------------------------------------------------------------ *
  * Page rendering
  * ------------------------------------------------------------------ */
@@ -568,7 +614,17 @@ const PageFace: React.FC<{
    * that ever played was the book shutting.
    */
   binding?: boolean;
-}> = ({ page, index, visible, onCardOpen, binding }) => {
+  /**
+   * Slots to draw as still empty although the card is already in the collection,
+   * because it is at this moment flying across the table towards them.
+   *
+   * The one place the book is knowingly drawn behind the truth, and the whole of what
+   * makes the landing a landing: the card is applied before the flight starts — it has
+   * to be, or there would be nothing for the slot to fill with — so without this the
+   * hole is already filled by the time the card arrives at it. See `PutAway`.
+   */
+  held?: ReadonlySet<string>;
+}> = ({ page, index, visible, onCardOpen, binding, held }) => {
   if (!page) return <div className="album__page" />;
 
   if (page.kind === 'cover') {
@@ -600,9 +656,9 @@ const PageFace: React.FC<{
           tally under it (see `buildPages`), so with that gone it reads as a
           flourish under the name, which is what foil rules do on real bindings.
 
-          `.album__cover-sub` still exists in album.css — AlbumChoice uses it for
-          the static "nog geen kaarten" on the unbound books, which is a printed
-          line rather than a counter and so has no reason to go.
+          Nothing prints below it on any cover any more: `.album__cover-sub` was the
+          last holdout, a static "nog geen kaarten" on the freshly bound book in
+          AlbumChoice, and it said out loud what an empty album already says.
         */}
         <div className="album__cover-rule" />
 
@@ -798,23 +854,34 @@ const PageFace: React.FC<{
   }
 
   /*
-   * **No running head, and nothing printed on the page but the folio.**
+   * **A head, the mounts and the folio.**
    *
-   * It used to carry "Verzamelalbum · <naam>" with the tally opposite, above a
-   * 2px rule. Every word of it was already known: the cover carries whose album
-   * it is — that is what a cover is for, and it is the same argument that took
-   * the owner off the header above the stage — and the tally is on the cover too.
-   * So the head repeated, twelve times, a line the reader had just read.
+   * The head is the checklist's, reused: `.album__list-head` with "COLLECTIE" and
+   * this leaf's rating range set in the title beside it.
    *
-   * Dropping it also removes the last thing competing with the cards for the top
-   * of the page. What is left is the paper, the mounts and the page number, which
-   * is the whole of what an album page needs.
+   * **This is not the running head coming back, and the difference is the range.**
+   * The old one read "Verzamelalbum · <naam>" with the tally opposite, and every
+   * word of it was already on the cover — so it repeated, twelve times, a line the
+   * reader had just read. A range is true of this page and no other, and since the
+   * book is sorted ascending by rating it also says where in the book you are,
+   * which nothing else on a slots page does. That is a heading naming its page,
+   * which is the same test the checklist's head passes.
    *
    * `title` and `subtitle` survive on `AlbumPage` for the **cover only** — do not
-   * take a slots page's word for either being set.
+   * take a slots page's word for either being set. `range` is this page's own.
    */
   return (
     <div className="album__page">
+      {page.range ? (
+        <div className="album__list-head">
+          <span className="album__list-title">Collectie</span>
+          <span className="album__list-sep">·</span>
+          <span className="album__list-range">
+            {page.range.lo} – {page.range.hi}
+          </span>
+        </div>
+      ) : null}
+
       {/*
         Each card sits in its own slot rather than directly in the grid. The slot
         is what the page is designed *around*: it draws the mount the card is
@@ -828,7 +895,7 @@ const PageFace: React.FC<{
       */}
       <div className="album__slots">
         {page.slots.map((slot) => {
-          const empty = slot.count === 0;
+          const empty = slot.count === 0 || held?.has(slot.card.player.id) === true;
           return (
             <button
               key={slot.card.player.id}
@@ -837,6 +904,15 @@ const PageFace: React.FC<{
               tabIndex={visible ? 0 : -1}
               /* How the card viewer finds this slot again to hand focus back. */
               data-slot-player={slot.card.player.id}
+              /*
+               * And how a card being put away finds out whether its own slot is on the
+               * page in front of the reader — the book renders every leaf at all times,
+               * so the element existing says nothing about it being in view. Stamped
+               * from `visible`, which is the only thing that knows, and so covers the
+               * mobile book (one page) and the desktop spread (two) without either
+               * having to be re-derived outside this component.
+               */
+              data-slot-shown={visible ? '1' : undefined}
               onClick={() => onCardOpen?.(slot.card.player.id)}
               aria-label={`${slot.card.player.name} — ${ownedLabel(slot.count)}`}
             >
@@ -922,6 +998,48 @@ interface AlbumProps {
    */
   focusPlayerId?: string | null;
   /**
+   * The spread the book is **already open on** when it mounts, named by a card printed
+   * on it. Overrides the saved reading position for that one mount.
+   *
+   * For the cards being put away after a pack: they fly into their own slots, so the
+   * page they are printed on has to be the page in front of the reader. Not
+   * `focusPlayerId`, which turns a book that is already on screen — the album is
+   * unmounted for the whole of the opener, so arriving open on the right spread costs
+   * nothing, where turning to it would cost the `SHUT_MS` leaf and a card would have to
+   * hang in the air waiting for the paper to land.
+   *
+   * Read at mount only, like the saved position it replaces. The page it lands on is
+   * then written back as the reading position by the ordinary effect, which is right:
+   * the book is left open where the card went.
+   */
+  openAtPlayerId?: string;
+  /**
+   * Turn to this card's page, **audibly**, because the reader is watching the book.
+   *
+   * The other half of `openAtPlayerId`: a pack being put away walks its new cards in
+   * rating order, and the ones that are not printed on the page in front of you need the
+   * page turned to them. That is a page turn the reader is looking straight at, so unlike
+   * `focusPlayerId` — which turns the book behind the card viewer's scrim — it gets the
+   * sound. `goToPage` does nothing when the page is already on screen, so cards sharing a
+   * page cost no turn.
+   */
+  turnToPlayerId?: string | null;
+  /**
+   * The book has **arrived** at `turnToPlayerId`'s page and is standing still.
+   *
+   * The placing sequence waits for this rather than timing the turn itself, and that is not
+   * a convenience: how long a move takes is a property of the distance — one leaf, three
+   * leaves, or none at all — so a caller guessing it either flies a card at a page still in
+   * the air or pays a turn's worth of beat for a turn that never happened. Fires on every
+   * path, including the ones with nothing to do, or a sequence waiting on it stalls.
+   */
+  onTurned?: (playerId: string) => void;
+  /**
+   * Cards that are in the collection but still in the air on their way to their slots.
+   * Those slots draw empty until they land. See `PageFace`'s `held`.
+   */
+  holdSlots?: readonly string[];
+  /**
    * Bound in the icon edition — ivory boards with the chosen stain at the corners.
    *
    * Server truth off `album.iconsUnlocked`, read on every render like `cover`, so a book
@@ -968,6 +1086,10 @@ const Album: React.FC<AlbumProps> = ({
   footer,
   onCardOpen,
   focusPlayerId,
+  openAtPlayerId,
+  turnToPlayerId,
+  onTurned,
+  holdSlots,
   icons,
   rebinding,
   handsOver = true,
@@ -992,13 +1114,44 @@ const Album: React.FC<AlbumProps> = ({
    * Restored from the last visit, which is why the stored value is a leaf rather
    * than a page: it is the thing the desktop book is actually in terms of. A
    * first-time visitor has nothing stored and so starts at 0 — closed.
+   *
+   * **Except on a book you just watched being bound, which always starts shut.** The
+   * saved position is keyed per owner and outlives the album it describes — `leegmaken`
+   * destroys the book and not the bookmark — so binding a second album under the same
+   * name mounted it already open, somewhere in the middle of the *previous* one. The
+   * ceremony then handed a shut cover over to a book lying open at page nine, and
+   * `justBound`'s whole beat, the cover turning itself, had nothing left to do.
+   *
+   * Read at mount only, which is all that is needed: the flag is raised in the same
+   * handler that swaps this component in, so it is already true on the first render.
    */
-  const [flipped, setFlipped] = useState(() => readLeaf(ownerId));
+  /**
+   * The page a card is being put away on, if that is why this book is being mounted.
+   * Outranks both the saved position and `justBound`'s shut cover — a card cannot land
+   * in a slot on a page that is not there. -1 when there is no such card.
+   */
+  const openAtPage = openAtPlayerId ? pageOfPlayer(pages, openAtPlayerId) : -1;
+
+  /** Undefined rather than an empty set, so the common render passes nothing at all. */
+  const held = useMemo(
+    () => (holdSlots && holdSlots.length > 0 ? new Set(holdSlots) : undefined),
+    [holdSlots],
+  );
+
+  const [flipped, setFlipped] = useState(() =>
+    openAtPage >= 0
+      ? Math.min(flippedForPage(openAtPage), maxFlipped)
+      : justBound
+        ? 0
+        : readLeaf(ownerId),
+  );
   /** The leaf mid-rotation, which must sit above both stacks. */
   const [moving, setMoving] = useState<number | null>(null);
 
   /** Mobile page index and the direction it arrived from. */
-  const [mobilePage, setMobilePage] = useState(() => readLeaf(ownerId) * 2);
+  const [mobilePage, setMobilePage] = useState(() =>
+    openAtPage >= 0 ? openAtPage : justBound ? 0 : readLeaf(ownerId) * 2,
+  );
 
   const touchStartX = useRef<number | null>(null);
 
@@ -1198,9 +1351,7 @@ const Album: React.FC<AlbumProps> = ({
    */
   useEffect(() => {
     if (!focusPlayerId) return;
-    const page = pages.findIndex((p) =>
-      p.slots.some((slot) => slot.card.player.id === focusPlayerId),
-    );
+    const page = pageOfPlayer(pages, focusPlayerId);
     if (page < 0) return;
 
     if (isMobile) {
@@ -1246,6 +1397,134 @@ const Album: React.FC<AlbumProps> = ({
     },
     [isMobile, maxFlipped, pages.length],
   );
+
+  /* ---------------------------------------------------------------- *
+   * Riffling: several leaves, one at a time
+   *
+   * `goToPage` sets `flipped` to the target in one go, and for its two original callers
+   * that was right — the voorwoord is one leaf from a shut book, and the card viewer's
+   * turns happen behind a scrim where nothing is seen. **A jump of more than one leaf in
+   * view is not a page turn**: every leaf in between changes class on the same frame, so
+   * they all rotate at once and `setMoving` can only mark one of them, leaving the others
+   * carrying the fore-edge hairline it exists to suppress. It reads as one turn and then an
+   * arrival.
+   *
+   * So a card being put away on a page several leaves off walks there, a leaf at a time,
+   * each one a real turn with its own sound. Quicker per leaf than a single deliberate
+   * turn (`RIFFLE_MS` against `SHUT_MS`, published to the CSS as `--leaf-ms`), because
+   * three full turns in a row is four seconds of paper.
+   *
+   * Strictly sequential — one leaf in flight at any moment. Overlapping them would put the
+   * book back in the state described above, where `moving` and the pile-splitting maths
+   * can only describe a single leaf.
+   * ---------------------------------------------------------------- */
+
+  /** `flipped` for the walker, which must read it without being re-created per step. */
+  const flippedRef = useRef(flipped);
+  flippedRef.current = flipped;
+
+  /**
+   * The per-leaf duration in force, published as `--leaf-ms` so the CSS transition and the
+   * walk's own timer are the same number.
+   */
+  const [leafMs, setLeafMs] = useState(SHUT_MS);
+
+  /**
+   * Latest `onTurned`, so the walk does not restart every time the page hands down a new
+   * callback identity. It is a report, not an input.
+   */
+  const onTurnedRef = useRef(onTurned);
+  onTurnedRef.current = onTurned;
+
+  /*
+   * A card is being put away, and this is the book going to meet it — with the sound,
+   * because it is a turn the reader is looking straight at.
+   *
+   * Reports when the book has **arrived**, which is what the placing sequence waits for:
+   * how long a move takes is a property of the distance, and a caller guessing it either
+   * flies a card at a page still in the air or pays for a turn that never happened. Fires
+   * on every path, including the ones with nothing to do, or the sequence stalls.
+   */
+  useEffect(() => {
+    if (!turnToPlayerId) return undefined;
+
+    const arrived = () => onTurnedRef.current?.(turnToPlayerId);
+    const page = pageOfPlayer(pages, turnToPlayerId);
+
+    /* No slot in this book — an icoon behind a shut latch. Nothing to turn to. */
+    if (page < 0) {
+      arrived();
+      return undefined;
+    }
+
+    if (isMobile) {
+      let landed = false;
+      setMobilePage((current) => {
+        const next = Math.min(Math.max(page, 0), pages.length - 1);
+        if (next === current) landed = true;
+        else playTurnSound(current, next);
+        return next;
+      });
+      if (landed) {
+        arrived();
+        return undefined;
+      }
+      /* One slide, whatever the distance: the pages are not stacked here. */
+      const timer = window.setTimeout(arrived, ms(SHUT_MS));
+      return () => window.clearTimeout(timer);
+    }
+
+    const target = Math.min(flippedForPage(page), maxFlipped);
+    const distance = Math.abs(target - flippedRef.current);
+
+    if (distance === 0) {
+      arrived();
+      return undefined;
+    }
+
+    /*
+     * One number for the whole walk rather than per step, so the leaves of one riffle all
+     * turn at the same rate — and so the duration is committed before the first leaf moves
+     * rather than in the same breath as it.
+     */
+    const stepMs = distance > 1 ? RIFFLE_MS : SHUT_MS;
+    setLeafMs(stepMs);
+
+    let timer: number | undefined;
+
+    const step = () => {
+      const from = flippedRef.current;
+      if (from === target) {
+        arrived();
+        return;
+      }
+
+      const to = from + (target > from ? 1 : -1);
+      /*
+       * One commit. These run from a timeout and `index.tsx` mounts with legacy
+       * `ReactDOM.render`, which does not batch those — unbatched, the leaf's class change
+       * can commit a frame before it is marked as moving, which is a frame of a page in
+       * flight carrying a pile's worth of edge.
+       */
+      unstable_batchedUpdates(() => {
+        setMoving(Math.min(from, to));
+        setFlipped(to);
+      });
+      playTurnSound(from, to);
+
+      timer = window.setTimeout(step, ms(stepMs));
+    };
+
+    step();
+
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+    /*
+     * `onTurned` is deliberately absent — it is read through a ref. Everything else here
+     * either identifies the destination or bounds it.
+     */
+  }, [turnToPlayerId, pages, isMobile, maxFlipped]);
 
   /* ---------------------------------------------------------------- *
    * The first opening
@@ -1307,6 +1586,17 @@ const Album: React.FC<AlbumProps> = ({
 
   const turn = useCallback(
     (delta: number) => {
+      /*
+       * A hand on the paper is always a full turn, whatever the last riffle left behind.
+       *
+       * `leafMs` is state and outlives the walk that set it, so without this every page the
+       * reader turned after a pack had been put away would keep the riffle's shorter clock —
+       * for the rest of the session. Reset *here* rather than at the end of the walk: the
+       * stack's own settle timer is keyed on `leafMs`, and re-arming it the moment the last
+       * leaf lands would leave the pile edges a beat behind the paper.
+       */
+      setLeafMs(SHUT_MS);
+
       if (isMobile) {
         setMobilePage((current) => {
           const next = Math.min(Math.max(current + delta, 0), pages.length - 1);
@@ -1447,11 +1737,14 @@ const Album: React.FC<AlbumProps> = ({
    * changes only because a `var()` it references changed does not reliably start a
    * transition. Holding the state back instead is exact and depends on nothing.
    *
-   * `SHUT_MS` is already documented as matching `.album__leaf`'s own transition, and
-   * `ms()` scales it by the same `--anim` knob the CSS multiplies by, so the two cannot
-   * drift. Rapid clicks restart the timer, so the stack settles once after the last turn
-   * rather than stepping through the ones it missed — which is what a handful of pages
-   * dropped in quick succession does anyway.
+   * `leafMs` is the leaf's own transition — `SHUT_MS`, or `RIFFLE_MS` while the book is
+   * walking several of them — and `ms()` scales it by the same `--anim` knob the CSS
+   * multiplies by, so the two cannot drift. It has to be *that* rather than a literal
+   * `SHUT_MS`, or a riffle's stack would settle two leaves behind the paper.
+   *
+   * Rapid clicks restart the timer, so the stack settles once after the last turn rather
+   * than stepping through the ones it missed — which is what a handful of pages dropped in
+   * quick succession does anyway, and which is also what makes a riffle land in one piece.
    */
   const [settledFlipped, setSettledFlipped] = useState(flipped);
 
@@ -1462,9 +1755,9 @@ const Album: React.FC<AlbumProps> = ({
       return undefined;
     }
 
-    const timer = window.setTimeout(() => setSettledFlipped(flipped), ms(SHUT_MS));
+    const timer = window.setTimeout(() => setSettledFlipped(flipped), ms(leafMs));
     return () => window.clearTimeout(timer);
-  }, [flipped]);
+  }, [flipped, leafMs]);
 
   /*
    * **Counted over the paper leaves only — the two boards are not pages.** Leaf 0 is the
@@ -1596,7 +1889,12 @@ const Album: React.FC<AlbumProps> = ({
             here, so the outside of the book agrees with itself. The pages inside do
             not — paper is paper in every stain.
           */
-          style={albumLeather(cover)}
+          /*
+            Plus the leaf's own clock, which is `SHUT_MS` for a single turn and shorter
+            while the book is riffling several. `.album__leaf` reads it; the walk times
+            itself against the same state, so the paper and the timer cannot disagree.
+          */
+          style={{ ...albumLeather(cover), '--leaf-ms': `${leafMs}ms` } as React.CSSProperties}
           onTouchStart={isMobile ? onTouchStart : undefined}
           onTouchEnd={isMobile ? onTouchEnd : undefined}
           /*
@@ -1664,6 +1962,7 @@ const Album: React.FC<AlbumProps> = ({
                       visible={index === mobilePage}
                       onCardOpen={onCardOpen}
                       binding={showBinding}
+                      held={held}
                     />
                   </div>
                 );
@@ -1715,6 +2014,7 @@ const Album: React.FC<AlbumProps> = ({
                       visible={leaf === flipped}
                       onCardOpen={onCardOpen}
                       binding={showBinding}
+                      held={held}
                     />
                   </div>
                   <div className="album__face album__face--back">
@@ -1723,6 +2023,7 @@ const Album: React.FC<AlbumProps> = ({
                       index={leaf * 2 + 1}
                       visible={leaf === flipped - 1}
                       onCardOpen={onCardOpen}
+                      held={held}
                     />
                   </div>
                 </div>

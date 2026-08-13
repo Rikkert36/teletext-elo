@@ -28,10 +28,15 @@
   align-items: center;
   gap: 16px;
   /*
-   * The book's box, less the ~30px row under it that carries "terug naar het album" —
-   * so the middle of the table is the same height whether it holds the book or a packet
-   * being torn open, and the panel hanging off `bottom: 0` in the margin does not move
-   * between the two. See `--album-room` in game.css.
+   * The book's box — so the middle of the table is the same height whether it holds the
+   * book or a packet being torn open, and the panel hanging off `bottom: 0` in the margin
+   * does not move between the two. See `--album-room` in game.css.
+   *
+   * **The whole of it now.** It used to subtract ~30px for the row under it that carried
+   * "terug naar het album", and that row is gone: the way out of the opener is the
+   * results row itself, which is inside this column and was always going to be. The
+   * column is shorter by the button and its gap, and the box it sits in is unchanged, so
+   * this simply stops being a book's worth of table minus a control.
    *
    * It was a bare `62vh`, which is what it still resolves to on the common case (a
    * 960-tall window leaves the book 690px and 62vh is 595) — the `min()` is what stops
@@ -43,10 +48,20 @@
    * not on a fraction of the viewport. Were they still on the `50% 45%` fallback this
    * would slide the card out of its own spotlight.
    */
-  min-height: min(62vh, calc(var(--album-room, 62vh) - 30px));
+  min-height: min(62vh, var(--album-room, 62vh));
   justify-content: center;
   position: relative;
   font-family: Tahoma, Verdana, sans-serif;
+  /*
+   * **No `align-self: stretch` here, and it is not a matter of taste.** `.album-main` is
+   * as wide as the whole layout and the packet shelf is an *absolutely positioned* aside
+   * inside it — while `.opener` is in the `z-index: 1` list at the top of game.css. A
+   * stretched opener therefore covers the margins and swallows every click aimed at a
+   * packet, which is exactly what it did: the pile looked live and was not.
+   *
+   * The sealed phase needs a wide click target for the wood beside the packet, and it
+   * takes it on `.opener__stage--table` below, bounded by the book's own width.
+   */
 }
 
 /**
@@ -721,6 +736,30 @@
   align-items: center;
   justify-content: center;
   height: var(--pack-h);
+}
+
+/*
+ * The stage while the packet is still sealed, where the wood beside it is the way back
+ * out — so the target has to *be* the table rather than the inch either side of the
+ * packet, which is all the row would otherwise be.
+ *
+ * **The book's width, not the column's.** The margins beside the book belong to the
+ * packet shelf and the register, and they are absolutely positioned asides that this
+ * would paint over and take the clicks from — `--book-w` is by construction the width
+ * that stops short of both. `max-width` is for the stacked layout below 1450px, where the
+ * book can be wider than the room the stage has.
+ *
+ * No cursor and no hover state, deliberately. This is not a control disguised as wood, it
+ * is the table; the line under the packet is what says you can put it down again, exactly
+ * as it is what says you can open it in the first place. The album cover is the other
+ * place this design allows itself that.
+ *
+ * Only ever the sealed phase. Past the tear there is nothing to put back, and a live click
+ * target across the middle of a reveal is the hole the old exit button left open.
+ */
+.opener__stage--table {
+  width: var(--book-w);
+  max-width: 100%;
 }
 
 /**
@@ -1700,16 +1739,120 @@
  * together.
  * ---------------------------------------------------------------- */
 
+/*
+ * **The table, and it belongs to the sitting rather than to the packet.** One row for every
+ * phase of the opener, holding what you have opened: earlier packets first, then whatever
+ * this one has turned over. Clicking it files the lot.
+ *
+ * It scrolls when it has to — see `--scrolls` below, which is the whole of the reason this
+ * is not simply `overflow-x: auto`.
+ */
 .opener__revealed {
   display: flex;
-  gap: 10px;
-  justify-content: center;
-  min-height: 148px;
+  /*
+   * The book's width, not the column's: the margins beside it belong to the packet shelf
+   * and the register, which are absolutely positioned asides that a wider row would paint
+   * over and take the clicks from. Same rule and the same reason as
+   * `.opener__stage--table`.
+   */
+  width: var(--book-w);
+  max-width: 100%;
+  /*
+   * Exactly one card tall, so the row reserves its box while it is still empty and the
+   * column does not change height when the first card lands in it. A card is
+   * `aspect-ratio: 5 / 7`, hence the 1.4 — it has to track the width below, which is a slot
+   * in the book rather than a flat 100px. A literal here was a 148 tuned for that 100, and
+   * it is what would silently start clipping.
+   */
+  min-height: calc(var(--album-card-w) * 1.4);
   align-items: flex-start;
 }
 
+/*
+ * **Only a scroller once the cards do not fit**, and that "only" is load-bearing.
+ *
+ * A scroll container clips *both* axes: `overflow-x: auto` computes `overflow-y` to `auto`
+ * as well, and there is no way in CSS to ask for a horizontal clip alone. So a row that is
+ * permanently a scroller cuts off the card descending into it from the stage — the reveal's
+ * FLIP starts that card up at the hero's position, well above this box, and it appeared from
+ * behind an invisible edge instead of travelling. One packet never overflows (five cards at
+ * a slot's width fit inside the book), so the ordinary reveal is now clipped by nothing at
+ * all, exactly as it was before the row learned to hold more than one packet.
+ *
+ * The class is toggled from a layout effect in PackOpener, which measures the hand against
+ * this box — before the FLIP effect runs, so the card being flown in is measured against
+ * whichever state actually applies.
+ *
+ * Known cost: a card descending into an *already overflowing* row is still clipped at this
+ * edge, which is the case where a second packet is opened onto a long row. Fixing that needs
+ * the descent to escape the scroller — a fixed-position flight, like `PutAway`'s — or the
+ * row to be a fan of overlapping cards rather than a scroller, which is the alternative that
+ * was on the table when the scrollbar was chosen.
+ */
+.opener__revealed--scrolls {
+  overflow-x: auto;
+  /*
+   * Room for the scrollbar so it cannot draw over the cards, taken back out of the layout
+   * again — otherwise the column would grow by its height the moment a seventh card landed
+   * and everything above would shift.
+   *
+   * 16 rather than 14: a `thin` scrollbar is 8–11px, but this has to hold for a browser that
+   * ignores `scrollbar-width` and draws the platform's 17px bar, where too small a figure
+   * takes the difference out of the bottom of the cards.
+   */
+  padding-bottom: 16px;
+  margin-bottom: -16px;
+  /* A hairline rather than a bar. There is no chrome on this table and a scrollbar is the
+     most chrome-like thing there is; it is here because the row can genuinely run long. */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(214, 188, 122, 0.35) transparent;
+}
+
+/*
+ * The cards themselves, inside the scroller.
+ *
+ * `margin: auto` is the whole trick: it centres a row that fits and computes to zero on one
+ * that does not, so a long row starts at its own left edge and is scrollable to both ends.
+ * `justify-content: center` on the scroller cannot do that — a centred overflow puts its
+ * start *before* the scroll origin, where no browser will let you reach it.
+ */
+.opener__hand {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: auto;
+}
+
+/*
+ * A pointer only while there is something to file — the row carries `role="button"` exactly
+ * then, so the attribute selector cannot drift from the handler.
+ *
+ * A hand reaching for cards, unlike the sealed packet's stretch of table, which has no
+ * cursor at all: that one is the table, this one is the cards being offered.
+ */
+.opener__revealed[role='button'] {
+  cursor: pointer;
+}
+
+/*
+ * **A card in this row is exactly a slot in the book**, and that is a rule rather than a
+ * coincidence. The row is where the cards are standing when the pack is put away, and they
+ * travel from it into the album's slots — so at parity the whole of that sequence is
+ * translation, with nothing growing or shrinking on the way in. A card being *moved* to
+ * where it goes reads as putting it away; a card resizing as it arrives reads as a
+ * transition between two screens.
+ *
+ * It was a flat 100px, which was smaller than a slot at every window size — so the cards
+ * ended the reveal too small to read and then had to inflate into the book.
+ *
+ * No fallback on the var, deliberately: cssnano resolves what it can inside a `calc()` and
+ * emits a literal declaration in front of the var-based one, and `--album-card-w` is itself
+ * a calc over a `min()` that it cannot parse — so a fallback is what it would emit. See
+ * `.album-side` in game.css, where the same trap cost a shelf. album.css and packopen.css
+ * are always in the same bundle, so there is nothing for a fallback to protect.
+ */
 .opener__revealed .card {
-  --card-width: 100px;
+  --card-width: var(--album-card-w);
 }
 
 /*
@@ -1723,43 +1866,45 @@
 }
 
 /* ---------------------------------------------------------------- *
- * Beat 5 — settle
+ * Beat 5 — the row is the ending
+ *
+ * **There is no results grid.** The row above is what the pack comes to: the last card
+ * flies into it like every other one, it is left alone for a beat, and then the doubles
+ * go off the table and the rest go into the book.
+ *
+ * The grid that used to be here was a third size for the same cards — after the hero and
+ * after the row — held for one beat before the album took them, and it was also a screen
+ * that waited for a click while the shelf beside it was set aside. `.opener__results`,
+ * `.opener__result`, `opener-settle` and the `--settled` guard went with it. The FLIP
+ * note above is the whole of what they needed: the row's cards arrive by transform, so
+ * nothing may put a keyframe animation on them.
  * ---------------------------------------------------------------- */
 
-.opener__results {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  justify-content: center;
-  max-width: 900px;
-}
-
-.opener__results .card {
-  --card-width: clamp(110px, 12vw, 160px);
-}
-
-.opener__result {
-  animation: opener-settle calc(260ms * var(--anim, 1)) ease-out backwards;
-  position: relative;
-}
+/* ---------------------------------------------------------------- *
+ * Beat 6 — putting them away
+ *
+ * The doubles leaving the table. The new cards are not touched here at all: they are
+ * left exactly where they landed, because the flight into the book is measured off
+ * their boxes and a card that is mid-transform has no box worth measuring. The rest of
+ * the sequence is in putaway.css.
+ *
+ * **A double is not waste.** It goes off the table because the book has no second
+ * place to put it — what the book keeps is a numeral beside its tick on the checklist,
+ * and a checklist is also a swap list. Off the table is where a swap lives.
+ * ---------------------------------------------------------------- */
 
 /*
- * Reached by the final FLIP rather than by a skip: the cards are already
- * travelling in from the row, so the entrance animation has to go. It is not
- * merely redundant — a CSS animation outranks an inline style, so `opener-settle`
- * would beat the inverted transform and nothing would move.
+ * **Nothing here animates the cards out.** The row is handed over intact and the clearing
+ * happens in the overlay `PutAway` owns — doubles off the bottom, keepers aside, together,
+ * over the top of a book that has already come back. It has to be out there: the album
+ * mounts in the same commit that unmounts this component, so an animation inside the opener
+ * would be thrown away mid-flight.
+ *
+ * There was an `opener-toss` keyframe here with `--toss-x` / `--toss-r` set per card, which
+ * is now three inline transitions in PutAway. The `translate(x, 150%) rotate() scale(.86)`
+ * shape survives intact — it is the whole of the tell that a double is being *dropped*
+ * rather than filed.
  */
-.opener__results--settled .opener__result {
-  animation: none;
-  will-change: transform;
-}
-
-@keyframes opener-settle {
-  from {
-    transform: translateY(-18px) scale(0.92);
-    opacity: 0;
-  }
-}
 
 /* ---------------------------------------------------------------- *
  * Reduced motion: the reveal still completes, it just does not move.
@@ -1781,7 +1926,6 @@
   .opener__sweep::before,
   .opener__particle,
   .opener__revealed .card,
-  .opener__result,
   .opener__stage .card,
   .opener__slot .card {
     animation: none;

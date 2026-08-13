@@ -1,0 +1,124 @@
+/**
+ * Putting the pack away: the cards standing aside while the book comes back, and then
+ * going into it one at a time.
+ *
+ * The first half of the sequence — the doubles sliding off the lower edge — is in
+ * packopen.css with the rest of the finished row, because that is cards animating in place
+ * inside the opener. This file is what happens after the opener has gone: a hand of clones
+ * in fixed viewport space, above the book and below the card viewer.
+ *
+ * There is very little here on purpose. How a card *looks* is already written —
+ * `.opener__slot--new` is the green rim, and the row it came out of already sized it to a
+ * slot in the book. The rules below do nothing but place the thing.
+ */
+
+/*
+ * The overlay. Fixed and inert: it is a picture of cards being handled, and everything
+ * underneath it — the book they are landing in — has to stay hittable the moment they
+ * have landed.
+ *
+ * Mounted as the last child of the shell, next to the card viewer, and **never inside
+ * `.album`**: that element carries `perspective`, which both makes it a containing block
+ * for fixed descendants and drops whatever is in it into the turning leaves' depth sort.
+ * The same reason the viewer and the opener's bloom live out here.
+ *
+ * 42 sits above the album's turn strips (35) and below the viewer's scrim (45), which is
+ * the whole of the ordering it needs: a card in flight passes over the book, and a viewer
+ * opened over a book is opened over everything.
+ */
+.putaway {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 42;
+}
+
+/*
+ * One card, out of the packet and not yet in the book.
+ *
+ * `position: fixed` with the box it came out of written on it in pixels, because every rect
+ * in this sequence was measured in viewport space — the row it left is gone by the time
+ * this mounts, so there is no element left to be positioned relative to. Every transform
+ * is then written against that box: "where it should be now, less where it started".
+ *
+ * **Nothing in this sequence resizes**, and the rule below is the whole of what guarantees
+ * it. The card fills whatever box the measurement produced — `aspect-ratio: 5 / 7` takes
+ * care of the height — and the row it came out of is already `--album-card-w` wide, a slot
+ * in the book, so the flight is pure translation. A second copy of that decision here is
+ * exactly what would break it.
+ */
+.putaway__flight {
+  position: fixed;
+  transform-origin: 50% 50%;
+  /* Opacity as well as transform: a double fades as it drops off the table. */
+  will-change: transform, opacity;
+}
+
+/*
+ * **On the card, not on the wrapper**, and that is not a style preference: `.card` declares
+ * `--card-width: 150px` on *itself*, and a custom property declared on an element beats one
+ * inherited from its parent. Setting it on `.putaway__flight` therefore did nothing at all
+ * — every clone rendered at a flat 150px, which is wider than a slot at most window sizes,
+ * so the cards visibly grew as they left the table and had to shrink into their slots.
+ *
+ * `.album__slots .card` in album.css is the same rule for the same reason. Anything that
+ * wants to size a card has to target the card.
+ */
+.putaway__flight .card {
+  --card-width: 100%;
+}
+
+/*
+ * The book is out of play for the length of the sequence.
+ *
+ * Not dimmed, and that is the difference from `.album-side--set-aside`: the book is the
+ * thing being watched, it simply cannot be *used* while the cards are going into it. What
+ * it stops is a page turned out from under a card that is already aimed at a slot on it,
+ * and a card opened in the viewer over the top of the one arriving.
+ *
+ * The turn strips are why this has to be on `.album` rather than on the slots: they are
+ * siblings of `.album__book`, not children of it.
+ *
+ * The shelf and the register are not here — they are set aside by `handsFull`, which
+ * covers the whole sequence from the tear to the last card being placed, and dims them as
+ * well. Your hands are full until the book is finished.
+ */
+.album-layout--placing .album {
+  pointer-events: none;
+  /*
+   * And it arrives rather than cuts. The album is mounted for the whole of the filing —
+   * `PutAway` measures the book to know where to stand the cards, so it has to be in the
+   * document from the first frame — but it is invisible until the middle of the table is
+   * empty, because a book appearing underneath cards that are still moving is two things
+   * happening in one place. `PLACE_ARRIVE_MS` in CollectionPage.tsx is the same number, and
+   * the beat it holds everything else still for.
+   *
+   * `opacity` on `.album` and nothing else. It is a **group** fade: the element is already a
+   * stacking context (it carries `perspective`), so the whole book composites and then goes
+   * transparent as one image — a dozen stacked leaves never show through each other. A
+   * transform would have been the nicer entrance and is not available: it would make `.album`
+   * a containing block for the fixed layers the re-binding ceremony hangs inside it.
+   */
+  transition: opacity calc(420ms * var(--anim, 1)) ease;
+}
+
+/*
+ * The table before the book is back on it: the cards are moving out of the middle and there
+ * is nothing else there. No transition on the way *in* — the album mounts already in this
+ * state, and a fade from a book nobody has seen yet is a fade from nothing.
+ */
+.album-layout--clearing .album {
+  opacity: 0;
+}
+
+/*
+ * Under reduced motion nothing is drawn here at all — `PutAway` renders no clones and only
+ * keeps the timers that report the landings, so the cards are simply in the book. This is
+ * for the case where the setting changes mid-sequence, which would otherwise leave a hand
+ * of cards parked in the margin with no transition left to carry them anywhere.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .putaway__flight {
+    display: none;
+  }
+}

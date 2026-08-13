@@ -194,8 +194,20 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
           : ({ '--picked-offset': String(CENTRE_INDEX - pickedIndex) } as React.CSSProperties)
       }
     >
-      {/* Keeps its box for the whole sequence: this is the album's nav-label row, and
-          losing it would shift the book up by its height at the handover. */}
+      {/*
+        Keeps its box for the whole sequence: this is the album's nav-label row, and losing
+        it would shift the book up by its height at the handover.
+
+        That is a non-breaking space rather than an ordinary one, which would collapse. It
+        no longer decides the height — `.choice__label` reserves a full line box now, so an
+        empty row and a filled one come out the same on both sides of the handover, which
+        the album needs regardless: `spreadLabel()` returns `''` at `flipped === 0`, so a
+        shut book's row is genuinely empty. Kept because a row whose height depends on
+        whether its content collapses is one that will go short again the next time either
+        reserve is touched, and this is the cheap half of not learning that from a 2px jump.
+        The same character, for the same reason, as the hint line the pack opener renders
+        during the tear.
+      */}
       <div className="choice__label">{busy ? ' ' : 'Kies je album'}</div>
 
       <div className="choice__well">
@@ -275,7 +287,6 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
                 ))}
               </div>
               <div className="album__cover-rule" />
-              <div className="album__cover-sub">nog geen kaarten</div>
             </div>
           </div>
         ) : null}
