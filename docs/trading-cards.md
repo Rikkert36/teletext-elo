@@ -1,6 +1,15 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-13)
+## Where this stands (last updated 2026-08-14)
+
+**A slots page has a head band, and it is the book's own leather.** The head is now a
+printed band bled to three trims with the rating range reversed out of it, on rebuilt
+paper, between two hairlines set on the card block's measure. Two candidates that
+coloured it by the tiers on the leaf were built, switched from the test panel, and
+dropped — the switch went with the decision. The band's colour, the four reasons the
+tiers lost, and what the bleed did to the fore-edge are under "The head band, and what
+colours it"; the spreads it was designed on are `docs/album-headband.html` and
+`docs/album-band-colours.html`.
 
 **The last button on the table is gone, and the cards do its job.** A reveal ends with the
 row of cards still lying there and the shelf live over it, so there are two things on the
@@ -1916,6 +1925,92 @@ supplement; a herbarium sheet; and ten modern ones from a Swiss grid through a
 progress rail to a contact sheet. **Every one of them was more page than the cards
 needed.** That is the finding worth keeping: on this page the collection is the
 content, and each layer of furniture was competing with it rather than framing it.
+
+#### The head band, and what colours it
+
+**The bareness above is superseded at the head, and only there.** A slots page now
+opens with a **printed band bled to head, fore-edge and fold**, with `COLLECTIE ·
+68 – 72` reversed out of it in cream; under it a hairline, the mounts, a second
+hairline, and the folio centred on the same measure. The mounts, the cards and the
+bareness of everything below the head are untouched, and the argument that took the
+running head off still holds — what is in the band is the **rating range**, which is
+true of that leaf and no other. The band is `.album__band`; the design was worked out
+as a standalone spread first, in `docs/album-headband.html`.
+
+Three things about it that will otherwise be undone:
+
+- **It takes the book's own leather**, mixed from `--leather-mid` toward the paper's
+  cream. Not `--leather-hi`: across the five stains `mid` sits in a much tighter band
+  of lightness, so one mix serves all five, where a mix off `hi` leaves cognac too pale
+  to hold the reversed type and antraciet nearly black. It is ink on paper, so it is a
+  step lighter than the hide — a raw stain at 13% of a leaf reads as a swatch of the
+  cover pasted onto the page.
+- **`--band` cannot be declared on `:root`.** `albumLeather` puts `--leather-*` on
+  `.album` as an inline style, and a `var()` inside a custom property is substituted on
+  the element that declares it — so a `--band` at the root mixes the bordeaux fallback
+  for ever and every book prints the same band. It is declared on `.album`. The same
+  trap costs the page geometry nothing only because `--page-h` and the band's own
+  fractions are both on `:root`, where the media queries that restate `--page-h` are
+  picked up correctly.
+- **The type sits below the band's optical centre**, by a fourteenth of its depth. The
+  eye puts the centre of a mass of colour a little high, so a line on the true centre
+  of a band this deep looks like it has slipped up.
+
+**The band is not coloured by the tiers on the leaf, and this was decided with both
+alternatives built.** They are still standing in `docs/album-band-colours.html`: the
+metal of the leaf's ratings, cut at the tier boundary or ramped across it. The album is
+one section sorted ascending by rating, so it was real information — you would learn to
+thumb straight to the gold end — and it lost anyway, on four counts. **The cut lands in
+the head type**, because its position is data and not layout: on a leaf running 73–81
+the silver/gold boundary falls exactly where the numerals are set, and the next leaf
+puts it somewhere else. **Bronze, silver and gold are the collection's language**, not
+the press's. **The ink would become a second thing the tier moves** — the card's own ink
+had that bug once, see "a bronze per tier was tried" in card.css. And **the fore-edge
+cannot state a pile of mixed metals**. What the leather buys instead is the thing a
+running head band is for: it is architecture, not information, and its sameness on every
+leaf is what makes a stack of sheets read as one manufactured object. It also pays off
+the one-time stain ceremony on all sixteen pages instead of on the cover and the
+endpapers alone.
+
+If the thumb-index is ever wanted, the candidate worth reviving is the third one in that
+file: the stain band with a **three-pixel metal rule along its foot**, which carries the
+tier without a gold field on cream and without touching the type.
+
+**The fore-edge reports the pile's bands, and it took four goes to get right.** The
+hairline at the trim moved to `z-index: 3`, *above* the band: it stands for the edges of
+the sheets underneath, and ink printed on the top sheet cannot cover them. It then
+carries the band's colour a shade darker for the band's own depth. Three things about
+how much colour, and they were each arrived at by getting it wrong first:
+
+- **It comes down in three 2px steps**, not as a level rectangle. A block is fanned, so
+  each sheet sits a hair lower than the one above and the band's foot cannot be level
+  across the pile. A smooth slope is the obvious fix and is wrong: over six pixels a
+  diagonal reads as a wedge of colour rather than a stack.
+- **It draws the sheets UNDER the top one, which is left out of its own pile.** Of the
+  leaf on screen you see the face; its edge is where that face stops. Counting it made
+  the first slots spread — where the left pile is the single sheet carrying the voorwoord
+  and the first slots page — report that leaf's own band back to it with nothing but
+  boards underneath. The stack *widths* still count it: a pile of one sheet has a
+  thickness, and it is the colour that describes what is beneath.
+- **A page with a white head has a white stack**, unconditionally, and this one is a
+  trade rather than a refinement. `--band-l` / `--band-r` and `--white-l` / `--white-r`
+  describe each pile truthfully as `white | banded | white` — see `pileBands` — and on the
+  voorwoord and checklist spreads the truth is inconvenient: the sheets a little way down
+  are slots pages, so an honest strip puts the band's brown a few pixels from a head that
+  plainly has none. A bare tenth at the far end and then a dropped innermost tread both
+  failed to fix it, because the pile really is banded and seven pixels is not enough to
+  say so quietly. So the drawing gives way to the page it is printed on. The cost is
+  real: on those two spreads the book stops reporting that its other leaves are banded.
+
+The fractions are still computed and still used everywhere else — it is how the last
+spread comes out white without a special case, and how the middle of the book carries
+colour nearly to the trim.
+
+The paper was rebuilt for the band's sake as well: **formation, fibre, flecks and
+tooth**, in that order of importance, multiplying into the leaf's own lighting. A single
+fine noise is what it was, and it gives a surface no photograph of paper has, because it
+is uniform and paper never is. The base cream was lightened three points to pay back
+what four multiplying layers take out; move one and the other has to follow.
 
 #### The cover carries a name and nothing else
 

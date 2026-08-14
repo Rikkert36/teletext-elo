@@ -1061,15 +1061,64 @@
     900px 900px;
 }
 
-/* The band bleeds to the trim, so it has to take the leaf's own outer corner with
-   it — square over a rounded page corner is the one place the bleed shows as a
-   mistake. A front face is the right-hand page, a back face the left. */
+/*
+ * **The band stops where the pile drawing starts, and that is not the trim.**
+ *
+ * The band bleeds to three trims — but the fore-edge is a cheat drawn *inside* this
+ * page's own margin, standing for the sheets underneath. So those last few pixels of
+ * margin belong to the pile, not to this sheet, and a band that runs under them shows
+ * through everywhere the pile drawing is transparent. That is what made a page with
+ * nothing but white leaves behind it still show a coloured head at the trim: not the
+ * stack reporting a band, but the page's own band showing through the stack.
+ *
+ * Insetting by exactly `--edge-l` / `--edge-r` hands that strip over. On a mid-book leaf
+ * the pile beneath is banded, so the strip paints the band's colour a shade darker and
+ * the two read as one band with its own cut edge. On the last slots leaf the pile beneath
+ * is the checklist and the boards, so the strip paints nothing and the pile is cream right
+ * where a reader looks for it. The tonal step where the face ends and the edges begin is
+ * what a fore-edge looks like.
+ *
+ * The band still has to take the leaf's outer corner with it — square over a rounded page
+ * corner is the one place a bleed shows as a mistake. A front face is the right-hand page,
+ * a back face the left.
+ */
 .album__face--front .album__band {
+  right: var(--edge-r, 0px);
   border-radius: 0 3px 0 0;
 }
 
 .album__face--back .album__band {
+  left: var(--edge-l, 0px);
   border-radius: 3px 0 0 0;
+}
+
+/*
+ * The tooth's tiles start at the LEAF's corner, not the band's — see `.album__band::after`
+ * for why. On a back face the inset moves the band's own left edge inboard, so the tiles
+ * have to be pulled back by the same amount or the grain steps at the band's foot on
+ * left-hand pages only. A front face is inset on its right and its origin does not move.
+ */
+.album__face--back .album__band::after {
+  background-position:
+    calc(-1 * var(--edge-l, 0px)) 0,
+    calc(-1 * var(--edge-l, 0px)) 0;
+}
+
+/*
+ * **A leaf in the air has no pile, so its band goes back to the trim.**
+ *
+ * This is the other half of `.album__leaf--moving .album__page::after`, which suppresses
+ * the fore-edge on the leaf being turned for the same reason: mid-rotation it belongs to
+ * neither side, and one sheet's thickness is nothing. Insetting the band there hands the
+ * margin to a drawing that is not being painted, and what shows instead is bare paper — a
+ * white nick at each end of the band, on the one leaf a reader is watching move.
+ *
+ * `.album__face` is in the selector only to out-specify the two inset rules above, which
+ * are also two classes deep; without it this would depend on source order.
+ */
+.album__leaf--moving .album__face .album__band {
+  left: 0;
+  right: 0;
 }
 
 /* The heading, inside the band: the rule and the margins come off, the colour
@@ -1264,9 +1313,29 @@
      *
      * Drawn as three no-repeat layers rather than one gradient because a linear
      * gradient's colour boundary is always straight and perpendicular to its axis —
-     * it can be tilted but it cannot be stepped. Widths are 34% so the three overlap
-     * by a fraction and leave no seam, and they are percentages because `--edge-w`
-     * grows and shrinks with the pile.
+     * it can be tilted but it cannot be stepped.
+     *
+     * **How far the colour reaches is how much of that pile is banded**, and it is
+     * measured from the INNER end. `--band-l` / `--band-r` come off the book beside
+     * `--edge-l` / `--edge-r`: the fraction of the sheets in that pile whose leaf
+     * prints a band — see `bandedShare` in Album.tsx.
+     *
+     * Measuring from the inner end is not a simplification, it is the album's
+     * structure: the banded pages are one contiguous run in the middle of the book,
+     * with the voorwoord and the boards before them and the checklist after. So on the
+     * left-hand pile the banded sheets are always the ones nearest the top, and on the
+     * right-hand pile likewise — the front and back matter is always at the far end.
+     *
+     * It ends the book honestly, which a fixed proportion could not. On the last spread
+     * the sheets under the right-hand leaf are the padding sheet, the checklist and the
+     * board: nothing banded, `--band-r` is 0, and the strip carries no colour at all.
+     * In the middle of the book the fraction is near 1 and it carries colour nearly to
+     * the trim, because there the pile really is slots pages almost all the way down.
+     *
+     * Sizes and offsets in px off `--edge-w`, so a background position is a plain
+     * offset from an edge. Percentages were the first attempt and they are the wrong
+     * tool: a position percentage aligns that point of the IMAGE with the same point of
+     * the BOX, so the offsets stop being offsets as soon as the widths move.
      *
      * Last in the layer list, so the sheet hairlines and the block's shade paint over
      * them and the colour comes out striated rather than as a clean chip of ink. On a
@@ -1276,28 +1345,63 @@
     linear-gradient(var(--band-edge), var(--band-edge)),
     linear-gradient(var(--band-edge), var(--band-edge)),
     linear-gradient(var(--band-edge), var(--band-edge));
+  /* One tread of the staircase: a third of however much of this pile is banded. Zero
+     when none of it is, which paints nothing at all. */
+  --band-step: calc(var(--edge-w, 0px) * var(--band-cover, 0) / 3);
+  /* And how far in the first tread stands: the run of white sheets at the near end of
+     the pile, so a stack that begins with two white leaves is drawn with two white
+     leaves. */
+  --band-gap: calc(var(--edge-w, 0px) * var(--band-white, 0));
   background-repeat: no-repeat, repeat, no-repeat, no-repeat, no-repeat, no-repeat;
   background-size:
     auto,
     auto,
     auto,
-    34% var(--band-h),
-    34% calc(var(--band-h) + 2px),
-    34% calc(var(--band-h) + 4px);
+    var(--band-step) var(--band-h),
+    var(--band-step) calc(var(--band-h) + 2px),
+    var(--band-step) calc(var(--band-h) + 4px);
   /* Innermost step shortest, outermost longest: the trim is the deep end of the pile.
-     A front face's trim is on its right — the back face mirrors these. */
+     A front face's trim is on its right, so its inner end is the LEFT and the treads
+     run left to right — the back face mirrors them. */
   background-position:
     center,
     center,
     center,
-    left top,
-    center top,
-    right top;
+    left var(--band-gap) top 0,
+    left calc(var(--band-gap) + var(--band-step)) top 0,
+    left calc(var(--band-gap) + var(--band-step) * 2) top 0;
   /*
    * No transition on the width. The timing is `settledFlipped` in Album.tsx, and a width
    * driven by a custom property does not reliably start one in any case — adding one back
    * would either do nothing or compose into a double delay.
    */
+}
+
+/*
+ * **A page with a white head has a white stack. No proportion, no exceptions.**
+ *
+ * This overrides everything above it, and it is a deliberate trade rather than a
+ * refinement of the model. `--band-cover` describes the pile truthfully, and on the
+ * checklist and voorwoord spreads the truth is inconvenient: the sheets a little way
+ * down are slots pages, so an honest strip carries the band's brown a few pixels from a
+ * head that plainly has none. Two attempts to keep the honesty and lose the contradiction
+ * — a bare tenth at the far end, then dropping the innermost tread — both left brown in
+ * the margin of a white page, because the pile really is banded and the strip is only
+ * seven pixels wide to say so in.
+ *
+ * So the drawing gives way to the page it is printed on. What it costs is real and worth
+ * stating: on those two spreads the book stops reporting that the rest of its leaves are
+ * banded. What it buys is that nothing in a page's own margin ever contradicts that
+ * page's own head, which at this scale is the thing a reader actually sees. It is the
+ * same trade as the pastedown being paper rather than leather — the more literal version
+ * read worse.
+ *
+ * One line, because `--band-cover` is what every tread's width is derived from: at zero
+ * they are all zero and the layer paints nothing. The plain fore-edge — the vignette, the
+ * sheet hairlines and the block's shade — is untouched, so the stack is still a stack.
+ */
+.album__page:not(.album__page--slots)::after {
+  --band-cover: 0;
 }
 
 /*
@@ -1334,12 +1438,17 @@
 .album__face--front .album__page::after {
   right: 0;
   --edge-w: var(--edge-r, 0px);
+  /* Its own pile's composition, from the same place the width comes from. */
+  --band-cover: var(--band-r, 0);
+  --band-white: var(--white-r, 0);
   border-radius: 0 3px 3px 0;
 }
 
 .album__face--back .album__page::after {
   left: 0;
   --edge-w: var(--edge-l, 0px);
+  --band-cover: var(--band-l, 0);
+  --band-white: var(--white-l, 0);
   border-radius: 3px 0 0 3px;
   /* Mirrored, so the shade deepens toward the other side. The pile's bands are not
      mirrored — a head is a head on either leaf — so that layer is repeated as is. */
@@ -1362,16 +1471,16 @@
     linear-gradient(var(--band-edge), var(--band-edge)),
     linear-gradient(var(--band-edge), var(--band-edge)),
     linear-gradient(var(--band-edge), var(--band-edge));
-  /* A back face is the left-hand page, so its trim is on the LEFT and the staircase
-     goes down the other way. Sizes and repeats carry over from the base rule — only
-     the order of the three steps across the strip changes. */
+  /* A back face is the left-hand page, so its trim is on the LEFT: its inner end is the
+     RIGHT and the staircase runs right to left. Sizes and repeats carry over from the
+     base rule — only the treads' places across the strip mirror. */
   background-position:
     center,
     center,
     center,
-    right top,
-    center top,
-    left top;
+    right var(--band-gap) top 0,
+    right calc(var(--band-gap) + var(--band-step)) top 0,
+    right calc(var(--band-gap) + var(--band-step) * 2) top 0;
 }
 
 .album__slots {
@@ -3091,6 +3200,11 @@
    here. */
 .album--mobile .album__band {
   border-radius: 3px 3px 0 0;
+  /* And the band goes back to both trims, because there is no pile drawing here to hand
+     the margin over to — see the fore-edge below. `--edge-l` / `--edge-r` are still set on
+     the book, so without this a phone gets a cream sliver at the trim with nothing in it. */
+  left: 0;
+  right: 0;
 }
 
 /* No fore-edge on a phone. One page slides across, there is no spine and no pile either

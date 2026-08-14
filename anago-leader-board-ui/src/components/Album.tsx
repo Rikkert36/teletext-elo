@@ -951,8 +951,17 @@ const PageFace: React.FC<{
           Only on a page that prints something, for the same reason the band is. */}
       {banded ? <div className="album__page-rule album__page-rule--foot" /> : null}
 
-      {/* The cover is page 0, so a content page's number is its index, not +1. */}
-      <div className="album__page-number">{index}</div>
+      {/*
+        The cover is page 0, so a content page's number is its index, not +1.
+
+        **A blank leaf is not numbered.** `buildPages` pads with an empty slots page so a
+        section or the checklist can start on a left-hand page, and that sheet has no
+        cards, no band and no rules — but it was still printing a folio, which is what
+        made it read as a page that had failed to render rather than as a blank leaf. A
+        bound book does contain blank leaves and a press never numbers one; the count
+        does not shift either, because the folio IS the page index.
+      */}
+      {page.slots.length > 0 ? <div className="album__page-number">{index}</div> : null}
     </div>
   );
 };
@@ -1825,9 +1834,84 @@ const Album: React.FC<AlbumProps> = ({
   const stackWidth = (leaves: number): number =>
     leaves === 0 || paperLeaves === 0 ? 0 : EDGE_MIN + EDGE_RANGE * (leaves / paperLeaves);
 
+  /**
+   * Does this sheet carry a head band on either of its faces?
+   *
+   * Either, because a sheet has one cut edge and the band bleeds to it from both sides:
+   * a leaf with a slots page on one face and the voorwoord on the other still shows
+   * colour at the trim.
+   */
+  const leafBanded = (leaf: number): boolean =>
+    pages[leaf * 2]?.range !== undefined || pages[leaf * 2 + 1]?.range !== undefined;
+
+  /**
+   * A pile, as two fractions of itself: how much of it is white before the band starts,
+   * and how much of it then carries the band. The fore-edge draws colour over the second
+   * one, offset by the first — see the note on the pile's head bands in album.css.
+   *
+   * **Fractions rather than a per-sheet drawing, and they are enough**, because the
+   * banded pages are one contiguous run in the middle of the book: boards, endpaper and
+   * voorwoord in front of them, padding and the checklist behind. So a pile is at most
+   * `white | banded | white` from its near end, and two numbers describe it exactly.
+   *
+   * The leading white run is what makes the ends of the book read right. Turn to the last
+   * spread and the sheets under the right-hand leaf are the padding sheet, the checklist
+   * and the board: `white` is 1, `cover` is 0, and the strip carries no colour at all
+   * rather than a proportion of it.
+   *
+   * `leaves` runs NEAR to FAR, which is why the caller builds it rather than passing a
+   * range: the two piles count in opposite directions.
+   *
+   * Anything banded beyond the first banded run is ignored, which cannot happen while the
+   * book is one ascending section — and if it ever does, an approximate stack drawing is
+   * the right thing to lose.
+   */
+  const pileBands = (leaves: number[]): { white: number; cover: number } => {
+    if (leaves.length === 0) return { white: 0, cover: 0 };
+
+    let white = 0;
+    while (white < leaves.length && !leafBanded(leaves[white])) white += 1;
+
+    let banded = 0;
+    while (white + banded < leaves.length && leafBanded(leaves[white + banded])) banded += 1;
+
+    return { white: white / leaves.length, cover: banded / leaves.length };
+  };
+
+  /*
+   * Both piles, near sheet first — and **the leaf on screen is left out of its own**.
+   *
+   * The strip is a drawing of the sheets you can see the edges of, which are the ones
+   * UNDER the top one: of the top sheet you see the face, and its edge is where that face
+   * stops. Counting it was wrong twice over. On the first slots spread the left pile is a
+   * single sheet — the leaf carrying the voorwoord and the first slots page — so the strip
+   * reported that leaf's own band back to it, with nothing but boards underneath. And on
+   * the checklist spread it made the top sheet's whiteness worth a fraction of the strip
+   * when the page it belongs to is the whole of what the reader is looking at.
+   *
+   * The widths above still count it, and that is not an inconsistency: a pile of one sheet
+   * has a thickness, and it is the colour, not the thickness, that describes what is under
+   * the top leaf.
+   *
+   * The left pile is the paper leaves already turned, so its top is the highest-numbered
+   * one and it counts DOWN toward leaf 1 — leaf 0 being the board. The right pile is the
+   * last `rightLeaves` paper leaves and counts up, ending one short of `leafCount` for the
+   * same reason. Both start one sheet in.
+   */
+  const leftPile = pileBands(
+    Array.from({ length: Math.max(leftLeaves - 1, 0) }, (_, i) => leftLeaves - 1 - i),
+  );
+  const rightPile = pileBands(
+    Array.from({ length: Math.max(rightLeaves - 1, 0) }, (_, i) => leafCount - rightLeaves + i),
+  );
+
   const edgeStyle = {
     '--edge-l': `${stackWidth(leftLeaves)}px`,
     '--edge-r': `${stackWidth(rightLeaves)}px`,
+    '--band-l': `${leftPile.cover}`,
+    '--band-r': `${rightPile.cover}`,
+    '--white-l': `${leftPile.white}`,
+    '--white-r': `${rightPile.white}`,
   } as React.CSSProperties;
 
   /*
