@@ -460,6 +460,29 @@
   font-size: 11px;
 }
 
+/*
+ * A key that is currently down — for a row of buttons standing in for a radio
+ * group, where one of them is the state rather than an action.
+ *
+ * Same 2px of travel and the same sunk shadow as `:active`, so "held" is the
+ * pressed gesture left in place rather than a second visual language; the accent is
+ * flooded instead of tinted, which is what makes it readable as on from across the
+ * panel. `:active` still out-specifies it on source order, so pressing a key that
+ * is already down still reads as a press.
+ */
+.game-button--on {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--accent) 58%, #fff) 0%,
+    color-mix(in srgb, var(--accent) 86%, #fff) 100%
+  );
+  color: color-mix(in srgb, var(--accent) 88%, #000);
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 4px rgba(0, 0, 0, 0.4),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
 /* A slot cut into the surface rather than a lit screen. */
 .game-input {
   font-family: Tahoma, Verdana, sans-serif;

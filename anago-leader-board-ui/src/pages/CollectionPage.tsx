@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
-import Album, { AlbumSection, albumSlotOrder } from '../components/Album';
+import Album, { AlbumSection, albumSlotOrder, BandMode } from '../components/Album';
 import AlbumChoice from '../components/AlbumChoice';
 import CardViewer from '../components/CardViewer';
 import GameShell from '../components/GameShell';
@@ -26,6 +26,31 @@ import { CURRENT_PLAYER_KEY as PLAYER_KEY } from '../utils/currentPlayer';
 import '../styles/game.css';
 
 const FAST_KEY = 'tafelvoetbal.cards.fastOpen';
+
+/*
+ * Which head-band candidate the book prints — see `BandMode` in Album.tsx.
+ *
+ * Kept in localStorage like `FAST_KEY`, and for the same reason: comparing three
+ * treatments means walking the book, opening a packet, watching a filing, and every
+ * one of those reloads or remounts. A setting that reset each time would have to be
+ * set again before every comparison, which is exactly when nobody bothers.
+ *
+ * Scaffolding, and it goes when the decision lands.
+ */
+const BAND_KEY = 'tafelvoetbal.cards.bandMode';
+
+const BAND_MODES: { id: BandMode; label: string }[] = [
+  { id: 'leather', label: 'leerkleur' },
+  { id: 'metal', label: 'metaal — hard' },
+  { id: 'metal-ramp', label: 'metaal — verloop' },
+];
+
+/* Validated rather than cast: the value comes off localStorage, where a stale key
+   from an earlier naming would otherwise reach `.album--band-<junk>`. */
+const readBandMode = (): BandMode => {
+  const stored = read(BAND_KEY);
+  return BAND_MODES.some((mode) => mode.id === stored) ? (stored as BandMode) : 'leather';
+};
 
 /* ------------------------------------------------------------------ *
  * Putting a pack away, beat by beat
@@ -203,6 +228,7 @@ const CollectionPage: React.FC = () => {
   /** Index into `slotOrder` of the card being looked at, or null for none. */
   const [viewing, setViewing] = useState<number | null>(null);
   const [fastMode, setFastMode] = useState(() => read(FAST_KEY) === 'true');
+  const [bandMode, setBandMode] = useState<BandMode>(readBandMode);
   /**
    * Whatever went wrong, in Dutch. Branched on before anything else.
    *
@@ -513,6 +539,11 @@ const CollectionPage: React.FC = () => {
     const next = !fastMode;
     setFastMode(next);
     write(FAST_KEY, String(next));
+  };
+
+  const chooseBand = (mode: BandMode) => {
+    setBandMode(mode);
+    write(BAND_KEY, mode);
   };
 
   const counts = useMemo(() => {
@@ -1402,6 +1433,35 @@ const CollectionPage: React.FC = () => {
                     <input type="checkbox" checked={fastMode} onChange={toggleFast} />
                     snel openen
                   </label>
+                  {/*
+                    The head band's colour, while the three candidates are being
+                    judged — see `BandMode` in Album.tsx for what each one is.
+
+                    Buttons rather than a `<select>`: everything else on this panel is
+                    a key lying on the wood, and the panel has no select style to
+                    borrow. Three of them rather than a cycle, because the whole point
+                    is going back and forth between two of the three — a cycle makes
+                    that two presses in one direction and one in the other.
+
+                    No album needed, unlike every button above it. This changes how a
+                    book is printed rather than what is in it, so it is worth being
+                    able to set before there is one.
+                  */}
+                  <span className="game-plate__label">Kopband</span>
+                  {BAND_MODES.map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      className={`game-button game-button--small${
+                        bandMode === mode.id ? ' game-button--on' : ''
+                      }`}
+                      aria-pressed={bandMode === mode.id}
+                      onClick={() => chooseBand(mode.id)}
+                      title={`Kopband in ${mode.label}`}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
                 </div>
               </div>
             </aside>
@@ -1463,6 +1523,8 @@ const CollectionPage: React.FC = () => {
                 owner={ownerName}
                 ownerId={player.id}
                 cover={collection.album?.cover}
+                /* Scaffolding, from the test panel — see `BAND_KEY`. */
+                bandMode={bandMode}
                 /*
                   Half-bound once the icons are in, and read on every render like `cover` —
                   so a book re-bound in a previous session simply draws that way, with no

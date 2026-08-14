@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Albumspread — kopband</title>
+<style>
+  /* ==================================================================== *
+   * The spread with a printed head band.
+   *
+   * Worked from the reference render only, and every measurement below is a
+   * fraction of `--page-w` or `--page-h` taken off that image, so the book
+   * scales from one number without the proportions drifting. Deliberately not
+   * percentages: a percentage inset on `.page` resolves against `.spread`, i.e.
+   * against two leaves, and every one would come out double.
+   *
+   * What the reference changes, against the earlier passes:
+   *
+   *   - the head is a GREEN BAND bled to all three trims, not a line of type
+   *     with a rule under it;
+   *   - the pennant and the position rail are gone;
+   *   - there is no field in the stock — the paper is plain;
+   *   - the measure is set by the card block, and both hairlines (under the
+   *     band, above the folio) run exactly its width;
+   *   - the folio is centred on that measure rather than flanked by rules.
+   *
+   * The band's chapter mark and the section headings the reference carries
+   * ("veteranen", "aanvallers", "hoofdstuk 03") are left out: neither the
+   * chapter nor the position groupings exist in this album.
+   * ==================================================================== */
+  :root {
+    /* The leaf. 0.698 is the reference's trim ratio, measured at 638 x 914. */
+    --page-w: min(648px, calc((100vw - 170px) / 2));
+    --page-h: calc(var(--page-w) / 0.698);
+
+    /* The measure: trim to the first card column. Everything printed on the
+       page — both hairlines, the folio, the band's type — starts here. */
+    --pad-x: calc(var(--page-w) * 0.070);
+
+    /* The head band, and the two stations under it. */
+    --band-h: calc(var(--page-h) * 0.128);
+    /* The type sits BELOW the band's centre, by a fourteenth of its height. A
+       band this deep with its line optically centred reads as a mistake — the
+       eye puts the centre of a mass of colour a little high, so type placed
+       geometrically centre looks like it has slipped up. Dropping it also leaves
+       the deeper air above, which is where a running head wants it. */
+    --band-drop: calc(var(--band-h) * 0.072);
+    --rule-gap: calc(var(--page-h) * 0.044);   /* band to the head rule   */
+    --slots-gap: calc(var(--page-h) * 0.036);  /* head rule to the cards  */
+
+    /* Times rather than Georgia for everything the press set. Georgia's figures
+       are old-style — `68 – 72` comes out with the 6 ascending and the 7
+       descending — and the reference's numerals are lining and tabular. There is
+       no `lnum` in Georgia to ask for instead. */
+    --serif: "Times New Roman", Times, Georgia, serif;
+
+    /* Paper and press */
+    /* Lighter than the tone the leaf is meant to end up at, because four
+       multiplying layers sit on top of it: the sheet's texture takes about three
+       points of value out of the paper, and it has to be paid back here. */
+    --paper: #f8f3e3;
+    --paper-hi: #fffcf2;
+    --paper-lo: #f0e9d2;
+    --rule: rgba(104, 92, 63, 0.42);
+    --ink: #24211a;
+    --ink-soft: #8d8571;      /* the folio */
+
+    /* The band. Two stops only — it is flat ink with the paper's own tooth
+       showing through, not a gradient anyone designed. */
+    --band: #4b5a35;
+    --band-lo: #3f4d2c;
+    --band-ink: #f6f1e0;
+
+    --board: #2a1509;
+    --board-hi: #4e2d15;
+  }
+
+  * { box-sizing: border-box; }
+
+  /* -------------------------------------------------------------------- *
+   * The tabletop
+   * -------------------------------------------------------------------- */
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 38px 20px;
+    background-color: #2c1507;
+    background-image:
+      /* fine figure, then the broad rings, then the lamp */
+      repeating-linear-gradient(180deg,
+        rgba(0, 0, 0, .18) 0 1px, rgba(255, 190, 130, .03) 1px 2px,
+        rgba(0, 0, 0, .07) 2px 5px, transparent 5px 9px),
+      repeating-linear-gradient(178.6deg,
+        rgba(0, 0, 0, .15) 0 3px, transparent 3px 27px,
+        rgba(120, 60, 24, .12) 27px 31px, transparent 31px 63px),
+      radial-gradient(ellipse 64% 42% at 50% 4%, rgba(255, 204, 148, .14), transparent 70%),
+      linear-gradient(176deg, #46220f 0%, #2f1607 46%, #1c0c04 100%);
+    background-attachment: fixed;
+  }
+
+  /* ==================================================================== *
+   * The book
+   * ==================================================================== */
+  .book {
+    position: relative;
+    padding: 8px;
+    border-radius: 5px 5px 8px 8px;
+    background: linear-gradient(148deg, var(--board-hi) 0%, var(--board) 46%, #3c1d0d 100%);
+    box-shadow:
+      0 0 0 1px rgba(126, 78, 36, .5),
+      0 34px 60px rgba(10, 4, 2, .74),
+      0 5px 12px rgba(0, 0, 0, .5);
+  }
+
+  /* The pile at both fore-edges: leaves standing a little proud of the block,
+     shaded away at head and tail so the stack has a middle. */
+  .book::before, .book::after {
+    content: "";
+    position: absolute;
+    top: 13px; bottom: 13px;
+    width: 26px;
+    z-index: 0;
+    border-radius: 2px;
+    background-image:
+      linear-gradient(180deg, rgba(22, 9, 3, .62) 0%, rgba(22, 9, 3, .1) 6%,
+        transparent 16%, transparent 84%, rgba(22, 9, 3, .1) 94%, rgba(22, 9, 3, .62) 100%),
+      repeating-linear-gradient(90deg,
+        rgba(96, 80, 47, .3) 0 1px, rgba(250, 245, 227, .5) 1px 3px),
+      linear-gradient(90deg, #cabe9c, #f0e9d2);
+  }
+  .book::before { left: -19px; }
+  .book::after  { right: -19px; }
+
+  .spread { position: relative; display: flex; }
+
+  /* -------------------------------------------------------------------- *
+   * The leaf
+   * -------------------------------------------------------------------- */
+  .page {
+    position: relative;
+    width: var(--page-w);
+    height: var(--page-h);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: var(--band-h) var(--pad-x) 0;
+    font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
+    color: var(--ink);
+    /* Only the lighting here — the sheet itself is built in `::before`, because
+       the layers that make it read as paper have to multiply into this rather
+       than sit beside it. */
+    background:
+      radial-gradient(ellipse 132% 76% at 50% -2%,
+        var(--paper-hi) 0%, var(--paper) 46%, var(--paper-lo) 100%),
+      var(--paper);
+  }
+  .page--left  { border-radius: 3px 0 0 3px; box-shadow: inset -30px 0 38px -26px rgba(38, 22, 4, .5); }
+  .page--right { border-radius: 0 3px 3px 0;  box-shadow: inset  30px 0 38px -26px rgba(38, 22, 4, .5); }
+
+  /* -------------------------------------------------------------------- *
+   * The sheet
+   *
+   * Four layers, and the order is the argument. A single fine noise — which is
+   * what this was — gives a surface a photograph of paper does not have: it is
+   * uniform, and paper never is. What makes stock read as stock, in descending
+   * order of how much work it does:
+   *
+   *   1. FORMATION. Low-frequency cloud at a large tile: the sheet is thicker
+   *      here and thinner there, because fibres settled unevenly on the wire.
+   *      This is the layer that does most of the work and the one that was
+   *      missing — it is what the eye reads as "a material" rather than "a fill
+   *      with grain on it".
+   *   2. FIBRE. Faint streaks off the horizontal, from the fibres lying down in
+   *      the machine direction. Barely there, and directional, which is what
+   *      keeps the mottle from looking like dirt.
+   *   3. FLECKS. A few darker inclusions — shive, in a cream book paper. Sparse:
+   *      four to a tile, and they are the difference between paper and card.
+   *   4. TOOTH. The fine grain last and smallest, over the top of the rest.
+   *
+   * All of it multiplies into the leaf's own lighting, so the sheet gets darker
+   * where the paper curves into the fold rather than carrying its own flat tone.
+   * -------------------------------------------------------------------- */
+  .page::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+    background-image:
+      /* tooth */
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .40 0 0 0 0 .36 0 0 0 0 .25 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E"),
+      /* flecks */
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cg fill='%23796a4a' fill-opacity='.3'%3E%3Ccircle cx='58' cy='104' r='1.1'/%3E%3Ccircle cx='247' cy='63' r='.8'/%3E%3Cellipse cx='166' cy='291' rx='1.7' ry='.6' transform='rotate(-14 166 291)'/%3E%3Ccircle cx='352' cy='218' r='.9'/%3E%3Cellipse cx='94' cy='366' rx='1.4' ry='.5' transform='rotate(9 94 366)'/%3E%3C/g%3E%3C/svg%3E"),
+      /* fibre — see the note above: SHORT streaks. At .006 across, one fibre ran
+         most of the leaf's width and the sheet came out brushed, like a milled
+         metal panel. Paper's machine direction is a hint, not a grain. */
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='700' height='700'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.045 .42' numOctaves='2' seed='3'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .43 0 0 0 0 .39 0 0 0 0 .28 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='700' height='700' filter='url(%23f)'/%3E%3C/svg%3E"),
+      /* formation */
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.009' numOctaves='4' seed='11'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .46 0 0 0 0 .42 0 0 0 0 .3 0 0 0 .13 0'/%3E%3C/filter%3E%3Crect width='900' height='900' filter='url(%23m)'/%3E%3C/svg%3E");
+    background-size: 260px 260px, 420px 420px, 700px 700px, 900px 900px;
+  }
+
+  /* The tooth coming back up through the band's ink. A printed band on a rough
+     stock is never a flat field: the high fibres take less ink, and the sheet's
+     formation shows through the ink as well as under it.
+     *
+     * `border-box` origin, so these tiles start at the leaf's top-left exactly
+     * as the paper's do — the band's own padding would otherwise offset the
+     * pattern and the grain would visibly step at the band's foot. */
+  .band::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-origin: border-box;
+    opacity: .5;
+    mix-blend-mode: soft-light;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 .96 0 0 0 0 .8 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.009' numOctaves='4' seed='11'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .1 0 0 0 0 .12 0 0 0 0 .05 0 0 0 .4 0'/%3E%3C/filter%3E%3Crect width='900' height='900' filter='url(%23m)'/%3E%3C/svg%3E");
+    background-size: 260px 260px, 900px 900px;
+  }
+
+  /* The fold: shading, never a line. It crosses the band as well as the paper,
+     which is most of what makes the band read as printed on a leaf rather than
+     laid over the spread. */
+  .gutter {
+    position: absolute;
+    top: 0; bottom: 0; left: 50%;
+    width: 104px;
+    transform: translateX(-50%);
+    z-index: 6;
+    pointer-events: none;
+    background: linear-gradient(90deg,
+      rgba(42, 24, 5, 0) 0%, rgba(42, 24, 5, .1) 36%, rgba(42, 24, 5, .27) 50%,
+      rgba(42, 24, 5, .1) 64%, rgba(42, 24, 5, 0) 100%);
+  }
+
+  /* -------------------------------------------------------------------- *
+   * The head band
+   *
+   * Bled to head, fore-edge and fold: a printed band, so it goes right off
+   * three trims and stops dead at the fourth. Absolute rather than in the
+   * column flow, because the leaf's own top padding is its height — that way
+   * the band and the copy under it cannot disagree.
+   * -------------------------------------------------------------------- */
+  .band {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: var(--band-h);
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    /* Centred, then dropped: the padding shortens the content box at the top, so
+       the centred line moves down by half of it. */
+    padding: calc(var(--band-drop) * 2) var(--pad-x) 0;
+    background: linear-gradient(184deg, var(--band) 0%, var(--band-lo) 100%);
+    /* The ink sitting on the stock: a hair of its own shadow onto the paper
+       below, and the fibres of the paper coming back up through it. */
+    box-shadow: 0 1px 3px rgba(38, 30, 8, .3);
+  }
+  .band__title {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: baseline;
+    gap: .42em;
+    font-family: var(--serif);
+    font-size: calc(var(--page-w) * 0.039);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    line-height: 1;
+    color: var(--band-ink);
+    text-shadow: 0 1px 2px rgba(20, 26, 10, .45);
+  }
+  .band__sep { font-weight: normal; opacity: .72; }
+  .band__range { font-variant-numeric: tabular-nums; }
+
+  /* -------------------------------------------------------------------- *
+   * The two hairlines and the folio
+   *
+   * Both rules run the width of the card block, which is what makes the block
+   * look set on a measure rather than centred by eye.
+   * -------------------------------------------------------------------- */
+  .rule {
+    flex: none;
+    position: relative;
+    z-index: 2;
+    height: 1px;
+    background: var(--rule);
+  }
+  .rule--head { margin-top: var(--rule-gap); }
+
+  .slots {
+    flex: none;
+    position: relative;
+    z-index: 2;
+    margin-top: var(--slots-gap);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    column-gap: calc(var(--page-w) * 0.039);
+    row-gap: calc(var(--page-h) * 0.031);
+  }
+
+  .foot {
+    flex: none;
+    position: relative;
+    z-index: 2;
+    margin-top: auto;
+    padding-bottom: calc(var(--page-h) * 0.048);
+  }
+  .foot .rule { margin-bottom: calc(var(--page-h) * 0.018); }
+  .folio {
+    text-align: center;
+    font-family: var(--serif);
+    font-size: calc(var(--page-w) * 0.021);
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ==================================================================== *
+   * The card
+   * ==================================================================== */
+  .slot { position: relative; aspect-ratio: 64 / 100; }
+
+  .card {
+    --display: "Bahnschrift SemiCondensed", Bahnschrift, "DIN Condensed",
+      "DIN Alternate", "Franklin Gothic Medium", "Segoe UI", Tahoma, sans-serif;
+    position: absolute;
+    inset: 0;
+    border-radius: 5%;
+    overflow: hidden;
+    container-type: inline-size;
+    color: #16140e;
+  }
+
+  /* Stuck down, so this is a contact shadow and nothing more. */
+  .card--set {
+    box-shadow:
+      0 1px 2px rgba(56, 42, 13, .36),
+      0 4px 9px -4px rgba(56, 42, 13, .38);
+  }
+
+  .card--zilver {
+    background-image:
+      linear-gradient(163deg, #f6f9fc 0%, #d0d8e0 33%, #a9b3be 62%, #e9eef3 100%);
+  }
+  .card--goud {
+    background-image:
+      linear-gradient(163deg, #fbe89e 0%, #e6c45c 30%, #cb9d1f 64%, #f8e28c 100%);
+  }
+  /* The rare treatment: the head flooded red, the tier's gold kept at the foot,
+     so the card still says which tier it belongs to. */
+  .card--rood {
+    background-image:
+      linear-gradient(179deg, #d8242c 0%, #ba121b 50%, #cf8f1c 76%, #eccd5e 100%);
+  }
+  /* A printed placeholder in the stock, not a dark card in a bright album — but
+     still a mount you can count from across the room, so the tone is a clear
+     step off the paper rather than a whisper against it. */
+  .card--leeg {
+    background-image:
+      linear-gradient(180deg, #cfc8ae 0%, #d6cfb6 44%, #e6dfc7 100%);
+    color: #9a9078;
+    box-shadow:
+      inset 0 0 0 1px rgba(112, 102, 76, .3),
+      inset 0 2px 6px rgba(112, 102, 76, .22),
+      inset 0 -1px 0 rgba(255, 253, 244, .75);
+  }
+
+  /* The portrait: a wash for the ground with the sitter over it, faded away at
+     the foot and into the top-left so the metal comes back round the numeral. */
+  .card__portrait {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    -webkit-mask-image:
+      linear-gradient(to top, transparent 4%, #000 21%),
+      linear-gradient(126deg, transparent 4%, #000 22%);
+    mask-image:
+      linear-gradient(to top, transparent 4%, #000 21%),
+      linear-gradient(126deg, transparent 4%, #000 22%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  .card__portrait svg { display: block; width: 100%; height: 100%; }
+
+  /* Standing in for the headshot — this study has no avatars on disk, so the
+     sitter is drawn and the ground is a wash.
+     *
+     * The sitter is INLINED per card rather than pulled in with `<use>`: Chrome
+     * carries only inherited properties into a use instance's shadow tree, so
+     * `.card--leeg .s-head` never reaches the paths and every silhouette on the
+     * spread comes out the same tone. */
+  .ground { fill: url(#g-cool); }
+  .card--goud .ground { fill: url(#g-warm); }
+  .card--rood .ground { fill: url(#g-red); }
+  .card--leeg .ground { fill: none; }
+
+  /* Two tones, because one tone is a blob: the head and the hair carry the
+     weight and the body sits a step behind, which is roughly what a headshot
+     does at this size. */
+  .s-body { fill: #56534b; opacity: .74; }
+  .s-head { fill: #3f3b34; opacity: .88; }
+  .card--rood .s-body { fill: #3a1c14; opacity: .66; }
+  .card--rood .s-head { fill: #290f0b; opacity: .8; }
+  /* Lighter than its own ground, which is the way round the reference has it:
+     an empty slot is a shape lifted out of the tone, not printed onto it. */
+  .card--leeg .s-body { fill: #e3dcc2; opacity: .92; }
+  .card--leeg .s-head { fill: #ded7ba; opacity: .92; }
+
+  .card__overall {
+    position: absolute;
+    top: 2.2%; left: 7%;
+    z-index: 2;
+    font-family: var(--display);
+    font-size: 27cqw;
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: .005em;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .16);
+  }
+  .card--goud .card__overall,
+  .card--rood .card__overall { text-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+  .card--leeg .card__overall { text-shadow: none; }
+
+  .card__name {
+    position: absolute;
+    left: 9%; right: 9%; bottom: 5.5%;
+    z-index: 2;
+    padding-top: 3.5%;
+    text-align: center;
+    font-family: var(--display);
+    font-size: 9.2cqw;
+    letter-spacing: .03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-top: 1px solid rgba(0, 0, 0, .3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .34);
+  }
+  .card--rood .card__name { color: #1b1006; }
+  .card--leeg .card__name {
+    border-top-color: rgba(120, 112, 90, .3);
+    box-shadow: inset 0 1px 0 rgba(255, 253, 244, .5);
+  }
+
+  /* The sheen. One pass, static — a card in an album does not tilt. */
+  .card--set::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    background: linear-gradient(116deg, transparent 34%, rgba(255, 255, 255, .11) 46%,
+      rgba(255, 255, 255, .03) 52%, transparent 62%);
+  }
+</style>
+</head>
+<body>
+
+<!-- The washes, defined once for the whole spread. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-cool" x1="0" y1="0" x2=".25" y2="1">
+      <stop offset="0" stop-color="#edebe5"/><stop offset="1" stop-color="#b6babf"/>
+    </linearGradient>
+    <linearGradient id="g-warm" x1="0" y1="0" x2=".25" y2="1">
+      <stop offset="0" stop-color="#f2e9d1"/><stop offset="1" stop-color="#c8b585"/>
+    </linearGradient>
+    <linearGradient id="g-red" x1="0" y1="0" x2=".25" y2="1">
+      <stop offset="0" stop-color="#e0323b"/><stop offset="1" stop-color="#9b0e17"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="book">
+  <div class="spread">
+
+    <section class="page page--left">
+      <div class="band">
+        <div class="band__title">
+          <span>Collectie</span>
+          <span class="band__sep">·</span>
+          <span class="band__range">68 – 72</span>
+        </div>
+      </div>
+      <div class="rule rule--head"></div>
+      <div class="slots" data-slots="left"></div>
+      <div class="foot">
+        <div class="rule"></div>
+        <div class="folio">5</div>
+      </div>
+    </section>
+
+    <section class="page page--right">
+      <div class="band">
+        <div class="band__title">
+          <span>Collectie</span>
+          <span class="band__sep">·</span>
+          <span class="band__range">73 – 81</span>
+        </div>
+      </div>
+      <div class="rule rule--head"></div>
+      <div class="slots" data-slots="right"></div>
+      <div class="foot">
+        <div class="rule"></div>
+        <div class="folio">6</div>
+      </div>
+    </section>
+
+  </div>
+  <div class="gutter"></div>
+</div>
+
+<script>
+/* ====================================================================== *
+ * The spread's contents, as the reference has them.
+ * ====================================================================== */
+
+const PAGES = {
+  left: [
+    [null, 'Jeroen van Geel', 'm'],
+    [null, 'Rianne Meiberg',  'f'],
+    [69,   'Ewan Deeley',     'm'],
+    [71,   'Simon',           'm'],
+    [71,   'Bo',              'f'],
+    [null, 'Marie Versteeg',  'f'],
+  ],
+  right: [
+    [73,   'Yannick',      'm'],
+    [null, 'Tanny',        'f'],
+    [78,   'Nick',         'm'],
+    [79,   'Daan Verkade', 'm', 'rood'],
+    [null, 'Max Smedts',   'm'],
+    [81,   'Mathijs',      'm'],
+  ],
+};
+
+/* 65+ silver, 75+ gold. `rood` is the rare treatment: it is carried on the card
+   rather than derived from the rating. */
+const tierFor = (o) => (o >= 75 ? 'goud' : o >= 65 ? 'zilver' : 'brons');
+
+/* The sitter, in a box the shape of the card (100 x 156).
+ *
+ * Framed as the reference's photographs are framed — a HEADSHOT CROP, not a
+ * figure standing in the middle of the card. So the head is small against the
+ * card (about a fifth of its height) and the shoulders run off both sides and
+ * off the foot, which is what stops a silhouette reading as a lavatory
+ * pictogram: a portrait is cut by its own frame on three sides.
+ *
+ * Body first, then the head over it. Two cuts of hair, which is about as much as
+ * a silhouette can usefully say about anybody. */
+const BODY = '<path class="s-body" d="M50 76c21 0 35.5 13.5 41 34l9 46H0l9-46C14.5 89.5 29 76 50 76Z"/>';
+const SITTER = {
+  m: BODY
+    + '<path class="s-head" d="M50 26c10.4 0 17.5 8.2 17.5 19.5 0 12.6-7.8 23.5-17.5 23.5s-17.5-10.9-17.5-23.5C32.5 34.2 39.6 26 50 26Z"/>',
+  f: BODY
+    + '<path class="s-head" d="M50 24c11.8 0 19.2 8.4 19.2 20 0 6.7-.7 11.8-1.9 15.8 3.4 8.2 5.5 17.7 6 28.6l.5 10.6H26.2l.5-10.6c.5-10.9 2.6-20.4 6-28.6-1.2-4-1.9-9.1-1.9-15.8 0-11.6 7.4-20 19.2-20Z"/>',
+};
+
+document.querySelectorAll('[data-slots]').forEach((host) => {
+  host.innerHTML = PAGES[host.dataset.slots].map(
+    ([overall, name, sitter, rare]) => {
+      const empty = overall === null;
+      const tier = empty ? 'leeg' : (rare || tierFor(overall));
+      return `<div class="slot">
+        <div class="card card--${tier}${empty ? '' : ' card--set'}">
+          <div class="card__portrait">
+            <svg viewBox="0 0 100 156" preserveAspectRatio="none">
+              <rect class="ground" x="0" y="0" width="100" height="156"/>
+              ${SITTER[sitter]}
+            </svg>
+          </div>
+          <div class="card__overall">${empty ? '??' : overall}</div>
+          <div class="card__name">${name}</div>
+        </div>
+      </div>`;
+    }).join('');
+});
+</script>
+</body>
+</html>

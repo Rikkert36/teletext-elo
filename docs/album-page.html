@@ -40,8 +40,12 @@
     --page-pad-x: 22px;
     --board-out: 9px;
 
-    /* The one number this study exists to settle. */
-    --field-ink: 0.30;
+    /* Not a number to tune — it is COPIED, and from the right line this time.
+       `.head` is `border-bottom: 1px solid rgba(107, 83, 37, 0.4)`, so the
+       drawing is .4 of the same brown at the same 1px. It was .22, taken from
+       the folio's old foot rules, which is a different and lighter line — half
+       the mismatch was simply that. */
+    --field-ink: 0.4;
   }
 
   * { box-sizing: border-box; }
@@ -213,17 +217,75 @@
     opacity: var(--field-ink);
   }
   .field svg { display: block; width: 100%; height: 100%; }
-  .field path { fill: none; stroke: var(--press); stroke-linecap: round; stroke-linejoin: round; }
-  /* In field units, and they have to be: one unit lands at about 7px on a
-     desktop leaf, so a hairline is .13 and not the .4 that reads as a crayon.
-     This is the number the first render got wrong by a factor of four. */
-  .field .thin  { stroke-width: .13; }
-  .field .med   { stroke-width: .18; }
-  .field .heavy { stroke-width: .26; }
-  /* The figures. Solid, and nearly the weight of a line — a man on a rod is the
-     one mark that makes this a table rather than a pitch, and at .26 nobody
-     could see one. */
-  .field .fill  { fill: var(--press); stroke: none; opacity: 1; }
+  /*
+   * `crispEdges` — and it is the whole reason the drawing never matched the
+   * page's own rules.
+   *
+   * A CSS `1px solid` border is laid on the device pixel grid: it fills exactly
+   * one row at exactly its stated alpha. An SVG stroke gets no such snapping —
+   * its centre lands on whatever fraction the geometry produces, so a 1px line
+   * centred at y = 812.37 covers 63% of one pixel row and 37% of the next. The
+   * ink that should have been one crisp row at .4 comes out as two soft rows at
+   * .25 and .15. No value of `--field-ink` can fix that, because the group
+   * opacity multiplies the coverage rather than replacing it — which is why
+   * every attempt to match by tuning the number failed.
+   *
+   * `shape-rendering: crispEdges` turns antialiasing off and snaps the edges, so
+   * a straight line is one full row again and the drawing is made of the same
+   * mark as the head rule.
+   *
+   * Straight lines ONLY. Anything curved keeps `geometricPrecision`, because
+   * crisp edges on the centre circle or on a figure is a staircase. The straight
+   * marks are the ones that have to pass for page furniture; the curves are
+   * never mistaken for a rule and can afford to be smooth.
+   *
+   * `stroke-linecap: butt` on the crisp lines too — round caps extend half a
+   * width past each end and fade, where a border stops square.
+   */
+  .field path {
+    fill: none;
+    stroke: var(--press);
+    stroke-linecap: butt;
+    stroke-linejoin: miter;
+    shape-rendering: crispEdges;
+  }
+  .field .curve {
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    shape-rendering: geometricPrecision;
+  }
+  /*
+   * In field units, and they have to be: one unit is about 13px on a desktop
+   * leaf now the table runs to the trim.
+   *
+   * **The outline has to pass for a page frame.** That is the test the whole
+   * drawing is set by: in the reference you take the border for printed page
+   * furniture and only later notice it is the edge of a table. So `heavy` is
+   * sized against the album's own rules — the folio's hairlines are 1px of
+   * `rgba(107,83,37,.22)` — and everything else steps DOWN from there. Nothing
+   * in the drawing may be heavier than the page's own ruling.
+   *
+   * That is a third of what these were two revisions ago. A watermark that
+   * announces itself has already failed, whatever it is a picture of.
+   */
+  /*
+   * **One weight, and it is exactly one pixel.**
+   *
+   * `--hair` is set per page by `draw` to `1 / scale`, so the stroke is 1 CSS
+   * pixel whatever the page is sized to — a literal in field units is only 1px
+   * at one particular window width, and drifts either side of it.
+   *
+   * Every line in the drawing is this: outline, rods, markings, goal alike. The
+   * three classes survive only so the source still says what a mark is; they no
+   * longer differ. The hierarchy they used to carry is gone deliberately —
+   * a drawing that has to pass for page furniture cannot have a loud part.
+   */
+  .field path { stroke-width: var(--hair, .075); }
+  /* The figures. Still solid — an outline of one is nothing at watermark weight,
+     which is a lesson already paid for — but held back from full, because a
+     filled shape and a hairline at the same opacity are not the same weight.
+     At 1 they were the loudest thing left once the ruling went fine. */
+  .field .fill  { fill: var(--press); stroke: none; opacity: .62; }
   body.no-field .field { display: none; }
 
   /* The drawing on its own. A table that is seven tenths hidden behind cards
@@ -231,59 +293,75 @@
      leave the paper and the plan. #bare in the URL starts here. */
   body.no-cards .slots { visibility: hidden; }
 
+  /* #plain — the book and nothing else. For showing the spread to someone who
+     has not been told what the drawing is: the lede says "half a table, four
+     rods" a few centimetres above it, which is enough to make anyone see one. */
+  body.plain h1,
+  body.plain .lede,
+  body.plain h2,
+  body.plain p,
+  body.plain hr,
+  body.plain table.rods,
+  body.plain .controls { display: none; }
+  body.plain .wrap { padding-top: 8px; }
+
   /* ------------------------------------------------------------------ *
    * Page furniture
    * ------------------------------------------------------------------ */
 
-  /* `.album__list-head`, as built. */
-  .head {
-    flex: none;
-    position: relative;
-    z-index: 1;
+  /*
+   * The head, now blocked into a green banner that runs in from the fore-edge.
+   *
+   * It was type printed straight onto the paper with a rule under it. The rule
+   * is gone (see the drawing, which supplies every rule on this page) and with
+   * it went the only thing holding the line together — so the head becomes an
+   * object instead: a ribbon bound in at the outer edge, carrying the title.
+   *
+   * **Out of the flow.** It is absolutely positioned, so the card grid no longer
+   * has to make room for it — the grid is hung off the rods now (see `solve`),
+   * and a header taking part in the column layout would fight that.
+   */
+  .flag {
+    position: absolute;
+    top: 26px;
+    z-index: 3;
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 8px;
-    border-bottom: 1px solid rgba(107, 83, 37, 0.4);
-    padding-bottom: 4px;
-    margin-bottom: 8px;
-  }
-  .head span {
+    height: 30px;
+    background: linear-gradient(158deg, #4c5530 0%, #333c1c 100%);
+    color: var(--foil);
+    white-space: nowrap;
     font-family: Georgia, "Times New Roman", serif;
-    font-size: clamp(11px, calc(var(--page-w) * 0.03), 17px);
+    font-size: clamp(10px, calc(var(--page-w) * 0.027), 15px);
   }
-  .head__title, .head__range {
+  /* The ribbon starts AT the trim and runs inward, and its inner end is
+     notched — a bound-in tail, not a label laid on the page. */
+  .page--left .flag {
+    left: 0;
+    padding: 0 26px 0 var(--page-pad-x);
+    clip-path: polygon(0 0, 100% 0, calc(100% - 13px) 50%, 100% 100%, 0 100%);
+  }
+  .page--right .flag {
+    right: 0;
+    padding: 0 var(--page-pad-x) 0 26px;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 13px 50%);
+  }
+  .flag__title, .flag__range {
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 2px;
-    color: #4a3a1c;
   }
-  .head__range { font-variant-numeric: tabular-nums; }
-  .head__sep { color: #a2977c; }
-  .page--right .head { justify-content: flex-end; }
+  .flag__range { font-variant-numeric: tabular-nums; }
+  .flag__sep { color: rgba(230, 201, 138, 0.55); }
 
-  /* The corner tab. Sits in the head margin at the fore-edge side, notched at
-     its foot — a thumb tab bound in, not a badge laid on. */
-  .tab {
-    position: absolute;
-    top: 0;
-    width: 44px;
-    height: 40px;
-    z-index: 3;
-    display: grid;
-    place-items: center;
-    padding-bottom: 8px;
-    clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%);
-    background: linear-gradient(158deg, #4c5530 0%, #333c1c 100%);
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 12px;
-    font-weight: bold;
-    letter-spacing: 1px;
-    color: var(--foil);
-    font-variant-numeric: tabular-nums;
-  }
-  .page--left  .tab { left: 20px; }
-  .page--right .tab { right: 20px; }
-  body.no-tab .tab { display: none; }
+  /*
+   * The corner tabs are gone for now — see "What is still open". They were the
+   * one saturated thing on the spread and they were pulling every judgement
+   * about the drawing toward them. The candidates they ran through (spread
+   * number, rating range, folio) are recorded there; nothing about them is
+   * settled, only set aside.
+   */
 
   /* `.album__slots` and `.album__slot`, verbatim. */
   .slots {
@@ -314,18 +392,16 @@
   }
   .slot--empty::before { z-index: 2; }
 
-  /* The trim frame. From the reference and NOT in album.css today: a printed box
-     inside the margin, which is what turns a sheet with things on it into a
-     designed page. It is the cheapest of the proposals here and the only one
-     that adds no words. */
-  .trim {
-    position: absolute;
-    inset: 12px;
-    z-index: 1;
-    pointer-events: none;
-    border: 1px solid rgba(107, 83, 37, 0.22);
-  }
-  body.no-trim .trim { display: none; }
+  /*
+   * The trim frame is GONE, and the table's outline stands where it did.
+   *
+   * It was a printed box inside the margin — the cheapest way to turn a sheet
+   * with things on it into a designed page. Then the watermark grew out to the
+   * trim and the two were a few millimetres apart, which is the worst distance:
+   * near enough to look like one thing badly registered, far enough not to be
+   * one thing. Only one of them could stay, and the one that carries meaning
+   * won. The page still has a border; it is the edge of the table.
+   */
 
   /* `.album__page-number`, with the reference's flanking hairlines added — they
      turn a loose numeral into a foot rule, and they are the same weight as the
@@ -342,15 +418,24 @@
     color: #8a7f64;
     padding-top: 8px;
   }
+  /*
+   * Spacers that keep the numeral centred, and **nothing is drawn in them**.
+   *
+   * They used to be the foot rules — one crisp 1px hairline either side of the
+   * folio at `rgba(107,83,37,.22)`, which is the line the whole drawing was
+   * restyled to match. The table's halfway line now lands at exactly this
+   * height, so drawing both would put two identical hairlines on top of each
+   * other. The drawing supplies the foot rule now, the way its outline supplies
+   * the page's border, and the numeral sits on it: `.folio` is above `.field`.
+   *
+   * The gap around the number is what these still do. `--gap` either side of the
+   * numeral leaves the halfway line running clear of it rather than through it,
+   * which is how the rule was drawn when it was CSS.
+   */
   .folio::before, .folio::after {
     content: "";
     flex: 1;
-    height: 1px;
-    background: rgba(107, 83, 37, 0.22);
   }
-  body.no-rules .folio::before,
-  body.no-rules .folio::after { display: none; }
-  body.no-rules .folio { justify-content: center; }
   body.no-folio .folio { visibility: hidden; }
 
   /* ------------------------------------------------------------------ *
@@ -515,12 +600,10 @@
 
         <section class="page page--left">
           <div class="field" data-half="left"></div>
-          <div class="trim"></div>
-          <div class="tab" data-tab></div>
-          <div class="head">
-            <span class="head__title">Collectie</span>
-            <span class="head__sep">·</span>
-            <span class="head__range">68 – 72</span>
+          <div class="flag">
+            <span class="flag__title">Collectie</span>
+            <span class="flag__sep">·</span>
+            <span class="flag__range">68 – 72</span>
           </div>
           <div class="slots" data-slots="left"></div>
           <div class="folio"><span>5</span></div>
@@ -528,12 +611,10 @@
 
         <section class="page page--right">
           <div class="field" data-half="right"></div>
-          <div class="trim"></div>
-          <div class="tab" data-tab></div>
-          <div class="head">
-            <span class="head__title">Collectie</span>
-            <span class="head__sep">·</span>
-            <span class="head__range">73 – 81</span>
+          <div class="flag">
+            <span class="flag__title">Collectie</span>
+            <span class="flag__sep">·</span>
+            <span class="flag__range">73 – 81</span>
           </div>
           <div class="slots" data-slots="right"></div>
           <div class="folio"><span>6</span></div>
@@ -545,44 +626,80 @@
   </div>
 
   <div class="controls">
-    <label>Veldinkt <input type="range" id="ink" min="0" max="60" value="30"><b id="inkv">.30</b></label>
-    <label>Hand <input type="range" id="wob" min="0" max="140" value="100"><b id="wobv">1.0</b></label>
+    <label>Veldinkt <input type="range" id="ink" min="0" max="60" value="22"><b id="inkv">.22</b></label>
+    <label>Hand <input type="range" id="wob" min="0" max="140" value="0"><b id="wobv">0.0</b></label>
     <label><input type="checkbox" id="onoff" checked> Watermerk</label>
-    <label>Vlag
-      <select id="tabmode">
-        <option value="spread">vel — 03</option>
-        <option value="none">geen</option>
-        <option value="range">bereik</option>
-        <option value="folio">paginanummer</option>
-      </select>
-    </label>
     <label><input type="checkbox" id="cards" checked> Kaarten</label>
-    <label><input type="checkbox" id="trim" checked> Kaderlijn</label>
-    <label><input type="checkbox" id="rules" checked> Voetlijnen</label>
     <label><input type="checkbox" id="folio" checked> Folio</label>
   </div>
 
   <hr>
 
-  <h2>Why the fold is the halfway line</h2>
+  <h2>The subject is the object, not the surface</h2>
   <p>
-    A foosball table is portrait and a spread is landscape, so the drawing has to be
-    turned one way or the other, and the choice is not free. Turning the
-    <em>table</em> — rods running down the page, goals at the two fore-edges — puts
-    eight vertical lines behind six cards and reads as a pitch again. Keeping the
-    table upright and turning the <em>crop</em> gives the arrangement above: goal end
-    at the head, rods running across, halfway line at the foot.
+    This is the finding the whole drawing turns on, and it was arrived at the
+    expensive way. The first versions drew the table faithfully: the surface with its
+    markings — penalty area, goal area, the D, corner arcs, centre circle. Shown the
+    result cold, without being told what it was, a reader called it
+    <em>“an association football pitch, seen from above — immediate and
+    unambiguous”</em>, and named exactly those markings as what gave it away.
   </p>
   <p>
-    That makes <strong>the gutter the long axis of the field</strong>. The centre of
-    the goal, the penalty spot, the centre spot and the middle man on every odd rod
-    all fall on <code>x = 34</code>, which is the fold — so the fold is doing the one
-    thing a fold can do for a drawing, which is be the axis the markings are set out
-    from. The two halves are not mirrors: the handles alternate, so each leaf carries
-    a genuinely different half of one table. And it has to work that way, because
-    leaves turn independently and <strong>nothing may span the gutter as one
-    element</strong>. Both pages are handed the same marks and their viewBoxes do the
-    cropping, split at 34.
+    They were right, and the fault was not in the drawing. <strong>A foosball table's
+    markings <em>are</em> football's markings.</strong> Every one of them is a mark the
+    thing it must not be mistaken for also has, so drawing them accurately could only
+    ever produce a pitch. Fidelity to the reference was the problem.
+  </p>
+  <p>
+    So what is drawn is the furniture: <strong>walls with a thickness, rods threaded
+    through those walls, men on the rods, handles out in the margin, serve holes, and a
+    goal that is a slot cut through an end wall</strong> rather than two boxes painted
+    on grass. A single hairline round a rectangle is a touchline; two lines 3.2 apart is
+    the side of something. None of it is available to a pitch.
+  </p>
+  <p>
+    Every painted marking went with that decision, and then <strong>most of them came
+    back</strong> — the halfway line, the centre circle, the penalty area, the goal area
+    and the D. Taking them out was the right diagnosis and the wrong cure: without them
+    the spread stopped being a pitch and became a wiring diagram, and a reader shown it
+    cold said so. What changed in between is that the drawing now has the furniture to
+    carry them. <strong>The object is what keeps it off a pitch; the markings are what
+    keep it a table rather than a schematic.</strong> Only the corner arcs stay gone —
+    they were pure football and bought nothing.
+  </p>
+
+  <h2>Where the paper is</h2>
+  <p>
+    A slots page shows bare paper in exactly three places: a sliver above the cards,
+    the narrow gaps between them, and about <strong>18% of the page height below the
+    last row</strong>. That last band is the only generous one, and it is the whole
+    composition problem — a mark not in it is a mark almost nobody sees.
+  </p>
+  <p>
+    The table sits <strong>the way up the reference has it</strong>: goal at the head,
+    halfway line and centre circle at the foot. It was turned end for end for a while,
+    on the argument that the goal is the least pitch-like mark in the drawing and so
+    deserved the open band. That was right about the goal and wrong about the picture —
+    the reference is a table seen from its own end, and turning it over is not a crop,
+    it is a different subject.
+  </p>
+  <p>
+    It also gave up more than it bought, which the flip hid. At this crop the rod that
+    lands in the band is the <strong>five-bar</strong> — so the open paper gets five
+    figures, four of them well clear of the fold, on a rod running out to a handle in
+    the margin. Turned over, that band held a keeper's single man sitting <em>on</em>
+    the fold, where a reader took the figures for the album's own binding studs. The
+    <code>BOX</code> height is solved for this: five-bar at 78% of the page, the top of
+    the centre circle at 76% just clear of the last card, the halfway line at 87% above
+    the folio, and the walls running off the trim at 99% so the cut never shows.
+  </p>
+  <p>
+    The fold is <strong>the field's long axis</strong>. The goal's centre and the middle
+    man on every odd rod fall on <code>x = 34</code>, which is the fold. The two halves
+    are not mirrors — the handles alternate, so each leaf carries a genuinely different
+    half of one table — and it has to work that way, because leaves turn independently
+    and <strong>nothing may span the gutter as one element</strong>. Both pages are
+    handed the same marks and their viewBoxes do the cropping, split at 34.
   </p>
 
   <h2>Half a table, four rods</h2>
@@ -604,12 +721,34 @@
   <p>
     The left/right alternation is the real one: a rod belongs to whoever's side its
     handle comes out on, which is why the 3-bar in the middle is the opponent's and
-    reaches in from the other margin. <strong>The handles are what stop this reading
-    as a football pitch</strong> — they run out past the trim on both fore-edges, and
-    they are the only marks in the drawing that no pitch has. The men are bars across
-    the rod rather than dots, because that is a foosball figure seen from above; the
-    near team's are filled and the far team's outlined, since one ink cannot do two
-    strips.
+    reaches in from the other margin.
+  </p>
+  <p>
+    <strong>The men are solid, every one of them.</strong> They were outlines, and the
+    outlines lost: a reader listing every mark they could make out on the page did not
+    see a single figure, and called their absence <em>“the single decisive
+    omission — bare horizontal lines with no beads on them are pitch rules, not
+    rods.”</em> A figure on a rod is a small dense mark, and at watermark weight an
+    outline of one is nothing at all.
+  </p>
+  <p>
+    <strong>Solid for one side, outlined for the other.</strong> The reference draws one
+    team's figures black and the other's white, and on ivory paper an outline with the
+    stock showing through <em>is</em> the white one — so the opponent's 3-bar comes out
+    light against three dark rods, exactly as it does on the table. This was tried once
+    and abandoned, back when <em>both</em> teams were outlines and nobody could find a
+    figure on the page at all. The lesson was that an outline alone is nothing at
+    watermark weight, not that the distinction was wrong: against solid neighbours an
+    outline reads perfectly well. Solid is the default and the outline is the exception,
+    which is the way round it has to be.
+  </p>
+  <p>
+    And they are figures rather than beads. An oval on a rod is a bead; a shape with a
+    head, a <strong>waist</strong> and a kicking foot is a man — and it is the waist
+    doing the work, because a shape pinched exactly where a line passes through it reads
+    as threaded onto that line. The outline is a table of ten half-widths in
+    <code>FIGURE</code>, walked down one side and back up the other so it closes and
+    <code>hand</code> can stroke it like any other primitive.
   </p>
 
   <h2>Drawn, not plotted</h2>
@@ -618,8 +757,18 @@
     vector diagram on aged stock reads as a screenshot of something else pasted under
     the page; what the album wants is the drawing a printer would have made for it.
     So every line here is <strong>stroked by hand</strong>: each primitive is a
-    parametric curve sampled with a smooth two-frequency wobble along its normal, laid
-    down twice with different phase, and corners overshoot the way a hand's do.
+    parametric curve sampled with a smooth wobble along its own normal, laid down twice
+    with different phase, and corners overshoot the way a hand's do.
+  </p>
+  <p>
+    <strong>The low frequency is what carries it.</strong> The first version ran all
+    three wobble terms at 1.6 cycles and above, so a line 400px long picked up several
+    small ripples that averaged back out to straight — at 1:1 it read as plotted, and
+    the hand was visible only on the little grip rectangles, where one ripple happened
+    to span the whole side. A hand does not ripple along a rule; it bows away once and
+    comes back. The dominant term is now 0.7 cycles over the whole primitive, barely
+    half a wave, with two faster terms as texture on top. Raise the amplitudes if it
+    needs more hand; never the frequencies.
   </p>
   <p>
     It is the same argument the checklist ticks already won — three drawn paths rather
@@ -630,28 +779,42 @@
     tuning control only; it is a constant in the real thing.
   </p>
   <p>
-    The end wall is <strong>hatched rather than filled</strong>, which is what a
-    section is in a technical drawing, and it is also the cheapest way to keep a solid
-    black band from landing directly under the running head. Everything is the press's
-    brown <code>#6b5325</code> and not <code>--graphite</code>: the two-hands rule on
-    the checklist page says graphite is the reader's, and the reader did not draw this.
-    It came off the press with the paper.
+    Everything is the press's brown <code>#6b5325</code> and not
+    <code>--graphite</code>: the two-hands rule on the checklist page says graphite is
+    the reader's, and the reader did not draw this. It came off the press with the
+    paper. An earlier version hatched the end wall, the way a section is hatched in a
+    technical drawing; it was the loudest mark on the spread and the only one the
+    reference has nothing like, and it went.
   </p>
 
   <h2>What is still open</h2>
   <p>
-    <strong>The ink.</strong> The slider starts at .20. Below about .12 the rods stop
-    being legible under a filled row of cards and the drawing reads as a stain; above
-    about .30 the hatched wall starts competing with the head rule. The band worth
-    arguing over is narrow.
+    <strong>The ink is not the lever it looks like.</strong> The slider starts at .30
+    and that is about right: at this weight the drawing is unambiguously subordinate to
+    the cards in every region and never competes with the silver or the gold. When a
+    mark cannot be read the answer is almost never to turn this up — it is that the
+    mark is behind a card. Every fix worth making moves marks into open paper.
   </p>
   <p>
-    <strong>The tab.</strong> Off by default, because it has not been earned yet. The
-    selector runs the three candidates: a spread number, which is the one figure
-    nothing else on the page states and is honestly true of both halves; the rating
-    range, which the head already says four centimetres away; and the folio, which the
-    foot already says. Only the first says something new, and it is still a second
-    piece of furniture on a page that was deliberately emptied.
+    <strong>The men on the fold.</strong> Three rods carry a figure at the exact centre
+    of the table, which is the fold, so three ovals sit down the gutter in the shadow.
+    It is physically honest and it is not obviously right: shown the page cold, one
+    reader took them for the album's own binding studs. The alternative is dishonest —
+    a keeper is centred — so this is recorded rather than fixed.
+  </p>
+  <p>
+    <strong>The side walls hide under a card column.</strong> At the current scale the
+    two wall lines fall at 47% of each page, which is the middle of a card, so for most
+    of their length they surface only as short stubs in the row gap. Solving the scale
+    so they land in a <em>column gap</em> instead is the next real move, and it retunes
+    every vertical number in <code>BOX</code>.
+  </p>
+  <p>
+    <strong>The tab.</strong> The selector runs the candidates: a spread number, which
+    is the one figure nothing else on the page states and is honestly true of both
+    halves; the rating range, which the head already says four centimetres away; and
+    the folio, which the foot already says. Only the first says something new, and it
+    is still a second piece of furniture on a page that was deliberately emptied.
   </p>
   <p>
     <strong>What it costs.</strong> Two <code>&lt;svg&gt;</code> per spread, built
@@ -672,20 +835,35 @@
  * ================================================================== */
 
 const W = 68;        /* the field, across the spread   */
-const HALF = 60;     /* half the length, head to foot  */
 const MID = W / 2;   /* the fold                       */
 
-/* How far a rod pokes out of the far side, the near side, and the length of the
-   grip block on the near side. */
-const OVER_FREE = 9, OVER_HANDLE = 15, GRIP = 7;
+/**
+ * Half the length, head to foot — and **39 rather than the true 60**.
+ *
+ * This is the one place the drawing stops being to scale, and it is deliberate.
+ * The table's outline is now the page's frame: it runs to a hair inside the trim
+ * on both fore-edges, which fixes the horizontal scale at 13.4px to the unit. At
+ * that scale a true half table is 60 units long — 800px — against a 600px page,
+ * so a third of it would have to run off the head, taking the goal with it.
+ *
+ * Foreshortening the length to 39 keeps the whole half on the page at full
+ * width. The alternative was staying true and cropping, and between an honest
+ * table with its end missing and a slightly squat table entire, the drawing
+ * wants the second: it is a watermark, and what it has to communicate is the
+ * arrangement — walls, rods, figures, goal — not the aspect ratio.
+ *
+ * Rod positions are fractions of this rather than literals, so they follow it.
+ */
+let HALF = 39;
 
-/* The first half of 1-2-3-5-5-3-2-1. `dir` is which margin the handle comes out
-   of, which is the same thing as which player the rod belongs to. */
+/* The first half of 1-2-3-5-5-3-2-1, at eighths of the half-length. `near` is
+   which player a rod belongs to — the opponent's figures are drawn outlined.
+   `y` is resolved against `HALF` at draw time, because `HALF` is measured. */
 const RODS = [
-  { y:  7.5, dir: -1, near: true,  men: [MID] },
-  { y: 22.5, dir: -1, near: true,  men: [22, 46] },
-  { y: 37.5, dir:  1, near: false, men: [13.5, MID, 54.5] },
-  { y: 52.5, dir: -1, near: true,  men: [10, 22, MID, 46, 58] },
+  { at: 0.125, near: true,  men: [MID] },
+  { at: 0.375, near: true,  men: [22, 46] },
+  { at: 0.625, near: false, men: [13.5, MID, 54.5] },
+  { at: 0.875, near: true,  men: [10, 22, MID, 46, 58] },
 ];
 
 /* The drawing's own box, which the two viewBoxes crop.
@@ -701,9 +879,45 @@ const RODS = [
  * goal — mouth, goal area, the front of the box with its D, and the keeper's
  * rod and grip — comes to 14 units, which is what that band holds. So `y` is
  * chosen to put the halfway line just under the head rule and the back of the
- * goal at 90% of the page, and everything diagnostic falls between the last
- * card and the folio. See the flip in `draw`. */
-const BOX = { x: -30, y: -5.5, w: 128, h: 74 };
+ * goal at the head and the halfway line low enough that the centre circle sits
+ * in the clear paper below the cards.
+ *
+ * **The horizontal is now fixed by the trim, and everything follows from it.**
+ * The table's outline is the page's frame, so the side line sits a hair inside
+ * the trim: 0.9 units of margin, which is the 12px the old frame was inset by.
+ * That pins the half viewBox at 34.9 units and the scale at 13.4px to the unit —
+ * nearly double what it was when the margins had to hold rod handles.
+ *
+ *   half viewBox     34 + 0.9 = 34.9 units
+ *   the field        34 / 34.9 = 97% of each page, i.e. out to the trim
+ *   one unit         13.4px, or 2.2% of the page height
+ *   visible down     44.7 units
+ *
+ * 44.7 is why `HALF` is 39 and not 60 — see the note there. What fits:
+ *
+ *   -2.4  back of the goal       4%    in the head margin
+ *    0    end of the table      10%    on the first card row
+ *   34.1  the five-bar          85%    in the open band, five figures
+ *   30    top of centre circle  77%    just behind the last card
+ *   39    halfway line          97%    ON the folio, and it IS the foot rule
+ *
+ * `y` is set by that last line rather than by the first: the halfway line has to
+ * land on the album's own foot rules, because it replaces them. Two identical
+ * hairlines a few pixels apart is the double this page can least afford, and it
+ * is the one the eye finds first — the folio is where you look for a rule.
+ */
+/**
+ * How far the table's outline stands inside the page's trim, in field units —
+ * about 12px, and the SAME on all three drawn sides.
+ *
+ * It used to be the horizontal inset only, with the back line pinned to the head
+ * rule instead. Making it govern the top as well is what turns the outline into
+ * a plain rectangle rather than a shape that happens to start where a piece of
+ * text ends, and it is why the goal could go: the frame reads as a frame.
+ */
+const TRIM = 0.9;
+
+const BOX = { x: -TRIM, y: -TRIM, w: 69.8, h: 44.7 };
 
 /* ------------------------------------------------------------------
  * The hand
@@ -717,7 +931,21 @@ const BOX = { x: -30, y: -5.5, w: 128, h: 74 };
  * on every render is an animation, not a mark.
  * ------------------------------------------------------------------ */
 
-let WOBBLE = 1;
+/*
+ * 0.2 — and the model for that number is the album's own foot rule beside the
+ * folio, which is what this drawing is supposed to pass for.
+ *
+ * The foot rule is a 1px CSS hairline: dead straight, pixel-aligned, uniform for
+ * its whole length. Anything that BOWS at that width antialiases across two
+ * pixels, so it renders softer, fatter and slightly furred next to a rule that
+ * does not move — which is why the drawing kept reading as a different material
+ * from the page's own ruling however far the opacity came down. The wobble was
+ * never the wrong idea; it is the wrong SIZE once the line is a pixel wide.
+ *
+ * So the hand comes off entirely. The foot rule does not bow, and the drawing is
+ * supposed to BE the foot rule. The slider is still there to put it back.
+ */
+let WOBBLE = 0;
 
 const rng = (seed) => {
   let s = (seed * 2654435761) >>> 0;
@@ -735,7 +963,22 @@ const n = (v) => Math.round(v * 100) / 100;
  * a printed diagram is a fraction of a millimetre, and at ~7px to the unit
  * anything over about .2 stops being a drawn line and becomes a wavy one. */
 function hand(pt, seed, o = {}) {
-  const { steps = 26, amp = 0.16, passes = 2, over = 0 } = o;
+  /*
+   * **One pass, and this is the fix for the doubled lines.**
+   *
+   * It defaulted to two, laid down with different phase, which is how a
+   * sketching hand goes over a line twice. That worked while the ruling was
+   * thick — the two strokes overlapped into one slightly ragged line. It stopped
+   * working the moment the drawing went fine and faint: at a 1px hairline the
+   * two passes no longer touch, so every mark on the page came out as two
+   * parallel ghosts a pixel apart. Read as printing misregistration, not as a
+   * hand.
+   *
+   * The model to match is the album's own foot rules either side of the folio:
+   * ONE crisp hairline. So one pass everywhere, and the hand lives in the bow of
+   * that single line rather than in a second stroke beside it.
+   */
+  const { steps = 26, amp = 0.16, passes = 1, over = 0 } = o;
   const w = amp * WOBBLE;
   const out = [];
 
@@ -782,21 +1025,119 @@ function hand(pt, seed, o = {}) {
   return out;
 }
 
-const line = (x1, y1, x2, y2) => (t) => [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t];
+/**
+ * A man on a rod, seen from above.
+ *
+ * Half of his outline, as [along the table, half-width across it], both in
+ * fractions of his own size. Walked down one side and back up the other, so the
+ * shape closes and `hand` can stroke it like any other primitive.
+ *
+ * **Traced off the real silhouette**, which is the one everybody already knows:
+ * a ball of a head on a pinched neck, shoulders that arrive almost square and
+ * are the widest thing on him, a body tapering all the way down, and a foot
+ * kicked forward at the bottom. It was a rounded blob with a waist before —
+ * generically figure-ish, specifically nothing.
+ *
+ * He is roughly one to two and a half, so `rx` and `ry` carry that; a foosball
+ * man is a tall mark, and squashing him toward square is most of what made the
+ * old one read as a chess pawn.
+ */
+const FIGURE = [
+  [-1.00, 0.00],
+  [-0.97, 0.15],
+  [-0.92, 0.21], /* the head — a ball on a neck */
+  [-0.83, 0.21],
+  [-0.78, 0.14],
+  [-0.75, 0.09], /* the neck, pinched */
+  [-0.72, 0.09],
+  [-0.70, 0.47], /* shoulders, and they arrive almost square */
+  [-0.62, 0.52],
+  [-0.30, 0.46],
+  [ 0.05, 0.36], /* the body tapering */
+  [ 0.38, 0.27],
+  [ 0.62, 0.24], /* the leg */
+  [ 0.72, 0.23],
+  [ 0.76, 0.40], /* the foot, kicked forward */
+  [ 0.96, 0.40],
+  [ 1.00, 0.00],
+];
+
+const figure = (cx, cy, rx, ry) => (t) => {
+  const n = FIGURE.length;
+  const side = t < 0.5 ? 1 : -1;
+  /* Clamped, because `hand` samples a little OUTSIDE [0,1] to take the normal
+     at each end — unclamped that walks off the front of the table and indexes
+     it at -1, which throws and takes the whole drawing with it. */
+  const u = Math.min(1, Math.max(0, t < 0.5 ? t * 2 : (1 - t) * 2));
+  const f = u * (n - 1);
+  const i = Math.max(0, Math.min(n - 2, Math.floor(f)));
+  const k = f - i;
+  const along = FIGURE[i][0] + (FIGURE[i + 1][0] - FIGURE[i][0]) * k;
+  const wide = FIGURE[i][1] + (FIGURE[i + 1][1] - FIGURE[i][1]) * k;
+  return [cx + side * wide * rx, cy + along * ry];
+};
+
+/**
+ * Where a unit coordinate has to sit for its line to come out exactly one pixel
+ * wide. Set per page by `draw`; null before the first measure.
+ *
+ * `crispEdges` snaps a stroke's two EDGES to the pixel grid independently, so a
+ * 1.006px stroke comes out 1px or 2px depending purely on where its centre
+ * happens to fall — which is why some lines were visibly fatter than their
+ * neighbours with no difference in the source. Snapping each centre to a half
+ * pixel puts both edges on whole pixels, and then the snap has nothing to round.
+ */
+let SNAP = null;
+
+/* Where the halfway line breaks for the folio numerals, in units. Measured. */
+let FOLIO_GAPS = [];
+
+const snapper = (host, vbx) => {
+  const r = host.getBoundingClientRect();
+  const s = r.width / (MID - BOX.x);
+  const to = (origin, vb) => (u) => {
+    const px = origin + (u - vb) * s;
+    return u + (Math.round(px - 0.5) + 0.5 - px) / s;
+  };
+  return { s, y: to(r.top, BOX.y), x: to(r.left, vbx) };
+};
+
+/**
+ * Axis-aligned lines get their constant coordinate snapped; everything else is
+ * left alone, because a diagonal or a curve has no single coordinate to snap and
+ * is drawn with antialiasing on anyway.
+ */
+const line = (x1, y1, x2, y2) => {
+  if (SNAP) {
+    if (y1 === y2) y1 = y2 = SNAP.y(y1);
+    else if (x1 === x2) x1 = x2 = SNAP.x(x1);
+  }
+  return (t) => [x1 + (x2 - x1) * t, y1 + (y2 - y1) * t];
+};
 const arc = (cx, cy, r, a0, a1) => (t) => {
   const a = a0 + (a1 - a0) * t;
   return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
 };
 
-/* A drawn box: four strokes that overshoot at the corners, not one closed path.
-   A hand lifts the pen at a corner and starts the next side a little early. */
+/**
+ * A box open at the top: left side, bottom, right side. THREE strokes.
+ *
+ * Every box in this drawing stands on the goal line, and the goal line is
+ * already drawn — by the table's own outline. Closing these rectangles put a
+ * second hairline exactly on top of the first, which is one of the doubles that
+ * were visible on the page.
+ *
+ * And the fourth side did something worse than double. The penalty area is wider
+ * than the goal, so its top edge ran straight across the goal MOUTH — filling in
+ * the one gap the whole drawing depends on. The goal could not read as an
+ * aperture because two box lids were laid over it.
+ */
 function box(x, y, w, h, seed, cls, o = {}) {
-  const opt = { steps: 18, amp: 0.14, over: 0.04, ...o };
+  const opt = { steps: 18, amp: 0.14, ...o };
   return [
-    [line(x, y, x + w, y), seed],
-    [line(x + w, y, x + w, y + h), seed + 1],
-    [line(x + w, y + h, x, y + h), seed + 2],
-    [line(x, y + h, x, y), seed + 3],
+    [line(x, y, x, y + h), seed + 1],
+    [line(x, y + h, x + w, y + h), seed + 2],
+    [line(x + w, y + h, x + w, y), seed + 3],
   ]
     .flatMap(([fn, s]) => hand(fn, s, opt))
     .map((d) => `<path class="${cls}" d="${d}"/>`)
@@ -846,89 +1187,306 @@ function table() {
    * The wall is two lines and that is the point: a single hairline round a
    * rectangle is a touchline, and two lines 2.5 apart is a side of something.
    */
-  const GOAL_L = 28, GOAL_R = 40, GOAL_D = 4.5, WALL = 2.5;
-  const OX = -WALL, OY = -WALL, OR2 = W + WALL;
-
-  /* Inner face of the wall — the playing surface, open at the halfway end. */
-  p.push(stroke(line(0, 0, GOAL_L, 0), 11, 'heavy', { steps: 12, amp: 0.13 }));
-  p.push(stroke(line(GOAL_R, 0, W, 0), 12, 'heavy', { steps: 12, amp: 0.13 }));
-  p.push(stroke(line(0, 0, 0, HALF), 13, 'heavy', { steps: 30, amp: 0.3 }));
-  p.push(stroke(line(W, 0, W, HALF), 14, 'heavy', { steps: 30, amp: 0.3 }));
-
-  /* Outer face. The wall stops at the halfway line because this is half a
-     table — the drawing is cut there, not closed there. */
-  p.push(stroke(line(OX, OY, GOAL_L, OY), 16, 'med', { steps: 12, amp: 0.12 }));
-  p.push(stroke(line(GOAL_R, OY, OR2, OY), 17, 'med', { steps: 12, amp: 0.12 }));
-  p.push(stroke(line(OX, OY, OX, HALF), 18, 'med', { steps: 30, amp: 0.28 }));
-  p.push(stroke(line(OR2, OY, OR2, HALF), 19, 'med', { steps: 30, amp: 0.28 }));
+  /*
+   * **The goal is gone.**
+   *
+   * It was a box standing off the end of the table — which is what a goal is,
+   * and it was also the only mark that broke the rectangle. At hairline weight a
+   * small box poking out of the top of a frame reads as a fault in the frame
+   * rather than as a goal, and the frame is the thing this drawing has to be.
+   *
+   * The back line has moved up to stand where the back of the goal did, and a
+   * little above that: it is now at `TRIM`, the same inset from the page edge as
+   * the two side lines. The outline is a plain rectangle, equally inset on three
+   * sides, closed at the foot by the halfway line on the folio.
+   */
 
   /*
-   * The goal: a slot cut clean through the end wall, and the trough behind it.
-   * One aperture, not two concentric boxes — that difference is most of what
-   * separates this drawing from a penalty area.
+   * **One line, and it is the page's frame.**
+   *
+   * The wall was two faces 3 apart, drawn so a rectangle would read as a box
+   * rather than as a touchline. It came out along with the page's own trim
+   * frame, and the two removals are the same removal: the table's outline now
+   * sits where that frame line was, a hair inside the trim on both fore-edges,
+   * so the drawing IS the page's border. Two rectangles nested a few
+   * millimetres apart were always going to read as one mistake or the other.
+   *
+   * Losing the thickness costs the "this is a box" cue the double line bought.
+   * The rods buy it back better: four lines crossing the outline and stopping
+   * dead ON it say enclosure in a way a second parallel line never did.
    */
-  p.push(stroke(line(GOAL_L, 0, GOAL_L, -GOAL_D - WALL), 21, 'heavy', { steps: 10, amp: 0.1 }));
-  p.push(stroke(line(GOAL_R, 0, GOAL_R, -GOAL_D - WALL), 23, 'heavy', { steps: 10, amp: 0.1 }));
-  p.push(stroke(line(GOAL_L, -GOAL_D - WALL, GOAL_R, -GOAL_D - WALL), 22, 'heavy',
-    { steps: 12, amp: 0.11, over: 0.03 }));
+  /*
+   * **No overshoot anywhere, and the back line is continuous.**
+   *
+   * The overshoot was a setting-out line's tail — a line running a hair past the
+   * corner it meets. It is right in a draughtsman's hand and wrong here: at a
+   * crisp 1px hairline every tail is a stub poking out of a corner, and there
+   * are eight corners.
+   *
+   * The back line runs the whole width, THROUGH the goal, rather than stopping
+   * either side of it. The goal is a box standing off the back of the table, not
+   * a bite taken out of it — and on the reference the end line is unbroken with
+   * the goal drawn beyond it.
+   */
+  p.push(stroke(line(0, 0, W, 0), 11, 'heavy', { steps: 26, amp: 0.16 }));
+  p.push(stroke(line(0, 0, 0, HALF), 13, 'heavy', { steps: 34, amp: 0.2 }));
+  p.push(stroke(line(W, 0, W, HALF), 14, 'heavy', { steps: 34, amp: 0.2 }));
 
   /*
-   * Serve holes in the side wall — the one detail on a real table that belongs
-   * to no pitch at all, and cheap to draw. Two a side, on the halves.
+   * The serve holes are gone. Four small circles down the side lines, and they
+   * read as four small circles — nobody takes an unlabelled ring near a margin
+   * for a hole in a wall, and at this weight they were four of the loudest marks
+   * on the page. The detail is only worth having if it is legible as the thing
+   * it depicts, and it never was.
    */
-  [0.34, 0.66].forEach((f, k) => {
-    p.push(stroke(arc(OX + WALL / 2, HALF * f, 1.1, 0, 6.283), 91 + k, 'thin', { steps: 14, amp: 0.06 }));
-    p.push(stroke(arc(OR2 - WALL / 2, HALF * f, 1.1, 0, 6.283), 95 + k, 'thin', { steps: 14, amp: 0.06 }));
+
+  /*
+   * The penalty area, the goal area and the D — as the reference table has them
+   * painted on.
+   *
+   * They were taken out, along with the halfway line and the circle, when an
+   * unprimed reader called the drawing a football pitch and named these as the
+   * reason. They come back because the reference has them and the picture is
+   * short without them; what changed in between is that the drawing now has the
+   * furniture — walls with a thickness, rods, figures, handles, a slot goal —
+   * to be read as a table with boxes painted on it rather than as a pitch.
+   *
+   * They stay `thin`, a weight below the outline, and they land almost entirely
+   * behind the first row of cards, which is where the reference has its box too:
+   * a corner of one showing at the head of the page.
+   *
+   * Depths are fractions of `HALF` for the same reason the rods are — the
+   * foreshortening has to reach every mark measured down the table, or the boxes
+   * would sit at true depth on a table that is no longer true length.
+   */
+  /*
+   * **The goal area is gone**, and only the penalty area is left.
+   *
+   * Two nested boxes at the head of the page is four more horizontals and four
+   * more verticals in the only band of the drawing that was already busy, and
+   * the inner one carries nothing the outer does not. One box says "there is
+   * marking at this end" as well as two do, at half the noise.
+   *
+   * The remaining box is also NARROWER — 20..48 rather than 14..54. Its side
+   * lines used to fall inside the running head on both leaves, so a vertical ran
+   * straight through "COLLECTIE · 68 – 72". A line crossing type is the loudest
+   * thing a hairline can do; the box gives way, because the head cannot.
+   */
+  const BOX_D = HALF * 0.2, SPOT = HALF * 0.133, D_R = 7.5;
+
+  p.push(box(20, 0, 28, BOX_D, 41, 'thin', { steps: 22, amp: 0.12 }));
+  p.push(stroke(arc(MID, SPOT, 0.45, 0, 6.283), 47, 'med curve', { steps: 12, amp: 0.05 }));
+
+  /* Only the part of the arc outside the box, which is all that is painted. Its
+     ends are where the circle round the spot crosses the front of the box. */
+  const dx = Math.sqrt(D_R * D_R - (BOX_D - SPOT) ** 2);
+  const a0 = Math.atan2(BOX_D - SPOT, -dx);
+  p.push(stroke(arc(MID, SPOT, D_R, a0, Math.PI - a0), 51, 'thin curve', { steps: 22, amp: 0.1 }));
+
+  /*
+   * The halfway line and the centre circle, at the foot of the spread — where
+   * the reference puts them, straddling the fold.
+   *
+   * These are the two marks that were taken out when the painted markings went,
+   * on the grounds that they are the most football-shaped things in the drawing.
+   * That was true and it was the wrong trade: the reference is a picture of a
+   * table from its own end, and the circle on the fold at the foot is most of
+   * what makes it read as that picture. They come back, and the object — walls,
+   * rods, figures, handles, the slot goal — is what keeps it off a pitch.
+   *
+   * A half circle, because this is half a table, and the cut is the halfway line.
+   */
+  /*
+   * The halfway line, in segments, with a gap cut for each folio numeral.
+   *
+   * It ran straight through the page numbers before. The album's own foot rules
+   * never did — they stopped either side of the numeral, which is how a foot
+   * rule is set — and since this line replaces those rules it has to keep their
+   * manners. `FOLIO_GAPS` is measured from the numerals themselves, so the gap
+   * is the width of the number that is actually there rather than a guess at it.
+   */
+  let cut = 0;
+  FOLIO_GAPS.forEach(([a, b], k) => {
+    if (a > cut) p.push(stroke(line(cut, HALF, a, HALF), 71 + k, 'med', { steps: 22, amp: 0.2 }));
+    cut = b;
   });
+  if (cut < W) p.push(stroke(line(cut, HALF, W, HALF), 79, 'med', { steps: 22, amp: 0.2 }));
+  p.push(stroke(arc(MID, HALF, 9, Math.PI, 2 * Math.PI), 73, 'thin curve', { steps: 28, amp: 0.12 }));
+  p.push(stroke(arc(MID, HALF, 0.45, 0, 6.283), 75, 'med curve', { steps: 12, amp: 0.05 }));
 
   /* ---------------------------------------------------------------- *
    * The rods
    * ---------------------------------------------------------------- */
-  RODS.forEach((rod, i) => {
+  RODS.forEach((spec, i) => {
+    const rod = { ...spec, y: HALF * spec.at };
     const seed = 100 + i * 40;
-    const near = rod.dir < 0 ? -OVER_HANDLE : W + OVER_HANDLE;
-    const far = rod.dir < 0 ? W + OVER_FREE : -OVER_FREE;
-    p.push(stroke(line(near, rod.y, far, rod.y), seed, 'med', { steps: 38, amp: 0.3, passes: 1 }));
-
-    /* The grip. An outline and nothing in it — a filled block at this weight
-       reads as a blot rather than as a handle. */
-    const gx = rod.dir < 0 ? near - GRIP : near;
-    p.push(box(gx, rod.y - 1.4, GRIP, 2.8, seed + 10, 'thin', { steps: 10, amp: 0.07 }));
+    /*
+     * **Wall to wall, and no further.** The rods used to run out past the table
+     * to a grip block in the margin, which is what a rod really does — and it
+     * was costing 17 units of margin on each side, which is exactly the margin
+     * that was keeping the table narrow. With the overhangs gone the table can
+     * open out to the trim, and the rods stopping ON the outline is its own
+     * gain: four lines crossing an edge and ending there read as enclosure.
+     *
+     * One pass, because a rod is machined and two strokes would look drawn
+     * twice; `heavy`, because these are the marks carrying the whole reading.
+     */
+    p.push(stroke(line(0, rod.y, W, rod.y), seed, 'heavy', { steps: 38, amp: 0.26, passes: 1 }));
 
     /*
-     * The men, and they are SOLID — every one of them.
+     * The men.
      *
-     * They were outlines, and the outlines lost: shown the page cold, a reader
-     * listing every mark they could make out did not see a single figure, and
-     * called their absence "the single decisive omission… bare horizontal lines
-     * with no beads on them are pitch rules, not rods". They were right. A
-     * figure on a rod is a small dense mark, and at watermark weight an outline
-     * of one is nothing at all.
+     * **Solid for one side, outlined for the other** — the reference draws one
+     * team's figures black and the other's white, and on ivory paper an outline
+     * with the stock showing through IS the white one. `near` says which team a
+     * rod belongs to, so the opponent's 3-bar comes out light against three
+     * dark rods, exactly as it does on the table.
      *
-     * **The near/far distinction went with the outlines**, and it is no loss:
-     * which player a rod belongs to is already said by the margin its handle
-     * comes out of, and saying it twice cost the men their legibility. One ink,
-     * one kind of mark.
+     * This was tried once and abandoned, because at the time BOTH teams were
+     * outlines and a reader shown the page could not find a single figure on it.
+     * The lesson was that an outline alone is nothing at watermark weight, not
+     * that the distinction was wrong: against solid neighbours an outline reads
+     * perfectly well. Solid is the default and the outline is the exception,
+     * which is the way round it has to be.
      */
     rod.men.forEach((x, k) => {
       const s = seed + 20 + k * 3;
-      const rx = 1.65, ry = 2.15;
-      const body = (t) => {
-        const a = t * 6.283 - Math.PI / 2;
-        return [x + rx * Math.cos(a), rod.y + ry * Math.sin(a)];
-      };
-      const [d] = hand(body, s, { steps: 30, amp: 0.07, passes: 1 });
-      p.push(`<path class="fill" d="${d}Z"/>`);
+      /* Sized off the SHOULDER, which is the widest part and the one the eye
+         measures him by: the reference figure stands about three shoulders
+         tall. At 1.15/2.6 he came out at four and a third — recognisably a man,
+         and a stretched one. */
+      const body = figure(x, rod.y, 1.25, 1.9);
+      if (rod.near) {
+        const [d] = hand(body, s, { steps: 40, amp: 0.06, passes: 1 });
+        p.push(`<path class="fill curve" d="${d}Z"/>`);
+      } else {
+        p.push(stroke(body, s, 'med curve', { steps: 40, amp: 0.06, passes: 1 }));
+      }
     });
   });
 
   return p.join('');
 }
 
+/**
+ * Lock the drawing onto the page's own furniture, by measuring it.
+ *
+ * The end of the table and the halfway line are the drawing's two horizontals
+ * that a reader will compare against a printed rule, because there IS a printed
+ * rule at each of those heights: the head rule under "COLLECTIE", and the foot
+ * rules beside the folio. Landing a hair off either is the worst available
+ * outcome — two hairlines three pixels apart read as one line printed twice,
+ * which is precisely the fault that kept showing up.
+ *
+ * So neither is a constant any more. The scale is fixed by the width (the
+ * outline runs to the trim), and `BOX.y` and `HALF` are then solved so that
+ * unit 0 lands exactly on the head rule and unit `HALF` exactly on the folio.
+ * They agree by construction at any page size, which no pair of hand-tuned
+ * numbers could promise.
+ *
+ * `BOX.h` comes from the measured aspect too, so the viewBox fills its box in
+ * both axes and `meet` has nothing left to letterbox — otherwise the vertical
+ * would quietly pick up a centring offset and undo the whole alignment.
+ */
+function solve(host, hosts) {
+  const page = host.closest('.page');
+  const box = host.getBoundingClientRect();
+  /*
+   * The NUMERAL, not the `.folio` box — the box carries `padding-top`, so its
+   * centre sits several pixels below the middle of the digit. That offset is why
+   * the halfway line kept landing just under the page numbers instead of through
+   * them.
+   */
+  const numeral = page.querySelector('.folio span').getBoundingClientRect();
+  if (!box.width || !box.height) return;
+
+  const scale = box.width / (MID - BOX.x);
+  BOX.h = box.height / scale;
+
+  /*
+   * Where to break the halfway line, in the drawing's own units — one gap per
+   * leaf, each measured from that leaf's numeral. Each page's SVG maps device x
+   * from its own viewBox origin, so the two are converted separately and then
+   * live in the one shared coordinate space the marks are built in.
+   */
+  const PAD = 9;
+  FOLIO_GAPS = hosts
+    .map((h) => {
+      const hb = h.getBoundingClientRect();
+      const n = h.closest('.page').querySelector('.folio span').getBoundingClientRect();
+      const vbx = h.dataset.half === 'left' ? BOX.x : MID;
+      const u = (px) => vbx + (px - hb.left) / scale;
+      return [u(n.left - PAD), u(n.right + PAD)];
+    })
+    .sort((a, b) => a[0] - b[0]);
+  /*
+   * The back line is no longer pinned to the head rule — it stands at `TRIM`,
+   * the same inset from the page edge as the two side lines, so the outline is
+   * inset equally on three sides. The head therefore sits INSIDE the table, and
+   * has its own rule again.
+   */
+  BOX.y = -TRIM;
+  /* The foot rules ran down the middle of `.folio`, and the halfway line
+     replaces them, so it is still measured. */
+  HALF = (numeral.top + numeral.height / 2 - box.top) / scale + BOX.y;
+
+  /*
+   * **And the cards are hung off the rods, not off the top of the page.**
+   *
+   * The block of six sits centred between the keeper's rod and the five-bar, so
+   * every card is inside the run of play and the two outer rods frame it. That
+   * is a relationship between the drawing and the grid, so it cannot be a margin
+   * picked once: the rods move with `HALF`, which is measured.
+   *
+   * Measured rather than derived for the same reason — the block's height comes
+   * out of the grid (three columns at 5:7 plus a row gap), and re-deriving that
+   * here would be a second copy of a number CSS already knows. Margin to zero,
+   * read where the cards land, then shift by the difference.
+   */
+  /*
+   * Measured on this page, applied to EVERY page. The solve is the spread's, not
+   * one leaf's — setting it only where it was measured left the two halves of
+   * the grid at different heights, which is the one misalignment a spread can
+   * least afford.
+   */
+  const all = [...document.querySelectorAll('.slots')];
+  const slots = page.querySelector('.slots');
+  const cards = slots.querySelectorAll('.slot');
+  if (!cards.length) return;
+
+  all.forEach((s) => { s.style.marginTop = '0px'; });
+  const first = cards[0].getBoundingClientRect();
+  const last = cards[cards.length - 1].getBoundingClientRect();
+  const at = (u) => (u - BOX.y) * scale;
+  const band = { top: at(HALF * RODS[0].at), bottom: at(HALF * RODS[RODS.length - 1].at) };
+  const blockH = last.bottom - first.top;
+  const want = band.top + (band.bottom - band.top - blockH) / 2;
+  const lift = `${Math.max(0, want - (first.top - box.top))}px`;
+  all.forEach((s) => { s.style.marginTop = lift; });
+}
+
 function draw() {
-  const marks = table();
-  document.querySelectorAll('[data-half]').forEach((host) => {
+  const hosts = [...document.querySelectorAll('[data-half]')];
+  if (!hosts.length) return;
+
+  /* The vertical solve is the page's, so it is done once and shared. */
+  solve(hosts[0], hosts);
+
+  hosts.forEach((host) => {
     const left = host.dataset.half === 'left';
+    const vbx = left ? BOX.x : MID;
+
+    /*
+     * Snapping is per page and the marks are therefore rebuilt per page: the two
+     * leaves show different x-ranges of the same drawing, so a vertical that
+     * lands on the pixel grid in one lands between pixels in the other. The
+     * horizontals come out identical either way, which is what lets the halves
+     * still register across the fold.
+     */
+    SNAP = snapper(host, vbx);
+    host.style.setProperty('--hair', 1 / SNAP.s);
+    const marks = table();
+
     const vb = left
       ? `${BOX.x} ${BOX.y} ${MID - BOX.x} ${BOX.h}`
       : `${MID} ${BOX.y} ${BOX.x + BOX.w - MID} ${BOX.h}`;
@@ -937,22 +1495,24 @@ function draw() {
        the viewBox does the cropping — no mirroring, because the table is not
        symmetric across its long axis: the handles alternate.
      *
-     * **And the whole drawing is turned end for end.** `table()` builds the
-     * table the way the reference draws it, goal at the top; this puts the goal
-     * at the FOOT of the page, and that is the composition decision the drawing
-     * lives or dies by. Built the other way up, every diagnostic mark — the
-     * mouth, the box, the keeper, his grip — sat behind the first row of cards,
-     * and the only marks left on open paper were the halfway line and the
-     * centre circle, which are exactly the two that say *football pitch*. Turned
-     * over, the pitch-ish markings go behind the cards and the goal comes out
-     * into the open. A goal with a man on a rod in front of it is not something
-     * a pitch can be mistaken for.
+     * **The table is the way up the reference has it**: goal at the head of the
+     * spread, halfway line and centre circle at the foot.
      *
-     * A transform rather than negated coordinates, so `table()` stays readable
-     * against the reference drawing and there is no sign to get wrong twice. */
+     * It was turned end for end for a while, on the argument that the goal is
+     * the least pitch-like thing in the drawing and so deserved the one band of
+     * open paper. That argument was sound about the goal and wrong about the
+     * composition — the reference is a picture of a table seen from its own end,
+     * and turning it over is not a crop, it is a different picture. Kept this way
+     * up, the foot of the spread carries the halfway line and the centre circle
+     * exactly as the reference does.
+     *
+     * It also costs nothing that matters, which the flip obscured: at this crop
+     * the rod that lands in the bottom band is the FIVE-bar, so the open paper
+     * gets five figures well clear of the fold instead of a keeper's one sitting
+     * on it. */
     host.innerHTML =
       `<svg viewBox="${vb}" preserveAspectRatio="${left ? 'xMaxYMid' : 'xMinYMid'} meet">` +
-      `<g transform="translate(0,${HALF}) scale(1,-1)">${marks}</g></svg>`;
+      `${marks}</svg>`;
   });
 }
 
@@ -1010,26 +1570,18 @@ $('wob').oninput = (e) => {
 $('onoff').onchange = (e) => document.body.classList.toggle('no-field', !e.target.checked);
 $('folio').onchange = (e) => document.body.classList.toggle('no-folio', !e.target.checked);
 $('cards').onchange = (e) => document.body.classList.toggle('no-cards', !e.target.checked);
-$('trim').onchange = (e) => document.body.classList.toggle('no-trim', !e.target.checked);
-$('rules').onchange = (e) => document.body.classList.toggle('no-rules', !e.target.checked);
-
-const TABS = { spread: ['03', '03'], range: ['68–72', '73–81'], folio: ['5', '6'] };
-
-$('tabmode').onchange = (e) => {
-  const mode = e.target.value;
-  document.body.classList.toggle('no-tab', mode === 'none');
-  if (mode === 'none') return;
-  document.querySelectorAll('[data-tab]').forEach((el, i) => {
-    el.textContent = TABS[mode][i];
-    el.style.fontSize = TABS[mode][i].length > 2 ? '9px' : '12px';
-  });
-};
-$('tabmode').onchange({ target: $('tabmode') });
 
 if (location.hash.includes('bare')) {
   $('cards').checked = false;
   document.body.classList.add('no-cards');
 }
+
+if (location.hash.includes('plain')) document.body.classList.add('plain');
+
+/* `solve` measures, so the drawing has to be rebuilt when the measurements
+   change. `--page-w` is a `min()` against the viewport, so a resize moves the
+   head rule and the folio and the drawing has to follow them. */
+window.addEventListener('resize', draw);
 
 draw();
 </script>

@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wat de kopband gekleurd houdt</title>
+<style>
+  /* ==================================================================== *
+   * Three candidates for the head band's colour, on the spread from
+   * album-headband.html.
+   *
+   *   stain    the band takes the album's own leather, one colour for the
+   *            whole book — the recommendation
+   *   tier     the band takes the metal of the cards on the page, cut or
+   *            ramped where the page crosses a tier boundary
+   *   index    the stain, with a metal rule along the band's foot: the tier
+   *            information at three pixels instead of a hundred
+   *
+   * The five stains are the real ones, spread straight off `albumLeather.ts`,
+   * so no colour below is a guess: bordeaux, cognac, bosgroen, marineblauw,
+   * antraciet, at their published `hi/mid/lo`.
+   * ==================================================================== */
+  /* ==================================================================== *
+   * Where the derived tokens are declared, and why it is not here
+   *
+   * `:root` holds only what nothing else derives from: the base scale, the
+   * paper, the stain, the metals. **Everything computed from one of those is
+   * declared on `.book` instead**, and that is load-bearing rather than tidy.
+   *
+   * A custom property's `var()`s are substituted **on the element that declares
+   * it**, and the result is what inherits. So `--band-h: calc(var(--page-h) *
+   * .128)` written here resolves against `:root`'s own `--page-h` once and for
+   * all: a descendant that overrides `--page-h` — which is exactly what the
+   * specimen rack does — inherits a band height computed from the wrong number
+   * and cannot get at it. Same trap with the stain: `--band` written here would
+   * mix `:root`'s bordeaux forever, and all five books in the rack would come out
+   * bordeaux however their `--leather-mid` was set. Both of those happened.
+   *
+   * Declared on `.book`, every one of them is substituted per book, against
+   * whatever scale and stain that book inherits.
+   * ==================================================================== */
+  :root {
+    --page-w: min(560px, calc((100vw - 210px) / 2));
+
+    --serif: "Times New Roman", Times, Georgia, serif;
+
+    --paper: #f8f3e3;
+    --paper-hi: #fffcf2;
+    --paper-lo: #f0e9d2;
+    --rule: rgba(104, 92, 63, 0.42);
+    --ink: #24211a;
+    --ink-soft: #8d8571;
+
+    --board: #2a1509;
+    --board-hi: #4e2d15;
+
+    /* Bordeaux, the incumbent, as the page's default. Overridden per book. */
+    --leather-hi: #5a4526;
+    --leather-mid: #35270f;
+    --leather-lo: #4a3820;
+
+    /* Not derived from the stain: the reversed type is the same cream on all
+       five, for the same reason the brass edge and the gold foil are. */
+    --band-ink: #f6f1e0;
+
+    /* ---------------------------------------------------------------- *
+     * The metals
+     *
+     * Two cuts of each: `-band` is dark enough to reverse cream type out of,
+     * for the tier-band candidate; `-rule` is the metal at full strength, for
+     * the three-pixel index rule where nothing has to sit on top of it.
+     * ---------------------------------------------------------------- */
+    --brons-band: #8d6127;  --brons-rule: #a97b32;
+    --zilver-band: #8b95a1; --zilver-rule: #aab4bf;
+    --goud-band: #ab8c1c;   --goud-rule: #cda423;
+    --rood-band: #a2121b;   --rood-rule: #c8202a;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0 0 40px;
+    font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
+    font-size: 14px;
+    line-height: 1.65;
+    color: #f3e5c9;
+    background-color: #2c1507;
+    background-image:
+      repeating-linear-gradient(180deg,
+        rgba(0, 0, 0, .18) 0 1px, rgba(255, 190, 130, .03) 1px 2px,
+        rgba(0, 0, 0, .07) 2px 5px, transparent 5px 9px),
+      repeating-linear-gradient(178.6deg,
+        rgba(0, 0, 0, .15) 0 3px, transparent 3px 27px,
+        rgba(120, 60, 24, .12) 27px 31px, transparent 31px 63px),
+      radial-gradient(ellipse 64% 42% at 50% 4%, rgba(255, 204, 148, .14), transparent 70%),
+      linear-gradient(176deg, #46220f 0%, #2f1607 46%, #1c0c04 100%);
+    background-attachment: fixed;
+  }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 34px 24px 0; }
+
+  h1, h2 {
+    font-family: Georgia, "Times New Roman", serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-shadow: 0 2px 3px rgba(0, 0, 0, .75);
+    margin: 0 0 6px;
+  }
+  h1 { font-size: 24px; }
+  h2 { font-size: 16px; margin: 46px 0 10px; }
+  p { max-width: 82ch; color: #cdb494; margin: 0 0 8px; }
+  strong { color: #eec18a; }
+  em { color: #eec18a; font-style: italic; }
+  code { font-family: Consolas, monospace; font-size: .9em; color: #eec18a; }
+
+  /* ==================================================================== *
+   * The book
+   * ==================================================================== */
+  .stage { display: flex; justify-content: center; margin: 22px 0 8px; }
+
+  .book {
+    /* Everything derived from the scale, per book — see the note at `:root`. */
+    --page-h: calc(var(--page-w) / 0.698);
+    --pad-x: calc(var(--page-w) * 0.070);
+    --band-h: calc(var(--page-h) * 0.128);
+    --band-drop: calc(var(--band-h) * 0.072);
+    --rule-gap: calc(var(--page-h) * 0.044);
+    --slots-gap: calc(var(--page-h) * 0.036);
+
+    /* ---------------------------------------------------------------- *
+     * The band, derived from the stain
+     *
+     * **From `--leather-mid`, lightened, and both of those matter.**
+     *
+     * `mid` is the body of the hide and the darkest of the three tokens, which
+     * is what makes it the one to build on: across the five stains `mid` runs
+     * from L*11 (antraciet) to L*29 (cognac), an 18-point spread, while `hi`
+     * runs from 25 to 45. Derive the band from `hi` and cognac comes out a pale
+     * tan that cannot hold cream type while antraciet comes out near-black —
+     * two of the five broken by the same rule. From `mid` all five land close
+     * enough together that one mix serves all of them and every one can carry
+     * reversed type.
+     *
+     * Lightened, because this is INK ON PAPER and not a patch of hide. A raw
+     * stain at 13% of the leaf's height reads as a swatch of the cover pasted
+     * onto the page; a step toward the paper's own cream makes it printing.
+     *
+     * The mix is toward the paper rather than toward white, so the band stays in
+     * the book's warm family whatever the stain — a cool grey lightener turns
+     * bordeaux and cognac muddy.
+     * ---------------------------------------------------------------- */
+    --band: color-mix(in oklab, var(--leather-mid) 72%, #f0e7c9 28%);
+    --band-lo: color-mix(in oklab, var(--leather-mid) 86%, #f0e7c9 14%);
+
+    position: relative;
+    width: fit-content;
+    padding: 8px;
+    border-radius: 5px 5px 8px 8px;
+    background: linear-gradient(148deg, var(--board-hi) 0%, var(--board) 46%, #3c1d0d 100%);
+    box-shadow:
+      0 0 0 1px rgba(126, 78, 36, .5),
+      0 34px 60px rgba(10, 4, 2, .74),
+      0 5px 12px rgba(0, 0, 0, .5);
+  }
+  .book::before, .book::after {
+    content: "";
+    position: absolute;
+    top: 13px; bottom: 13px;
+    width: 26px;
+    z-index: 0;
+    border-radius: 2px;
+    background-image:
+      linear-gradient(180deg, rgba(22, 9, 3, .62) 0%, rgba(22, 9, 3, .1) 6%,
+        transparent 16%, transparent 84%, rgba(22, 9, 3, .1) 94%, rgba(22, 9, 3, .62) 100%),
+      repeating-linear-gradient(90deg,
+        rgba(96, 80, 47, .3) 0 1px, rgba(250, 245, 227, .5) 1px 3px),
+      linear-gradient(90deg, #cabe9c, #f0e9d2);
+  }
+  .book::before { left: -19px; }
+  .book::after  { right: -19px; }
+
+  /* The boards take the stain, so the candidate can be judged against the book
+     it is bound in rather than in the abstract. */
+  .book--stained {
+    background: linear-gradient(148deg, var(--leather-hi) 0%, var(--leather-mid) 46%, var(--leather-lo) 100%);
+    box-shadow:
+      0 0 0 1px #6b5325,
+      0 34px 60px rgba(10, 4, 2, .74),
+      0 5px 12px rgba(0, 0, 0, .5);
+  }
+
+  .spread { position: relative; display: flex; }
+
+  /* ==================================================================== *
+   * The leaf — as album-headband.html has it
+   * ==================================================================== */
+  .page {
+    position: relative;
+    width: var(--page-w);
+    height: var(--page-h);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: var(--band-h) var(--pad-x) 0;
+    font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(ellipse 132% 76% at 50% -2%,
+        var(--paper-hi) 0%, var(--paper) 46%, var(--paper-lo) 100%),
+      var(--paper);
+  }
+  .page--left  { border-radius: 3px 0 0 3px; box-shadow: inset -30px 0 38px -26px rgba(38, 22, 4, .5); }
+  .page--right { border-radius: 0 3px 3px 0;  box-shadow: inset  30px 0 38px -26px rgba(38, 22, 4, .5); }
+
+  /* Formation, fibre, flecks, tooth — see album-headband.html for why in that
+     order and why the base cream has to be lighter than the tone wanted. */
+  .page::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    mix-blend-mode: multiply;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .40 0 0 0 0 .36 0 0 0 0 .25 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cg fill='%23796a4a' fill-opacity='.3'%3E%3Ccircle cx='58' cy='104' r='1.1'/%3E%3Ccircle cx='247' cy='63' r='.8'/%3E%3Cellipse cx='166' cy='291' rx='1.7' ry='.6' transform='rotate(-14 166 291)'/%3E%3Ccircle cx='352' cy='218' r='.9'/%3E%3Cellipse cx='94' cy='366' rx='1.4' ry='.5' transform='rotate(9 94 366)'/%3E%3C/g%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='700' height='700'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.045 .42' numOctaves='2' seed='3'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .43 0 0 0 0 .39 0 0 0 0 .28 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='700' height='700' filter='url(%23f)'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.009' numOctaves='4' seed='11'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .46 0 0 0 0 .42 0 0 0 0 .3 0 0 0 .13 0'/%3E%3C/filter%3E%3Crect width='900' height='900' filter='url(%23m)'/%3E%3C/svg%3E");
+    background-size: 260px 260px, 420px 420px, 700px 700px, 900px 900px;
+  }
+
+  .gutter {
+    position: absolute;
+    top: 0; bottom: 0; left: 50%;
+    width: 104px;
+    transform: translateX(-50%);
+    z-index: 6;
+    pointer-events: none;
+    background: linear-gradient(90deg,
+      rgba(42, 24, 5, 0) 0%, rgba(42, 24, 5, .1) 36%, rgba(42, 24, 5, .27) 50%,
+      rgba(42, 24, 5, .1) 64%, rgba(42, 24, 5, 0) 100%);
+  }
+
+  /* ==================================================================== *
+   * The band
+   * ==================================================================== */
+  .band {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: var(--band-h);
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    padding: calc(var(--band-drop) * 2) var(--pad-x) 0;
+    background: linear-gradient(184deg, var(--band) 0%, var(--band-lo) 100%);
+    box-shadow: 0 1px 3px rgba(38, 30, 8, .3);
+  }
+  .band::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-origin: border-box;
+    opacity: .5;
+    mix-blend-mode: soft-light;
+    background-image:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 .96 0 0 0 0 .8 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.009' numOctaves='4' seed='11'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .1 0 0 0 0 .12 0 0 0 0 .05 0 0 0 .4 0'/%3E%3C/filter%3E%3Crect width='900' height='900' filter='url(%23m)'/%3E%3C/svg%3E");
+    background-size: 260px 260px, 900px 900px;
+  }
+
+  .band__title {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: baseline;
+    gap: .42em;
+    font-family: var(--serif);
+    font-size: calc(var(--page-w) * 0.039);
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    line-height: 1;
+    color: var(--band-ink);
+    text-shadow: 0 1px 2px rgba(20, 26, 10, .45);
+  }
+  .band__sep { font-weight: normal; opacity: .72; }
+  .band__range { font-variant-numeric: tabular-nums; }
+
+  /*
+   * The index rule, along the band's foot.
+   *
+   * **A rating axis, not a plan of the grid.** The segments are proportional to
+   * how many of the leaf's six slots belong to each tier, in reading order, so a
+   * page that crosses 75 two slots in cuts a third of the way along. It is
+   * deliberately NOT aligned to the card columns and cannot be: the slots run
+   * row-major, so the fourth-lowest rating on the page is at the left of the
+   * second row and no single x is "where gold starts". What the rule says is
+   * "this leaf crosses from silver to gold, a third of the way in", which is
+   * true, and reading it against the columns is a mistake the gradient variant
+   * makes harder to commit.
+   *
+   * Bled to the same three trims as the band, because it belongs to the band and
+   * not to the measure.
+   */
+  .band__index {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: max(3px, calc(var(--page-h) * 0.0042));
+    z-index: 2;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+  }
+  body:not(.mode-index) .band__index { display: none; }
+
+  /* The tier candidate: the whole band in the metal of the page's cards. The
+     title's shadow goes with it — cream type on silver needs more than it does
+     on a stain. */
+  /* The same vertical shading the stain band gets, over the metal — otherwise the
+     comparison is rigged: a flat field loses to a shaded one on sight, and that
+     would be a fact about this mockup rather than about the candidate. */
+  body.mode-tier .band {
+    background-image:
+      linear-gradient(184deg, rgba(255, 255, 255, .07) 0%, rgba(0, 0, 0, .11) 100%),
+      var(--tier-band);
+  }
+  body.mode-tier .band__title { text-shadow: 0 1px 2px rgba(0, 0, 0, .55); }
+
+  /* ==================================================================== *
+   * The rest of the leaf
+   * ==================================================================== */
+  .rule {
+    flex: none;
+    position: relative;
+    z-index: 2;
+    height: 1px;
+    background: var(--rule);
+  }
+  .rule--head { margin-top: var(--rule-gap); }
+
+  .slots {
+    flex: none;
+    position: relative;
+    z-index: 2;
+    margin-top: var(--slots-gap);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    column-gap: calc(var(--page-w) * 0.039);
+    row-gap: calc(var(--page-h) * 0.031);
+  }
+
+  .foot {
+    flex: none;
+    position: relative;
+    z-index: 2;
+    margin-top: auto;
+    padding-bottom: calc(var(--page-h) * 0.048);
+  }
+  .foot .rule { margin-bottom: calc(var(--page-h) * 0.018); }
+  .folio {
+    text-align: center;
+    font-family: var(--serif);
+    font-size: calc(var(--page-w) * 0.021);
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ==================================================================== *
+   * The card
+   * ==================================================================== */
+  .slot { position: relative; aspect-ratio: 64 / 100; }
+
+  .card {
+    --display: "Bahnschrift SemiCondensed", Bahnschrift, "DIN Condensed",
+      "DIN Alternate", "Franklin Gothic Medium", "Segoe UI", Tahoma, sans-serif;
+    position: absolute;
+    inset: 0;
+    border-radius: 5%;
+    overflow: hidden;
+    container-type: inline-size;
+    color: #16140e;
+  }
+  .card--set {
+    box-shadow:
+      0 1px 2px rgba(56, 42, 13, .36),
+      0 4px 9px -4px rgba(56, 42, 13, .38);
+  }
+  .card--brons {
+    background-image:
+      linear-gradient(163deg, #e8c893 0%, #c99b58 32%, #a9762f 64%, #e0bd85 100%);
+  }
+  .card--zilver {
+    background-image:
+      linear-gradient(163deg, #f6f9fc 0%, #d0d8e0 33%, #a9b3be 62%, #e9eef3 100%);
+  }
+  .card--goud {
+    background-image:
+      linear-gradient(163deg, #fbe89e 0%, #e6c45c 30%, #cb9d1f 64%, #f8e28c 100%);
+  }
+  .card--rood {
+    background-image:
+      linear-gradient(179deg, #d8242c 0%, #ba121b 50%, #cf8f1c 76%, #eccd5e 100%);
+  }
+  .card--leeg {
+    background-image:
+      linear-gradient(180deg, #cfc8ae 0%, #d6cfb6 44%, #e6dfc7 100%);
+    color: #9a9078;
+    box-shadow:
+      inset 0 0 0 1px rgba(112, 102, 76, .3),
+      inset 0 2px 6px rgba(112, 102, 76, .22),
+      inset 0 -1px 0 rgba(255, 253, 244, .75);
+  }
+
+  .card__portrait {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    -webkit-mask-image:
+      linear-gradient(to top, transparent 4%, #000 21%),
+      linear-gradient(126deg, transparent 4%, #000 22%);
+    mask-image:
+      linear-gradient(to top, transparent 4%, #000 21%),
+      linear-gradient(126deg, transparent 4%, #000 22%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  .card__portrait svg { display: block; width: 100%; height: 100%; }
+
+  .ground { fill: url(#g-cool); }
+  .card--goud .ground, .card--brons .ground { fill: url(#g-warm); }
+  .card--rood .ground { fill: url(#g-red); }
+  .card--leeg .ground { fill: none; }
+
+  .s-body { fill: #56534b; opacity: .74; }
+  .s-head { fill: #3f3b34; opacity: .88; }
+  .card--rood .s-body { fill: #3a1c14; opacity: .66; }
+  .card--rood .s-head { fill: #290f0b; opacity: .8; }
+  .card--leeg .s-body { fill: #e3dcc2; opacity: .92; }
+  .card--leeg .s-head { fill: #ded7ba; opacity: .92; }
+
+  .card__overall {
+    position: absolute;
+    top: 2.2%; left: 7%;
+    z-index: 2;
+    font-family: var(--display);
+    font-size: 27cqw;
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: .005em;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .16);
+  }
+  .card--goud .card__overall,
+  .card--rood .card__overall { text-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+  .card--leeg .card__overall { text-shadow: none; }
+
+  .card__name {
+    position: absolute;
+    left: 9%; right: 9%; bottom: 5.5%;
+    z-index: 2;
+    padding-top: 3.5%;
+    text-align: center;
+    font-family: var(--display);
+    font-size: 9.2cqw;
+    letter-spacing: .03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-top: 1px solid rgba(0, 0, 0, .3);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .34);
+  }
+  .card--rood .card__name { color: #1b1006; }
+  .card--leeg .card__name {
+    border-top-color: rgba(120, 112, 90, .3);
+    box-shadow: inset 0 1px 0 rgba(255, 253, 244, .5);
+  }
+  .card--set::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    background: linear-gradient(116deg, transparent 34%, rgba(255, 255, 255, .11) 46%,
+      rgba(255, 255, 255, .03) 52%, transparent 62%);
+  }
+
+  /* ==================================================================== *
+   * The five books, side by side
+   *
+   * A leaf cropped to the band and the first row of cards: enough to judge the
+   * band against the paper, the silver and the gold, and no more. Five whole
+   * spreads would be a scroll nobody compares anything across.
+   * ==================================================================== */
+  .rack {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 26px 22px;
+    margin: 18px 0 0;
+  }
+  .rack .book { padding: 6px; }
+  .rack figure { margin: 0; }
+  .rack figcaption {
+    font-family: var(--serif);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #cdb494;
+    padding: 8px 0 0 2px;
+  }
+  /* Its own scale, so the rack does not inherit the judging spread's. The height
+     restates the ratio rather than reading `--page-h`, which belongs to the book
+     inside it and not to this element. */
+  .specimen {
+    --page-w: 300px;
+    height: calc(var(--page-w) / 0.698 * 0.52);
+    overflow: hidden;
+    position: relative;
+  }
+  .specimen .page { border-radius: 3px 3px 0 0; }
+
+  /* ==================================================================== *
+   * Controls — chrome, not design
+   * ==================================================================== */
+  .controls {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 8px 22px;
+    margin: 16px auto 0;
+    padding: 10px 20px;
+    max-width: 1040px;
+    border-radius: 8px;
+    background: rgba(18, 9, 5, .9);
+    border: 1px solid rgba(230, 201, 138, .22);
+    font-size: 12px;
+    color: #cdb494;
+  }
+  .controls label { display: flex; align-items: center; gap: 6px; white-space: nowrap; cursor: pointer; }
+  .controls select {
+    background: #241a10; color: #f3e5c9; border: 1px solid #5a4a2c;
+    border-radius: 4px; padding: 2px 5px; font: inherit;
+  }
+</style>
+</head>
+<body class="mode-stain">
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="g-cool" x1="0" y1="0" x2=".25" y2="1">
+      <stop offset="0" stop-color="#edebe5"/><stop offset="1" stop-color="#b6babf"/>
+    </linearGradient>
+    <linearGradient id="g-warm" x1="0" y1="0" x2=".25" y2="1">
+      <stop offset="0" stop-color="#f2e9d1"/><stop offset="1" stop-color="#c8b585"/>
+    </linearGradient>
+    <linearGradient id="g-red" x1="0" y1="0" x2=".25" y2="1">
+      <stop offset="0" stop-color="#e0323b"/><stop offset="1" stop-color="#9b0e17"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <h1>Wat de kopband gekleurd houdt</h1>
+  <p>
+    Three candidates on one spread. <strong>Stain</strong> gives the whole book one
+    band in its own leather; <strong>tier</strong> colours each leaf in the metal of
+    the cards on it; <strong>index</strong> keeps the stain and puts the tier in a
+    three-pixel rule along the band's foot. The five stains are the published ones
+    from <code>albumLeather.ts</code>, and the band is derived from
+    <code>--leather-mid</code> rather than chosen — see the note in the source.
+  </p>
+
+  <div class="stage">
+    <div class="book book--stained" id="book">
+      <div class="spread">
+        <section class="page page--left"  data-page="left"></section>
+        <section class="page page--right" data-page="right"></section>
+      </div>
+      <div class="gutter"></div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <label>Band
+      <select id="mode">
+        <option value="stain">leer — één boek, één kleur</option>
+        <option value="index">leer + metalen voetlijn</option>
+        <option value="tier">tier — harde overgang</option>
+        <option value="tier-ramp">tier — verloop</option>
+      </select>
+    </label>
+    <label>Leer
+      <select id="cover"></select>
+    </label>
+  </div>
+
+  <h2>The five books</h2>
+  <p>
+    The band against the paper, the silver and the gold, in all five stains. What
+    the derivation is for: <strong>cognac and antraciet are the two that break a
+    naive rule</strong> — nine points of lightness apart at <code>hi</code> and
+    almost together at <code>mid</code>.
+  </p>
+  <div class="rack" id="rack"></div>
+</div>
+
+<script>
+/* ====================================================================== *
+ * The spread, as album-headband.html has it — with a rating on every slot.
+ *
+ * **The unowned slots carry ratings too, and that is the point.** The album is
+ * one section sorted ascending by rating, so a slot's position — and therefore
+ * its page and its tier — is fixed by the player's rating whether or not anybody
+ * has drawn the card yet. The index rule is the same on your book and on mine;
+ * only the cards in the mounts differ. A tier mark derived from what you OWN
+ * would move as you collected, which is the one thing page furniture may not do.
+ * ====================================================================== */
+
+const PAGES = {
+  left: [
+    [68, 'Jeroen van Geel', 'm', false],
+    [68, 'Rianne Meiberg',  'f', false],
+    [69, 'Ewan Deeley',     'm', true],
+    [71, 'Simon',           'm', true],
+    [71, 'Bo',              'f', true],
+    [72, 'Marie Versteeg',  'f', false],
+  ],
+  right: [
+    [73, 'Yannick',      'm', true],
+    [74, 'Tanny',        'f', false],
+    [78, 'Nick',         'm', true],
+    [79, 'Daan Verkade', 'm', true, 'rood'],
+    [80, 'Max Smedts',   'm', false],
+    [81, 'Mathijs',      'm', true],
+  ],
+};
+
+const HEADS = { left: '68 – 72', right: '73 – 81' };
+const FOLIOS = { left: 5, right: 6 };
+
+/* Brons <65, Zilver 65–74, Goud 75–84, Goud Zeldzaam 85+ — the published bands. */
+const tierFor = (o) => (o >= 85 ? 'rood' : o >= 75 ? 'goud' : o >= 65 ? 'zilver' : 'brons');
+
+const BODY = '<path class="s-body" d="M50 76c21 0 35.5 13.5 41 34l9 46H0l9-46C14.5 89.5 29 76 50 76Z"/>';
+const SITTER = {
+  m: BODY
+    + '<path class="s-head" d="M50 26c10.4 0 17.5 8.2 17.5 19.5 0 12.6-7.8 23.5-17.5 23.5s-17.5-10.9-17.5-23.5C32.5 34.2 39.6 26 50 26Z"/>',
+  f: BODY
+    + '<path class="s-head" d="M50 24c11.8 0 19.2 8.4 19.2 20 0 6.7-.7 11.8-1.9 15.8 3.4 8.2 5.5 17.7 6 28.6l.5 10.6H26.2l.5-10.6c.5-10.9 2.6-20.4 6-28.6-1.2-4-1.9-9.1-1.9-15.8 0-11.6 7.4-20 19.2-20Z"/>',
+};
+
+/* ---------------------------------------------------------------------- *
+ * The tier segments
+ *
+ * Runs of equal tier over the leaf's slots in reading order, each with the
+ * fraction of the leaf it covers. One entry for a leaf that sits inside a single
+ * tier, which is the common case and the reason the band alone is nearly always
+ * flat: only the two or three leaves that straddle a cutoff have anything to
+ * say, and page furniture that is informative on one leaf in six is decoration
+ * on the other five.
+ * ---------------------------------------------------------------------- */
+function segments(slots) {
+  const runs = [];
+  slots.forEach((slot, i) => {
+    /* By rating, never by `rood` — the rare treatment is a property of a
+       printing, not of where a player sits in the book. */
+    const tier = tierFor(slot[0]);
+    const last = runs[runs.length - 1];
+    if (last && last.tier === tier) last.n += 1;
+    else runs.push({ tier, n: 1, from: i });
+  });
+  return runs.map((run) => ({ ...run, frac: run.n / slots.length }));
+}
+
+/* A hard cut, or a ramp across the join. The ramp is two stops either side of
+   each boundary rather than one gradient end to end: a leaf inside one tier has
+   to come out FLAT in both modes, or the mode is not about the boundary. */
+/* Always a gradient, even for one tier — `--tier-band` is consumed as a
+   `background-image` layer under the band's shading, and a bare colour is not a
+   valid image. */
+function metalBar(runs, prop, ramp) {
+  if (runs.length === 1) {
+    const c = `var(${prop(runs[0].tier)})`;
+    return `linear-gradient(90deg, ${c} 0, ${c} 100%)`;
+  }
+  const stops = [];
+  let at = 0;
+  runs.forEach((run, i) => {
+    const c = `var(${prop(run.tier)})`;
+    const end = at + run.frac * 100;
+    /* Half a slot of overlap each side of a join, which is about as soft as a
+       cut can be and still be locatable. */
+    const soft = ramp ? (100 / 12) : 0;
+    stops.push(`${c} ${i === 0 ? 0 : at + soft}%`);
+    stops.push(`${c} ${i === runs.length - 1 ? 100 : end - soft}%`);
+    at = end;
+  });
+  return `linear-gradient(90deg, ${stops.join(', ')})`;
+}
+
+const bandProp = (tier) => `--${tier}-band`;
+const ruleProp = (tier) => `--${tier}-rule`;
+
+const cardHtml = ([overall, name, sitter, owned, rare]) => {
+  const tier = owned ? (rare || tierFor(overall)) : 'leeg';
+  return `<div class="slot">
+    <div class="card card--${tier}${owned ? ' card--set' : ''}">
+      <div class="card__portrait">
+        <svg viewBox="0 0 100 156" preserveAspectRatio="none">
+          <rect class="ground" x="0" y="0" width="100" height="156"/>
+          ${SITTER[sitter]}
+        </svg>
+      </div>
+      <div class="card__overall">${owned ? overall : '??'}</div>
+      <div class="card__name">${name}</div>
+    </div>
+  </div>`;
+};
+
+function pageHtml(side, ramp, rows) {
+  const slots = PAGES[side];
+  const runs = segments(slots);
+  const shown = rows ? slots.slice(0, rows * 3) : slots;
+  return `
+    <div class="band" style="--tier-band: ${metalBar(runs, bandProp, ramp)}">
+      <div class="band__title">
+        <span>Collectie</span>
+        <span class="band__sep">·</span>
+        <span class="band__range">${HEADS[side]}</span>
+      </div>
+      <div class="band__index" style="background: ${metalBar(runs, ruleProp, ramp)}"></div>
+    </div>
+    <div class="rule rule--head"></div>
+    <div class="slots">${shown.map(cardHtml).join('')}</div>
+    <div class="foot">
+      <div class="rule"></div>
+      <div class="folio">${FOLIOS[side]}</div>
+    </div>`;
+}
+
+/* ====================================================================== *
+ * The five stains, spread verbatim from albumLeather.ts
+ * ====================================================================== */
+const COVERS = [
+  { id: 'oxblood',  label: 'bordeaux',    hi: '#5a4526', mid: '#35270f', lo: '#4a3820' },
+  { id: 'tan',      label: 'cognac',      hi: '#8a6134', mid: '#5b3c1b', lo: '#754f27' },
+  { id: 'forest',   label: 'bosgroen',    hi: '#2f4a2c', mid: '#182c17', lo: '#274023' },
+  { id: 'navy',     label: 'marineblauw', hi: '#2b3a55', mid: '#151f33', lo: '#233149' },
+  { id: 'charcoal', label: 'antraciet',   hi: '#3a3a3c', mid: '#1c1c1e', lo: '#2e2e30' },
+];
+
+const stainStyle = (c) =>
+  `--leather-hi:${c.hi};--leather-mid:${c.mid};--leather-lo:${c.lo}`;
+
+const $ = (id) => document.getElementById(id);
+
+$('cover').innerHTML = COVERS.map(
+  (c) => `<option value="${c.id}">${c.label}</option>`).join('');
+
+function render() {
+  const mode = $('mode').value;
+  const ramp = mode === 'tier-ramp';
+  document.body.className =
+    'mode-' + (mode === 'tier-ramp' ? 'tier' : mode);
+
+  const cover = COVERS.find((c) => c.id === $('cover').value) ?? COVERS[0];
+  $('book').setAttribute('style', stainStyle(cover));
+
+  document.querySelectorAll('[data-page]').forEach((page) => {
+    page.innerHTML = pageHtml(page.dataset.page, ramp);
+  });
+
+  /* The rack always shows the stain candidate — it is there to compare leathers,
+     and a tier band would make all five identical. */
+  $('rack').innerHTML = COVERS.map((c) => `
+    <figure>
+      <div class="specimen">
+        <div class="book book--stained" style="${stainStyle(c)}">
+          <section class="page page--left">${pageHtml('right', false, 1)}</section>
+        </div>
+      </div>
+      <figcaption>${c.label}</figcaption>
+    </figure>`).join('');
+}
+
+$('mode').onchange = render;
+$('cover').onchange = render;
+
+/* `#index/forest` — so a candidate can be linked to, and screenshotted, without
+   anybody having to describe which two dropdowns to set. */
+const [hashMode, hashCover] = location.hash.replace('#', '').split('/');
+if (hashMode) $('mode').value = hashMode;
+if (hashCover) $('cover').value = hashCover;
+
+render();
+</script>
+</body>
+</html>

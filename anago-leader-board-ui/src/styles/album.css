@@ -130,6 +130,24 @@
   );
   --page-h: calc(var(--page-w) / 0.78);
   --page-pad-x: 22px;
+
+  /*
+   * The head band and the two gaps under it.
+   *
+   * Fractions of the leaf rather than literals, so one set of numbers serves all
+   * three page shapes the book has — the desktop leaf at 0.78, the phone's at
+   * 0.72, and the short-viewport leaf that comes out of the `70vh` term.
+   *
+   * Derived here and not below, and that is safe *because* it is here: a `var()`
+   * inside a custom property is substituted against the declaring element's own
+   * final value, so the two media queries that restate `--page-h` on `:root` are
+   * picked up by these as well. A descendant restating `--page-h` would NOT be —
+   * which is why nothing derived from the stain lives up here (see `.album__band`).
+   */
+  --band-h: calc(var(--page-h) * 0.128);
+  --band-drop: calc(var(--band-h) * 0.072);
+  --band-rule-gap: calc(var(--page-h) * 0.044);
+  --band-slots-gap: calc(var(--page-h) * 0.036);
   --album-card-w: calc((var(--page-w) - var(--page-pad-x) * 2 - 28px) / 3);
   --book-w: calc(var(--page-w) * 2);
 
@@ -849,8 +867,14 @@
       transparent 0 calc(33.33% - 1px),
       rgba(107, 83, 37, 0.07) calc(33.33% - 1px) 33.33%
     ),
-    radial-gradient(circle at 50% 0%, #fffcf0 0%, #e8e1c9 100%),
-    #f4efdd;
+    radial-gradient(circle at 50% 0%, #fffdf4 0%, #ece5cd 100%),
+    #f7f2e2;
+  /*
+   * Three points lighter than the #f4efdd it was, and it is not a recolour: the
+   * sheet's texture in `::before` multiplies into this, and four multiplying
+   * layers take about that much value out of the paper. The leaf lands on the tone
+   * it always had. Change one and the other has to move with it.
+   */
   display: flex;
   flex-direction: column;
   font-family: Tahoma, "MS Sans Serif", Verdana, sans-serif;
@@ -865,9 +889,278 @@
  * decoration goes behind the collection.
  */
 .album__slots,
+.album__page-rule,
 .album__page-number {
   position: relative;
   z-index: 1;
+}
+
+/* ---------------------------------------------------------------- *
+ * The sheet
+ *
+ * Four layers, and the order is the argument. A single fine noise — which is the
+ * obvious way to do this — gives a surface no photograph of paper has: it is
+ * uniform, and paper never is. In descending order of how much work they do:
+ *
+ *   1. FORMATION. Low-frequency cloud on a large tile: the sheet is thicker here
+ *      and thinner there, because the fibres settled unevenly on the wire. This is
+ *      the layer that makes the leaf read as a material rather than as a fill with
+ *      grain on it, and it is the one that gets left out.
+ *   2. FIBRE. Faint streaks off the horizontal, from the fibres lying down in the
+ *      machine direction. **Short streaks.** At a low enough frequency across, one
+ *      fibre runs most of the leaf and the paper comes out looking like a milled
+ *      metal panel; paper's machine direction is a hint, not a grain.
+ *   3. FLECKS. A few darker inclusions — shive, in a cream book paper. Sparse, and
+ *      about the difference between paper and card.
+ *   4. TOOTH. The fine grain last and smallest, over the top of the rest.
+ *
+ * It multiplies, so the sheet darkens into the gutter with the page's own shading
+ * instead of carrying a flat tone of its own — and so the printed band takes the
+ * paper's tooth as well, since the band paints over this and not under it.
+ *
+ * `z-index: 0` puts it above the paper and below everything printed, which is the
+ * same place the fore-edge sits; `::after` is declared after this and so keeps the
+ * trim hairline on top of the grain.
+ * ---------------------------------------------------------------- */
+
+.album__page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .40 0 0 0 0 .36 0 0 0 0 .25 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cg fill='%23796a4a' fill-opacity='.3'%3E%3Ccircle cx='58' cy='104' r='1.1'/%3E%3Ccircle cx='247' cy='63' r='.8'/%3E%3Cellipse cx='166' cy='291' rx='1.7' ry='.6' transform='rotate(-14 166 291)'/%3E%3Ccircle cx='352' cy='218' r='.9'/%3E%3Cellipse cx='94' cy='366' rx='1.4' ry='.5' transform='rotate(9 94 366)'/%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='700' height='700'%3E%3Cfilter id='f'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.045 .42' numOctaves='2' seed='3'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .43 0 0 0 0 .39 0 0 0 0 .28 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='700' height='700' filter='url(%23f)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.009' numOctaves='4' seed='11'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .46 0 0 0 0 .42 0 0 0 0 .3 0 0 0 .13 0'/%3E%3C/filter%3E%3Crect width='900' height='900' filter='url(%23m)'/%3E%3C/svg%3E");
+  background-size:
+    260px 260px,
+    420px 420px,
+    700px 700px,
+    900px 900px;
+}
+
+/* ---------------------------------------------------------------- *
+ * The head band
+ *
+ * A printed band bled to head, fore-edge and fold — three trims, and it stops dead
+ * at the fourth, because a leaf turns on its own and nothing on one may look like
+ * it continues onto the other. Each face paints its own; the two meet at the fold
+ * and the gutter shading crosses them, which is most of what keeps the band reading
+ * as ink on a leaf rather than a bar laid over the spread.
+ *
+ * **It replaces the rule under the head, not the head.** The type is still
+ * `.album__list-head` with `.album__list-title` / `-sep` / `-range` inside it, so
+ * the heading's font, size and tracking stay in one place and the checklist's head
+ * cannot drift from a slots page's. What the band takes off it is the border and
+ * the margins; what it adds is a ground to reverse out of.
+ *
+ * Positioned rather than in the column flow, and `.album__page--slots` pays for it
+ * with a `padding-top` of exactly `--band-h` — so the band's depth and the copy
+ * under it are the same number and cannot disagree.
+ *
+ * **The checklist keeps the plain head.** Its vertical budget is spent by twenty
+ * `1fr` rows and its head carries a tally; putting a 13% band on it is a separate
+ * design decision, not a consequence of this one.
+ * ---------------------------------------------------------------- */
+
+.album__band {
+  /*
+   * The band's colour, derived from the book's own leather.
+   *
+   * **Declared here, on the consumer, and this is load-bearing.** `albumLeather`
+   * spreads `--leather-*` onto `.album` as an inline style, and a `var()` inside a
+   * custom property is substituted on the element that DECLARES it — so a `--band`
+   * written on `:root` would mix bordeaux for ever and every book would print the
+   * same band whatever it was bound in. On `.album__band` it is substituted per
+   * band, against whatever stain that band inherits.
+   *
+   * **From `--leather-mid`, lightened.** `mid` is the body of the hide and the
+   * darkest of the three tokens, which is what makes it the one to build on: across
+   * the five stains `mid` sits in a much tighter band of lightness than `hi` does,
+   * so one mix serves all five. Derived from `hi`, cognac comes out a pale tan that
+   * cannot hold the reversed type and antraciet comes out near-black — two of the
+   * five broken by one rule.
+   *
+   * Lightened because this is INK ON PAPER, not a patch of hide: a raw stain at 13%
+   * of the leaf reads as a swatch of the cover pasted onto the page. The mix is
+   * toward the paper's own cream rather than toward white, so the band stays in the
+   * book's warm family whatever the stain — a grey lightener turns bordeaux and
+   * cognac muddy.
+   *
+   * The flat value first is a fallback, not a leftover, and the same pattern as
+   * `round()` on the checklist: a browser without `color-mix()` drops the second
+   * declaration at parse time and keeps the first, rather than leaving `--band`
+   * unset and the band unpainted.
+   */
+  --band: #4b4130;
+  --band: color-mix(in oklab, var(--leather-mid, #35270f) 72%, #f0e7c9 28%);
+  --band-lo: #3e3527;
+  --band-lo: color-mix(in oklab, var(--leather-mid, #35270f) 86%, #f0e7c9 14%);
+
+  /* Cream on all five stains, for the same reason the brass edge and the gold foil
+     are identical on all five: one product line in five dyes. */
+  --band-ink: #f6f1e0;
+
+  /*
+   * The metals, for the two tier candidates — dark enough to reverse cream type
+   * out of, which the cards' own metal is not. Keyed by `Tier`, so `PageFace` can
+   * name one straight from `card.tier` without a second table in TypeScript.
+   *
+   * **The top tier is gold, a step lighter, and not red.** It was red, borrowed from
+   * the rare printing's own flood — and that was a category error: red on a card is
+   * a property of a *printing*, carried by `card--rood`, while these say which
+   * ratings a leaf holds. `card.css` is unambiguous about the tier itself —
+   * "the top tier. Still gold — there is no Icoon tier above it" — and it separates
+   * `goudZeldzaam` from `goud` exactly this way, by lifting the highlight rather
+   * than changing the colour. So the two golds here are deliberately close: the
+   * cards they stand for are.
+   */
+  --tier-brons: #8d6127;
+  --tier-zilver: #8b95a1;
+  --tier-goud: #ab8c1c;
+  --tier-goudZeldzaam: #b8971e;
+
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--band-h);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  /*
+   * Centred, then dropped: the padding shortens the content box at the top, so the
+   * centred line moves down by half of it. A band this deep with its line
+   * geometrically centred reads as a mistake — the eye puts the centre of a mass of
+   * colour a little high, so type placed on the true centre looks like it has
+   * slipped up.
+   */
+  padding: calc(var(--band-drop) * 2) var(--page-pad-x) 0;
+  background-image: linear-gradient(184deg, var(--band) 0%, var(--band-lo) 100%);
+  /* The ink's own edge on the paper below it. */
+  box-shadow: 0 1px 3px rgba(38, 30, 8, 0.3);
+}
+
+/* The tooth coming back up through the ink. A printed band on a rough stock is
+   never a flat field: the high fibres take less ink, and the sheet's formation
+   shows through the ink as well as under it.
+
+   `border-box` origin so these tiles start where the page's do — the band's own
+   padding would otherwise offset the pattern and the grain would visibly step at
+   the band's foot. */
+.album__band::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-origin: border-box;
+  opacity: 0.5;
+  mix-blend-mode: soft-light;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 .96 0 0 0 0 .8 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='900'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.009' numOctaves='4' seed='11'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .1 0 0 0 0 .12 0 0 0 0 .05 0 0 0 .4 0'/%3E%3C/filter%3E%3Crect width='900' height='900' filter='url(%23m)'/%3E%3C/svg%3E");
+  background-size:
+    260px 260px,
+    900px 900px;
+}
+
+/* The band bleeds to the trim, so it has to take the leaf's own outer corner with
+   it — square over a rounded page corner is the one place the bleed shows as a
+   mistake. A front face is the right-hand page, a back face the left. */
+.album__face--front .album__band {
+  border-radius: 0 3px 0 0;
+}
+
+.album__face--back .album__band {
+  border-radius: 3px 0 0 0;
+}
+
+/* The heading, inside the band: the rule and the margins come off, the colour
+   changes, and nothing about the type does. */
+.album__band .album__list-head {
+  border-bottom: 0;
+  padding-bottom: 0;
+  margin-bottom: 0;
+  z-index: 1;
+}
+
+.album__band .album__list-title,
+.album__band .album__list-range {
+  color: var(--band-ink);
+  text-shadow: 0 1px 2px rgba(20, 26, 10, 0.45);
+}
+
+.album__band .album__list-sep {
+  color: rgba(246, 241, 224, 0.72);
+}
+
+/*
+ * The two tier candidates, on the album rather than on the band: `PageFace` always
+ * hands the band both gradients as custom properties, and which one gets painted is
+ * a book-wide setting. That way the switch is one class on one element and no page
+ * has to be told what mode the book is in.
+ *
+ * The shading layer is kept over the metal, so the comparison is not rigged — a
+ * flat field loses to a shaded one on sight, and that would be a fact about the
+ * switch rather than about the candidate.
+ */
+.album--band-metal .album__band {
+  background-image:
+    linear-gradient(184deg, rgba(255, 255, 255, 0.07) 0%, rgba(0, 0, 0, 0.11) 100%),
+    var(--band-metal);
+}
+
+.album--band-metal-ramp .album__band {
+  background-image:
+    linear-gradient(184deg, rgba(255, 255, 255, 0.07) 0%, rgba(0, 0, 0, 0.11) 100%),
+    var(--band-metal-ramp);
+}
+
+/* Cream on silver needs more than cream on a stain does. */
+.album--band-metal .album__band .album__list-title,
+.album--band-metal .album__band .album__list-range,
+.album--band-metal-ramp .album__band .album__list-title,
+.album--band-metal-ramp .album__band .album__list-range {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------------------------------------------------------------- *
+ * The measure
+ *
+ * Both hairlines run the width of the card block and no further, which is what
+ * makes the block look set on a measure rather than centred by eye. They are the
+ * page's only printed rules, and they are the same weight as each other on purpose:
+ * one system, top and bottom.
+ * ---------------------------------------------------------------- */
+
+.album__page-rule {
+  flex: none;
+  height: 1px;
+  background: rgba(107, 83, 37, 0.34);
+}
+
+.album__page-rule--head {
+  margin-top: var(--band-rule-gap);
+}
+
+/* Above the folio, and the folio's own top padding is what separates them. */
+.album__page-rule--foot {
+  margin-bottom: calc(var(--page-h) * 0.018);
+}
+
+/*
+ * A slots page with a band pays for its depth in `padding-top` — see `.album__band`.
+ * The rows then start `--band-rule-gap` + the rule + `--band-slots-gap` below it,
+ * which is where the reference's do.
+ */
+.album__page--slots {
+  padding-top: var(--band-h);
+}
+
+.album__page--slots .album__slots {
+  margin-top: var(--band-slots-gap);
 }
 
 /* Pages darken toward the spine, which is what actually sells the binding. */
@@ -905,9 +1198,20 @@
  * ones below, so this darkens rather than lightens — which is also what stops the "extra
  * white page" reading coming back.
  *
- * `z-index: 0` keeps it above the paper and below the cards, which are at 1. It cannot
- * take a click, being a pseudo element, but the margin it sits in is the turn strip's hit
- * area and that has been expensive once, so `pointer-events: none` is stated anyway.
+ * **`z-index: 3`, which is above the head band — and that is the physics, not a
+ * preference.** This hairline is not a mark on this sheet: it stands for the edges of
+ * the sheets *underneath* it, seen at the trim. Ink printed on the top sheet cannot
+ * cover the pages below it, so a band that bleeds to the trim has to pass behind the
+ * pile rather than over it. At `z-index: 0` it did the opposite and the band wiped
+ * the top of the stack out for its full depth.
+ *
+ * Above the cards as well, which is new and harmless: `--page-pad-x` guarantees 22px
+ * of margin with nothing printed in it and 6px is the most this ever takes, so there
+ * is no card within a dozen pixels of it.
+ *
+ * It cannot take a click, being a pseudo element, but the margin it sits in is the
+ * turn strip's hit area and that has been expensive once, so `pointer-events: none`
+ * is stated anyway.
  * ---------------------------------------------------------------- */
 
 .album__page::after {
@@ -916,7 +1220,7 @@
   top: 0;
   bottom: 0;
   width: var(--edge-w, 0px);
-  z-index: 0;
+  z-index: 3;
   pointer-events: none;
   background-image:
     /*
@@ -1156,7 +1460,10 @@
    * itself is kept. One property, and `background-color` from `.album__page`'s
    * shorthand still shows through underneath.
    */
-  background-image: radial-gradient(circle at 50% 0%, #fffcf0 0%, #e8e1c9 100%);
+  /* The same two stops `.album__page` now carries — the sheet's texture multiplies
+     into this page too, so it has to start from the same lighter tone or the
+     checklist is printed on darker stock than the leaf facing it. */
+  background-image: radial-gradient(circle at 50% 0%, #fffdf4 0%, #ece5cd 100%);
 
   --graphite: #46474f;
 

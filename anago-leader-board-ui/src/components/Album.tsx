@@ -313,6 +313,89 @@ interface Slot {
   count: number;
 }
 
+/* ------------------------------------------------------------------ *
+ * The head band's colour
+ *
+ * Three candidates, switched from the test panel while it is being decided:
+ *
+ *   leather     one band for the whole book, in the leather it is bound in
+ *   metal       the tiers on the leaf, cut where the page crosses a cutoff
+ *   metal-ramp  the same, ramped across the join instead of cut
+ *
+ * The band itself is `.album__band` in album.css; all this side decides is which
+ * gradient the two metal modes paint. The leather candidate needs nothing from
+ * here — it is derived from the stain in CSS.
+ * ------------------------------------------------------------------ */
+
+export type BandMode = 'leather' | 'metal' | 'metal-ramp';
+
+/**
+ * Runs of equal tier over a leaf's slots, in reading order, each with the fraction
+ * of the leaf it covers.
+ *
+ * **By rating, so it is the same in everybody's book.** The album is one section
+ * sorted ascending by rating, so which tiers a leaf holds is fixed by the players
+ * on it and not by which of their cards you have drawn — `card.tier` is a property
+ * of the player's rating, and an empty mount counts exactly as much as a filled
+ * one. A band derived from what you *own* would change colour as you collected,
+ * which is the one thing page furniture may not do.
+ *
+ * One entry for a leaf that sits inside a single tier, which is the common case:
+ * only the two or three leaves that straddle a cutoff have anything to say, and
+ * that is itself an argument about these candidates rather than a detail of them.
+ */
+const tierRuns = (slots: Slot[]): { tier: string; frac: number }[] => {
+  const runs: { tier: string; n: number }[] = [];
+
+  slots.forEach((slot) => {
+    const last = runs[runs.length - 1];
+    if (last && last.tier === slot.card.tier) last.n += 1;
+    else runs.push({ tier: slot.card.tier, n: 1 });
+  });
+
+  return runs.map((run) => ({ tier: run.tier, frac: run.n / slots.length }));
+};
+
+/**
+ * A leaf's tiers as one horizontal gradient, cut or ramped.
+ *
+ * **A rating axis, not a plan of the grid**, and it cannot be anything else: the
+ * slots run row-major, so the fourth-lowest rating on a leaf is at the left of the
+ * second row and there is no single x where gold starts. What this says is "this
+ * leaf crosses from silver to gold a third of the way in", which is true.
+ *
+ * Always a gradient, even for one tier — the band consumes it as a
+ * `background-image` layer under its own shading, and a bare colour is not a valid
+ * image.
+ */
+const metalBand = (runs: { tier: string; frac: number }[], ramp: boolean): string => {
+  const ink = (tier: string): string => `var(--tier-${tier})`;
+
+  if (runs.length < 2) {
+    const c = ink(runs[0]?.tier ?? 'zilver');
+    return `linear-gradient(90deg, ${c} 0, ${c} 100%)`;
+  }
+
+  /* Half a slot of overlap each side of a join, which is about as soft as a cut can
+     be and still be locatable. Stated as a fraction of a six-slot leaf rather than
+     of the run, so every join on every page is equally soft. */
+  const soft = ramp ? 100 / 12 : 0;
+  const stops: string[] = [];
+  let at = 0;
+
+  runs.forEach((run, i) => {
+    const c = ink(run.tier);
+    const end = at + run.frac * 100;
+    /* The first and last stops go to the trim, so a ramp never fades the band's own
+       ends into nothing. */
+    stops.push(`${c} ${i === 0 ? 0 : at + soft}%`);
+    stops.push(`${c} ${i === runs.length - 1 ? 100 : end - soft}%`);
+    at = end;
+  });
+
+  return `linear-gradient(90deg, ${stops.join(', ')})`;
+};
+
 /**
  * One printed line of the checklist at the back.
  *
@@ -854,10 +937,18 @@ const PageFace: React.FC<{
   }
 
   /*
-   * **A head, the mounts and the folio.**
+   * **A head band, the mounts and the folio.**
    *
    * The head is the checklist's, reused: `.album__list-head` with "COLLECTIE" and
-   * this leaf's rating range set in the title beside it.
+   * this leaf's rating range set in the title beside it — now reversed out of a
+   * printed band bled to three trims. See `.album__band` in album.css for what the
+   * band takes off the head (its rule and its margins) and what it adds (a ground),
+   * and why the type itself is untouched.
+   *
+   * Both metal gradients are handed to the band whatever mode the book is in, and
+   * `.album--band-*` on the album decides which one is painted. The alternative was
+   * a mode prop threaded through three `PageFace` call sites to pick one of them
+   * here, which is more code to reach the same pixel.
    *
    * **This is not the running head coming back, and the difference is the range.**
    * The old one read "Verzamelalbum · <naam>" with the tally opposite, and every
@@ -870,16 +961,35 @@ const PageFace: React.FC<{
    * `title` and `subtitle` survive on `AlbumPage` for the **cover only** — do not
    * take a slots page's word for either being set. `range` is this page's own.
    */
+  /* A padding page has no cards, so it has no range, no band and no rules — and it
+     keeps the plain page's top margin rather than paying for a band it does not
+     print. */
+  const banded = page.range !== undefined;
+  const runs = banded ? tierRuns(page.slots) : [];
+
   return (
-    <div className="album__page">
-      {page.range ? (
-        <div className="album__list-head">
-          <span className="album__list-title">Collectie</span>
-          <span className="album__list-sep">·</span>
-          <span className="album__list-range">
-            {page.range.lo} – {page.range.hi}
-          </span>
-        </div>
+    <div className={`album__page${banded ? ' album__page--slots' : ''}`}>
+      {banded ? (
+        <>
+          <div
+            className="album__band"
+            style={
+              {
+                '--band-metal': metalBand(runs, false),
+                '--band-metal-ramp': metalBand(runs, true),
+              } as React.CSSProperties
+            }
+          >
+            <div className="album__list-head">
+              <span className="album__list-title">Collectie</span>
+              <span className="album__list-sep">·</span>
+              <span className="album__list-range">
+                {page.range?.lo} – {page.range?.hi}
+              </span>
+            </div>
+          </div>
+          <div className="album__page-rule album__page-rule--head" />
+        </>
       ) : null}
 
       {/*
@@ -921,6 +1031,10 @@ const PageFace: React.FC<{
           );
         })}
       </div>
+
+      {/* The foot rule, on the same measure as the head's — see `.album__page-rule`.
+          Only on a page that prints something, for the same reason the band is. */}
+      {banded ? <div className="album__page-rule album__page-rule--foot" /> : null}
 
       {/* The cover is page 0, so a content page's number is its index, not +1. */}
       <div className="album__page-number">{index}</div>
@@ -969,6 +1083,15 @@ interface AlbumProps {
    * was a choice.
    */
   cover?: string;
+  /**
+   * What colours the head band — see `BandMode`.
+   *
+   * **Scaffolding.** It is here so the three candidates can be looked at in a real
+   * book from the test panel while one of them is being chosen; when that decision
+   * lands, the winner becomes the only behaviour and this prop goes. Defaults to the
+   * leather, which is the recommendation.
+   */
+  bandMode?: BandMode;
   /**
    * This book was bound a moment ago and the reader watched it happen.
    *
@@ -1082,6 +1205,7 @@ const Album: React.FC<AlbumProps> = ({
   owner,
   ownerId,
   cover,
+  bandMode = 'leather',
   justBound,
   footer,
   onCardOpen,
@@ -1881,6 +2005,13 @@ const Album: React.FC<AlbumProps> = ({
             */
             rebindingNow ? 'album--rebind' : '',
             rebindPhase ? `album--rebind-${rebindPhase}` : '',
+            /*
+              Which of the three head-band candidates is printed. Nothing for the
+              leather one — that is what `.album__band` paints on its own, so the
+              default state of the book needs no class and the two overrides are
+              additions rather than a set of three that must stay exhaustive.
+            */
+            bandMode === 'leather' ? '' : `album--band-${bandMode}`,
           ]
             .filter(Boolean)
             .join(' ')}
