@@ -10,27 +10,37 @@ native. Under in-process IIS hosting those would stay loaded in `w3wp`, which lo
 dlls during a deploy and keeps a model session in memory permanently for something that
 runs a handful of times a year. A short-lived child process has neither problem.
 
-The API starts this script after an avatar upload — see `SilhouetteService` and the
-`Silhouette` section in `appsettings.json`. It is fire-and-forget: if generation fails the
-upload still succeeds and the card falls back to its flat plate.
+The API starts this script after an avatar upload — see `SilhouetteService`. It is
+fire-and-forget: if generation fails the upload still succeeds and the card falls back to
+its flat plate.
 
 ## Setup
 
-```
-npm install
-npm run model      # downloads u2netp.onnx, ~4.6 MB, Apache-2.0
-```
+None. `AnagoLeaderboard.csproj` runs `npm ci` here when `node_modules` is missing or the
+lockfile has moved, so building the API is enough. The model, `u2netp.onnx` (4.6 MB,
+Apache-2.0), is committed next to the script — it is a fixed asset, not a resolvable
+dependency, and `npm run model` only exists to fetch it again if it is ever lost. Missing,
+the script exits with code 3 and prints the download command.
 
-The model is not committed. If it is missing the script exits with code 3 and prints the
-download command.
+`node_modules` is ~260 MB of onnxruntime binaries and stays out of the repository, the same
+way the front end's does.
 
 ## Deploying
 
-The script resolves both the model and its modules **next to itself**, so deploy the whole
-directory — `make-silhouettes.mjs`, `node_modules/` and `u2netp.onnx` — and point
-`Silhouette:Arguments` in `appsettings.json` at that copy. Node must be installed on the
-server. Set `Silhouette:Enabled` to `true` once it is in place; while it is `false` the
-API simply never calls out, and cards fall back to the flat plate.
+Nothing to do by hand and nothing to configure. `dotnet publish` copies this whole
+directory to `silhouette/` beside the application, and `SilhouetteService` looks for it
+there — falling back to the repository copy when the API runs from a build rather than a
+publish. Both layouts are found without a path in `appsettings.json`, which is why there is
+no `Silhouette` section in it.
+
+There is no on/off switch either. There was one, and it defaulted to off, which meant an
+avatar upload quietly changed nothing on a machine where nobody had thought to turn it on —
+the failure it was meant to protect against is already handled by the generation being
+fire-and-forget.
+
+**Node must be installed** on the server, on the `PATH` of the account the API runs as.
+That is the one requirement this cannot carry with it; a missing `node` is logged as a
+failed generation.
 
 ## Usage
 

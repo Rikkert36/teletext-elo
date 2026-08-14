@@ -1754,13 +1754,6 @@
   color: #a2977c;
 }
 
-/* Printed with the list: how many there are is what the press knows. */
-.album__list-total {
-  margin-left: auto;
-  font-family: Georgia, "Times New Roman", serif;
-  color: #8a7f64;
-}
-
 /*
  * Two columns of twenty, filled down and then across, as a printed list is.
  *

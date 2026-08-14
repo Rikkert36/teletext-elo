@@ -497,3 +497,7 @@ anago-leader-board-ui/node_modules/.bin/acorn.cmd
 /anago-leader-board-ui/node_modules
 /anago-leader-board-ui/node_modules
 /anago-leader-board-ui/build
+
+# Request files holding the caretaker's key. The committed AnagoLeaderboard.http reads it
+# from here so the value itself never enters the repository.
+*.private.http

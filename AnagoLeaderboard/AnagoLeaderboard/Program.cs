@@ -1,4 +1,5 @@
 using AnagoLeaderboard.Database;
+using AnagoLeaderboard.Security;
 using AnagoLeaderboard.Services;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.EntityFrameworkCore;
@@ -66,6 +67,18 @@ if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
+
+// A deploy that forgets the key fails closed and therefore fails quietly - the gift route
+// simply answers 404 - so say it once at startup rather than leaving it to be discovered by a
+// present that never arrives.
+if (!app.Environment.IsDevelopment()
+    && string.IsNullOrWhiteSpace(app.Configuration[AdminOnlyAttribute.ConfigurationKey]))
+{
+    app.Logger.LogWarning(
+        "{Setting} is not configured, so admin-only routes answer 404 in this environment. "
+        + "Set it as the Admin__Key environment variable.",
+        AdminOnlyAttribute.ConfigurationKey);
 }
 
 app.UseCors("AllowReactApp");

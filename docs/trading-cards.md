@@ -256,8 +256,21 @@ real: the pack buttons hand the **signed-in player** a present, so nothing on th
 fakes state the server does not have. It deliberately does not offer the other two
 shapes — a button that quietly gave the whole office a packet is not a thing to have one
 click away from a button that gives you one, so a named list and "everybody" are reachable
-from the API only. The panel itself still wants a debug flag rather than
-`SHOW_DEBUG = true`.
+from the API only.
+
+**And it is development-only, compiled out rather than hidden.** `SHOW_DEBUG` is
+`process.env.NODE_ENV === 'development'`, which webpack inlines at build time, so a
+production build eliminates the branch and the panel is not in the bundle at all — no
+markup, no strings, nothing to unhide. A runtime flag was rejected for exactly that: the
+panel gifts packs and deletes albums, and a flag is one devtools line away from being on.
+It is the outer layer of two, and the inner one is the real fence — `collections/gifts` is
+`[AdminOnly]` (which waves Development through and asks everybody else for a key), while
+`DELETE collections/{playerId}` and the icons `force` path both return 404 outside
+Development. So the buttons are gone *and* the calls behind them are refused; either alone
+would have been enough to be safe, and the pair is what makes it hard to undo by accident.
+One consequence worth knowing: `NODE_ENV` is `test` under jest, so the panel is absent in
+tests too. Nothing asserts on it today, and a test that wants it should render the panel's
+contents rather than flip the flag.
 
 **It now lies at the foot of the right margin**, under the register, rather than on a
 full-width plate beneath the table. That was not about the panel: the book is sized off

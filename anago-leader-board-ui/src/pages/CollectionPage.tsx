@@ -85,9 +85,20 @@ const PLACE_TURN_CAP_MS = 4000;
  * collection and the icons latch, so nothing here fakes state the server does not
  * have. Plus `snel openen`, which was always client-side.
  *
- * It still wants to go behind a debug flag rather than a constant.
+ * Development only, and **compiled out** rather than hidden. `process.env.NODE_ENV` is
+ * inlined by webpack at build time, so `production` turns the branch below into dead code
+ * and it leaves the bundle entirely — markup, handlers' call sites and Dutch strings. A
+ * runtime flag would have shipped a panel that gifts packs and deletes albums to everybody
+ * with devtools open.
+ *
+ * It is belt to the API's braces rather than the protection itself: `collections/gifts` is
+ * `[AdminOnly]`, and `DELETE collections/{playerId}` and the icons `force` path both 404
+ * outside Development. Those are what actually stop the calls; this stops the buttons from
+ * being there to press.
+ *
+ * `NODE_ENV` is `test` under jest, so the panel is absent there too — nothing asserts on it.
  */
-const SHOW_DEBUG = true;
+const SHOW_DEBUG = process.env.NODE_ENV === 'development';
 
 /** The seam. Everything behind it is a real call now. */
 const client = httpCardsClient;

@@ -1,5 +1,6 @@
 using AnagoLeaderboard.Models.RequestParameters;
 using AnagoLeaderboard.Models.Results;
+using AnagoLeaderboard.Security;
 using AnagoLeaderboard.Services;
 using Microsoft.AspNetCore.Mvc;
 
@@ -11,6 +12,11 @@ namespace AnagoLeaderboard.Controllers
     /// bounded, since cards always land with the rightful owner and only the surprise of a
     /// reveal can be spoiled. The mitigation lives in the UI: the player picker is a
     /// type-ahead rather than a list to choose from.
+    ///
+    /// The one exception is the gift route, which carries <see cref="AdminOnlyAttribute"/>. That
+    /// is not a player signing in - it is a key on the caretaker's toolbox, and it is there
+    /// precisely because a present is the one thing here that is not bounded by what somebody
+    /// earned.
     /// </summary>
     [Route("api")]
     [ApiController]
@@ -154,10 +160,22 @@ namespace AnagoLeaderboard.Controllers
         /// something done by hand a few times a month rather than a thousand times a year.
         ///
         /// **Not development only**, unlike the two routes below it. Handing out packs is a real
-        /// thing to want to do in an office - a tournament prize, a birthday, a welcome - and this
-        /// app has no authentication anywhere by design, so gating it on the environment would
-        /// protect nothing while removing the feature.
+        /// thing to want to do in an office - a tournament prize, a birthday, a welcome - so an
+        /// environment gate would remove the feature outright. What it carries instead is
+        /// <see cref="AdminOnlyAttribute"/>: outside Development the caretaker's key must be in
+        /// the <c>X-Admin-Key</c> header, and without it this route 404s like the two below.
+        ///
+        /// That is the whole protection, and it is deliberately the only route that has any. The
+        /// rest of this controller is still open and still trusts the player named in the path,
+        /// exactly as the class comment says - because what those routes can do is bounded by
+        /// what somebody earned, and a present is not. This is the one place where asking is
+        /// enough to be given, so it is the one place worth a key.
+        ///
+        /// The key never reaches the browser bundle - an SPA cannot hold a secret - so on a real
+        /// server this is called by hand from <c>AnagoLeaderboard.http</c> or curl. The test
+        /// panel's gift buttons keep working in Development, where no key is asked for.
         /// </summary>
+        [AdminOnly]
         [HttpPost("collections/gifts")]
         public async Task<ActionResult<GiftReceipt>> GiveGift([FromBody] GiftForm form)
         {

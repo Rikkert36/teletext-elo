@@ -717,17 +717,17 @@ const PageFace: React.FC<{
             strikt noodzakelijk.
           </p>
           <p>
-            En natuurlijk gaat het allang niet meer alleen om de stand. 
+            Wie vaak genoeg meespeelt, weet dat de leukste momenten lang niet altijd op het scorebord terechtkomen.
             Er zijn goals die met echte doelpalen nooit hadden gezeten, 
-            ballen die via de bunda van de keeper alsnog binnenvallen, 'Pietjes', 'Mark-ies' en 
-            langzaam rollende ballen die met “psst psst” en driftig wijzen 
-            de juiste hoek in worden gewenst. 
-            Aan het einde van de dag groeit “nog één potje” bovendien verrassend 
-            makkelijk uit tot een complete rotatie.
+            ballen die via de achterwand en vervolgens via de pumba van de keeper alsnog binnenvallen, 
+            ‘Pietjes’, ‘Mark-ies’ en langzaam rollende ballen die met “psst psst” en driftig wijzen 
+            de juiste hoek in worden gewenst. Zelfs een bal die uit de tafel vliegt, 
+            krijgt soms op wonderbaarlijke wijze een tweede leven wanneer hij hooghoudend weer het spel in wordt gewerkt. 
+            Aan het einde van de dag groeit “nog één potje” bovendien verrassend makkelijk uit tot een complete rotatie.
           </p>
           <p>
             Na genoeg wedstrijden krijgt bijna iedere speler vanzelf een eigen
-            verhaal. Een favoriete positie, een beruchte signature-move, een irritant trekje
+            verhaal. Een favoriete positie, een beruchte signature-move, een twijfelachtige gewoonte
             of simpelweg een reputatie die groter is geworden dan de resultaten
             rechtvaardigen. Al die spelers, verhalen en eigenaardigheden verdienen
             eigenlijk een plek bij elkaar.
@@ -775,11 +775,14 @@ const PageFace: React.FC<{
     return (
       <div className="album__page album__page--list">
         <div className="album__list-head">
+          {/*
+            The head is the word and nothing else. It used to carry "<n> spelers"
+            in the far margin, and the figure was already on the page twice over —
+            once per row in the count column, and once as the total in the tally
+            below the list. Three copies of one number is two too many, and the
+            tally is the one that belongs, since it is the reader's own sum.
+          */}
           <span className="album__list-title">Checklist</span>
-          {/* Printed with the list: how many there are is what the press knows. */}
-          {page.tally ? (
-            <span className="album__list-total">{page.tally.total} spelers</span>
-          ) : null}
         </div>
 
         <ol className="album__list">

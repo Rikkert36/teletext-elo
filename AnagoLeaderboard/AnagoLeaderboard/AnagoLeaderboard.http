@@ -1,6 +1,37 @@
 @AnagoLeaderboard_HostAddress = http://localhost:5233
 
-GET {{AnagoLeaderboard_HostAddress}}/weatherforecast/
-Accept: application/json
+# The caretaker's key, for the routes carrying [AdminOnly]. Leave it empty here and put the
+# real one in AnagoLeaderboard.private.http (git-ignored) as:
+#
+#     @AdminKey = ...
+#
+# Development does not ask for it at all, so this only matters when pointing the requests at
+# the real server. Never commit the value.
+@AdminKey =
+
+###
+# Presents a pack to named players. Leave playerIds out entirely to give one to everybody.
+POST {{AnagoLeaderboard_HostAddress}}/api/collections/gifts
+Content-Type: application/json
+X-Admin-Key: {{AdminKey}}
+
+{
+  "playerIds": ["put-a-player-id-here"],
+  "size": 3,
+  "reason": "toernooiprijs"
+}
+
+###
+# A guaranteed single instead: a floor on the overall rather than a count of cards. One or the
+# other, never both.
+POST {{AnagoLeaderboard_HostAddress}}/api/collections/gifts
+Content-Type: application/json
+X-Admin-Key: {{AdminKey}}
+
+{
+  "playerIds": ["put-a-player-id-here"],
+  "minimumOverall": 88,
+  "reason": "verjaardag"
+}
 
 ###

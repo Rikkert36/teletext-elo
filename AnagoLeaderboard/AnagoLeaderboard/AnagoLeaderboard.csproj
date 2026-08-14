@@ -12,4 +12,53 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.10" />
   </ItemGroup>
+
+  <!--
+    The silhouette generator (tools/silhouette) is a node script the API starts as a child
+    process after an avatar upload — see SilhouetteService. It is treated as part of this
+    project's build rather than as something installed by hand on the server: its packages
+    are restored like any other dependency, and a publish carries the whole tool along, so
+    there is nothing to copy and nothing to point at a path.
+
+    Its node_modules is ~260 MB of onnxruntime binaries and stays out of the repository, the
+    same way the front end's does. The model beside the script is 4.6 MB and is committed,
+    because it is a fixed asset rather than a resolvable dependency.
+  -->
+  <PropertyGroup>
+    <SilhouetteToolDir>$(MSBuildThisFileDirectory)..\..\tools\silhouette\</SilhouetteToolDir>
+  </PropertyGroup>
+
+  <!--
+    Incremental on npm's own marker: npm ci writes node_modules/.package-lock.json, so this
+    runs on a fresh clone and after the lockfile changes, and is skipped on every build in
+    between. npm ci rather than npm install so the lockfile is authoritative and never
+    silently rewritten by a build.
+
+    ONNXRUNTIME_NODE_INSTALL=skip stops onnxruntime-node's postinstall reaching out to
+    nuget.org for GPU provider binaries. On win32/x64 it asks for none of them anyway, but
+    the masks are generated on the CPU on every platform, so nothing here wants a build that
+    can turn into a several-hundred-megabyte download somewhere else.
+  -->
+  <Target Name="RestoreSilhouetteTool"
+          BeforeTargets="BeforeBuild"
+          Inputs="$(SilhouetteToolDir)package-lock.json"
+          Outputs="$(SilhouetteToolDir)node_modules\.package-lock.json">
+    <Message Importance="high" Text="Restoring the silhouette generator's packages (npm ci)..." />
+    <Exec Command="npm ci" WorkingDirectory="$(SilhouetteToolDir)" EnvironmentVariables="ONNXRUNTIME_NODE_INSTALL=skip" />
+  </Target>
+
+  <!--
+    Publish-only, and the glob is inside the target so it is expanded after the restore
+    above has run rather than when the project is evaluated. .package-lock.json is included:
+    it is what makes the copy incremental on the next publish.
+  -->
+  <Target Name="PublishSilhouetteTool" AfterTargets="Publish" DependsOnTargets="RestoreSilhouetteTool">
+    <ItemGroup>
+      <SilhouetteToolFiles Include="$(SilhouetteToolDir)**\*" Exclude="$(SilhouetteToolDir)README.md" />
+    </ItemGroup>
+    <Copy SourceFiles="@(SilhouetteToolFiles)"
+          DestinationFiles="@(SilhouetteToolFiles->'$(PublishDir)silhouette\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Message Importance="high" Text="Silhouette generator published to $(PublishDir)silhouette\" />
+  </Target>
 </Project>
