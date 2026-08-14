@@ -73,6 +73,17 @@
     --brons-band: #8d6127;  --brons-rule: #a97b32;
     --zilver-band: #8b95a1; --zilver-rule: #aab4bf;
     --goud-band: #ab8c1c;   --goud-rule: #cda423;
+    /*
+     * **Superseded in the app, and this is the record of why.** The top tier's band
+     * was red here, borrowed from the rare printing's own flood, and that is a
+     * category error: red on a card is a property of a PRINTING (`card--rood`) while
+     * these say which ratings a leaf holds. `card.css` is explicit about the tier —
+     * "the top tier. Still gold — there is no Icoon tier above it" — and separates
+     * `goudZeldzaam` from `goud` by lifting the highlight, not by changing colour.
+     * album.css therefore has `--tier-goudZeldzaam: #b8971e`, a step lighter than its
+     * gold. Left here because the spread below has nobody above 81 and so never draws
+     * it, which is itself worth knowing: nothing on this page ever tested it.
+     */
     --rood-band: #a2121b;   --rood-rule: #c8202a;
   }
 

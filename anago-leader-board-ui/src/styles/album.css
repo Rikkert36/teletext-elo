@@ -231,6 +231,51 @@
 }
 
 .album {
+  /*
+   * The head band's colour, derived from the book's own leather.
+   *
+   * **Declared here, on `.album`, and that is exactly as high as it can go.**
+   * `albumLeather` spreads `--leather-*` onto this element as an inline style, and a
+   * `var()` inside a custom property is substituted on the element that DECLARES it,
+   * against that element's own final value. On `.album` the inline stain is that
+   * value, so this resolves per book. One level up, on `:root`, it would resolve
+   * against nothing and mix the bordeaux fallback for ever — every book would print
+   * the same band whatever it was bound in.
+   *
+   * Here rather than on `.album__band` because two things read it: the band, and the
+   * fore-edge, which has to show the pile's bands on a page that prints none of its
+   * own.
+   *
+   * **From `--leather-mid`, lightened.** `mid` is the body of the hide and the
+   * darkest of the three tokens, which is what makes it the one to build on: across
+   * the five stains `mid` sits in a much tighter band of lightness than `hi` does, so
+   * one mix serves all five. Derived from `hi`, cognac comes out a pale tan that
+   * cannot hold the reversed type and antraciet comes out near-black — two of the
+   * five broken by one rule.
+   *
+   * Lightened because this is INK ON PAPER, not a patch of hide: a raw stain at 13%
+   * of the leaf reads as a swatch of the cover pasted onto the page. The mix is
+   * toward the paper's own cream rather than toward white, so the band stays in the
+   * book's warm family whatever the stain — a grey lightener turns bordeaux and
+   * cognac muddy.
+   *
+   * The flat value first is a fallback, not a leftover, and the same pattern as
+   * `round()` on the checklist: a browser without `color-mix()` drops the second
+   * declaration at parse time and keeps the first, rather than leaving `--band` unset
+   * and the band unpainted.
+   */
+  --band: #4b4130;
+  --band: color-mix(in oklab, var(--leather-mid, #35270f) 72%, #f0e7c9 28%);
+  --band-lo: #3e3527;
+  --band-lo: color-mix(in oklab, var(--leather-mid, #35270f) 86%, #f0e7c9 14%);
+
+  /*
+   * The same band seen at the pile's cut edge: a step darker than its face, because
+   * an edge is ink at a glancing angle with the dark between two sheets beside it.
+   */
+  --band-edge: #3a3124;
+  --band-edge: color-mix(in oklab, var(--band) 82%, #1c1206 18%);
+
   perspective: 2600px;
   perspective-origin: 50% 42%;
   display: flex;
@@ -967,61 +1012,11 @@
  * ---------------------------------------------------------------- */
 
 .album__band {
-  /*
-   * The band's colour, derived from the book's own leather.
-   *
-   * **Declared here, on the consumer, and this is load-bearing.** `albumLeather`
-   * spreads `--leather-*` onto `.album` as an inline style, and a `var()` inside a
-   * custom property is substituted on the element that DECLARES it — so a `--band`
-   * written on `:root` would mix bordeaux for ever and every book would print the
-   * same band whatever it was bound in. On `.album__band` it is substituted per
-   * band, against whatever stain that band inherits.
-   *
-   * **From `--leather-mid`, lightened.** `mid` is the body of the hide and the
-   * darkest of the three tokens, which is what makes it the one to build on: across
-   * the five stains `mid` sits in a much tighter band of lightness than `hi` does,
-   * so one mix serves all five. Derived from `hi`, cognac comes out a pale tan that
-   * cannot hold the reversed type and antraciet comes out near-black — two of the
-   * five broken by one rule.
-   *
-   * Lightened because this is INK ON PAPER, not a patch of hide: a raw stain at 13%
-   * of the leaf reads as a swatch of the cover pasted onto the page. The mix is
-   * toward the paper's own cream rather than toward white, so the band stays in the
-   * book's warm family whatever the stain — a grey lightener turns bordeaux and
-   * cognac muddy.
-   *
-   * The flat value first is a fallback, not a leftover, and the same pattern as
-   * `round()` on the checklist: a browser without `color-mix()` drops the second
-   * declaration at parse time and keeps the first, rather than leaving `--band`
-   * unset and the band unpainted.
-   */
-  --band: #4b4130;
-  --band: color-mix(in oklab, var(--leather-mid, #35270f) 72%, #f0e7c9 28%);
-  --band-lo: #3e3527;
-  --band-lo: color-mix(in oklab, var(--leather-mid, #35270f) 86%, #f0e7c9 14%);
+  /* The band's own colours are on `.album` — the fore-edge reads them too. */
 
   /* Cream on all five stains, for the same reason the brass edge and the gold foil
      are identical on all five: one product line in five dyes. */
   --band-ink: #f6f1e0;
-
-  /*
-   * The metals, for the two tier candidates — dark enough to reverse cream type
-   * out of, which the cards' own metal is not. Keyed by `Tier`, so `PageFace` can
-   * name one straight from `card.tier` without a second table in TypeScript.
-   *
-   * **The top tier is gold, a step lighter, and not red.** It was red, borrowed from
-   * the rare printing's own flood — and that was a category error: red on a card is
-   * a property of a *printing*, carried by `card--rood`, while these say which
-   * ratings a leaf holds. `card.css` is unambiguous about the tier itself —
-   * "the top tier. Still gold — there is no Icoon tier above it" — and it separates
-   * `goudZeldzaam` from `goud` exactly this way, by lifting the highlight rather
-   * than changing the colour. So the two golds here are deliberately close: the
-   * cards they stand for are.
-   */
-  --tier-brons: #8d6127;
-  --tier-zilver: #8b95a1;
-  --tier-goud: #ab8c1c;
-  --tier-goudZeldzaam: #b8971e;
 
   position: absolute;
   top: 0;
@@ -1096,37 +1091,43 @@
   color: rgba(246, 241, 224, 0.72);
 }
 
-/*
- * The two tier candidates, on the album rather than on the band: `PageFace` always
- * hands the band both gradients as custom properties, and which one gets painted is
- * a book-wide setting. That way the switch is one class on one element and no page
- * has to be told what mode the book is in.
+/* ----------------------------------------------------------------- *
+ * What the band is NOT coloured by, and why — settled, do not re-open
  *
- * The shading layer is kept over the metal, so the comparison is not rigged — a
- * flat field loses to a shaded one on sight, and that would be a fact about the
- * switch rather than about the candidate.
- */
-.album--band-metal .album__band {
-  background-image:
-    linear-gradient(184deg, rgba(255, 255, 255, 0.07) 0%, rgba(0, 0, 0, 0.11) 100%),
-    var(--band-metal);
-}
+ * Two other candidates were built, switchable from the test panel, and both were
+ * dropped. Both coloured the band by the **tiers of the cards on the leaf** — the
+ * metal of the ratings it holds, either cut where the page crosses a cutoff (65, 75,
+ * 85) or ramped across the join. The album is one section sorted ascending by rating,
+ * so it was real information: you would learn to thumb straight to the gold end.
+ *
+ * Four things killed it, in order of how much they cost:
+ *
+ *   - **The cut lands in the head type.** Its position is data, not layout: on a leaf
+ *     running 73–81 the silver/gold boundary falls a third of the way along, which is
+ *     exactly where `73 – 81` is set. It cannot be fixed by moving the type, because
+ *     the next leaf puts the cut somewhere else.
+ *   - **It is the cards' language.** Bronze, silver and gold belong to the collection;
+ *     the page furniture is the press's. `card.css` keeps that line carefully, and a
+ *     gold band at 13% of a leaf competes with the metal it is supposed to frame.
+ *   - **The ink would be a second thing the tier moves.** Ratings shift, cards
+ *     re-sort, and the band would change colour under a reader. The card's own ink had
+ *     this exact bug once — see "a bronze per tier was tried" in card.css.
+ *   - **The fore-edge cannot state it.** A pile of silver and gold bands has no colour,
+ *     so the stack drawing had to fake a mixed metal.
+ *
+ * What the leather buys instead: a running head band is architecture, not information
+ * — in a real album it is the same on every page, and that sameness is what makes a
+ * stack of leaves read as one manufactured object. It also pays off the one-time
+ * stain ceremony on every leaf, where it previously showed on the cover and the
+ * endpapers and then vanished for sixteen pages.
+ *
+ * A third candidate is recorded in docs/album-band-colours.html and is the one worth
+ * reviving if the thumb-index is ever wanted: the stain band with a **three-pixel
+ * metal rule along its foot**, which carries the tier without a gold field on cream
+ * and without touching the type.
+ * ----------------------------------------------------------------- */
 
-.album--band-metal-ramp .album__band {
-  background-image:
-    linear-gradient(184deg, rgba(255, 255, 255, 0.07) 0%, rgba(0, 0, 0, 0.11) 100%),
-    var(--band-metal-ramp);
-}
-
-/* Cream on silver needs more than cream on a stain does. */
-.album--band-metal .album__band .album__list-title,
-.album--band-metal .album__band .album__list-range,
-.album--band-metal-ramp .album__band .album__list-title,
-.album--band-metal-ramp .album__band .album__list-range {
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
-}
-
-/* ---------------------------------------------------------------- *
+/* ----------------------------------------------------------------- *
  * The measure
  *
  * Both hairlines run the width of the card block and no further, which is what
@@ -1243,13 +1244,71 @@
       transparent 1px 2px
     ),
     /* And the block sitting in its own shade, deepest at the trim. */
-    linear-gradient(90deg, rgba(78, 64, 36, 0.16), rgba(78, 64, 36, 0.05));
+    linear-gradient(90deg, rgba(78, 64, 36, 0.16), rgba(78, 64, 36, 0.05)),
+    /*
+     * **The pile's own head bands, at the cut edge — and they come down in STEPS.**
+     *
+     * The band bleeds to the trim, so every banded sheet in the block carries colour
+     * right out to its own edge, and this is a drawing of those edges. It goes on
+     * every paper page and not only the banded ones, which is the whole point: the
+     * pages a reader is *not* looking at are what the pile is made of. Without it the
+     * first and last spreads — the voorwoord and the checklist, which print no band
+     * of their own — showed a plain cream stack, reporting a book with no bands in it.
+     *
+     * It was one rectangle with a ruled horizontal foot, and that is what gave it
+     * away: a block is fanned, so each sheet sits a hair lower than the one on top of
+     * it and the band's foot cannot be level across the pile. A smooth slope is the
+     * obvious fix and it is the wrong one — over six pixels a diagonal reads as a
+     * wedge of colour, not as a stack. **Three steps of 2px, deepest at the trim**,
+     * says what is actually there: sheets, at slightly different heights, seen end on.
+     *
+     * Drawn as three no-repeat layers rather than one gradient because a linear
+     * gradient's colour boundary is always straight and perpendicular to its axis —
+     * it can be tilted but it cannot be stepped. Widths are 34% so the three overlap
+     * by a fraction and leave no seam, and they are percentages because `--edge-w`
+     * grows and shrinks with the pile.
+     *
+     * Last in the layer list, so the sheet hairlines and the block's shade paint over
+     * them and the colour comes out striated rather than as a clean chip of ink. On a
+     * page that does print a band, these sit directly under it in the same colour a
+     * shade darker, which is what an edge below a face is.
+     */
+    linear-gradient(var(--band-edge), var(--band-edge)),
+    linear-gradient(var(--band-edge), var(--band-edge)),
+    linear-gradient(var(--band-edge), var(--band-edge));
+  background-repeat: no-repeat, repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  background-size:
+    auto,
+    auto,
+    auto,
+    34% var(--band-h),
+    34% calc(var(--band-h) + 2px),
+    34% calc(var(--band-h) + 4px);
+  /* Innermost step shortest, outermost longest: the trim is the deep end of the pile.
+     A front face's trim is on its right — the back face mirrors these. */
+  background-position:
+    center,
+    center,
+    center,
+    left top,
+    center top,
+    right top;
   /*
    * No transition on the width. The timing is `settledFlipped` in Album.tsx, and a width
    * driven by a custom property does not reliably start one in any case — adding one back
    * would either do nothing or compose into a double delay.
    */
 }
+
+/*
+ * **The pile is one colour, and that is now a property of the design.**
+ *
+ * While the band was a candidate rather than a decision, it could also be drawn in
+ * the metal of the ratings on each leaf — and then the edge could not honestly name a
+ * colour at all, because a block of silver and gold bands has no single one. That the
+ * fore-edge can state the stain plainly is one of the things the leather candidate
+ * won on. See the note on `.album__band`.
+ */
 
 /*
  * **A leaf in the air has no pile, so it draws no edge.**
@@ -1282,7 +1341,8 @@
   left: 0;
   --edge-w: var(--edge-l, 0px);
   border-radius: 3px 0 0 3px;
-  /* Mirrored, so the shade deepens toward the other side. */
+  /* Mirrored, so the shade deepens toward the other side. The pile's bands are not
+     mirrored — a head is a head on either leaf — so that layer is repeated as is. */
   background-image:
     linear-gradient(
       180deg,
@@ -1298,7 +1358,20 @@
       rgba(78, 64, 36, 0.22) 0 1px,
       transparent 1px 2px
     ),
-    linear-gradient(270deg, rgba(78, 64, 36, 0.16), rgba(78, 64, 36, 0.05));
+    linear-gradient(270deg, rgba(78, 64, 36, 0.16), rgba(78, 64, 36, 0.05)),
+    linear-gradient(var(--band-edge), var(--band-edge)),
+    linear-gradient(var(--band-edge), var(--band-edge)),
+    linear-gradient(var(--band-edge), var(--band-edge));
+  /* A back face is the left-hand page, so its trim is on the LEFT and the staircase
+     goes down the other way. Sizes and repeats carry over from the base rule — only
+     the order of the three steps across the strip changes. */
+  background-position:
+    center,
+    center,
+    center,
+    right top,
+    center top,
+    left top;
 }
 
 .album__slots {
@@ -3010,6 +3083,14 @@
 .album--mobile .album__endpaper {
   border-radius: 3px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+/* The band bleeds to the trim, so it takes the page's corners with it — and on a phone
+   that is both of the top two, because a slide is a whole leaf rather than one face of
+   one. The desktop rules are keyed to `.album__face--front/--back`, which do not exist
+   here. */
+.album--mobile .album__band {
+  border-radius: 3px 3px 0 0;
 }
 
 /* No fore-edge on a phone. One page slides across, there is no spine and no pile either
