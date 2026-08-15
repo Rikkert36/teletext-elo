@@ -1,13 +1,21 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import Album, { AlbumSection, albumSlotOrder } from '../components/Album';
 import AlbumChoice from '../components/AlbumChoice';
 import CardViewer from '../components/CardViewer';
 import GameShell from '../components/GameShell';
 import Hourglass from '../components/Hourglass';
-import PackOpener from '../components/PackOpener';
+import PackOpener, { REACH_MS } from '../components/PackOpener';
 import LedgerCorner from '../components/LedgerCorner';
 import LockedAlbum from '../components/LockedAlbum';
+import PackFace from '../components/PackFace';
 import PackTile from '../components/PackTile';
 import PutAway, { Placing } from '../components/PutAway';
 import SigningLedger from '../components/SigningLedger';
@@ -21,7 +29,10 @@ import {
   splitName,
 } from '../mock/cardMock';
 import { CoverId } from '../utils/albumLeather';
-import { ms } from '../utils/animationSpeed';
+import { ms, prefersReducedMotion } from '../utils/animationSpeed';
+import { packFoil } from '../utils/packFoil';
+import { PackGrab } from '../utils/packGrab';
+import { playSlot } from '../utils/sounds';
 import { CURRENT_PLAYER_KEY as PLAYER_KEY } from '../utils/currentPlayer';
 import '../styles/game.css';
 
@@ -79,6 +90,96 @@ const PLACE_REST_MS = 520;
  */
 const PLACE_TURN_CAP_MS = 4000;
 
+/* ------------------------------------------------------------------ *
+ * Reaching for a packet
+ *
+ * One gesture in three places, and it used to be a cut in all three: the packet left the
+ * pile, a bigger one appeared in the middle, and the book it replaced blinked out — three
+ * simultaneous changes with nothing connecting them, on the one click that is supposed to
+ * feel like picking something up.
+ *
+ * So the packet is **flown** from its place in the margin to the stage, growing as it comes
+ * (`REACH_MS`, and the flight itself is the opener's — it owns the far end); the pile
+ * **closes up** behind it; and the book **fades** rather than vanishing. All three run over
+ * the same short window, because they are one movement seen from three sides.
+ *
+ * None of it happens under `prefers-reduced-motion`, which lands on the finished state
+ * everywhere on this page rather than playing it stilled.
+ * ------------------------------------------------------------------ */
+
+/**
+ * The pile closing up behind a packet that has been taken off it.
+ *
+ * `REACH_MS`, deliberately: the shelf shifting and the packet arriving are the same event
+ * and must not be tuned apart. It is a FLIP over the tiles that are left — the shelf is a
+ * wrapping row two packets wide, so taking one out pulls every packet after it up a place.
+ */
+const SHELF_SHIFT_MS = REACH_MS;
+
+/**
+ * The curve everything in this gesture moves on — the packet, the pile, the clone going
+ * home. It is the row of cards' own easing, because this is the same kind of motion: a
+ * thing being carried, which sets off decisively and is put down gently.
+ */
+const CARRY = 'cubic-bezier(0.32, 0.72, 0.28, 1)';
+
+/* ------------------------------------------------------------------ *
+ * The packets being brought over
+ *
+ * The one thing the binding ceremony did not cover. Your name is written into the cover,
+ * the book is set down and opens itself — and the pile beside it simply *was there*, on the
+ * frame the ceremony ended, because the shelf is suppressed for the length of the choice
+ * and unsuppressed after it. Every other arrival on this page is flown; this was the last
+ * cut left in the sequence, and it landed on the one screen that is nothing but ceremony.
+ *
+ * So the packets are **slid in from your own side of the table** — up from below the bottom
+ * edge, straightening out of a steeper lean as they come to rest. The reader is sitting at
+ * the near edge, so below the fold is where a thing handed to you comes from, and it is the
+ * gesture the shelf's own vocabulary already implies: the return flight is a packet being
+ * put back on the pile, and this is the pile being put there in the first place.
+ *
+ * **They arrive as one pile, not as a deal.** A per-packet stagger big enough to read as
+ * dealing is fine for the two or three packets a new colleague has and is a machine gun at
+ * twenty — and the number is not something this page controls, since packs are derived from
+ * games played. The stagger is capped in *total* instead (`DEAL_SPREAD_MAX`), so a deep pile
+ * simply arrives more nearly together. That is also why there is one `playSlot` rather than
+ * one per packet: the sound is the pile touching down, which is a fact about the gesture and
+ * not about how many games you have played.
+ *
+ * Clones in viewport space, exactly as the return flight uses, and for the identical reason
+ * — `.pack-shelf` is `overflow-y: auto`, so a tile animated from off-screen would be behind
+ * the pile's own edge for the whole journey. See `returning`.
+ * ------------------------------------------------------------------ */
+
+/**
+ * How long one packet is in the air.
+ *
+ * Longer than `REACH_MS`, and not tuned to feel different: this crosses most of the viewport
+ * where reaching for a packet crosses a margin, and the same speed over four times the
+ * distance is a packet fired out of a cannon.
+ */
+const DEAL_MS = 380;
+/** Between one packet and the next, before the total cap below takes over. */
+const DEAL_STEP = 34;
+/**
+ * The whole pile is on the table within this of the first one moving.
+ *
+ * What keeps the arrival a gesture rather than a queue. Above about six packets the step
+ * shrinks to fit, which is the right way round: the pile gets denser, not longer.
+ */
+const DEAL_SPREAD_MAX = 150;
+/**
+ * The book is set down before anything is put beside it.
+ *
+ * Under `JUST_BOUND_OPEN_MS` (420, in Album), so the packets are already on their way while
+ * the cover turns itself back — two halves of the same moment rather than a queue of
+ * ceremonies. Waiting for the book to finish opening put a dead beat in the middle of the
+ * one sequence on this page that has none.
+ */
+const DEAL_WAIT = 200;
+/** Extra lean on the way in, straightened out as the packet comes to rest. */
+const DEAL_LEAN = 7;
+
 /**
  * The test panel. Everything on it is real now: the pack buttons hand the signed-in
  * player a present through `POST api/collections/gifts`, which is a row like the
@@ -132,6 +233,103 @@ const CollectionPage: React.FC = () => {
   const [player, setPlayer] = useState<SelectablePlayer | null>(null);
   const [collection, setCollection] = useState<CollectionState | null>(null);
   const [openingPack, setOpeningPack] = useState<Pack | null>(null);
+  /**
+   * The book is changing places with a packet, and which way round.
+   *
+   *   leaving    a packet has been picked up in front of it: the book fades out
+   *   returning  a sealed packet has been put back down: the book fades in
+   *
+   * `leaving` also keeps `Album` **mounted** for the length of the flight — the opener
+   * replaces the book rather than dimming it (see the render), so without that there is
+   * nothing left to fade and the swap is the cut it always was. It goes down again the
+   * moment the packet lands, and the book is then gone for the whole reveal, which is the
+   * thing the design doc is firm about: a second lit object inside the ceremony's vignette
+   * is not wanted. `returning` needs no such thing — by then the album is what the middle
+   * of the table holds — so it is a class and nothing more.
+   *
+   * `leaving` is only ever raised when there was a book on screen to begin with — reaching
+   * for a second packet from a finished row has nothing to fade, and mounting a whole album
+   * to hold it at zero opacity for 440ms would be a real cost for no frames.
+   */
+  const [bookPass, setBookPass] = useState<'leaving' | 'returning' | null>(null);
+  /**
+   * The packet being put back on the pile, drawn in flight.
+   *
+   * **A clone rather than the packet itself**, and the reason is the shelf: it is a scroll
+   * container (`overflow-y: auto`, capped at the book's height), so it clips, and a tile
+   * flown in from the middle of the table would be invisible until it crossed the pile's
+   * own edge. The way *in* has no such problem — the stage clips nothing — which is why
+   * only this direction needs a clone. It is mounted out at the shell, next to `PutAway`'s
+   * hand of cards, and for the same reasons.
+   *
+   * The tile it is flying to is on the shelf from the first frame, holding its place in the
+   * pile and hidden until this lands on it.
+   */
+  const [returning, setReturning] = useState<{ pack: Pack; from: PackGrab } | null>(null);
+  /** The clone, so the flight can be written onto it once its landing place is known. */
+  const flightRef = useRef<HTMLDivElement | null>(null);
+  /**
+   * The pile being slid onto the shelf after the binding, drawn in flight.
+   *
+   * Clones for the same reason `returning` is one — the shelf clips — and the tiles they are
+   * flying to are on the shelf from the first frame, holding the pile's shape and hidden
+   * until their own packet lands on them.
+   *
+   * The whole pile at once rather than one packet: a shelf that arrives with one packet
+   * flying and the rest already lying there is a pile that was always on the table plus one
+   * late delivery, which is not what just happened.
+   */
+  const [dealing, setDealing] = useState<Pack[] | null>(null);
+  /** The clones, by pack id, so each can be given its own landing place. */
+  const dealRefs = useRef(new Map<string, HTMLDivElement>());
+  /**
+   * The same deal, as a one-shot for the layout effect — the state lives for the whole
+   * arrival and re-renders freely, and the flights may only be written on the commit that
+   * first put the tiles on the shelf. Consumed like `shelfFrom` and `pendingFlight`.
+   */
+  const pendingDeal = useRef(false);
+  /**
+   * The pile still owes the reader an arrival.
+   *
+   * **Raised by the ceremony and read by a layout effect, never acted on in `onDone`
+   * itself** — and the first version of this got it wrong, so the reason is worth keeping.
+   * `AlbumChoice` schedules `onDone` from a timer set on the *click* (see `choose`), so the
+   * callback closes over the render that was current when you picked a binding — which
+   * pre-dates `createAlbum` answering, and so has the pre-album collection's shelf in it.
+   * Reading `shelfPacks` there gets a list that is empty or stale, the deal never covers the
+   * packets that actually arrive, and they go on simply appearing.
+   *
+   * A ref rather than state because nothing renders from it: it is a note that a delivery is
+   * owed, consumed by the first commit that has a shelf to deliver onto.
+   */
+  const undelivered = useRef(false);
+  /**
+   * The same flight, as a one-shot for the layout effect: the state above lives for the
+   * whole 440ms and re-renders freely, and the measurement may only be taken on the commit
+   * that put the tile back. Consumed like `shelfFrom`, and `pendingFlip` in the opener.
+   */
+  const pendingFlight = useRef<{ id: string; from: PackGrab } | null>(null);
+  /**
+   * Where the packet now opening was picked up from, handed to the opener that mounts in
+   * the same commit. Null on every path that is not a click on the pile.
+   *
+   * A ref rather than state because nothing renders *from* it: it is read once, by the
+   * opener's mount effect, and a second render with the same value has to change nothing.
+   * Set immediately before the `setOpeningPack` that mounts its reader, so the value the
+   * opener sees is always its own packet's.
+   */
+  const reach = useRef<PackGrab | null>(null);
+  /**
+   * The tiles on the shelf, by pack id, so the pile can be measured before one leaves it.
+   *
+   * Owned here rather than in `PackTile` because the FLIP is about the packets that are
+   * *left*: a tile cannot see its neighbours, and the one that moves them is the one that
+   * is being unmounted.
+   */
+  const tileRefs = useRef(new Map<string, HTMLButtonElement>());
+  /** Where those tiles were lying, read in the click handler and consumed by the layout
+      effect that runs after the pile has closed up. Empty except across that one commit. */
+  const shelfFrom = useRef(new Map<string, DOMRect>());
   /**
    * True from the tear until the last card has settled — *not* for as long as the opener
    * is mounted. A sealed packet lying on the stage is a decision you have not taken yet,
@@ -421,12 +619,38 @@ const CollectionPage: React.FC = () => {
    * `revealing` is reset here rather than relying on the opener remounting: the new
    * opener starts sealed and its `onStart` has not fired yet, so without this the
    * pile would stay inert until the second packet was torn.
+   *
+   * `grab` is where the packet was lying when it was clicked, and everything the flight
+   * needs is decided here rather than in the render: the three halves of the gesture — the
+   * packet, the pile and the book — all start on this event and have to agree about
+   * whether they are running at all.
    */
-  const openPack = (next: Pack) => {
+  const openPack = (next: Pack, grab: PackGrab | null = null) => {
     /* The shelf is behind the viewer's scrim and so unreachable while one is open,
        but the opener would be layered under a viewer left mounted over it. */
     setViewing(null);
     setRevealing(false);
+
+    /*
+     * Land on the finished state, never play it stilled — the same rule the reveal and the
+     * filing follow. The packet is simply on the stage, the pile is simply shorter, and the
+     * book is simply gone.
+     */
+    const still = prefersReducedMotion();
+    reach.current = still ? null : grab;
+
+    /*
+     * The pile as it is *now*, before the packet leaves it. Measured here because this is
+     * the last moment it exists: the tile unmounts in the commit this handler schedules,
+     * and the packets after it move up to fill the hole. Its own tile is deliberately not
+     * recorded — it is not shifting, it is leaving.
+     */
+    shelfFrom.current = new Map();
+    if (!still) {
+      tileRefs.current.forEach((el, id) => {
+        if (id !== next.id) shelfFrom.current.set(id, el.getBoundingClientRect());
+      });
+    }
     /*
      * The packet just finished joins the table, and this is the one place that happens:
      * reaching for the next packet is what makes the previous one's cards "already on the
@@ -465,11 +689,252 @@ const CollectionPage: React.FC = () => {
       pendingIconPack.current = next;
       setRebindHandsOver(true);
       claimIcons();
+      /*
+       * No flight and no fade: the book is not being replaced, it is being *shut and
+       * re-bound* in front of you, and the packet is handed over at the end of that. It
+       * would have to lie in the margin for the length of a six-beat ceremony and then set
+       * off from a shelf the reader stopped looking at long ago. The pile still closes up,
+       * because the packet still left it.
+       */
+      reach.current = null;
       return;
     }
 
+    /*
+     * The book fades out from under the packet arriving over it. Only when there is one:
+     * reaching for a second packet mid-sitting has the opener on screen already, and this
+     * is what keeps the album from being mounted for 440ms to fade something nobody could
+     * see. See `bookPass`.
+     */
+    if (!still && !openingPack) setBookPass('leaving');
     setOpeningPack(next);
   };
+
+  /**
+   * Registers a tile, so the pile can be measured before one is taken off it.
+   *
+   * Fresh on every render like `setSlotRef` in the opener, which is what makes it
+   * impossible to hold a node that has been unmounted: React hands the callback a null
+   * for the old element before it hands the new one an element.
+   */
+  const setTileRef = (id: string, el: HTMLButtonElement | null): void => {
+    if (el) tileRefs.current.set(id, el);
+    else tileRefs.current.delete(id);
+  };
+
+  /** The same, for the clones sliding in. Same construction, same reason. */
+  const setDealRef = (id: string, el: HTMLDivElement | null): void => {
+    if (el) dealRefs.current.set(id, el);
+    else dealRefs.current.delete(id);
+  };
+
+  /*
+   * The pile opening and closing: a FLIP over whatever is on the shelf.
+   *
+   * The shelf is a wrapping row two packets wide, so a packet taken out of the middle of
+   * it pulls every one after it up a place — and one put back pushes them down again. Until
+   * now they simply appeared in their new positions on the next frame, which reads as the
+   * pile rearranging itself rather than as one packet having left it or rejoined it.
+   *
+   * `translate` rather than `transform`, and that is not a preference: a packet lies at an
+   * angle (`transform: rotate(var(--tilt))`) and grows under the pointer, both from the
+   * stylesheet, and an inline `transform` would flatten a packet for the whole shift and
+   * kill the hover on any tile the pointer happened to be over. The individual property
+   * composes underneath both and leaves them alone.
+   *
+   * The packet coming back does not shift, it *arrives*, and its tile is not what the
+   * reader watches arrive — the clone is (see `returning`). What happens here is that the
+   * clone is given its landing place, which cannot be known until the tile holding it
+   * exists.
+   *
+   * No dependency list. It has to run after the commit that added or removed the tile, and
+   * the measurements it consumes are the only thing that says there was one — every other
+   * render finds nothing pending and stops on the first line.
+   */
+  useLayoutEffect(() => {
+    const flight = pendingFlight.current;
+    const deal = pendingDeal.current;
+    if (shelfFrom.current.size === 0 && !flight && !deal) return;
+
+    pendingFlight.current = null;
+    pendingDeal.current = false;
+    const was = shelfFrom.current;
+    shelfFrom.current = new Map();
+
+    const duration = ms(SHELF_SHIFT_MS);
+    /* The step shrinks so the pile is always down within `DEAL_SPREAD_MAX` of the first
+       packet moving. One clone means no spread at all, hence the guard on the divisor. */
+    const step =
+      dealRefs.current.size > 1
+        ? Math.min(DEAL_STEP, DEAL_SPREAD_MAX / (dealRefs.current.size - 1))
+        : 0;
+    let dealt = 0;
+
+    tileRefs.current.forEach((el, id) => {
+      const to = el.getBoundingClientRect();
+
+      /*
+       * A packet being brought over: its clone is below the fold and this tile is where it
+       * is going, hidden underneath until it gets there.
+       *
+       * The clone is drawn *at* the tile rather than flown between two measured boxes, which
+       * is what makes this simpler than the return flight: it lands at the tile's own size,
+       * so there is no scale to solve and the only thing in motion is how far below the
+       * table edge it starts. `offsetWidth`/`offsetHeight` for the box and the bounding rect
+       * for the place, for the reason `PackGrab` documents — a leaning packet's bounding box
+       * is the box around the lean, so only its centre is a fact about the packet.
+       */
+      const clone = deal ? dealRefs.current.get(id) : undefined;
+      if (clone) {
+        const w = el.offsetWidth;
+        const h = el.offsetHeight;
+        /* Its own tilt, read off the tile: `PackTile` derives it from the pack id and writes
+           it inline, so this is the angle the packet actually lies at. */
+        const tilt = el.style.getPropertyValue('--tilt') || '0deg';
+        /* Scaled once, at the end, rather than per step: `ms` rounds, and a fractional step
+           rounded nineteen times drifts past the cap the step was solved to fit. */
+        const delay = ms(DEAL_WAIT + dealt * step);
+        dealt += 1;
+
+        clone.style.setProperty('--pack-w', `${w}px`);
+        clone.style.left = `${Math.round(to.left + to.width / 2 - w / 2)}px`;
+        clone.style.top = `${Math.round(to.top + to.height / 2 - h / 2)}px`;
+
+        /* Off the bottom of the viewport by its own height, so it is genuinely out of the
+           frame at every window size rather than at the one this was written on. */
+        clone.style.setProperty('transition', 'none');
+        clone.style.setProperty(
+          'translate',
+          `0px ${Math.round(window.innerHeight - to.top + h)}px`,
+        );
+        clone.style.setProperty('rotate', `${parseFloat(tilt) + DEAL_LEAN}deg`);
+        // Committed where it starts before it is told to move, or the flight collapses
+        // into its landing frame — the same reflow the return flight needs.
+        void clone.offsetWidth;
+        clone.style.setProperty(
+          'transition',
+          `translate ${ms(DEAL_MS)}ms ${CARRY} ${delay}ms, rotate ${ms(
+            DEAL_MS,
+          )}ms ${CARRY} ${delay}ms`,
+        );
+        clone.style.setProperty('translate', '0px 0px');
+        clone.style.setProperty('rotate', tilt);
+        return;
+      }
+
+      /*
+       * The packet being put back: the clone is standing on the stage and this tile is its
+       * destination, hidden underneath until it gets there. Centre to centre, because the
+       * clone both shrinks and takes on the tile's lean on the way — and a tile's box is
+       * the box *around* its lean, so only its centre is a place.
+       */
+      if (flight && id === flight.id) {
+        const clone = flightRef.current;
+        if (!clone) return;
+
+        const dx = to.left + to.width / 2 - flight.from.cx;
+        const dy = to.top + to.height / 2 - flight.from.cy;
+
+        // Committed as it stands before it is told to move, or there is nothing to
+        // transition from and the whole flight collapses into its landing frame.
+        void clone.offsetWidth;
+        clone.style.setProperty(
+          'transition',
+          `translate ${duration}ms ${CARRY}, rotate ${duration}ms ${CARRY}, scale ${duration}ms ${CARRY}`,
+        );
+        clone.style.setProperty('translate', `${dx}px ${dy}px`);
+        /* The tile's own lean, read off the tile: `PackTile` derives it from the pack id
+           and writes it inline, so this is the packet's angle rather than a guess at it. */
+        clone.style.setProperty('rotate', el.style.getPropertyValue('--tilt') || '0deg');
+        clone.style.setProperty('scale', String(el.offsetWidth / flight.from.w));
+        return;
+      }
+
+      const from = was.get(id);
+      if (!from) return;
+
+      const dx = from.left - to.left;
+      const dy = from.top - to.top;
+      /* Most of the pile does not move: only the packets after the one that left or came
+         back. */
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
+
+      el.style.setProperty('transition', 'none');
+      el.style.setProperty('translate', `${dx}px ${dy}px`);
+      // Force the inverted position to be committed before releasing it.
+      void el.offsetWidth;
+      el.style.setProperty('transition', `translate ${duration}ms ${CARRY}`);
+      el.style.setProperty('translate', '0px 0px');
+
+      window.setTimeout(() => {
+        /* Back to the stylesheet, so `.pack`'s own hover transition is the packet's
+           again the moment it has settled. */
+        el.style.removeProperty('translate');
+        el.style.removeProperty('transition');
+      }, duration + 20);
+    });
+  });
+
+  /**
+   * The end of a pass, either way round: the book is gone, or the packet is home.
+   *
+   * The fades themselves are CSS — see `.album-layout--reaching` and `--returning` — and
+   * this is only what ends the state they hang off. Dropping `returning` is what takes the
+   * clone away and uncovers the real tile underneath it, which is why one timer serves
+   * both: they are the same 440ms, and the packet must not be visible twice on any frame.
+   *
+   * An effect rather than a timer in the handler so the cleanup cancels it: a page that
+   * unmounted mid-flight would otherwise set state on a component that is not there.
+   */
+  useEffect(() => {
+    if (!bookPass) return undefined;
+
+    const timer = window.setTimeout(
+      () => {
+        unstable_batchedUpdates(() => {
+          setBookPass(null);
+          setReturning(null);
+        });
+      },
+      /*
+       * A frame of slack, because this is a *hand-over* and not a cleanup: the clone goes
+       * and the tile underneath it appears on the same commit, so firing a frame early
+       * would show the gap between them. Late shows nothing at all — the clone is already
+       * sitting exactly on the tile it is being swapped for.
+       */
+      ms(REACH_MS) + 30,
+    );
+
+    return () => window.clearTimeout(timer);
+  }, [bookPass]);
+
+  /**
+   * The end of the pile arriving: the clones go and the tiles underneath them come out.
+   *
+   * Same hand-over as the return flight above, and the same frame of slack for the same
+   * reason — the clone is by then sitting exactly where the tile is, so being late shows
+   * nothing and being early shows a gap.
+   *
+   * **One `playSlot`, on the frame the first packet touches down.** Per packet is what a
+   * deal would want and this is not a deal — see the `DEAL_MS` block. It is also the sound
+   * the rest of the page uses for a thing coming to rest on the table, so the packets and
+   * the cards going into the book agree about what landing sounds like.
+   */
+  useEffect(() => {
+    if (!dealing) return undefined;
+
+    const spread = Math.min(DEAL_SPREAD_MAX, DEAL_STEP * (dealing.length - 1));
+    const land = window.setTimeout(playSlot, ms(DEAL_WAIT + DEAL_MS));
+    const done = window.setTimeout(
+      () => setDealing(null),
+      ms(DEAL_WAIT + DEAL_MS + spread) + 30,
+    );
+
+    return () => {
+      window.clearTimeout(land);
+      window.clearTimeout(done);
+    };
+  }, [dealing]);
 
   /**
    * Applies whatever collection came back with the last claim, if it has not been yet.
@@ -505,19 +970,55 @@ const CollectionPage: React.FC = () => {
    * bare `setOpeningPack(null)`, which meant that leaving mid-reveal unmounted the one
    * component that would ever have lowered the flag, and the shelf stayed dimmed and
    * unclickable until the page was reloaded.
+   *
+   * `from` is where the packet is standing, and it is **the way in run backwards**: the
+   * packet goes home to its place on the pile, the pile opens to take it, and the book
+   * comes back up underneath. Only the sealed-packet caller has one — a reduced-motion
+   * filing has no packet on the table and nothing to fly.
+   *
+   * **One commit, and here it is load-bearing.** The packet is put down by clicking the
+   * table, which is a React handler and batches — but the same gesture is on Escape, and
+   * that listener is a plain `window.addEventListener` inside the opener. `index.tsx`
+   * mounts with legacy `ReactDOM.render`, which does not batch native listeners: unbatched,
+   * `setReturning` commits on its own, the layout effect below runs while the packet is
+   * *still* on the stage and finds no tile to fly to, and consumes the flight. The clone
+   * would then hang in the middle of the table until its timer took it away.
    */
-  const closeOpener = () => {
+  const closeOpener = (from: PackGrab | null = null) => {
     applyPendingCollection(player?.id);
-    setOpeningPack(null);
-    setRevealing(false);
+
     /*
-     * And the table goes with it. Both callers mean "the row is over": a sealed packet put
-     * back has nothing on the table behind it (with cards there, a click on the table files
-     * them instead — see `tableClick` in PackOpener), and the reduced-motion path has just
-     * had its cards put in the book without a row being drawn at all. Leaving it set would
-     * put filed cards back on the table the next time a packet was opened.
+     * Everything the return needs, decided here for the same reason the way in decides it
+     * in `openPack`: the three halves of the gesture start on this one event.
+     *
+     * The pile is measured *before* the packet rejoins it, and the tile it is rejoining is
+     * deliberately not in that measurement — it has no old position, it is arriving. The
+     * flight is a clone rather than that tile, because the shelf clips; see `returning`.
      */
-    stopPlacing();
+    shelfFrom.current = new Map();
+    pendingFlight.current = null;
+
+    unstable_batchedUpdates(() => {
+      if (from && openingPack && !prefersReducedMotion()) {
+        tileRefs.current.forEach((el, id) =>
+          shelfFrom.current.set(id, el.getBoundingClientRect()),
+        );
+        pendingFlight.current = { id: openingPack.id, from };
+        setReturning({ pack: openingPack, from });
+        setBookPass('returning');
+      }
+
+      setOpeningPack(null);
+      setRevealing(false);
+      /*
+       * And the table goes with it. Both callers mean "the row is over": a sealed packet put
+       * back has nothing on the table behind it (with cards there, a click on the table files
+       * them instead — see `tableClick` in PackOpener), and the reduced-motion path has just
+       * had its cards put in the book without a row being drawn at all. Leaving it set would
+       * put filed cards back on the table the next time a packet was opened.
+       */
+      stopPlacing();
+    });
   };
 
   const toggleFast = () => {
@@ -897,6 +1398,38 @@ const CollectionPage: React.FC = () => {
     [collection, openingPack],
   );
 
+  /** Which tiles are holding a place for a packet still in the air. See `dealing`. */
+  const dealingIds = useMemo(() => new Set(dealing?.map((p) => p.id) ?? []), [dealing]);
+
+  /**
+   * Starting the delivery, on the first commit that has a shelf to deliver onto.
+   *
+   * The trigger has to be here rather than in `onDone`, because that callback cannot see the
+   * pile — see `undelivered`. What it *can* see is the ceremony ending, and this watches for
+   * the consequence: the choice gone, and packets on the table.
+   *
+   * **A layout effect, and it must stay one.** Raising `dealing` mounts the clones, and only
+   * the commit after that can measure a tile and fly them; React flushes a layout effect's
+   * update synchronously before painting, so both commits land in one frame and the tiles
+   * are never seen unheld. From an ordinary effect the pile would paint once, in place, and
+   * only then be hidden and flown — the snap this exists to remove, with a flicker on top.
+   *
+   * **Below `shelfPacks` and after the flight effect**, and both positions are load-bearing:
+   * it reads the first, and effects run in declaration order, so the re-render this schedules
+   * reaches the flight effect with `pendingDeal` already up.
+   *
+   * Once per binding. If the pile is empty at the handover — a colleague who crossed the gate
+   * with nothing banked — the note stays up and the first packets to arrive are flown
+   * instead, which is the same promise kept later rather than a delivery missed.
+   */
+  useLayoutEffect(() => {
+    if (!undelivered.current || showChoice || shelfPacks.length === 0) return;
+
+    undelivered.current = false;
+    pendingDeal.current = true;
+    setDealing(shelfPacks);
+  }, [showChoice, shelfPacks]);
+
   /**
    * Hand the signed-in player a pack, as a present.
    *
@@ -1198,6 +1731,11 @@ const CollectionPage: React.FC = () => {
           className={[
             'album-layout',
             openingPack ? 'album-layout--opening' : '',
+            /* A packet is on its way in from the margin and the book is on its way out from
+               under it — or the same thing backwards, a packet going home to the pile and
+               the book coming back up. Both last `REACH_MS`; see game.css. */
+            bookPass === 'leaving' ? 'album-layout--reaching' : '',
+            bookPass === 'returning' ? 'album-layout--returning' : '',
             /* Cards are in the air: the book is out of play for as long as they are
                going into it, and it fades in rather than cutting. See putaway.css. */
             placing ? 'album-layout--placing' : '',
@@ -1222,7 +1760,24 @@ const CollectionPage: React.FC = () => {
             <aside className={`album-side${handsFull ? ' album-side--set-aside' : ''}`}>
               <div className="pack-shelf">
                 {shelfPacks.map((pack) => (
-                  <PackTile key={pack.id} pack={pack} onOpen={openPack} />
+                  <PackTile
+                    key={pack.id}
+                    pack={pack}
+                    onOpen={openPack}
+                    /* So the pile can be measured before one of them leaves it. */
+                    elementRef={setTileRef}
+                    /*
+                      This one is still in the air: it is holding its place in the pile —
+                      which is what makes the packets either side of it move now rather
+                      than when it lands — while the clone flying home is what the reader
+                      actually watches. See `returning`.
+
+                      Both arrivals use it, and that is why it is a test rather than a flag
+                      on the pack: one packet coming back to a pile that is already there,
+                      and the whole pile being brought over after the binding. See `dealing`.
+                    */
+                    held={returning?.pack.id === pack.id || dealingIds.has(pack.id)}
+                  />
                 ))}
               </div>
             </aside>
@@ -1452,21 +2007,63 @@ const CollectionPage: React.FC = () => {
             </aside>
           ) : null}
 
+          {/*
+            **Three slots rather than one ternary**, and the positions are load-bearing.
+
+            The book is still mounted for the length of the flight that replaces it — see
+            `bookPass` — so for those 440ms the opener and the album are on the page at
+            once, which a chain of `? :` cannot express. It also has to be the *same* album:
+            React reconciles children by position, so the album has to sit at a fixed index
+            whether or not there is an opener in front of it. Moving it would remount it,
+            and a remounted album re-reads its saved page — the book would flick to
+            somewhere else in itself on the way out, which is a good deal worse than the cut
+            this replaces.
+
+            Out of flow and behind the opener while it fades; see `.album-layout--reaching`.
+          */}
           <div className="album-main">
             {showChoice ? (
               <AlbumChoice
                 stampName={ownerName}
                 onChoose={chooseCover}
+                /*
+                  One commit, via `unstable_batchedUpdates`. The ceremony reports itself
+                  finished from a timeout, and `index.tsx` mounts with legacy
+                  `ReactDOM.render`, which does not batch those — so unbatched, lowering
+                  `creating` mounts the album a render *before* `justBound` is true, and it
+                  reads its saved position instead of starting shut. That is the bookmark of
+                  the album this one replaced, so the handover cut to page nine of the
+                  previous book and only then turned to the voorwoord. The album reads
+                  `justBound` at mount by design — see its `flipped` initialiser — so the
+                  flag has to be up on the first render, not the second.
+                */
                 onDone={() => {
-                  setCreating(false);
-                  setJustBound(true);
+                  unstable_batchedUpdates(() => {
+                    setCreating(false);
+                    setJustBound(true);
+                    /*
+                      And the packets are owed an arrival. Only a note here — **what** is on
+                      the shelf cannot be read from this callback, which closes over the
+                      render you clicked on rather than the one the album exists in. See
+                      `undelivered`, and the layout effect that consumes it.
+                    */
+                    undelivered.current = !prefersReducedMotion();
+                  });
                 }}
               />
-            ) : openingPack ? (
+            ) : null}
+
+            {!showChoice && openingPack ? (
               <>
                 <PackOpener
                   key={openingPack.id}
                   pack={openingPack}
+                  /*
+                    Where it was picked up from, so the packet is flown onto the stage
+                    rather than cut to it. Null on every way in that is not a click on the
+                    pile, and the opener simply starts on the stage then — see `reach`.
+                  */
+                  from={reach.current}
                   onOpen={() => handleOpen(openingPack)}
                   onStart={() => setRevealing(true)}
                   onFinished={handleFinished}
@@ -1494,7 +2091,9 @@ const CollectionPage: React.FC = () => {
                   there to pick up.
                 */}
               </>
-            ) : (
+            ) : null}
+
+            {!showChoice && (!openingPack || bookPass === 'leaving') ? (
               <Album
                 /*
                   Keyed on the owner, so switching player is a different book rather than
@@ -1562,10 +2161,66 @@ const CollectionPage: React.FC = () => {
                 onTurned={bookArrived}
                 holdSlots={placing ? held : undefined}
               />
-            )}
+            ) : null}
           </div>
         </div>
       )}
+
+      {/*
+        The packet going home, out here for the same reason `PutAway`'s cards are: the
+        shelf it is flying to is a scroll container and clips, so a tile flown in from the
+        middle of the table would spend most of the journey behind the pile's own edge.
+
+        A `.pack` like any other, sized in pixels off the packet it is a picture of, so it
+        is the same object at the same size on the frame the opener's own packet leaves the
+        screen. `--pack-w` is the *measured* width rather than the clamp `.opener` resolves,
+        which is what makes that identity hold at any viewport without this having to know
+        how the stage sizes itself. Everything derived from it — the seals, the teeth, the
+        type — comes from the shared rule in packopen.css.
+
+        It stands square and lands leaning, shrunk to a card's width; the tile underneath it
+        is uncovered as it lands. See `returning`, and the layout effect that flies it.
+      */}
+      {returning ? (
+        <div
+          className="pack pack-flight"
+          ref={flightRef}
+          style={
+            {
+              ...packFoil(returning.pack),
+              '--pack-w': `${returning.from.w}px`,
+              left: `${Math.round(returning.from.cx - returning.from.w / 2)}px`,
+              top: `${Math.round(returning.from.cy - returning.from.h / 2)}px`,
+            } as React.CSSProperties
+          }
+          aria-hidden="true"
+        >
+          <PackFace pack={returning.pack} />
+        </div>
+      ) : null}
+
+      {/*
+        The pile being slid over after the binding, out here for the identical reason and
+        rendered as the identical object — `.pack pack-flight`, a real packet in viewport
+        space rather than a picture of the idea of one.
+
+        **No `left`, `top` or `--pack-w` here**, which is the one difference from the flight
+        above: that one is drawn off a `PackGrab` measured in the click handler, and these
+        have no origin to be measured — they are arriving from off the table. All three are
+        written by the layout effect from the tile each one lands on, before the first paint,
+        so a clone is never seen anywhere but on its way to its own place in the pile.
+      */}
+      {dealing?.map((pack) => (
+        <div
+          key={pack.id}
+          className="pack pack-flight"
+          ref={(el) => setDealRef(pack.id, el)}
+          style={packFoil(pack) as React.CSSProperties}
+          aria-hidden="true"
+        >
+          <PackFace pack={pack} />
+        </div>
+      ))}
 
       {/*
         The viewer mounts here, as the last child of the shell — the same place

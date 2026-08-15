@@ -241,6 +241,12 @@ const REBIND_RINGS = [
  * bound: nothing in the game is rarer than the moment this plays under, so nothing should
  * out-sound it. The card that comes out of the packet a few seconds later gets its own
  * payoff at whatever level it earns, which will usually be less.
+ *
+ * **Nothing else in the app may use this, and the choosing ceremony briefly did.** It took
+ * this chord when the light left the owner's name, on the argument that both ceremonies are
+ * a book being bound — which put the game's rarest sound over a book with no cards in it,
+ * and put a pitch off the cards' ladder on a beat that has no card in it. It runs on the
+ * build alone now. See `AlbumChoice`.
  */
 const REBIND_PAYOFF = 4;
 
@@ -748,7 +754,7 @@ const PageFace: React.FC<{
           */}
           <p>
             <span className="album__foreword-open">Er hoeft maar iemand</span> “potje?”
-            te zeggen en het ritueel begint vanzelf.
+            te roepen en het ritueel begint vanzelf.
             Vier mensen verzamelen, de optocht richting de tafel, Chwazi openen, vingers erop en kijken wie met wie
             opgescheept zit. Daarna volgt meestal precies waarvoor je gekomen bent:
             een paar minuten tafelvoetbal, een hoop onzin en iets meer fanatisme dan
@@ -1366,12 +1372,17 @@ const Album: React.FC<AlbumProps> = ({
 
     at(bloomed + ms(BLOOM_MS), () => setRebindPhase('resolving'));
 
-    /* The board settling, as the bloom lets go of it. */
+    /*
+     * The board settling, as the bloom lets go of it — **and it is silent.**
+     *
+     * A `playCoverTurn` used to mark it as the ceremony's accent. Nothing turns here: the
+     * book has been shut since `shutting` and the bloom is simply fading off it, so a spine
+     * creak and a paper arc over a still cover is heard as a page being flipped somewhere
+     * off-screen. The accent it was reaching for already landed at the bloom, as the chord.
+     * A second one afterwards was always going to be the weaker of the two.
+     */
     const resolved = bloomed + ms(BLOOM_MS) + ms(RESOLVE_MS);
-    at(resolved, () => {
-      setRebindPhase('resting');
-      playCoverTurn();
-    });
+    at(resolved, () => setRebindPhase('resting'));
 
     /*
      * A beat of the bound book on an ordinary table, and then the album fades rather than

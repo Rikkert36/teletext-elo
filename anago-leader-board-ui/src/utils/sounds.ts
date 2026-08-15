@@ -151,7 +151,12 @@ interface GrainCloudOptions {
   hz: [number, number];
   gain: number;
   q?: number;
-  /** >1 clusters grains toward the end, <1 toward the start. */
+  /**
+   * **<1 clusters grains toward the end, >1 toward the start** — the exponent in
+   * `progress = ((i + rand) / count) ** bias`, and a root pushes progress *up*. This said
+   * the opposite for a long time while every caller was written against the real behaviour,
+   * so read the callers, not the old comment, if the two ever disagree again.
+   */
   bias?: number;
   /**
    * Seconds to hold the cloud back, so it can be scheduled *ahead* of the beat it
@@ -289,6 +294,26 @@ const playSwish = (opts: {
   source.buffer = getNoise(ctx);
   // Same reason the grains randomise theirs: two turns in a row must not match.
   source.playbackRate.value = 0.85 + Math.random() * 0.35;
+  /*
+   * **Looped, and this is not a refinement — without it a long arc stops dead partway
+   * through.** `getNoise` is three seconds, `start()` below enters it at a random offset of
+   * up to two, and the rate runs as high as 1.2, so what is actually left to play is
+   * between 0.83s and 3.5s — and it is a different number every time. A BufferSource that
+   * runs off the end simply stops; the envelope goes on ramping over nothing.
+   *
+   * Every turn in the album is under a second and never noticed. `playRebind` asks for four
+   * (charge + hold + bloom), so the arc died somewhere in the first half of every re-binding
+   * and left the bare grain cloud playing — which is heard, correctly, as the sound cutting
+   * to a different sound, at a moment that moved around between runs because the offset is
+   * random. It usually landed near where the rings come on.
+   *
+   * `playRareRise` hit exactly this and its note calls itself "the one layer in the file
+   * longer than the buffer". It stopped being the only one the moment `playRebind` was given
+   * a four-second caller, which is the general lesson: **anything here that takes its length
+   * from a caller can outlive the buffer**, so it loops. White noise through a moving filter
+   * has no seam.
+   */
+  source.loop = true;
 
   const filter = ctx.createBiquadFilter();
   filter.type = 'bandpass';
@@ -593,7 +618,15 @@ const playBell = (fundamental: number, gain: number, delay = 0): void => {
  * Physical effects
  * ------------------------------------------------------------------ */
 
-/** Foil ripping: a dense crackle cloud that intensifies, over a low rip. */
+/**
+ * Foil ripping: a dense crackle cloud that intensifies, over a low rip.
+ *
+ * **No boom at the end.** There was one — 90 Hz at +0.34s, meant as the pack giving way —
+ * and it is deleted, for the same reason `playCoverTurn`'s landing went: nothing on screen
+ * arrives on that frame. The foil is still tearing when it fired, so it read as a *dook*
+ * dropped in after a sound that was already going well. Foil has no mass; the crackle is
+ * the event, and it ends when the tear does.
+ */
 export const playTear = (): void => {
   playGrains({
     count: 54,
@@ -605,7 +638,6 @@ export const playTear = (): void => {
     bias: 0.75,
   });
   playNoise(0.4, 700, 180, 0.1);
-  playBoom(90, 0.22, 0.1, 0.34);
 };
 
 /** A card turning: paper snap plus the soft slap of it landing. */
@@ -766,11 +798,23 @@ export const playSlot = (): void => {
  */
 
 /**
- * The book being re-cased: the icon binding drawn across the board.
+ * The book being bound: the binding drawn across the board.
+ *
+ * Both ceremonies run on this — the re-casing in the icon binding (`Album`) and the
+ * owner's name being lit into a new cover (`AlbumChoice`) — and both hand over to
+ * `playRarePayoff` at the accent. They are the same event at two scales.
  *
  * **Takes its length from the caller**, the same contract as `playRareRise` — a musical
  * hit should not stretch, but a build must, or it finishes before the thing it is under
  * and the last third of the visual plays in silence.
+ *
+ * **The build audibly cut to a different sound partway through, and the cause was not in
+ * this function.** `playSwish` was not looping its buffer, so the arc — the layer carrying
+ * the whole gesture — ran out after somewhere between 0.83 and 3.5 seconds of a four-second
+ * build and left the grain cloud playing alone. The third layer below was deleted first on
+ * the theory that it was the seam, and restored when that turned out to be wrong; the fix
+ * is `source.loop` in `playSwish`. Recorded because the symptom points here and the bug is
+ * one level down.
  *
  * Three rules it exists to obey.
  *
@@ -784,9 +828,35 @@ export const playSlot = (): void => {
  * - **No low end.** The weight in this sequence belongs to the board landing, which is
  *   `playCoverTurn` firing after this ends. A boom in here would spend the arrival early,
  *   and two impacts a beat apart read as a stumble rather than as an ending.
+ * - **The last stretch is the arc alone.** Both grain clouds are over by `CONTACT_END` and
+ *   only the swish runs to the end — see that constant. The build now finishes as one
+ *   decaying layer rather than as a texture that stops.
  */
 export const playRebind = (durationMs: number): void => {
   const seconds = Math.max(0.25, durationMs / 1000);
+
+  /*
+   * **Where the hands come off the book.** Both grain clouds end here; the arc plays on
+   * alone to `seconds`.
+   *
+   * They used to run the full length, and both are biased late, so the densest, brightest
+   * moment of the whole build was its last instant — short high-Q grains at random
+   * frequencies, which is the same construction as `playTear` and was heard, correctly, as
+   * the pack coming open at the end of the binding. The swish is at a fraction of its peak
+   * by then and masked nothing.
+   *
+   * 0.72 is not arbitrary. `Album` fires `playRarePayoff` at the bloom, which over
+   * `CHARGE + HOLD + BLOOM` is 0.775 of the build, so the clouds are gone before the chord
+   * lands rather than sizzling underneath and past it. In `AlbumChoice`, where nothing lands
+   * at all, it leaves the arc to crest at 0.82 and fall away by itself — which is what that
+   * beat's note says it is there to do.
+   *
+   * Both clouds keep their own spans, biases and densities; they are simply measured against
+   * this instead of against the end. Scaling `count` with it is what holds the density
+   * constant — a fixed count over a shorter window would thicken rather than shorten.
+   */
+  const CONTACT_END = 0.72;
+  const contact = seconds * CONTACT_END;
 
   /*
    * The paste and the leather under the bone folder. Grain count scales with the length
@@ -794,8 +864,8 @@ export const playRebind = (durationMs: number): void => {
    * and stops reading as contact.
    */
   playGrains({
-    count: Math.round(seconds * 26),
-    spread: seconds,
+    count: Math.round(contact * 26),
+    spread: contact,
     grainMs: [5, 22],
     hz: [320, 2200],
     gain: 0.03,
@@ -803,7 +873,8 @@ export const playRebind = (durationMs: number): void => {
     bias: 0.58,
   });
 
-  /* The board itself, brightening as the binding closes over it. */
+  /* The board itself, brightening as the binding closes over it. The one layer that runs
+     the whole length, so that it is what the beat ends on. */
   playSwish({
     duration: seconds,
     fromHz: 300,
@@ -815,16 +886,17 @@ export const playRebind = (durationMs: number): void => {
     space: 0.22,
   });
 
-  /* A thin skin of fibre on top, late, so the last third has the most detail in it. */
+  /* A thin skin of fibre on top, late, so the second half of the contact has the most
+     detail in it. Late within `contact` now, not within the beat. */
   playGrains({
-    count: Math.round(seconds * 18),
-    spread: seconds * 0.5,
+    count: Math.round(contact * 18),
+    spread: contact * 0.5,
     grainMs: [3, 11],
     hz: [1800, 6400],
     gain: 0.014,
     q: 2.8,
     bias: 0.5,
-    delay: seconds * 0.5,
+    delay: contact * 0.5,
   });
 };
 

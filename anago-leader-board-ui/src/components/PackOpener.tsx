@@ -19,6 +19,7 @@ import {
 import PlayerCard, { CardBack } from './PlayerCard';
 import PackFace from './PackFace';
 import { packFoil } from '../utils/packFoil';
+import { PackGrab, grabPack } from '../utils/packGrab';
 import {
   playFlip,
   playNameReveal,
@@ -62,6 +63,29 @@ import '../styles/packopen.css';
  * see utils/animationSpeed.ts.
  */
 const TEAR_MS = 420;
+/**
+ * **Reaching for a packet**: the flight off the shelf onto the stage, 440ms real.
+ *
+ * Short on purpose, and shorter than anything else on this page. Nothing is being
+ * revealed here — the packet is the same packet, still sealed, and the only new fact is
+ * that it is now in your hands. A beat long enough to be *watched* would be a beat spent
+ * on a decision the reader has already taken.
+ *
+ * It was 320 and that was a *snatch* rather than a reach: the packet crossed most of the
+ * table in the time the eye takes to find it, so what registered was the arrival and not
+ * the journey — which is the fault the cut had. The room to slow it comes from the flight
+ * carrying no information. Nothing is waiting on it.
+ *
+ * It is a flight rather than a cut because the two packets are the same object at two
+ * sizes: a tile in the margin is exactly a card wide, the one on the stage is `--pack-w`.
+ * Cutting between them left the reader to work out that the big packet in the middle was
+ * the small one they had just clicked — and with the pile closing up behind it in the
+ * same frame, the one clue that said which was which was gone too.
+ *
+ * The book's fade is the same gesture from the other side and is timed against this; see
+ * `.album-layout--reaching` in game.css.
+ */
+export const REACH_MS = 220;
 /**
  * Face-down beat before a normal flip. Matches the 180ms entrance animation, so
  * the card finishes arriving before it starts turning rather than doing both at
@@ -124,7 +148,7 @@ const TALLY_MS = 320;
  * It is what this component holds the nib mounted for; a keyframe left running under an
  * element nobody removes is a keyframe that replays the next time anything re-renders it.
  */
-const NIB_MS = 400;
+const NIB_MS = 500;
 
 /**
  * Dutch for the count, spelled out to twelve.
@@ -536,6 +560,16 @@ type Phase = 'sealed' | 'tearing' | 'waiting' | 'revealing' | 'done';
 interface PackOpenerProps {
   pack: Pack;
   /**
+   * Where this packet was lying on the shelf when it was picked up, if it was picked up
+   * at all — see `REACH_MS`.
+   *
+   * Absent on every other way in: the set-completion packet arrives from the re-binding
+   * ceremony rather than from the pile, and a reader who has asked for less motion gets
+   * the packet already on the stage. Absent then means "it is simply here", which is what
+   * this component did on every path until now.
+   */
+  from?: PackGrab | null;
+  /**
    * Rolls the cards. Called once, when the wrapper is clicked — and **not awaited
    * before anything moves**. See `start`.
    */
@@ -585,13 +619,23 @@ interface PackOpenerProps {
   /**
    * The packet was put back down unopened. Only reachable while it is still sealed,
    * which is the whole point of it: up to the tear nothing has happened yet.
+   *
+   * It hands over **where the packet is standing**, so the page can fly it back to its
+   * place on the pile — the same journey as the way in, run backwards. Measured at the
+   * moment of the click rather than remembered from the way in, because those are not
+   * always the same box: the reader can put a packet down before it has finished arriving,
+   * and what has to travel back is where it actually is.
+   *
+   * Null only where there is no packet to measure, which cannot happen while its own stage
+   * is the thing being clicked past.
    */
-  onPutBack: () => void;
+  onPutBack: (from: PackGrab | null) => void;
   fastMode: boolean;
 }
 
 const PackOpener: React.FC<PackOpenerProps> = ({
   pack,
+  from,
   onOpen,
   onStart,
   onFinished,
@@ -893,6 +937,85 @@ const PackOpener: React.FC<PackOpenerProps> = ({
 
     prevRects.current.clear();
   });
+
+  /* --- Reaching: the packet coming off the shelf ------------------------- *
+   *
+   * The same FLIP as the one above, one object smaller and one beat earlier: the packet
+   * is laid out where it belongs — the middle of the stage, at `--pack-w` — and then put
+   * back where the reader last saw it and released. So the landing is wherever the layout
+   * puts it rather than a position anybody had to work out, which is what makes this
+   * survive the stage moving, the window resizing and the shelf sizing itself off the
+   * book.
+   *
+   * Three properties rather than one `transform`, because `.pack` already has a
+   * `transform` of its own — `:hover` lifts it 3px and grows it 2% — and an inline
+   * `transform` beats a stylesheet one, so the packet would be stuck flat under the
+   * pointer for the whole flight and for as long afterwards as the styles were left on.
+   * `translate`, `rotate` and `scale` compose *underneath* it in exactly that order,
+   * which is also the order this needs: move, straighten, grow.
+   *
+   * The tilt is the last of it and the one that is not geometry. A packet lies at an
+   * angle on the pile and stands square on the stage, so the lean has to go somewhere;
+   * losing it on the first frame is the one part of the old cut that was still visible
+   * after everything else had been made continuous.
+   */
+  const sealedRef = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const el = sealedRef.current;
+    /*
+     * No grab means the packet was not picked off the pile — see the prop. Reduced motion
+     * lands on the finished state like everything else here: the packet is on the stage,
+     * which is where it was going.
+     */
+    if (!el || !from || prefersReducedMotion()) return;
+
+    const to = el.getBoundingClientRect();
+    if (to.width === 0) return;
+
+    const duration = ms(REACH_MS);
+    /* The row's curve, because this is the same kind of motion: a thing being carried. */
+    const easing = 'cubic-bezier(0.32, 0.72, 0.28, 1)';
+
+    // Centre to centre — `rotate` and `scale` both turn about it, so a corner would only
+    // agree with this while the packet was square and full size, which is the one frame
+    // it is not.
+    const dx = from.cx - (to.left + to.width / 2);
+    const dy = from.cy - (to.top + to.height / 2);
+
+    /* `.pack` transitions its own `transform`, not these three, so nothing would carry
+       the inverted state anyway — but the rule is one line away from listing `all`. */
+    el.style.setProperty('transition', 'none');
+    el.style.setProperty('translate', `${dx}px ${dy}px`);
+    el.style.setProperty('rotate', `${from.tilt}deg`);
+    el.style.setProperty('scale', String(from.w / to.width));
+    // Force the inverted position to be committed before releasing it.
+    void el.offsetWidth;
+
+    el.style.setProperty(
+      'transition',
+      `translate ${duration}ms ${easing}, rotate ${duration}ms ${easing}, scale ${duration}ms ${easing}`,
+    );
+    el.style.setProperty('translate', '0px 0px');
+    el.style.setProperty('rotate', '0deg');
+    el.style.setProperty('scale', '1');
+
+    timers.current.push(
+      window.setTimeout(() => {
+        /* Back to the stylesheet, so the hover transition on `.pack` is the packet's
+           again — it is a thing you can pick up and put down once it has landed. */
+        ['translate', 'rotate', 'scale', 'transition'].forEach((property) =>
+          el.style.removeProperty(property),
+        );
+      }, duration + 20),
+    );
+    /*
+     * Once, on mount. The opener is keyed on the pack id, so a second packet is a second
+     * component and gets its own flight; the same one re-rendering is a packet that has
+     * already landed.
+     */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const clearTimers = useCallback(() => {
     timers.current.forEach((id) => window.clearTimeout(id));
@@ -1498,7 +1621,11 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    */
   const tableClick = () => {
     if (canFile) putAway();
-    else if (phase === 'sealed') onPutBack();
+    /* Square, hence a tilt of 0: a packet leans on the pile and stands up on the stage,
+       and the lean is what the journey back has to give it again. */
+    else if (phase === 'sealed') {
+      onPutBack(sealedRef.current ? grabPack(sealedRef.current, 0) : null);
+    }
   };
 
   /*
@@ -1667,6 +1794,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
         <div className="opener__stage">
           <div
             className="pack"
+            ref={sealedRef}
             style={foil}
             /*
               **The one thing carved out of the table's click.** Everything else in this

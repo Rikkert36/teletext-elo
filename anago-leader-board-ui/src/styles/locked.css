@@ -41,9 +41,13 @@
 }
 
 /*
- * The book. Shut, so it is the cover face and the board edge and nothing else — the same
- * shadow stack as `.album__binding` and `.choice__stage`, because it is the same book seen
- * closed and the three must not disagree about how high off the table it sits.
+ * The book. Shut, so it is the cover face and nothing else — the same shadow stack as
+ * `.album__binding` and `.choice__stage`, because it is the same book seen closed and the
+ * three must not disagree about how high off the table it sits.
+ *
+ * No brass ring, for the same reason none of them has one: the edge is `#6b5325` on all ten
+ * stains and reads as gold on the dark cool ones and as nothing on the warm browns. See
+ * `.album--closed .album__leaf--cover` in album.css.
  */
 .locked__book {
   position: relative;
@@ -58,7 +62,6 @@
     var(--leather-lo, #4a3820) 100%
   );
   box-shadow:
-    0 0 0 2px var(--board-edge, #6b5325),
     0 26px 50px rgba(0, 0, 0, 0.65),
     0 6px 14px rgba(0, 0, 0, 0.5);
 }

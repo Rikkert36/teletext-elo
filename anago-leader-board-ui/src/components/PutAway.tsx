@@ -267,6 +267,21 @@ const PutAway: React.FC<PutAwayProps> = ({ cards, flying, onCleared, onLanded })
     }
 
     /*
+     * **The same sound the card made getting here.** Standing aside and going in are one
+     * gesture in two steps — a hand moving cards, the same distance, on the same curve, at
+     * the same `FLIGHT_MS` — so the travel sounds the same both times and only the *ending*
+     * differs: nothing at the margin, `playSlot` in the book.
+     *
+     * One per flight is not the rustle the clearing note refuses. Those five went at once
+     * and had to be one sound; these are strictly sequential, paced by the page turning
+     * between them, so they are never within half a second of each other.
+     *
+     * Below the early return above, deliberately: with no slot on screen there is no flight
+     * to hear, and a swish over a card that does not move is worse than a beat of silence.
+     */
+    playPageTurn();
+
+    /*
      * Pure translation — see the note on the component. The card in the row was already a
      * slot's width, so there is no scale to interpolate and no `--flip-scale` to keep the
      * rim honest through one.

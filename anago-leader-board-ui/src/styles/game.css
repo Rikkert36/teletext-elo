@@ -881,6 +881,96 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  /*
+   * **Not `position: relative`, and it cannot be.** This element spans the whole layout —
+   * the asides are out of flow so the book can centre on the table whether or not there
+   * are packets beside it — and it comes *after* both of them in the document. Positioned
+   * elements at `z-index: auto` paint in document order and hit-testing follows paint, so
+   * a positioned `.album-main` covers the pile and the register and takes every click
+   * aimed at them. The fading book below is anchored to `.album-layout` instead, which is
+   * already the asides' containing block and is the same box for this purpose.
+   */
+}
+
+/*
+ * **Reaching for a packet**: the book going, while the packet comes.
+ *
+ * The opener replaces the album rather than dimming it, and that is deliberate — this is
+ * the one screen where the book genuinely is not the subject, and leaving it under the
+ * reveal would put a second lit object inside the ceremony's vignette. What was wrong was
+ * only the *frame* it went on: the packet you clicked, the pile it came out of and the book
+ * it replaced all changed at once, with nothing to say they were one event.
+ *
+ * So for the length of the flight — and not one beat longer — the album is still mounted
+ * (`bookLeaving` in CollectionPage.tsx) and simply fades. It comes out of flow to do it, so
+ * the opener has the middle of the table to lay itself out in as though the book had
+ * already gone; the geometry it lands in is therefore the geometry it keeps, which is what
+ * lets the packet be flown to a position measured on the first frame.
+ *
+ * **Anchored to `.album-layout`, not to `.album-main`.** They are the same box here —
+ * `.album-main` is a full-width block at the top of a layout with no padding — and the
+ * layout is a containing block already, for the asides. Making `.album-main` one instead
+ * would have put a positioned, full-width element after the margins in document order,
+ * which is a lid over the pile and the register: they would paint under it and lose every
+ * click.
+ *
+ * `top: 0` and the centring are what the album had as a flex item — the column stacks from
+ * the top and centres across — so nothing moves on the frame it leaves the flow. `translate`
+ * rather than a `transform`, which `.album` may want for itself.
+ *
+ * **400ms against the flight's 440.** The book still finishes first — what is wanted is a
+ * table being cleared for something, not a dissolve between two things — but only just, and
+ * that margin is deliberately narrower than it was. At 240 against 320 the book was gone a
+ * quarter of the way into the flight and the fade was the fastest thing on a page whose
+ * whole manner is unhurried; a book is a heavy object and should not evaporate. It now
+ * spends most of the flight going, which is what makes the packet read as *displacing* it
+ * rather than as arriving after it left.
+ *
+ * `ease-out` and not a linear ramp, so the last of it is the slowest part: the book is
+ * faintest for longest, and the frame it finally goes on is the one nobody is looking at.
+ *
+ * `REACH_MS` is the other number and lives in PackOpener.tsx; both are scaled by `--anim`,
+ * so the pacing knob cannot pull them apart.
+ */
+.album-layout--reaching .album {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity calc(200ms * var(--anim, 1)) ease-out;
+}
+
+/*
+ * No reduced-motion rule on either of these, and that is not an oversight: neither class is
+ * ever applied under it. A reader who has asked for less motion never picks a packet *up* or
+ * puts one *down* — the middle of the table is simply what it now holds, on the frame of the
+ * click, as it always was.
+ */
+
+/*
+ * **The same pass, run backwards**: a sealed packet is put back on the pile and the book
+ * comes back up under it.
+ *
+ * An `animation` rather than a transition, because the album is *mounted* by the click that
+ * starts this — the opener had replaced it — and a transition needs a value to leave. The
+ * fade is the fade-out's own length, so the two directions are one length, and it is in flow
+ * from the first frame: nothing is being cleared for it, it is what the table now holds.
+ *
+ * Inert while it arrives. It is not a book you can turn the pages of until it is a book, and
+ * a page turned at 20% opacity by a click aimed at the wood is the sort of thing nobody
+ * would report and everybody would feel.
+ */
+@keyframes album-return {
+  from {
+    opacity: 0;
+  }
+}
+
+.album-layout--returning .album {
+  animation: album-return calc(200ms * var(--anim, 1)) ease-out both;
+  pointer-events: none;
 }
 
 /*

@@ -95,7 +95,11 @@
  * less its teeth put the card behind the seals. Only the coloured panel is the pouch.
  */
 .opener,
-.pack-shelf {
+.pack-shelf,
+/* The packet going home is neither: it is a picture of one, in viewport space, and sets
+   its own `--pack-w` in pixels from the measurement it was drawn off. Everything below
+   still has to be derived the one way — see `.pack-flight`. */
+.pack-flight {
   /* ~90° sawtooth. `--tooth-w` must stay under 2 × `--tooth-h` × tan(44°) ≈
      1.93 × `--tooth-h`, or consecutive teeth stop meeting and the seam between
      the teeth and the body shows as a row of notches. */
@@ -104,6 +108,36 @@
   /* Depth of one sealed end, teeth included — the blade cuts *through* the seal. */
   --crimp: calc(var(--pack-w) * 0.15);
   --pack-h: calc(var(--pack-w) * 1.4 + 2 * var(--crimp));
+}
+
+/**
+ * A packet in the air between the stage and the pile: the way in, run backwards.
+ *
+ * **A clone rather than the tile it is landing on**, and the shelf is the reason. It is a
+ * scroll container — `overflow-y: auto`, capped at the book's height — so it clips, and a
+ * tile flown in from the middle of the table would be behind the pile's own edge for most
+ * of the journey. The way *in* needs none of this: the opener's packet is the real element
+ * and nothing clips it, which is why only one direction has a clone in it.
+ *
+ * Fixed, and mounted at the shell next to `PutAway`'s hand of cards — for the same reasons
+ * set out there, and at the same depth: above the album's turn strips, below the viewer's
+ * scrim. Inert, because it is a picture of a thing being put down and the pile underneath
+ * has to be live the moment it lands.
+ *
+ * The flight itself is written on by CollectionPage's layout effect, in `translate`,
+ * `rotate` and `scale` — the same three the way in uses, composing under whatever
+ * `transform` the packet already has.
+ */
+.pack.pack-flight {
+  /*
+   * Both classes, because `.pack` sets `position: relative` and is declared *below* this —
+   * at equal specificity the later rule wins, and a packet that stayed in the flow of the
+   * shell would sit under the table rather than over it. The pair settles it wherever
+   * either happens to be written.
+   */
+  position: fixed;
+  z-index: 42;
+  pointer-events: none;
 }
 
 /* ---------------------------------------------------------------- *
@@ -209,8 +243,8 @@
   -webkit-mask-position: 90% 0;
   mask-position: 90% 0;
   transition:
-    -webkit-mask-position calc(400ms * var(--anim, 1)) linear,
-    mask-position calc(400ms * var(--anim, 1)) linear;
+    -webkit-mask-position calc(500ms * var(--anim, 1)) linear,
+    mask-position calc(500ms * var(--anim, 1)) linear;
 }
 
 .opener__tally--told .opener__tally-ink {
@@ -251,7 +285,7 @@
     0 0 15px rgba(230, 196, 120, 0.45);
   filter: blur(0.4px);
   pointer-events: none;
-  animation: tally-nib calc(400ms * var(--anim, 1)) linear both;
+  animation: tally-nib calc(500ms * var(--anim, 1)) linear both;
 }
 
 /*
@@ -749,6 +783,194 @@
   outline: none;
   filter: drop-shadow(0 0 2px #fff3c4) drop-shadow(0 0 3px #ffe9a0)
     drop-shadow(0 7px 12px rgba(0, 0, 0, 0.6));
+}
+
+/* ---------------------------------------------------------------- *
+ * The docket — what a packet says when you look at it
+ *
+ * A packet's colour tells you what size it is and its print tells you how many
+ * cards, and neither tells you the one thing that is about *you*: why it is lying
+ * there. That was a native `title` — a second of waiting, five words, unstyled, in
+ * the corner of the cursor.
+ *
+ * **One line of type on a slip of paper, and both halves of that are load-bearing.**
+ * It carried three layers for an afternoon — a tracked heading, the sentence, and the
+ * contents in small caps — which is a caption block, not a docket: the heading named
+ * what the sentence underneath already said, and the contents line repeated the number
+ * printed on the wrapper two inches away. What is left is the sentence.
+ *
+ * Paper, because the table allows nothing else: game.css's third rule is that
+ * everything here is an object or it is engraved and nothing gets a panel, and a dark
+ * rounded box with a hairline border is neither. So the docket is the book's own stock —
+ * `.album__page`'s cream taken a grade warmer, `.album__page`'s ink, and two of the four
+ * layers of `.album__page::before`'s sheet — under `--drop`, the way the packing slip in
+ * a box of cards would be.
+ *
+ * **It was flat cream in a browser face and that is what was wrong with it.** Nothing
+ * about the shape needed changing: what it lacked was material. It is the grain, the
+ * margins, the cut edge in the two inset shadows and the book's serif that make a
+ * rectangle of #f1ead6 into a piece of paper, and every one of them is quoted from the
+ * album rather than invented for a tooltip.
+ *
+ * **Square to the screen, and every packet on the table is not.** The slip was laid at
+ * 1.1° like everything else here, and it was the wrong 1.1°: a rotated element cannot
+ * be rasterised on the pixel grid, so the browser drops LCD subpixel antialiasing for
+ * grey and resamples the result, and small type is precisely the size where
+ * that is the difference between type and a smudge of it. Nothing else on this table
+ * pays that price — the packets are foil and gradients, the cards are art, the book's
+ * text is upright — and there is no angle small enough to keep that is still worth
+ * seeing. What replaces it is the shadow: `--drop` is offset, so the slip still sits
+ * *above* the wood rather than being printed on it. The same rule governs the fade,
+ * which animates opacity alone: a `transform` left behind by a filled animation
+ * layerises the element and softens the text for as long as it is up, even at
+ * `translateX(0)`.
+ *
+ * It is portalled to the body (see PackNote for the two reasons it has to be), so it
+ * inherits nothing: none of the shelf's `--pack-*`, none of the stage's `--ink`. Every
+ * value here is written out, and the ones quoted from album.css are marked.
+ * ---------------------------------------------------------------- */
+
+.pack-note {
+  position: fixed;
+  /*
+   * Above the table and the book, which top out at 40 (album.css) — a slip is on top of
+   * whatever it is lying on, always. It never has to beat the opener's 39–42: those only
+   * exist while a packet is on the stage, and the pointer that opened one has left the
+   * tile that could raise this.
+   */
+  z-index: 50;
+  /* The corner it is measured in, for the one commit before PackNote has placed it. */
+  left: 0;
+  top: 0;
+  /*
+   * As wide as its sentence and no wider, capped where a game line breaks to two.
+   *
+   * The opposite of `.viewer__detail`'s reserved column, and for the opposite reason:
+   * that one is a caption beside a card that must not move, this is a slip of paper
+   * that is only ever as big as what is written on it. A fixed width would leave
+   * "Cadeaupakje" floating in half a card of empty stock.
+   */
+  width: max-content;
+  max-width: 250px;
+  box-sizing: border-box;
+  /*
+   * A slip of paper has margins. The 8/12 it was left the sentence sitting against all
+   * four cut edges, which is what made it read as a label printed on stock rather than a
+   * thing written on a piece of it — a page's `--page-pad-x` is ~9% of its width and this
+   * is the same proportion at this size.
+   */
+  padding: 11px 15px 12px;
+  /* It is a label, not a target: it must never take the hover off the packet under it. */
+  pointer-events: none;
+
+  /*
+   * **Book stock, one grade down.** `.album__page` is a radial from #fffdf4 with the top
+   * of the sheet near white, which is right for a leaf lying open under the album's own
+   * light and wrong for a slip lying loose on dark timber: it glared, and the white was
+   * doing the work the shadow should be doing. This is the same cream taken warmer, duller
+   * and flatter — a raking gradient along the table's one light direction instead of a
+   * dome — so the paper is lit rather than lamp-like.
+   *
+   * Set ~3 points lighter than the tone it should land on, for the reason album.css gives
+   * at the same place: the grain in `::before` multiplies into it. Change one, move the other.
+   */
+  background:
+    linear-gradient(168deg, #f6f0dc 0%, #ebe3ca 62%, #e3dabe 100%),
+    #f1ead6;
+  /* Trimmed, not torn: two corners a hair rounder than the other two is all a cut edge
+     needs, and a real deckle would be a second material to keep in step with the book. */
+  border-radius: 1px 2px 2px 1px;
+  /*
+   * The table's one light and one shadow direction, and then the sheet's own thickness:
+   * a warm hairline inside the top edge where the light catches the cut, and a darker one
+   * inside the bottom where it does not. Two insets are what stop a rectangle of cream
+   * from having the edge of a div.
+   */
+  box-shadow:
+    var(--drop, 3px 8px 18px rgba(14, 5, 2, 0.6)),
+    inset 0 1px 0 rgba(255, 252, 240, 0.75),
+    inset 0 -1px 0 rgba(120, 100, 58, 0.22);
+
+  /*
+   * **The book's Georgia, not the page's Tahoma.** The page sets its lists in a sans
+   * because twenty rows of it have to stay quiet under the cards; a slip is one sentence
+   * with nothing to defer to, and the sans at 12px was the last thing on this table that
+   * looked like a browser default. Georgia also carries the score's figures properly —
+   * they are old-style in this face, which is what a printed docket's numerals look like.
+   *
+   * 13px because the serif's x-height is smaller than Tahoma's at the same size, and a
+   * whole number because a fractional one is rasterised at fractional stem widths.
+   */
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #3a3222;
+}
+
+/*
+ * The sheet, quoted from `.album__page::before` — the same stock, so the slip cannot
+ * drift from the book it came out of.
+ *
+ * **Two of the four layers, and the other two are folded into the colour above.** The
+ * album's formation cloud is a 900px tile and its fibre a 700px one; over a slip 200px
+ * wide those are not a texture but a constant tint, because every docket samples the same
+ * corner of the same tile. Carrying them would be two more data URIs to keep in step for
+ * a flat multiply that the background colour already expresses.
+ *
+ * `z-index: -1` rather than `position: relative; z-index: 1` on the content, which is how
+ * the album raises its own printing above this: the docket's content is a bare text node
+ * with no element to raise. A negative index paints the grain above the element's own
+ * background and below its inline content — exactly the sandwich this needs — and the
+ * multiply still finds the paper underneath because `.pack-note` is a stacking context.
+ */
+.pack-note::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background-image:
+    /* TOOTH: the fine surface, and the layer that stops the cream being a fill. */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .40 0 0 0 0 .36 0 0 0 0 .25 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* FLECKS: shive in a cream book paper. Sparse enough that a slip gets one or two. */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cg fill='%23796a4a' fill-opacity='.3'%3E%3Ccircle cx='58' cy='104' r='1.1'/%3E%3Ccircle cx='247' cy='63' r='.8'/%3E%3Cellipse cx='166' cy='291' rx='1.7' ry='.6' transform='rotate(-14 166 291)'/%3E%3Ccircle cx='352' cy='218' r='.9'/%3E%3Cellipse cx='94' cy='366' rx='1.4' ry='.5' transform='rotate(9 94 366)'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:
+    260px 260px,
+    420px 420px;
+  /*
+   * The flecks are offset because a slip is about 40px tall and every inclusion on that
+   * tile is below it — sampled at the origin the layer would be five specks of nothing at
+   * all. `-20px -94px` walks the tile so the one at (58, 104) lands near the left of the
+   * paper, which is the whole of what "sparse" means at this size: one speck, not five.
+   */
+  background-position:
+    0 0,
+    -20px -94px;
+}
+
+/*
+ * Placed, and fading in on opacity alone — see the note at the top of this block for
+ * why there is no transform anywhere in here. `both` so it starts at zero rather than
+ * flashing in at full strength on the first frame.
+ */
+.pack-note--placed {
+  animation: pack-note-in 130ms ease-out both;
+}
+
+/* Measured but not yet placed — one commit, before paint. See PackNote's layout effect. */
+.pack-note--measuring {
+  opacity: 0;
+}
+
+@keyframes pack-note-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ---------------------------------------------------------------- *
@@ -2125,7 +2347,9 @@
   /* The line is simply there. It still says what it says — the ending has to land, not be
      taken away — it just is not written on. */
   .opener__tally,
-  .opener__tally-ink {
+  .opener__tally-ink,
+  /* The slip is simply there. The fade is all it has and all it loses. */
+  .pack-note--placed {
     animation: none;
     transition: none;
   }

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { COVERS, CoverId, albumLeather } from '../utils/albumLeather';
-import { ms } from '../utils/animationSpeed';
+import { ms, prefersReducedMotion } from '../utils/animationSpeed';
+import { playRebind } from '../utils/sounds';
 import WrittenName, { durationFor } from './WrittenName';
 import { writeName } from '../utils/hersheyScript';
 /*
@@ -47,6 +48,15 @@ const SETTLE_MS = 200;
 const PRINTED_MS = 520;
 /** After the name is finished, before handing the book to the album. */
 const REST_MS = 460;
+
+/*
+ * **There is no accent constant here any more, and that is the design.**
+ *
+ * `COOL_AT = 0.6` stood here — `album-name-lit`'s 60% keyframe, the frame the light starts
+ * to leave the letters on — because a chord was scheduled against it. Nothing is scheduled
+ * against it now: the build simply runs the length of the beat and its own arc crests
+ * inside the cool-off. One less number that has to be kept in step with a keyframe.
+ */
 
 /**
  * The shape of the shelf, and it has to be the same five as `grid-template-columns` in
@@ -183,15 +193,33 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
       }
 
       /*
-       * **The whole ceremony is silent, and that is the finished state of it.**
+       * **The binding sound: the re-binding's build, across the whole beat, and nothing
+       * lands at the end of it.**
        *
-       * There were two sounds here and both are deleted. `playPenStroke` fired once per
-       * stroke, off this same geometry — the strokes are short and the lifts between them
-       * shorter, so the grain clouds ran together and the pen read as *smacking* rather
-       * than as a nib. And a `playCoverTurn` at +120 laid the finished book on the table,
-       * which with the name already written is a page rustling for no reason anyone can
-       * see. `written` stays: the timings still come from the real stroke geometry.
+       * The light gathering on the cover and the icon binding closing over the boards are
+       * the same event at two scales, so the album's build does both — but only the build.
+       * This ends on `playRarePayoff` for a while and it was wrong twice over. At
+       * `REBIND_PAYOFF` it was the full four-voice chord, which is the rarest moment in the
+       * game played over a book that has no cards in it yet. And *any* level is wrong here
+       * on a stricter reading: every pitch in `sounds.ts` belongs to the D-minor payoff
+       * ladder, which is the cards' ladder — `playRebind` is unpitched precisely so it
+       * cannot argue with it — so a chord on a beat with no card in it is borrowed weight.
+       *
+       * **The build ends the beat by itself, which is why it runs the full `writeMs`.**
+       * `playRebind`'s arc crests at 0.82 and falls; over the whole lighting beat that puts
+       * its brightest moment inside the 60–100% cool-off, decaying out as the gilt settles.
+       * So the light leaving and the sound leaving are the same movement. Ending the build
+       * early instead — at the accent, with a hit after it — is what made this need a hit.
+       *
+       * If the beat ever does read as unfinished, the fallback is `playRarePayoff(1)`: bell
+       * only, no impact and no booms, the smallest thing on the ladder. Not the full chord.
+       *
+       * Silent under reduced motion, where album.css drops the lighting animation entirely
+       * and the name is simply present: a build under a static cover is a build under
+       * nothing.
        */
+      if (!prefersReducedMotion()) playRebind(writeMs);
+
       const finished = ms(SETTLE_MS) + writeMs;
       after(finished + ms(REST_MS), () => {
         setPhase('resting');

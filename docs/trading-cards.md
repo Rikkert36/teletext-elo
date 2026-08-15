@@ -9,8 +9,9 @@ the letter-spacing with it, because ink displaces nothing and a cursive has to j
 drawn from **vendored Hershey script simplex** (`hersheyScriptData.ts`, generated from the
 `.jhf`, never hand-typed), and *simplex* is the load-bearing word: complex script and any
 ordinary outline font animate as the pen tracing the letter's silhouette rather than
-writing it. Timing comes from path length, so the pen holds one speed; the sound is one
-`playPenStroke` per stroke, and `playFoilStamp` is retired. Facing it, the voorwoord moved
+writing it. Timing comes from path length, so the pen holds one speed. **Its sound is the re-binding's
+build and nothing else** — `playRebind` across the whole beat, no chord at the end of it —
+with `playPenStroke` and `playFoilStamp` both retired. Facing it, the voorwoord moved
 to a book face (Palatino, Georgia behind it) and took a three-line brass versal on "Er",
 with the following words in small capitals — the versal is what makes the type change
 load-bearing rather than a preference. All of it is under "The name is written, not
@@ -42,6 +43,19 @@ nib riding at its edge. It earns the place four captions under the row did not b
 the one fact about a sitting the table cannot show you. It takes the reserved box
 `.opener__hint` used to hold, so the column's geometry is unchanged, and that element is gone.
 See "The tally, written in over the cards".
+
+**A packet on the shelf carries a docket now.** Hovering one used to show a native `title`
+and nothing else, so the pile said what size its packets were and never why they were lying
+there. `PackNote` puts a slip of the book's own paper next to the packet under the pointer,
+with **one line** on it: "Gewonnen met Bo van Daan en Rik met 10 - 3", "Dagelijks gratis
+pakje", "Cadeaupakje". It is paper rather than a tooltip panel because the table admits no
+panels, portalled out of the shelf's clip and placed from its own measured box before the
+first paint. The sentence comes off the wire whole — `AvailablePack.Reason` stopped being a
+wrapper label and became the docket's line, because the game line needs three player names
+and those live only on the replayed game row. Nothing on the slip says how many cards are in
+the packet; the wrapper prints that. It is also **the one object on this table that is square
+to the screen and pixel-snapped**, which cost it its 1.1° lean and is why its type is sharp.
+See "What a packet says: the docket".
 
 **The last button on the table is gone, and the cards do its job.** A reveal ends with the
 row of cards still lying there and the shelf live over it, so there are two things on the
@@ -1553,8 +1567,52 @@ negative.
 Five shut albums lying side by side, blank covers, one per stain. Click one: the other
 four are taken off the table, the survivor slides to the middle, comes up to full size,
 and the owner's name is **written** into the cover in gilt, stroke by stroke, by a pen
-you watch moving. Then the shelf and the book appear.
+you watch moving. Then the book is set down, opens itself on the voorwoord, and your
+packets are **slid onto the shelf from your own side of the table**.
 
+- **The pile is brought over rather than being there** (2026-08-15). It was the last cut
+  left in this sequence: the shelf is suppressed for the whole of the choice, so on the
+  frame the ceremony ended the packets simply *were* on the table — on the one screen that
+  is nothing but ceremony, and next to a book that had just been flown, written and opened.
+  They come up from **below the fold**, straightening out of a steeper lean as they land.
+  Below is where a thing handed to you comes from, the reader being at the near edge of the
+  table, and it is the shelf's own vocabulary run forwards: the return flight is a packet
+  being put back on the pile, and this is the pile being put there to begin with.
+  - **Clones in viewport space, exactly as the return flight uses**, and for the identical
+    reason — `.pack-shelf` is `overflow-y: auto`, so a tile animated from off-screen is
+    behind the pile's own edge for the whole journey. The tiles are on the shelf from the
+    first frame, `held`, holding the pile's shape until their own packet lands on them.
+  - **Simpler than the return flight in one way**: a clone lands at its tile's own size, so
+    there is no scale to solve and no `PackGrab` to measure. It is drawn *at* the tile and
+    the only thing in motion is how far below the table edge it starts.
+  - **It arrives as one pile, not as a deal.** A stagger wide enough to read as dealing is
+    right for the two or three packets a new colleague has and is a machine gun at twenty —
+    and the number is not this page's to choose, since packs are derived from games played.
+    So the stagger is capped in *total* (`DEAL_SPREAD_MAX`, 150 base): past about six
+    packets the step shrinks to fit and a deep pile simply arrives more nearly together.
+    The pile gets denser, never longer.
+  - **One `playSlot`, on the first packet touching down.** One per packet is what a deal
+    would want, and the same objection kills it. The sound is the pile landing, which is a
+    fact about the gesture rather than about how many games you have played. `playSlot` and
+    not something new: it is already what a thing coming to rest on this table sounds like.
+  - **It starts before the book has finished opening** — `DEAL_WAIT` is 200 against
+    `JUST_BOUND_OPEN_MS`'s 420 — so the two are halves of one moment. Waiting for the cover
+    to turn put a dead beat in the middle of the one sequence on this page that has none.
+  - **`onDone` notes that a delivery is owed; it does not read the shelf.** The first version
+    did, and the packets went on appearing exactly as before — `AlbumChoice` schedules
+    `onDone` from a timer set on the *click*, so the callback closes over the render you
+    picked a binding in, which pre-dates `createAlbum` answering. `shelfPacks` there is the
+    pre-album collection's, empty, and the deal covered nothing. The flag is consumed by a
+    layout effect keyed on the shelf appearing instead, which is the only place the pile can
+    be seen. If the pile is empty at the handover the note simply stays up and the first
+    packets to arrive are flown — the promise kept later rather than missed.
+  - **That trigger is a *layout* effect.** Raising the flight state mounts the clones, and
+    only the commit after that can measure a tile and fly them. React flushes a layout
+    effect's update before painting, so both commits land in one frame; from an ordinary
+    effect the pile would paint in place and only then be hidden and flown, which is the snap
+    this exists to remove with a flicker added to it.
+  - Nothing replays it — a reload is not a delivery, the same rule that keeps `writing` false
+    on the album's own cover.
 - **Five books, not a swatch row, and no preview.** Choosing is picking an object up off
   a table; a control that restains a book in place is a settings widget with leather
   printed on it. The cost is committing before you see your name on it, which is the
@@ -1629,12 +1687,13 @@ you watch moving. Then the shelf and the book appear.
   hairline is a box-shadow on a square board — while `.album__cover` inside it is rounded
   `0 3px 3px 0`. A shut album is rounded leather with a square hairline just outside it. A
   radius on the stage rounded the hairline too, and those two corners popped square.
-- **Nothing here makes a sound, and `AlbumChoice` imports nothing from `sounds.ts`.** Two
-  designs were tried and both are deleted — see "The name is written, not stamped" below.
-  The rejection that killed the first of them still stands and is why nothing per-letter
-  comes back: `playSlot` per letter is eleven grains over 100ms plus a 130Hz boom, so the
-  grains smear into a wash and the booms become a pitched pulse train. Per *stroke* was no
-  better in the end — it read as smacking.
+- **Nothing here is per-letter or per-stroke any more; the ceremony has one build and one
+  chord.** Two per-event designs were tried and both are deleted — see "The name is
+  written, not stamped" below. The rejection that killed the first still stands and is why
+  nothing per-letter comes back: `playSlot` per letter is eleven grains over 100ms plus a
+  130Hz boom, so the grains smear into a wash and the booms become a pitched pulse train.
+  Per *stroke* was no better — it read as smacking. What is there instead is the
+  re-binding's build, `playRebind`, running the length of the beat and ending by itself.
 
 #### The name is written, not stamped
 
@@ -1672,16 +1731,44 @@ a personal album than a press that somehow knew your name in advance.
   timing was right for a press indexing along a line and is wrong for a hand. Pen *lifts*
   are charged against the same budget (`PEN_LIFT_COST`), because otherwise the pen
   teleports between strokes and the dot of an i lands in the same instant as its stem.
-- **The ceremony is silent, and it is the third sound design here rather than the absence
-  of one** (2026-08-15). It went foil tick per letter → grain cloud per stroke
-  (`playPenStroke`) → nothing. The per-stroke version was right about *what* to follow —
+- **The sound is one build and nothing else, and it is the fifth design here** (2026-08-15).
+  It went foil tick per letter → grain cloud per stroke (`playPenStroke`) → nothing →
+  the re-binding's build **and** its chord → the build alone. The per-stroke version was
+  right about *what* to follow —
   one long scratch would keep scratching through every lift, including the one between two
   words where the pen is demonstrably off the leather — and still wrong in the ear: the
   strokes are short and the lifts shorter, so the clouds ran together into a series of
-  smacks rather than into a nib. `playPenStroke` is deleted along with its last caller.
-  The `playCoverTurn` that laid the finished book down at the end went at the same time —
-  with the name already written there is nothing on screen for a rustle to belong to. What
-  remains is a hand drawing a name in silence, which is what the picture always was.
+  smacks rather than into a nib. `playPenStroke` is deleted along with its last caller, and
+  the `playCoverTurn` that laid the finished book down at the end went with it — nothing on
+  screen moves there, so it was a page rustling at nothing.
+
+  What replaced the silence is the thing this beat was always a smaller version of:
+  **`playRebind`, the icon re-binding's own build.** Binding a book sounds like binding a
+  book. The thread through all five attempts: this beat wants one gesture, and every attempt
+  to score the *mechanism* of the lettering — a press indexing, a nib travelling — described
+  the wrong thing at the wrong scale.
+- **The build has no chord after it, and losing that chord is the fifth design.** It landed
+  at `COOL_AT`, the 60% keyframe of `album-name-lit`, where the light starts to leave the
+  letters — the right *frame*, since the letters are white by 38% and then merely hold. It
+  was the wrong sound to put on it, at `REBIND_PAYOFF` for one reason and at any level for a
+  better one:
+
+  - The full four-voice chord is the rarest sound in the game, and this is a book that has
+    no cards in it yet — played before the player owns anything, it flattens the moment it
+    was borrowed from.
+  - **Every pitch in `sounds.ts` belongs to the D-minor payoff ladder, which is the cards'
+    ladder.** `playRebind` is unpitched precisely so it cannot argue with that. A chord on a
+    beat with no card in it is borrowed weight whatever its level.
+
+  So the build runs the whole beat and ends by itself. Its arc crests at 0.82 and falls,
+  which over the full lighting animation puts the brightest point inside the 60–100%
+  cool-off: the light leaving and the sound leaving are one movement, and the beat resolves
+  without anything arriving. Ending the build *early*, at the accent, is what made it need
+  something after it. `COOL_AT` is gone with the chord — one less number pinned to a
+  keyframe. If it ever reads as unfinished, the fallback on record is `playRarePayoff(1)`:
+  bell only, no impact, no booms, the smallest thing on the ladder. Not the full chord.
+- **Silent under reduced motion**, where the lighting animation is dropped altogether and a
+  build would be building under a static cover.
 - **`--ink` is its own token, and shares `--foil`'s hex today.** Sharing the *value* is
   right — one shop, one pot of gilt. Sharing the *token* is not: `--foil` means hot foil
   blocking, which still has a job (the rule, and the spine on the icon binding), and the
@@ -1699,6 +1786,20 @@ a personal album than a press that somehow knew your name in advance.
   The handover is invisible because both sides draw the same strokes from the same pure
   function; `AlbumChoice` computes the duration once and hands it to the component so the
   ear and the eye cannot disagree.
+- **The measurement is cached across mounts, and that is what finally made the handover
+  invisible** (2026-08-15). Everything above was true and the swap still showed a blip on the
+  name, because the two covers are two *mounts*: `AlbumChoice` unmounts, `Album` mounts a
+  second `WrittenType`, and a fresh one has no viewBox yet. It paints the plain-text fallback
+  until the font promise resolves and the layout effect measures — at least one frame — so the
+  cover that had just been ceremonially lettered flashed its name small and unfitted, the
+  title box changed height under it, and the rule below jumped. The blip was *only* visible
+  here, because nowhere else does a second cover mount in front of a reader who is watching
+  the first. A module-level `Map` keyed by name and face, read in the `useState` initialiser
+  rather than in an effect, means the album mounts straight into the finished SVG. Read from
+  an effect it would not help: state set in an effect arrives after a paint, and the paint it
+  arrives after is the fallback. Safe to hold forever — the box is a pure function of the
+  name, the face and `NOMINAL` — and only ever filled past `ready`, so no entry is measured
+  against the fallback face.
 - **A name the font cannot set falls back to printed type.** `writeName` folds diacritics
   (José → Jose, which is what a binder with one set of dies would have done) and returns
   null for anything left over. The fallback is set in italic Palatino and is deliberately
@@ -1749,6 +1850,14 @@ along with `hint`, `everOpened` and the effect that latched it.
   cover over to a book lying open at page nine, and the beat this whole section is about
   had nothing left to do. Read at mount only, which is enough: `justBound` is raised in the
   same handler that swaps the ceremony out, so it is already true on the first render.
+- **And that handler has to commit both flags at once**, which is why `onDone` wraps them in
+  `unstable_batchedUpdates`. `AlbumChoice` reports itself finished from a timeout and
+  `index.tsx` mounts with legacy `ReactDOM.render`, so unbatched, lowering `creating` mounts
+  the album a render *before* `justBound` is true — and a book that reads the flag at mount
+  reads a false one, takes the saved position, and the whole beat above is undone by an
+  ordering nobody wrote down. The symptom is the bug this section exists to prevent, one
+  layer further out: the ceremony ends, the book appears open on page nine of the album this
+  one replaced, and only then turns to the voorwoord.
 - Somebody returning tomorrow to a book they never opened is a different case and gets a
   shut book, because `justBound` is session state and their saved position is leaf 0. That
   is deliberate — the ceremony is what earns the automatic opening, and there is none on a
@@ -1920,7 +2029,7 @@ Five beats, base (so half their real length at `--anim = 2`), ≈2450 total — 
 | `shutting` | 620 | `flipped` forced to 0; the existing closed-book transform and leaf flip do the work | `playCoverTurn` |
 | `settling` | 200 | held shut, nothing moving — a press has a pause before it | — |
 | `binding` | 900 | the build: the new binding drawn across the board from the spine | `playRebind(900)` |
-| `resting` | 460 | the board settles — **the accent** | `playCoverTurn` at +120 |
+| `resting` | 460 | the board settles | — |
 
 > **A `blocking` beat used to sit between `binding` and `resting`**, foil-blocking `ICONEN`
 > across the new boards a letter at a time with `playFoilStamp` under each one. Both the
@@ -1937,13 +2046,36 @@ letter landing together with the board. `playRebind` takes its length from the c
 `sounds.ts` belongs to the D-minor payoff ladder, so a pitched riser would either join that
 chord or fight it, and a boom would spend the arrival early.
 
-> **And there is now no boom in the ceremony at all.** `playCoverTurn` used to end on a
-> landing — an impact plus a 76 Hz boom at a fixed +0.55s — and it is deleted (2026-08-15).
-> One delay cannot suit four callers: no cover animation here is 550ms long, so the thud
-> never arrived *with* the board. It read as a stray *dook* after the move was over, and the
-> two places it was worst are the two where the book is already lying still — this `resting`
-> accent, and the finished album being laid down at the end of the choosing ceremony. The
-> arc's own decay ends the turn. `playImpact` and `playBoom` both survive for the payoffs.
+> **The build cut to a different sound around where the rings come on, and the bug was a
+> buffer running out** (2026-08-15). `playSwish` — the arc, which is the layer carrying the
+> whole gesture — did not loop its source. `getNoise` is three seconds, the swish enters it
+> at a **random** offset of up to two, and its playback rate runs to 1.2, so what is left to
+> play is between 0.83 and 3.5 seconds. Every page and cover turn is under a second and
+> never noticed. `playRebind` asks for four, so the arc died mid-build and left the grain
+> cloud playing bare, at a moment that moved between runs.
+>
+> `playRareRise` had already hit this and its comment claimed to be "the one layer in the
+> file longer than the buffer" — which stopped being true the moment `playRebind` got a
+> four-second caller. The rule that replaces it: **anything taking its length from a caller
+> can outlive the buffer, so it loops.**
+>
+> Worth recording that the first fix was aimed at the wrong layer. The late high-fibre skin
+> (1800–6400 Hz, entering at the half-way point) looks exactly like a seam on paper, was
+> deleted on that theory, and changed nothing — the cut was still there because the arc was
+> still dying. It is back.
+
+> **And `resting` is silent, which took two goes** (2026-08-15). First `playCoverTurn` lost
+> its landing — an impact plus a 76 Hz boom at a fixed +0.55s, deleted because one delay
+> cannot suit four callers: no cover animation here is 550ms long, so the thud never arrived
+> *with* the board and read as a stray *dook* after the move was over. What was left still
+> did not belong on this beat. **Nothing turns at `resting`**: the book has been shut since
+> `shutting` and the bloom is merely fading off it, so a spine creak and a paper arc over a
+> still cover is heard as a page flipping somewhere off-screen. So the call went too.
+>
+> The beat was reaching for an accent it does not need — the accent is the chord at the
+> bloom, and a second one after it was always going to be the weaker of the two. The rule
+> underneath both deletions: **a sound here has to be the sound of something that is moving
+> on that frame.** `playImpact` and `playBoom` survive for the payoffs.
 
 **Half-bound, and that is what makes the spine free.** Ivory boards with the chosen stain
 kept as the spine strip and four corner triangles. `albumLeather.ts` warns that the cover,
@@ -2184,6 +2316,57 @@ carries — not the tally coming back.
 
 **Where a count belongs is the checklist at the back**, because that is the one
 page in an album a hand writes on. See "The checklist at the back" below.
+
+#### The shut cover is a board, and its edges say so
+
+Everything the cover had was one 150° gradient and one broad soft wash down the left,
+and face-on that is a coloured rectangle: nothing at any of its four edges said the
+leather was lying *on top of* anything. `.album__cover::after` is six gradient layers
+that draw the board's own thickness. Settled:
+
+- **The round-over is steep, with most of the alpha in the first 2px.** This is the
+  number the whole thing rests on. A board's turn-in is a couple of millimetres against
+  a 150mm cover, so it reads as a hard mark; a linear ramp across the full 8px is a
+  vignette, and a vignette is a lighting effect that says nothing about the object.
+- **The head is lit and the tail and fore-edge are not.** Shadowing all three was the
+  obvious symmetry and was rejected: the leather is lit from the top-left — its own
+  ground gradient says so — so a round-over at the head tilts *into* the light. The
+  catch is tinted toward `--foil` rather than white, because a white highlight on
+  leather reads as plastic.
+- **The left edge is a hinge, not a gutter, and the wash that was there treated it as
+  one.** `inset 12px 0 24px -12px` was described in album.css as "the spine shadow of a
+  right-hand page", which is what a page has where the paper curves into the fold.
+- **A hinge has two channels, and one is not enough.** Going in from the trim: the spine
+  edge, where the leather turns the corner and is gone; a narrow lit shoulder; then the
+  **joint** — the channel the board actually swings in — and only then the flat of the
+  board. It shipped with the first two and stopped, and that reads as a book with a
+  shadow down one side rather than as a cover hinged to a spine. The crest between them
+  is deliberately narrow: broad, it pushes the joint out to where it stops being a
+  channel in the hinge and becomes a band lying on the leather. The trim is the darker
+  of the two darks — there the leather has left for the spine, where the joint is only a
+  groove in a surface you can still see — and nothing drops to clear between them, since
+  a gap of untouched ground between two darks is two stripes.
+- **This is not the spine hardware coming back**, and the distinction is worth keeping.
+  album.css rejects the hollow, the hinge grooves and the headband on a shut book,
+  because those are objects inside an open case and shrinking them to an 11px sliver
+  drew detail too small to read and put a hard line down the cover. Neither failure is
+  available here: shape is drawn with falloff only, there is no stop in the whole
+  overlay that is not a ramp, and the thickness of the thing you are looking straight
+  at is in view whether the book is open or shut.
+- **On `::after`, so it paints over the icon binding.** An ivory board has the same
+  edges as a leather one — re-casing changes the covering, not the object's shape. It
+  also means the overlay is a *background* rather than a `box-shadow`, so unlike every
+  other shadow on the cover it is inside the re-bind's `filter` — which is not enough.
+  `brightness(8)` clips `--leather-mid` only because that desaturates to about 40; under
+  a 0.55 black roll the same pixel desaturates to about 20 and lands at 160, i.e. a grey
+  frame round every edge of a white-hot book. It is named in the kill list with the rest.
+- **Only `.album__cover` gets it**, which is the album and the ceremony's finished book.
+  The ten choice tiles, the locked gate and the mobile cover keep their own flat copies
+  and this is chosen, not an oversight: none of the three hard-swaps into the album at
+  1:1 (the tiles are 0.4 scale, `.choice__stage` scales up from 0.86, the gate is another
+  screen), so nothing pops, and half the overlay is a hinge that the phone — one flat
+  slide at `inset: 0`, no spine — has nothing to hinge to. The shelf of ten reads
+  slightly flatter than the bound book as a result.
 
 #### Boards, endpapers and the voorwoord
 
@@ -3497,6 +3680,126 @@ its own spotlight on exactly the pulls the spotlight is for. Underneath is no be
 the opener is 62vh and centred, so packets below it start off screen. The stacked
 layout keeps the old round trip, and loses nothing it had.
 
+### What a packet says: the docket
+
+*On trial — built, not yet checked in a browser.*
+
+A packet on the shelf says two things about itself and both are about the product:
+the colour is its size and the print is its count. Neither is the thing that is
+actually about *you* — the game you won this morning, the free one for turning up, a
+present from a colleague. That was in `pack.reason` all along and reachable only
+through a native `title`: a second of waiting, five words, unstyled, in the corner of
+the cursor. Hovering the pile felt like hovering nothing.
+
+`PackNote` is a **docket**: a slip of paper that lies next to the packet while the
+pointer is on it, with one line on it saying where the packet came from.
+
+> Gewonnen met Bo van Daan en Rik met 10 - 3
+> Dagelijks gratis pakje
+> Cadeaupakje
+> De set is compleet
+
+- **One line, and nothing else on the slip.** It was built with three — a tracked
+  heading, the sentence, and the contents in small capitals — and that is a caption
+  block, not a docket. The heading named what the sentence under it already said, and
+  the contents line repeated the number printed on the wrapper two inches away. Both
+  came off. **Nothing on the docket says how many cards are in the packet**: the
+  wrapper prints that, and how the number was arrived at is not the slip's business.
+- **The server writes the whole sentence, all four kinds of it.** The game line needs
+  the other three players' *names*, and they exist in exactly one place — the replayed
+  game row `PackService` already has in its hand. A `Pack` carries no player ids, and
+  giving it some so the browser could look names up would have put a sentence's
+  grammar on one side of the wire and its nouns on the other. So `Reason` stopped
+  being a wrapper label and became the docket's line, capitalised, for games, the
+  daily, the set-completion packet and a present alike. `PackNote` prints it verbatim
+  and knows nothing about which kind it is holding.
+  - **The margin bonus left the sentence with it.** It used to be a four-way switch —
+    "gewonnen — 10-3 tegen de verwachting in" against "gespeeld — 6-10" — which is an
+    explanation of the *size*. It survives where it always mattered, in the count and
+    in `DoubledPlayerIds`.
+  - Names are first names, `FirstName` in `PackService`, which is
+    `PlayerPerformance.ToString`'s rule without its null dereference: a game row that
+    never went through `GameService.GetGames` has no names on it, and that must cost a
+    docket its names and not the collection response its packets. The fallback is the
+    player id, because there is nothing better to say about a player the roster does
+    not know.
+- **It is paper, because the table allows nothing else.** game.css's third rule is
+  that everything on the stage is an object or it is engraved, and nothing gets a
+  panel. A floating dark box with a hairline border and a rounded corner — the
+  default tooltip of every design system — is neither, and it would be the second
+  admitted piece of UI on a page whose only other one is the debug plate. So the slip
+  is the book's own stock: `.album__page`'s cream, its `#3a3222` ink, `--drop`
+  underneath. The other reading of the same rule — type **engraved into the timber**
+  beside the packet — was passed over for one reason: the slip has to be legible over the
+  *book* as often as over bare wood, and engraving that crosses onto paper stops being
+  engraving.
+- **What was wrong with the first one was material, not shape.** It shipped as flat
+  cream in 12px Tahoma with 8px of padding, and it read as a browser tooltip that
+  happened to be beige. Four things fixed it, and each is quoted from the album rather
+  than invented for a label:
+  - **The sheet.** Two of the four layers of `.album__page::before` — the tooth and the
+    flecks — multiplying into the paper. The formation cloud and the fibre are 900px and
+    700px tiles, which over a 200px slip are a constant tint rather than a texture, so
+    they are folded into the background colour instead of carried as two more data URIs.
+    The flecks are offset `-20px -94px` because every inclusion on that tile sits below a
+    slip's 40px and the layer would otherwise be five specks of nothing.
+  - **The stock, a grade warmer and flatter.** The page's radial from `#fffdf4` puts near
+    white at the top of the sheet, which is right for a leaf under the album's light and
+    glared on a slip lying loose on dark timber. It is a raking gradient along the table's
+    one light direction now, and set ~3 points light of where it should land because the
+    grain multiplies into it — the same bargain, and the same warning, as album.css.
+  - **The cut edge.** A warm hairline inset at the top where the light catches it and a
+    darker one at the bottom where it does not. Two insets are what stop a rectangle of
+    cream from having the edge of a `div`.
+  - **Georgia at 13px, and margins.** The page sets its *lists* in Tahoma because twenty
+    rows have to stay quiet under the cards; a slip is one sentence with nothing to defer
+    to. The serif also gives the score old-style figures, which is what a printed docket's
+    numerals look like. Padding went to 11/15, about the proportion `--page-pad-x` is of a
+    page: the sentence was sitting against all four cut edges.
+- **It is square to the screen, and it is the only thing on this table that is.** The
+  slip was laid at 1.1° like the packets beside it, and the type came out soft: a
+  rotated box cannot be rasterised on the pixel grid, so the browser drops LCD subpixel
+  antialiasing for grey and resamples, and 12px Tahoma is exactly the size where that is
+  the difference between type and a smudge of it. Three things went with the angle, all
+  for the same reason — the fade animates **opacity alone**, because a `transform` left
+  behind by a filled animation layerises the element even at `translateX(0)`; the
+  placement is `Math.round`ed, because the anchor is a rect off a packet lying at 4.1°
+  and a box of text landing on x.4 is drawn between two columns of pixels; and the size
+  is 12px rather than 11.5, because a fractional size is rasterised at fractional stem
+  widths. The shadow is what is left to say the slip is above the wood and not printed
+  on it, and it is enough.
+- **Portalled to the body, and there was no choice.** `.pack-shelf` is `overflow-y:
+  auto`, which clips on both axes, so a docket rendered beside the tile is cut off at
+  the pile's edge — the same clip that forced `returning`'s flying clone out to the
+  shell. `position: fixed` inside the tile does not escape it either: `.pack--mini`
+  carries a `transform`, which makes it the containing block for fixed descendants
+  and puts them straight back under the scroller.
+- **Placed from its own measured box, in a layout effect.** The docket goes to the
+  right of the packet — the shelf is in a margin, so the table is that way — and
+  flips left only when the window leaves it nowhere to go, then is held inside the
+  viewport vertically because the pile scrolls and its top and bottom tiles can be
+  close to an edge. Measuring in `useLayoutEffect` rather than `useEffect` is what
+  makes that invisible: the placement is flushed before paint, so the first frame
+  anyone sees is already in the right place instead of at the top-left of the window.
+  It is `offsetWidth`/`offsetHeight` and not a rect, because the paper is rotated and
+  a bounding box of a rotated element is not the paper.
+  - Measuring is not an optimisation here, it is the only option: the slip is
+    `width: max-content` capped at 250px, because a one-line docket is as wide as its
+    sentence and "Cadeaupakje" in a reserved 216px column is a slip of paper with half
+    a card of empty stock on it. That is the exact opposite of `.viewer__detail`'s
+    fixed column, and for the opposite reason — that one must not move the card beside
+    it; this one has nothing to hold still for.
+- **Anything that moves the packet takes the slip away** rather than moving it with
+  it — scroll (captured, since the shelf's own scrolling does not bubble), resize, and
+  the click that picks the packet up. A slip that keeps station with a packet sliding
+  out from under it is a UI element again, and the pointer is leaving the tile anyway.
+- **The `title` is gone.** Leaving the native tooltip on would pop a second, worse copy
+  of the same sentence over the top of the first a second later. The `aria-label` keeps
+  it — `reason` after the count — and it is also the only route to any of this on touch,
+  where there is no hover to open a slip. The count is in the label and not on the slip
+  because a reader gets the wrapper and the docket in one look and a listener gets one
+  string.
+
 ### Putting the pack away, and the last button on the table
 
 **There is no "terug naar het album" any more, and no button anywhere on this page.** The
@@ -3685,12 +3988,21 @@ transaction rather than as the point of it. A total over them is what the sittin
     travel is not something two ends of a transition can describe.
   - **`writing` mounts it and takes it away**, like the reveal's flash. A keyframe on an
     element nobody removes replays the next time anything re-renders it.
-  - The opacity fade on the line is 130ms against the stroke's 400 — quick enough that the
+  - The opacity fade on the line is 130ms against the stroke's 500 — quick enough that the
     line is *there* to be written on. Much past a third and the two read as one dissolve, and
     the left-to-right stops registering at all.
 - **`NIB_MS` is in three places** — the constant, the ink's transition and the keyframe's
   duration — because CSS cannot read the constant. All three scale by `--anim`, so the pacing
-  slider cannot pull them apart.
+  slider cannot pull them apart. **It is 500**, up from 400, and the direction is the point:
+  400 was already too quick. **Faster was tried three ways — 300, 275, 200 — and every one of
+  them is worse**, because what this beat is for is not delivering a figure but being watched
+  being written. A quick sweep left to right is a wipe with a highlight on it; the slow one is
+  a hand. The ending has no exit and nothing after it, so there is nothing for the stroke to
+  hold up. Read speed is not the constraint here — a reader has the four words long before the
+  nib lands, and that is fine.
+  - The over-travel, the mask geometry and the nib's range are all expressed in `p` rather
+    than in time, so a change of duration re-solves none of them. The opacity fade is the one
+    number that has to move with it, and only downward: it must stay under about a third.
 - **`TALLY_MS` is 320**, the shelf's own beat, so where a packet is left on the pile the words
   and the pile arrive together. It has to be a beat rather than the last card's own frame: the
   card arriving and the count of them are two facts, and stacking them puts the second under a
@@ -3928,10 +4240,18 @@ same reasoning — and z-index 42 puts it over the turn strips (35) and under th
   callbacks, and `index.tsx` mounts with legacy `ReactDOM.render`, which does not batch those.
   Unbatched, the opener unmounts a frame before the book is open, or a clone leaves a frame
   before its slot fills and the hole blinks.
-- **No new sound.** `playPageTurn` once as the table is cleared — paper moving, the same weight
-  of event as a leaf turning, which is the argument the register already runs on — the book's
-  own turn sounds per leaf, and `playSlot` for each landing, which is the sound of a card being
-  put in its place.
+- **No new sound, and the travel sounds the same in both directions.** `playPageTurn` once as
+  the table is cleared — paper moving, the same weight of event as a leaf turning, which is
+  the argument the register already runs on — then `playPageTurn` again per card as it leaves
+  the margin for its slot, the book's own turn sounds per leaf, and `playSlot` for each
+  landing.
+
+  Standing aside and going in are one gesture in two steps: same hand, same distance, same
+  curve, same `FLIGHT_MS`. Only the *ending* differs — nothing at the margin, a card being
+  put in its place in the book. One per flight is not the rustle the clearing refuses; those
+  five go at once and have to be one sound, where these are strictly sequential, paced by the
+  page turning between them. **Only when there is a flight to hear**: the no-visible-slot
+  path stays silent rather than swishing a card that does not move.
 - **The book is inert for the sequence** (`.album-layout--placing`), not dimmed: it is the
   thing being watched, it simply cannot be used while cards are going into it. What that stops
   is a page turned out from under a card already aimed at a slot on it.
@@ -4622,7 +4942,9 @@ Notes:
     while every shard after it was heard bare. The tick was fine; the comparison
     was the bug. Fixed at both ends: the snap carries its own air, and
     `playNameReveal` takes `air = false` for the shard family so nothing stacks
-    on shard one. It keeps its chime, because the rim still arrives.
+    on shard one. It keeps its chime, because the rim still arrives. (**Moot as
+    of 2026-08-15**: `playNameReveal` has no air layer at all now, so there is no
+    flag to pass — if this candidate is ever revived, that parameter is gone.)
   - **It is glass, and that came from removing things.** The version before it
     was air, mid grains and a 168 Hz body — the recipe for a piece of wood being
     set down. The low end is what made it wood and the broad soft band under it
@@ -4949,6 +5271,13 @@ swells overlap and would otherwise clip.
   irregular crackles with randomised playback rate, buffer offset, filter
   frequency and gain. A single filtered noise burst with a smooth decay is
   precisely what "fake" sounds like.
+- **Nothing gets a boom it has not earned by moving something.** Three were deleted on the
+  same day (2026-08-15) and they failed identically: `playCoverTurn`'s landing at +0.55s,
+  `playTear`'s 90 Hz rip at +0.34s, and — for the same reason at the level of a whole call —
+  `playCoverTurn` itself on the re-binding's `resting` beat. Each fired on a frame where the
+  thing it claimed to be the weight of was either still going or already finished, and a low
+  hit with nothing under it is heard as a *dook* dropped into an otherwise good sound. Foil
+  has no mass and a board that stopped moving a second ago has no landing left to make.
 - **A turn is three events: peel, arc, settle.** The arc is `playSwish`, whose
   band rises *and falls again* — a one-way filter ramp reads as a fade rather
   than as something passing you, which is why the first page turn sounded like
@@ -4957,26 +5286,32 @@ swells overlap and would otherwise clip.
   made every turn sound like the book being shut.
 - **The cover has its own sound** (`playCoverTurn`), because a cover is a stiff
   board on a glued spine, not a big page: a stick-slip creak instead of a peel,
-  an arc an octave and a half lower over twice the time, almost no fibre rustle —
-  and it is the one turn that *does* get a boom, because it lands. Fires on the
-  move between the shut book and the first spread in either direction, which is
-  leaf 0 on desktop and page 0 on mobile.
+  an arc an octave and a half lower over twice the time, almost no fibre rustle.
+  Fires on the move between the shut book and the first spread in either
+  direction, which is leaf 0 on desktop and page 0 on mobile.
+
+  **It used to land, and no longer does** (2026-08-15). An impact plus a 76 Hz boom
+  sat at a fixed +0.55s, which is not the length of any cover animation that calls
+  it — one delay cannot suit four callers — so the weight arrived after the board
+  had already stopped and read as a stray *dook*. See the note on the function.
 - **The shimmer phase has its own sound** (`playShimmerSweep`), scaled to the
   shimmer length so it lands on the phase boundary.
-- **The pen has its own sound** (`playPenStroke`), one call per stroke while the owner's
-  name is written into the cover. It **takes its length from the caller**, the same
-  contract as `playRebind` and `playRareRise`: a musical hit must not stretch, but a
-  gesture must, or the pen is still moving after the sound has stopped. What is held
-  constant is *density* rather than count — a fixed number of grains spread over a longer
-  name thins out into separable ticks, which is the one artefact it exists to avoid.
-  High, dry, no low end and no pitch, and among the quietest things in the module: it runs
-  for the better part of a second under a sequence whose climax is the board landing.
-  It replaced `playFoilStamp`, which is retired.
+- **The choosing ceremony borrows the re-binding's build and only the build**: `playRebind`
+  across the whole of the name lighting, with nothing after it — the arc crests inside the
+  cool-off and the beat resolves on the sound leaving rather than on anything arriving. It
+  briefly ended on `playRarePayoff` too, and that is the one to not put back: pitch in this
+  module belongs to the cards' ladder, and this beat has no card in it. `playPenStroke` (a
+  grain cloud per stroke) and `playFoilStamp` before it are both retired; the note under
+  "The name is written, not stamped" has all five attempts and why each failed.
 - **The face reveal is a rising arpeggio** (`playNameReveal`): D5 · F5 · A5 · D6,
-  45ms apart, rising in gain into the accent, over an air sweep and with the
-  sparkle released on the landing. Chosen over three others — the shipped single
-  chime, a FIFA-style walkout (sub and crowd) and an MTG-style foil sheen (no
-  attack anywhere).
+  45ms apart, rising in gain into the accent, with the sparkle released on the
+  landing. Chosen over three others — the shipped single chime, a FIFA-style
+  walkout (sub and crowd) and an MTG-style foil sheen (no attack anywhere).
+
+  **The air sweep under it is deleted** (2026-08-15) — a bandpass climbing
+  700 → 5200 Hz, opening on the same frame as the flash. Noise sweeping up through
+  the mids is friction, not light: it turned the moment the silhouette lights into
+  a shovel going into sand. The run opens the beat by itself.
 
   The chime it replaced was **one struck note held back to the accent**, written
   when the card resolved by *expanding*. It does not: it charges, holds, and the
@@ -5047,14 +5382,18 @@ swells overlap and would otherwise clip.
 > wanted again if the per-character write comes back. **Read it as a specification, not
 > as a description of the code.**
 >
-> **It was wanted again, and it paid for itself.** `playPenStroke` — the album cover being
-> written — was built straight off the constraints below, and `playFoilStamp`, the sound
-> this section produced the first time it was read as a spec, has now been retired by it.
-> One constraint did *not* carry over and the difference is worth stating, because it is
-> the thing that makes a pen not a press: these ticks are **per character**, and the pen is
-> **per stroke**. A press indexes along a line and strikes once per letter; a hand lays ink
-> while it is down and none while it is lifted, so the sound has to follow the strokes.
-> The "granular, non-pitched, quietest in the module" constraints carried over intact.
+> **It was wanted again, it paid for itself, and it then failed on its own terms.**
+> `playPenStroke` — the album cover being written — was built straight off the constraints
+> below, and retired `playFoilStamp`, the sound this section produced the first time it was
+> read as a spec. One constraint did *not* carry over, and it is the thing that makes a pen
+> not a press: these ticks are **per character**, the pen was **per stroke**. A press
+> indexes along a line and strikes once per letter; a hand lays ink while it is down and
+> none while it is lifted. The "granular, non-pitched, quietest in the module" constraints
+> carried over intact — and were still not enough. Strokes are short and lifts are shorter,
+> so the clouds ran together into smacking, and the cover ceremony now takes the
+> re-binding's build-and-chord instead (2026-08-15). Which is the standing warning about
+> this section restated: it is a good spec for *what a per-event sound must obey*, and it
+> has twice said nothing about whether a per-event sound belongs there at all.
 
 The beat was silent in its first version, and that is most of why it read as a
 glitch: nothing was happening and nothing said anything was about to. It now has

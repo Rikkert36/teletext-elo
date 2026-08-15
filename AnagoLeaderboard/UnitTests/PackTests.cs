@@ -72,7 +72,7 @@ namespace UnitTests
 
             Assert.That(pack.Size, Is.EqualTo(1));
             Assert.That(pack.DoubledPlayerIds, Is.Empty);
-            Assert.That(pack.Reason, Does.StartWith("gespeeld"));
+            Assert.That(pack.Reason, Does.StartWith("Verloren met"));
         }
 
         [Test]
@@ -82,8 +82,7 @@ namespace UnitTests
             var pack = PackService.PackForGame(GameBetween(10, 7), "t1p1");
 
             Assert.That(pack.Size, Is.EqualTo(3));
-            Assert.That(pack.Reason, Does.StartWith("gewonnen"));
-            Assert.That(pack.Reason, Does.Not.Contain("verwachting"));
+            Assert.That(pack.Reason, Does.StartWith("Gewonnen met"));
         }
 
         [Test]
@@ -93,7 +92,10 @@ namespace UnitTests
             var pack = PackService.PackForGame(GameBetween(10, 3), "t1p1");
 
             Assert.That(pack.Size, Is.EqualTo(5));
-            Assert.That(pack.Reason, Is.EqualTo("gewonnen \u2014 10-3 tegen de verwachting in"));
+
+            // The margin bonus is in the *size* and nowhere else: a docket says which game the
+            // packet came out of, not how the count was arrived at.
+            Assert.That(pack.Reason, Is.EqualTo("Gewonnen met t1p2 van t2p1 en t2p2 met 10 - 3"));
         }
 
         [Test]
@@ -104,7 +106,39 @@ namespace UnitTests
             var pack = PackService.PackForGame(GameBetween(8, 10, 700, 1400), "t1p1");
 
             Assert.That(pack.Size, Is.EqualTo(3));
-            Assert.That(pack.Reason, Is.EqualTo("tegen de verwachting in \u2014 8-10"));
+            Assert.That(pack.Reason, Is.EqualTo("Verloren met t1p2 van t2p1 en t2p2 met 8 - 10"));
+        }
+
+        /// <summary>
+        /// The docket is a sentence about the game, so it needs the three other people in it -
+        /// the partner first, then both opponents, all by first name.
+        /// </summary>
+        [Test]
+        public void ADocketNamesThePartnerAndBothOpponents()
+        {
+            var game = GameBetween(10, 7);
+            game.FirstTeam.FirstPlayer.Name = "Rik Maas";
+            game.FirstTeam.SecondPlayer.Name = "Bo de Vries";
+            game.SecondTeam.FirstPlayer.Name = "Daan";
+            // A nickname in the middle goes with the surname: the first word is the first name.
+            game.SecondTeam.SecondPlayer.Name = "Jeroen \"Jerry\" van Geel";
+
+            Assert.That(
+                PackService.PackForGame(game, "t1p1").Reason,
+                Is.EqualTo("Gewonnen met Bo van Daan en Jeroen met 10 - 7"));
+        }
+
+        /// <summary>
+        /// A game row that never went through <c>GameService.GetGames</c> has no names on it, and
+        /// that must cost the docket its names and nothing else - the collection response is built
+        /// from these.
+        /// </summary>
+        [Test]
+        public void ADocketFallsBackToIdsWhenTheNamesWereNeverFilledIn()
+        {
+            Assert.That(
+                PackService.PackForGame(GameBetween(10, 7), "t1p1").Reason,
+                Is.EqualTo("Gewonnen met t1p2 van t2p1 en t2p2 met 10 - 7"));
         }
 
         [Test]
@@ -117,8 +151,8 @@ namespace UnitTests
             Assert.That(PackService.PackForGame(game, "t1p1").Size, Is.EqualTo(1));
 
             // And the score is printed from the reader's seat, not the row's.
-            Assert.That(PackService.PackForGame(game, "t2p1").Reason, Does.Contain("10-3"));
-            Assert.That(PackService.PackForGame(game, "t1p1").Reason, Does.Contain("3-10"));
+            Assert.That(PackService.PackForGame(game, "t2p1").Reason, Does.Contain("10 - 3"));
+            Assert.That(PackService.PackForGame(game, "t1p1").Reason, Does.Contain("3 - 10"));
         }
 
         /* ----------------------------------------------------------------- *

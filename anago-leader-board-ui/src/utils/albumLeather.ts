@@ -122,7 +122,18 @@ export const albumLeather = (cover: string | null | undefined): CSSProperties =>
     '--leather-hi': stain.hi,
     '--leather-mid': stain.mid,
     '--leather-lo': stain.lo,
-    /* Brass, on every stain. */
+    /*
+     * Brass, on every stain.
+     *
+     * **It is no longer drawn round a shut book.** A single edge colour under ten dyes
+     * ranges from 1.10:1 to 2.44:1 against the leather it borders, so as an outline it was
+     * a gold hairline on marineblauw and invisible on cognac — see
+     * `.album--closed .album__leaf--cover` in album.css for the full reasoning and for why
+     * tinting it per stain was the wrong fix. What still uses it is brass where two things
+     * meet rather than brass round the outside: the open book's case (`.album__binding`),
+     * the join between leather and boards on the icon binding, and the small books on the
+     * choosing table, where at 90px the hairline is the object's edge and not decoration.
+     */
     '--board-edge': '#6b5325',
     '--foil': '#e6c98a',
     '--foil-rule': '#a9853c',

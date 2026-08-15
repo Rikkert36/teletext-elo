@@ -61,13 +61,6 @@ public class PackService
     private const string IconsPackId = IconsPrefix + "once";
 
     /// <summary>
-    /// Em dash, escaped rather than typed: every other .cs file in this project is pure ASCII
-    /// outside its comments, and a string literal that has to survive the compiler guessing at
-    /// an encoding is not worth the risk for one punctuation mark.
-    /// </summary>
-    private const string Dash = "\u2014";
-
-    /// <summary>
     /// Beating the expected margin by this much earns the +2, and doubles both opponents'
     /// tickets.
     ///
@@ -289,7 +282,7 @@ public class PackService
 
         var team = game.GetTeam(playerId);
         var opponents = game.GetOtherTeam(playerId);
-        var score = $"{team.Goals}-{opponents.Goals}";
+        var partner = team.FirstPlayer.PlayerId == playerId ? team.SecondPlayer : team.FirstPlayer;
 
         // Winning *or* beating the expected margin doubles both opponents' tickets. Flat 2x
         // even when both are true - a dominant win already pays five cards, and compounding to
@@ -299,13 +292,20 @@ public class PackService
             ? new List<string> { opponents.FirstPlayer.PlayerId, opponents.SecondPlayer.PlayerId }
             : new List<string>();
 
-        var reason = (won, beatExpectation) switch
-        {
-            (true, true) => $"gewonnen {Dash} {score} tegen de verwachting in",
-            (true, false) => $"gewonnen {Dash} {score}",
-            (false, true) => $"tegen de verwachting in {Dash} {score}",
-            (false, false) => $"gespeeld {Dash} {score}"
-        };
+        /*
+         * The whole of what the packet's docket says, in one sentence: who you played it with,
+         * who you played it against, and how it went. Written here rather than assembled in the
+         * browser because this is the only place that has all three - the names live on the
+         * replayed game row, and a `Pack` carries no player ids a client could look up.
+         *
+         * It says nothing about the *size*, and that is deliberate: the wrapper already prints
+         * the number, and the four-way split that used to be in this switch ("tegen de
+         * verwachting in") was an explanation of how the number was arrived at. A docket says
+         * which game the packet came out of; the odds are not its business.
+         */
+        var reason = $"{(won ? "Gewonnen" : "Verloren")} met {FirstName(partner)} "
+            + $"van {FirstName(opponents.FirstPlayer)} en {FirstName(opponents.SecondPlayer)} "
+            + $"met {team.Goals} - {opponents.Goals}";
 
         return new AvailablePack(
             GamePrefix + game.Id,
@@ -314,12 +314,33 @@ public class PackService
             doubled);
     }
 
+    /// <summary>
+    /// A first name, the way the scoreboard prints one - the first word of the stored name, so
+    /// a nickname in the middle of it is dropped along with the surname.
+    ///
+    /// Not <see cref="PlayerPerformance.ToString"/>, which is the same rule but throws on a
+    /// player whose name was never filled in. That happens on any game row not read through
+    /// <c>GameService.GetGames</c>, and a missing name must cost a packet its docket, not the
+    /// whole collection response. The id is the fallback because it is at least identifying;
+    /// there is nothing better to say about a player the roster does not know.
+    /// </summary>
+    private static string FirstName(PlayerPerformance player)
+    {
+        if (string.IsNullOrWhiteSpace(player.Name))
+        {
+            return player.PlayerId;
+        }
+
+        var cut = player.Name.IndexOfAny(new[] { ' ', '\t', '\n', '\r' });
+        return cut == -1 ? player.Name : player.Name[..cut];
+    }
+
     /// <summary>One free single a day, for turning up.</summary>
     public static AvailablePack DailyPack(DateTime day) =>
         new(
             DailyPrefix + day.ToString("yyyy-MM-dd"),
             1,
-            "dagelijks pakje",
+            "Dagelijks gratis pakje",
             Array.Empty<string>());
 
     /// <summary>
@@ -338,7 +359,7 @@ public class PackService
         new(
             IconsPackId,
             1,
-            "de set is compleet",
+            "De set is compleet",
             Array.Empty<string>(),
             GuaranteesIcon: true);
 
@@ -590,10 +611,11 @@ public class PackService
     }
 
     /// <summary>
-    /// What the wrapper says when the giver did not say. Dutch, like every other reason.
+    /// What the docket says when the giver did not say. Dutch, like every other reason, and a
+    /// sentence rather than a label because it is printed as one - see <see cref="PackForGame"/>.
     /// </summary>
     private static string GiftReason(string? reason) =>
-        string.IsNullOrWhiteSpace(reason) ? "cadeautje" : reason.Trim();
+        string.IsNullOrWhiteSpace(reason) ? "Cadeaupakje" : reason.Trim();
 
     /// <summary>How many of each subject this player holds.</summary>
     public async Task<Dictionary<string, int>> CountsBySubject(string playerId) =>

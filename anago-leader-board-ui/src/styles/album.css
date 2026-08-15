@@ -712,6 +712,17 @@
  * on the cover's hinge to avoid it appearing later — which just drew a spine's worth of
  * detail at a size and angle where none of it is visible, and put a line down the cover.
  *
+ * **What a shut book does get is its own board, and that is a different thing.** See
+ * `.album__cover::after`: the round-over where the leather goes over the board at the
+ * three trims, and at the hinge a groove with the board rising back out of it. The line
+ * this note is drawing is between *hardware* and *shape*. Hardware is the hollow, the
+ * grooves and the silk — objects, with edges, that exist inside an open case and are not
+ * in view here; shrinking them to fit is what failed. Shape is the thickness of the
+ * thing you are looking straight at, which is in view whether the book is open or shut,
+ * and which is drawn with nothing but falloff. Neither of the two failures above is
+ * available to it: there is no detail to be too small to read, and no stop hard enough
+ * to be a line.
+ *
  * The reveal is what needed fixing, not the hiding — and it took two goes to land on the
  * right moment. A full-flip delay put the spine there *after* the page had already come
  * down. Removing the delay put it there on the very first frame, while the cover was
@@ -775,12 +786,41 @@
   transition-delay: 0s;
 }
 
-/* Only the cover leaf: every leaf sits at the same place in the closed pile, so
-   shadowing all of them stacks a dozen copies into a black halo. */
+/*
+ * Only the cover leaf: every leaf sits at the same place in the closed pile, so
+ * shadowing all of them stacks a dozen copies into a black halo.
+ *
+ * **No brass round the outside of a shut book, on any stain.** There used to be a
+ * `0 0 0 2px var(--board-edge)` ring here, and the reason it came off is that it cannot
+ * be one mark across the shelf. `--board-edge` is `#6b5325` on all ten dyes — deliberately
+ * not derived from the stain, see the note in utils/albumLeather.ts — and against the
+ * leather it edges it lands anywhere between 1.10:1 and 2.44:1. On the dark cool stains
+ * (marineblauw 2.44, bordeaux 2.39, antraciet 2.34) it separates cleanly and reads as a
+ * gold hairline; on the warm browns it does not read at all (cognac is 1.33 at the lit
+ * corner and 1.37 in the body, olijf 1.10 at the corner), and cognac's highlight `#8a6134`
+ * is *lighter* than the brass, so on that book the gold edge reads as a dark one. A line
+ * that is decoration on half the shelf, absent on a third of it and inverted on one book
+ * is not one product line in ten dyes.
+ *
+ * **Tinting it per stain is the fix that was rejected**, and for the reason albumLeather.ts
+ * gives at the top: a green book with a green edge stops being an album from this series.
+ * The only move that keeps all ten agreeing is to have no ring at all.
+ *
+ * This also puts the leather binding and the icon binding on the same footing — the
+ * half-bound book already had no ring, because out there the leather is at the trim and
+ * the brass sits at its inner edge instead (see the underlay in `.album__cover-icons`,
+ * which keeps its hairline: that is a join between two materials, not an outline round a
+ * book). The `.album--icons.album--closed` override that used to strip the ring is gone
+ * with it — it had been restating the drop shadows by hand to drop one line, and its
+ * literals were a pre-`--book-drop` copy, so a shut icon binding had quietly been sitting
+ * lower on the table than a shut leather one.
+ *
+ * `.choice__stage` in albumchoice.css and `.locked__book` in locked.css are the same book
+ * seen shut and lost the ring at the same time. The ceremony hands off to the album with a
+ * hard swap, so an edge on one side of it and not the other is a visible pop.
+ */
 .album--closed .album__leaf--cover {
-  box-shadow:
-    0 0 0 2px var(--board-edge, #6b5325),
-    var(--book-drop);
+  box-shadow: var(--book-drop);
 }
 
 .album__leaf {
@@ -2814,6 +2854,13 @@
  * pages navy inside a navy book.
  */
 .album__cover {
+  /*
+   * The board's own edges — see `.album__cover::after` below, which is the only thing
+   * that reads them. Here rather than on `:root` because they are this element's
+   * business and nothing else derives from them.
+   */
+  --board-roll: 8px; /* the round-over at head, tail and fore-edge */
+  --joint-w: 24px; /* spine edge, shoulder and joint at the hinge */
   height: 100%;
   box-sizing: border-box;
   /* The containing block for `.album__cover-icons`, so the icon binding is clipped and
@@ -2835,7 +2882,14 @@
   text-align: center;
   padding: 24px;
   border-radius: 0 3px 3px 0;
-  box-shadow: inset 12px 0 24px -12px rgba(0, 0, 0, 0.7);
+  /*
+   * **The broad wash down the left is gone**, and its going is the point of the overlay
+   * below. It was `inset 12px 0 24px -12px rgba(0,0,0,.7)`, described here as "the spine
+   * shadow of a right-hand page" — which is what a page has at the gutter, where the
+   * paper curves away into the fold. A shut cover's left edge is not a gutter. It is the
+   * hinge, and what is actually there is a groove with the board rising out of it. One
+   * soft ramp says neither, and the book read as a coloured rectangle because of it.
+   */
   /*
    * **Unkerned, because the opening ceremony blocks this name a letter at a time.**
    *
@@ -2853,6 +2907,139 @@
    * which is exactly why the shift was small enough to live with for a while.
    */
   font-kerning: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * The board has a thickness, and face-on you see it at the four edges
+ *
+ * A cased book's covering leather is wrapped **over** the board, so in the last couple
+ * of millimetres at every trim the surface curves away from you. That is the whole of
+ * this overlay, and without it the cover is a coloured rectangle: one flat gradient
+ * with nothing at its edges to say the leather is on top of anything.
+ *
+ * **Steep, with most of the alpha in the first 2px.** This is the number that carries
+ * the effect. A board's round-over is tight — a couple of millimetres against a 150mm
+ * cover — so it reads as a hard mark, not as a gradual darkening. A linear ramp across
+ * the full 8px is a vignette, which is a lighting effect and says nothing about the
+ * object. Same division of labour the spine already works to: soft falloffs describe a
+ * surface curving, a steep front describes an edge.
+ *
+ * **No hard stop anywhere in it**, which is the rule `.album__spine` is built to and the
+ * reason the note further up rejected spine hardware here. Every stop below ramps into
+ * the next; nothing is `Npx, Npx`. A groove drawn with a hard stop is a line ruled down
+ * the cover, and that is what came off last time.
+ *
+ * **The head is lit and the tail and fore-edge are not**, because the leather is lit
+ * from the top-left (the 150deg gradient above says so) and a round-over at the head
+ * tilts *into* that light. Shadowing all three would have been the obvious symmetry and
+ * would have put the cover at odds with its own ground. The catch is warm — tinted
+ * toward `--foil` rather than white, because a white highlight on leather reads as
+ * plastic.
+ *
+ * **The left edge is a hinge, not a gutter, and a hinge has two channels.** Going in from
+ * the trim: the spine edge, where the leather turns the corner and is gone; the shoulder,
+ * a narrow lit crest; then the **joint** — the channel the board swings in — and only
+ * then the flat of the board. It first had the first two and stopped, which reads as a
+ * book with a shadow down one side; the second channel is what makes it a cover hinged to
+ * something. The crest between them is kept narrow for the same reason, since a broad one
+ * pushes the joint out to where it is just a band lying on the leather.
+ *
+ * It replaces the broad inset wash, see the note in the rule above. Nothing of the hollow,
+ * the caps or the headband comes with it; those are still things you only see by looking
+ * into an open case.
+ *
+ * **Six layers rather than one gradient per side.** The head and the joint each need a
+ * light band and a dark band, and CSS interpolates gradients with premultiplied alpha —
+ * a stop running from translucent black to translucent cream inside one layer goes
+ * through a blend that is nobody's idea of anything. Separate layers composite cleanly.
+ *
+ * **On `::after`, so it paints over `.album__cover-icons`.** The half-bound binding is
+ * ivory boards, and an ivory board has the same edges as a leather one — the object's
+ * shape does not change when it is re-cased, only its covering. `::after` is last in
+ * tree order and everything in here sorts by tree order (`.album__face` does not set
+ * `preserve-3d`, so `z-index` and `translateZ` buy nothing — see the note down at the
+ * re-bind wipe). It clears the printing geometrically: the title is 76% of a 560px
+ * cover and centred, so there is ~67px of margin against a 10px edge.
+ *
+ * `::before` is deliberately left free. Note also that this is a *background*, not a
+ * `box-shadow`, which is why the re-bind has to switch it off explicitly — the same
+ * failure the kill list further down is about.
+ * ---------------------------------------------------------------- */
+.album__cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* 0 3px 3px 0 — square at the spine, rounded at the two fore corners. */
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    /*
+     * The hinge, lights. Two crests: the shoulder between the two channels, and the
+     * far wall of the joint, which is tilted back into the lamp on the way up to the
+     * flat of the board. On top of the darks below, so the shoulder is not eaten.
+     */
+    linear-gradient(
+      to right,
+      rgba(255, 244, 219, 0) 4px,
+      rgba(255, 244, 219, 0.065) 7.5px,
+      rgba(255, 244, 219, 0) 10.5px,
+      rgba(255, 244, 219, 0) 16px,
+      rgba(255, 244, 219, 0.03) 19.5px,
+      rgba(255, 244, 219, 0) var(--joint-w)
+    ),
+    /*
+     * The hinge, darks. Two channels, not one, and that is what a French joint is:
+     * the spine edge falling away at the very trim, then the shoulder, then the joint
+     * proper — the channel the board actually swings in. One channel reads as a book
+     * with a shadow down one side; two read as a cover hinged to a spine.
+     *
+     * The trim is the darker of the two: there the leather leaves for the spine and is
+     * gone, where the joint is a groove in a surface you can still see. Nothing here
+     * drops to zero between them either — the shoulder sits at 0.02, not clear, because
+     * a shoulder is leather in the same room as the rest and a gap of clean ground
+     * between two darks is two stripes.
+     */
+    linear-gradient(
+      to right,
+      rgba(0, 0, 0, 0.72) 0,
+      rgba(0, 0, 0, 0.42) 2.5px,
+      rgba(0, 0, 0, 0.12) 5px,
+      rgba(0, 0, 0, 0.02) 7.5px,
+      rgba(0, 0, 0, 0.16) 10.5px,
+      rgba(0, 0, 0, 0.32) 13.5px,
+      rgba(0, 0, 0, 0.1) 18px,
+      rgba(0, 0, 0, 0) 22px
+    ),
+    /* The fore-edge, turning away from a light on the left. */
+    linear-gradient(
+      to left,
+      rgba(0, 0, 0, 0.55) 0,
+      rgba(0, 0, 0, 0.3) 2px,
+      rgba(0, 0, 0, 0.1) 4px,
+      rgba(0, 0, 0, 0) var(--board-roll)
+    ),
+    /* The tail, turning away hardest of the three and so a shade wider. */
+    linear-gradient(
+      to top,
+      rgba(0, 0, 0, 0.62) 0,
+      rgba(0, 0, 0, 0.34) 2px,
+      rgba(0, 0, 0, 0.12) 5px,
+      rgba(0, 0, 0, 0) calc(var(--board-roll) + 2px)
+    ),
+    /* The head: the crown of the roll catching the lamp... */
+    linear-gradient(
+      to bottom,
+      rgba(255, 244, 219, 0.11) 0,
+      rgba(255, 244, 219, 0.055) 1.5px,
+      rgba(255, 244, 219, 0) 3.5px
+    ),
+    /* ...and the shade where it comes back down to the flat of the board. */
+    linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0.1) 4.5px,
+      rgba(0, 0, 0, 0) 9px
+    );
 }
 
 /* "Verzamelalbum van", above the owner's name. Deliberately the smaller of the
@@ -2979,9 +3166,14 @@
  *
  *     0-12%    nothing on the cover
  *     4-30%    a formless bloom gathers and tightens
- *     26-42%   the letters resolve, white, fast
- *     42-60%   the hold — this is the moment
+ *     26-38%   the letters resolve, white, fast
+ *     38-60%   the hold — this is the moment
  *     60-100%  the light leaves; the gilt is what it leaves behind
+ *
+ * **Nothing lands on any of these frames.** `AlbumChoice` runs `playRebind` across the whole
+ * beat and nothing after it; the build's own arc crests at 0.82, inside the cool-off, so the
+ * light leaving and the sound leaving are one movement. A chord used to land at 60% and it
+ * was borrowed weight — see the note there.
  *
  * **It settles rather than drains.** On a card the silhouette goes to zero opacity
  * because a photograph waits underneath and the two must never read as a crossfade.
@@ -3064,7 +3256,7 @@
     opacity: 0;
     fill: var(--reveal-peak, #fffefa);
   }
-  42% {
+  38% {
     opacity: 1;
     fill: var(--reveal-peak, #fffefa);
     filter: drop-shadow(0 0 var(--glow-near, 20px) rgba(255, 248, 210, 0.95))
@@ -3306,26 +3498,23 @@
  */
 
 /*
- * **No brass round the outside of a shut icon binding.** The rule comes off the leather
- * cover, where it is right: an edge of brass on a board covered in stain. On this binding
- * the leather has moved to the trim, so the same rule drew a box around the outside of the
- * very material it exists to edge — two lines a few pixels apart saying the same thing, and
- * the outer one boxing the book in. The brass is at the leather's inner edge instead; see
- * the underlay in `.album__cover-icons`.
+ * **The icon binding has no shut-book rule of its own, and that is the point.**
  *
- * **The leather cover keeps its rule, and this is not an exception to the brass-on-every-
- * stain rule.** That rule is about the five stains agreeing with each other: all five
- * leather bindings have the rule, all five icon bindings have the hairline, and the values
- * are identical across both sets.
+ * It used to carry one, to strip a brass ring that `.album--closed .album__leaf--cover`
+ * put round every shut book: on this binding the leather has moved to the trim, so that
+ * ring drew a box around the outside of the very material it exists to edge — two lines a
+ * few pixels apart saying the same thing, and the outer one boxing the book in.
  *
- * The drop shadows are restated rather than inherited, because `box-shadow` is one
- * declaration — dropping the ring means writing out what stays.
+ * The ring is gone from the leather binding too now (see the note there), so an override
+ * that exists only to remove it has nothing left to do. Deleting it also fixes what it had
+ * been hiding: `box-shadow` is one declaration, so dropping the ring meant restating the
+ * drop shadows by hand, and the hand-written copy was the pre-`--book-drop` pair — a shut
+ * icon binding sat lower on the table than a shut leather one, which is exactly the drift
+ * `--book-drop` was extracted to prevent.
+ *
+ * The brass this binding does keep is the hairline at the leather's inner edge; see the
+ * underlay in `.album__cover-icons`. That is a join between two materials, not an outline.
  */
-.album--icons.album--closed .album__leaf--cover {
-  box-shadow:
-    0 26px 50px rgba(0, 0, 0, 0.65),
-    0 6px 14px rgba(0, 0, 0, 0.5);
-}
 
 /* ---------------------------------------------------------------- *
  * The printing, on boards rather than on leather
@@ -3504,6 +3693,26 @@
 .album--rebind-charging .album__cover-icons,
 .album--rebind-holding .album__cover-icons {
   box-shadow: none;
+}
+
+/*
+ * **And the board's edges go with them, even though they are not shadows.**
+ *
+ * `.album__cover::after` is a stack of translucent gradients rather than a `box-shadow`,
+ * so unlike the rule above it *is* inside the filter — which looks like it should be
+ * enough and is not. The arithmetic in the note above only clips because `--leather-mid`
+ * desaturates to about 40 and 40x8 clears 255. Put a 0.55 black over it at the trim and
+ * the same pixel desaturates to about 20, which lands at 160: a grey frame drawn round
+ * every edge of a white-hot book, and the tail and the joint are darker still.
+ *
+ * So this is the same bug as the one above in a place `brightness()` genuinely reaches,
+ * and it wants the same answer for the same reason — a board that is emitting light has
+ * no thickness to show. `opacity`, not `background: none`, so the six layers stay in one
+ * place and this rule stays a switch.
+ */
+.album--rebind-charging .album__cover::after,
+.album--rebind-holding .album__cover::after {
+  opacity: 0;
 }
 
 .album--rebind-charging .album__cover-kicker,
@@ -4114,6 +4323,17 @@
 .album--mobile .album__endpaper {
   border-radius: 3px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+/*
+ * No board edges on a phone, for the same reason there is no fore-edge below and no
+ * spine at all here: a slide is one face lying flat at `inset: 0`, not a case seen
+ * face-on. Half of that overlay is a hinge, and there is nothing on this side of it
+ * to hinge to — the rule above has already taken the desktop cover's left-hand wash
+ * off for exactly that reason, by overriding the `box-shadow` it used to live in.
+ */
+.album--mobile .album__cover::after {
+  display: none;
 }
 
 /* The band bleeds to the trim, so it takes the page's corners with it — and on a phone

@@ -315,11 +315,17 @@
  * missing its squares. At the swap the cover grew 9px on three sides and rose 9px, which
  * is small, in the wrong direction, and instant.
  *
- * **No radius, and that is not an oversight.** `.album__leaf--cover` has none — the brass
- * hairline is a box-shadow on a square board — while `.album__cover` inside it is rounded
- * `0 3px 3px 0`. So a shut album shows rounded leather with a square hairline just outside
- * it, and a hair of table showing between the two at the fore-edge corners. A radius here
- * rounded the hairline as well and those two corners popped square at the swap.
+ * **No radius, and that is not an oversight.** `.album__leaf--cover` has none, while
+ * `.album__cover` inside it is rounded `0 3px 3px 0` — the leaf is a transparent box and
+ * the leather it holds is what has the corners. Matching that here means leaving this box
+ * square too and letting the cover inside round itself; a radius on the stage would round
+ * the clip as well, and the two fore-edge corners would pop at the swap.
+ *
+ * This used to have a second half: the leaf carried a brass hairline as a box-shadow on
+ * that square box, so a shut album read as rounded leather inside a square rule with a hair
+ * of table between them at the fore-edge. The ring is gone from every shut book now — see
+ * `.album--closed .album__leaf--cover` in album.css for why — so the corners are simply
+ * rounded. The square box stays for the reason above, which never depended on the rule.
  * ---------------------------------------------------------------- */
 
 .choice__stage {
@@ -330,9 +336,9 @@
   height: calc(var(--page-h) + var(--board-out) * 2);
   margin-left: calc(var(--page-w) / -2);
   overflow: hidden;
-  /* The shut album's own edge and shadow, from `.album--closed .album__leaf--cover`. */
+  /* The shut album's own shadow, from `.album--closed .album__leaf--cover` — which carries
+     no brass ring on any stain, so neither does this. The handover is a hard swap. */
   box-shadow:
-    0 0 0 2px var(--board-edge),
     0 26px 50px rgba(0, 0, 0, 0.65),
     0 6px 14px rgba(0, 0, 0, 0.5);
 

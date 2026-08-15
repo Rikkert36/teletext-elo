@@ -862,7 +862,7 @@ namespace UnitTests
             var state = await _collectionService.GetCollection(me.Id);
             var packet = state!.Packs.Single(pack => pack.Id == "gift:" + gift.GiftIds.Single());
 
-            Assert.That(packet.Reason, Is.EqualTo("cadeautje"));
+            Assert.That(packet.Reason, Is.EqualTo("Cadeaupakje"));
         }
 
         /* ----------------------------------------------------------------- */

@@ -90,6 +90,15 @@ public sealed record OwnedCard(string PlayerId, int Count);
 /// because a derived pack has no row to take an id from, and the packet pile's tilt and sheen
 /// are seeded from the id so it must survive a refetch.
 /// </summary>
+/// <param name="Reason">
+/// The one line the packet's docket prints, and the whole of it: a full Dutch sentence, capitalised,
+/// saying where the packet came from. "Gewonnen met Bo van Daan en Rik met 10 - 3" for a game,
+/// "Dagelijks gratis pakje", "De set is compleet", or whatever the giver wrote on a present.
+///
+/// It is a sentence and not a label because there is nothing else on the docket to caption - see
+/// "What a packet says: the docket" in docs/trading-cards.md. Nothing about the *size* belongs in
+/// it: the wrapper prints the number, and how it was arrived at is not the docket's business.
+/// </param>
 /// <param name="MinimumOverall">
 /// The floor on every card in it, or null for an ordinary draw - which is every earned pack,
 /// since the only choice a game makes is the size. Only a <see cref="PackGift"/> ever sets it.

@@ -85,7 +85,16 @@ export interface Pack {
   id: string;
   /** 1, 3 or 5 for anything earned; a gift may be any size up to 10. */
   size: number;
-  /** Why it is owed, shown on the wrapper. */
+  /**
+   * The one line the packet's docket prints, and the whole of it — a full Dutch
+   * sentence written by the server: `Gewonnen met Bo van Daan en Rik met 10 - 3`,
+   * `Dagelijks gratis pakje`, or whatever the giver wrote on a present.
+   *
+   * Nothing here composes it or picks it apart. The game line needs the other three
+   * players' names, which exist only on the replayed game row, so all four kinds are
+   * written in `PackService` rather than one of them being written there and three
+   * more here. See `PackNote`.
+   */
   reason: string;
   /** Opponents whose tickets are doubled for this pack's draw. */
   doubledPlayerIds: string[];
