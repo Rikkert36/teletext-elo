@@ -336,11 +336,17 @@
   height: calc(var(--page-h) + var(--board-out) * 2);
   margin-left: calc(var(--page-w) / -2);
   overflow: hidden;
-  /* The shut album's own shadow, from `.album--closed .album__leaf--cover` — which carries
-     no brass ring on any stain, so neither does this. The handover is a hard swap. */
-  box-shadow:
-    0 26px 50px rgba(0, 0, 0, 0.65),
-    0 6px 14px rgba(0, 0, 0, 0.5);
+  /*
+   * The shut album's own shadow, **the property and not a copy of its numbers**. This was
+   * a literal, on the reading that it matched `.album--closed .album__leaf--cover`; it had
+   * matched once and stopped, because `--book-drop` was folded in at 1.6 on `.album` where
+   * this file could not see it. So the book stood on a shadow two-thirds the depth of the
+   * one the album it becomes stands on, for the whole ceremony, and gained the rest in a
+   * single frame at the handover. `--book-drop` is on `:root` now for that reason.
+   *
+   * No brass ring on any stain, so neither does this. The handover is a hard swap.
+   */
+  box-shadow: var(--book-drop);
 
   /* Held back until the row has finished sliding. */
   opacity: 0;

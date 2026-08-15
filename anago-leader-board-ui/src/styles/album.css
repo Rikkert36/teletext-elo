@@ -173,6 +173,41 @@
   --board-out: 9px;
 
   /*
+   * The shadow the whole object throws on the table, stated once.
+   *
+   * **Three places draw it and they are the same shadow.** `.album__binding` carries it
+   * for the open book; shut, `.album--closed .album__binding` goes to `opacity: 0` and
+   * takes the shadow with it, so `.album--closed .album__leaf--cover` carries a copy for
+   * the duration. The third is the same book outside the album entirely: `.choice__stage`
+   * in albumchoice.css, which is the shut book the binding ceremony hands over.
+   *
+   * **On `:root` rather than on `.album`, for the same reason `--board-out` above is** —
+   * and this is what it cost to learn. It sat on `.album`, where the ceremony could not
+   * reach it and so kept a literal, and that literal was the *pre-multiply* pair below:
+   * `0 26px 50px / 0.65` and `0 6px 14px / 0.5`. So the book you were handed at the end of
+   * the binding sat visibly lower on the table than the album it became and deepened in one
+   * frame at the swap — which is exactly the drift stating it once was meant to prevent,
+   * happening in the one file the note was not written to cover.
+   *
+   * **Set by eye on a `schaduw` slider in the test panel, then folded in at 1.6 and the
+   * slider deleted** — which is the lifecycle the note at the top of utils/animationSpeed.ts
+   * asks for, and it exists because the last sliders on that panel persisted to
+   * localStorage: a value stored while tuning then overrode the constant for ever on that
+   * browser alone, with no UI left to correct it. These wrote to `:root` for the session
+   * only, and now the numbers below are the whole of it.
+   *
+   * The geometry was multiplied through; the alpha was not, quite. `0.65 x 1.6` is `1.04`
+   * and CSS clamps an alpha at 1, so the wide shadow had been solid black from about 1.54
+   * upward and every notch past that bought blur and offset alone. Written as `1` because
+   * that is what it renders as, rather than `1.04` pretending otherwise.
+   */
+  --book-drop:
+    0 42px 80px
+      rgba(0, 0, 0, 1),
+    0 10px 22px
+      rgba(0, 0, 0, 0.8);
+
+  /*
    * How far *outside* the book the page-turn strips still take a click.
    *
    * The strip is exactly the page's margin wide and stops on the trim, which put the
@@ -316,31 +351,11 @@
   --board-rule-w: 2px;
 
   /*
-   * The shadow the whole object throws on the table, stated once.
-   *
-   * **Two places draw it and they are the same shadow.** `.album__binding` carries it
-   * for the open book; shut, `.album--closed .album__binding` goes to `opacity: 0` and
-   * takes the shadow with it, so `.album--closed .album__leaf--cover` carries a copy for
-   * the duration. They were two literals that happened to match, which is a pair of
-   * numbers waiting to drift — a book casting one shadow open and a different one shut.
-   *
-   * **Set by eye on a `schaduw` slider in the test panel, then folded in at 1.6 and the
-   * slider deleted** — which is the lifecycle the note at the top of utils/animationSpeed.ts
-   * asks for, and it exists because the last sliders on that panel persisted to
-   * localStorage: a value stored while tuning then overrode the constant for ever on that
-   * browser alone, with no UI left to correct it. These wrote to `:root` for the session
-   * only, and now the numbers below are the whole of it.
-   *
-   * The geometry was multiplied through; the alpha was not, quite. `0.65 x 1.6` is `1.04`
-   * and CSS clamps an alpha at 1, so the wide shadow had been solid black from about 1.54
-   * upward and every notch past that bought blur and offset alone. Written as `1` because
-   * that is what it renders as, rather than `1.04` pretending otherwise.
+   * **`--book-drop` used to be declared here and is on `:root` now.** It is the shadow the
+   * whole object throws on the table, and the binding ceremony draws the shut book while
+   * `.album` is not mounted — so it has to be reachable from outside, exactly as
+   * `--board-out` is. See the note there for what the version scoped to this element cost.
    */
-  --book-drop:
-    0 42px 80px
-      rgba(0, 0, 0, 1),
-    0 10px 22px
-      rgba(0, 0, 0, 0.8);
 }
 
 .album__book {
@@ -383,8 +398,9 @@
     var(--leather-hi, #4a3a22) 0%,
     var(--leather-mid, #33270f) 100%
   );
-  /* The drop is `--book-drop` on `.album`, because the shut book draws the same one from
-     a different element. The brass edge is this element's alone. */
+  /* The drop is `--book-drop` on `:root`, because the shut book draws the same one from
+     a different element and the binding ceremony from a different file. The brass edge is
+     this element's alone. */
   box-shadow:
     0 0 0 2px var(--board-edge, #6b5325),
     var(--book-drop);
@@ -773,6 +789,32 @@
 
 .album--closed .album__book {
   transform: translateX(calc(var(--page-w) / -2));
+  /*
+   * **A shut book is drawn half a page left of where its box is, and the box does not
+   * come with it.** `transform` moves paint and hit-testing, never layout: this element is
+   * `--page-w * 2` wide, so shut it hit-tests across `[-page-w/2 … 1.5 * page-w]` relative
+   * to `.album`, and its left half is empty. The cover has slid to the middle, the binding
+   * and the left backing are at `opacity: 0` just below — which is transparent, not absent —
+   * and the whole of it is an invisible slab of book reaching up to 280px into the left
+   * margin. The pack shelf is 26–42px away (`--shelf-gap` + 16 in game.css) and about 300px
+   * wide, so it lay over the right column of packets and most of the left.
+   *
+   * It won the pointer because `.album` is `position: relative` and comes *after* both
+   * asides in the document, and positioned siblings at `z-index: auto` paint in document
+   * order with hit-testing following paint — the same trap `.album-main` is written the way
+   * it is to avoid, see game.css. The symptom was that hovering the pile only worked with
+   * the book open: shut, packets under the slab never took the hover, and the last one that
+   * had it kept its lift until the pointer crossed one that was not covered.
+   *
+   * Nothing inside a shut book is interactive — the turn strips only render on an open
+   * spread — and the click that opens it is on `.album` itself, whose own box has not moved.
+   * So a click on the cover still lands (on `.album`, one level up), `cursor: pointer` still
+   * comes off `.album--closed`, and the margin beside the book goes back to the packets.
+   *
+   * The mobile book never gets this class (`closed && !isMobile` in Album.tsx) and is one
+   * page wide with no slide, so it has nothing to give back.
+   */
+  pointer-events: none;
 }
 
 .album__binding,
@@ -1627,7 +1669,7 @@
  * ink spread over more paper.
  *
  * All four alphas were set by eye on a `bladschaduw` slider and folded in at 2.5; see
- * `--book-drop` on `.album` for why that knob is gone rather than parked at 1.
+ * `--book-drop` on `:root` for why that knob is gone rather than parked at 1.
  * ---------------------------------------------------------------- */
 
 /*

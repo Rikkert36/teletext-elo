@@ -33,16 +33,30 @@
  *
  *   **Two stops, not one.** The vignette is a *list* of shadows doing two
  *   different jobs: a tight dark band hugging the rim, and a wide soft falloff
- *   reaching a couple of hundred pixels in. Trying to get both out of a single
- *   shadow is what put a ceiling on how deep this could go — past a point the blur
- *   is so wide that the rim itself goes pale, and pushing the alpha to compensate
- *   greys out the whole slab. Split, the rim can be near-black while the middle
- *   keeps its timber. Anything added there must stay a list.
+ *   behind it. Trying to get both out of a single shadow is what put a ceiling on
+ *   how deep this could go — past a point the blur is so wide that the rim itself
+ *   goes pale, and pushing the alpha to compensate greys out the whole slab. Split,
+ *   the rim can be dark while the middle keeps its timber. Anything added there
+ *   must stay a list.
+ *
+ *   **How far each stop reaches is now a constraint and not a taste.** Since the
+ *   falloff paints over the room rather than under it, its reach — about
+ *   `spread + blur/2` — decides how much light is left on the things lying in the
+ *   margins, all of which sit within ~60px of an edge. The stops were pulled back
+ *   from ~250px to ~120px for exactly that. See the tokens on `.game-stage`.
  * - **Ink reads against the timber.** `--ink` and `--ink-dim` are warm and light
  *   because the wood is dark red-brown; every text token maps to them.
  *
- * The book and the cards are deliberately untouched by any of this; only the
- * surface, the chrome and the accents belong to the table.
+ * **The falloff is the room's, and everything in the room takes it.** This used to
+ * read "the book and the cards are deliberately untouched by any of this; only the
+ * surface, the chrome and the accents belong to the table", and the exemption was
+ * not really a decision — it was what an `inset` shadow does on its own. Inset
+ * shadows paint below an element's children, so the vignette could only ever reach
+ * the timber, and every object lying on the timber stayed at full brightness however
+ * dark the corner it was in. A cream leaf in the top-right margin made that
+ * impossible to keep believing. The stops now paint from `.game-stage::after`, over
+ * the wood *and* over what is on it — see the note there, including the one seam:
+ * the fullscreen overlays are not lying on the table and stay clear.
  */
 
 /*
@@ -294,7 +308,34 @@
   background-blend-mode: screen, overlay, soft-light, normal;
 
   /*
-   * Edge grain, the light falling off, and the shadow on the floor.
+   * The falloff, in three stops — declared here, painted by `::after`.
+   *
+   * **They are tokens rather than literals because they no longer only touch the wood.**
+   * See the note on `::after`: an `inset` shadow is box decoration and paints *below* the
+   * element's children, so for as long as these were in this rule the vignette darkened
+   * the timber and nothing lying on it. A leaf of paper in the top-right margin sat at
+   * full brightness in a corner the room had taken to near-black, which is what made it
+   * read as pasted on rather than placed — and it is also why a *dark* drop shadow under
+   * it did nothing, there being no tone left in that corner for a shadow to take away.
+   *
+   * **Both stops were pulled back out to the rim once they started landing on objects.**
+   * They were `76px 12px / 0.68` and `340px 78px / 0.92`, tuned against bare timber where
+   * crushing the outer third of the table costs nothing. An inset stop reaches about
+   * `spread + blur/2` inward, so the far one was dark to ~250px and had the register, the
+   * packet shelf and the foot of the book — every one of which lies within ~60px of an
+   * edge — sitting at a third of their brightness. The room now lets go of the light much
+   * sooner: ~55px for the near stop and ~120px for the far one, so the outer band still
+   * turns away from the lamp and everything lying in the margins keeps most of its own.
+   *
+   * That arithmetic is how to retune this. Measure how far in the thing you want lit
+   * actually sits, and keep `spread + blur/2` under it:
+   *
+   *   - the register leaf   `--stage-pad-t`, ~36px from the top edge
+   *   - the packet shelf    `--stage-pad`, ~34px from the left edge
+   *   - the foot of the book ~60px above the bottom edge, per `--album-room`'s 40px slack
+   *
+   * Alpha is the second knob and the coarser one: it lifts or drops the whole band without
+   * moving where the band ends. Change both here, never on `::after`.
    *
    * **No lit lip on the top edge.** There used to be an `inset 0 1px 0` white
    * hairline here as the chamfer catching the light, and it has to stay gone: it
@@ -305,10 +346,17 @@
    * 0.07 is a visible line, so dimming it does not help and only removing it does.
    * The rim now reads purely as the wood turning away from the lamp.
    */
+  --vignette-rim: inset 0 0 0 1px rgba(0, 0, 0, 0.65);
+  /* The tight band hugging the rim: dark at the edge, done by ~55px. */
+  --vignette-near: inset 0 0 90px 10px rgba(0, 0, 0, 0.78);
+  /* The wide falloff behind it, carrying the last of it to ~120px and no further. */
+  --vignette-far: inset 0 0 200px 20px rgba(0, 0, 0, 0.5);
+
+  /*
+   * What is left on the slab itself is the shadow it throws on the floor — cast *by* the
+   * table rather than falling *on* it, so it belongs to the object and not to the room.
+   */
   box-shadow:
-    inset 0 0 0 1px rgba(0, 0, 0, 0.65),
-    inset 0 0 76px 12px rgba(0, 0, 0, 0.68),
-    inset 0 0 340px 78px rgba(0, 0, 0, 0.92),
     0 26px 60px rgba(0, 0, 0, 0.85),
     0 6px 16px rgba(0, 0, 0, 0.6);
 }
@@ -332,6 +380,47 @@
     rgba(255, 236, 200, 0.06) 48%,
     transparent 60%
   );
+}
+
+/*
+ * The falloff, painted over the room rather than under it.
+ *
+ * **This used to be three `inset` shadows in `.game-stage`'s own `box-shadow`, and that
+ * is a light that stops at the tabletop.** An inset shadow is box decoration: it paints
+ * with the element's background and border, *below* every child. So the rim went to
+ * near-black and everything lying on it — the register in one margin, the packet shelf in
+ * the other, the book between them — carried on at full brightness, lit by a lamp the
+ * table could not see. A cream leaf at `top: 0; right: 0` sits about 30px into a stop with
+ * a 78px spread, which is to say in the deepest part of the vignette, and it was the one
+ * bright object in the darkest corner of the room. Nothing reads as *placed* under those
+ * conditions; it reads as pasted on. It is also why a dark drop shadow beneath it was
+ * invisible — the wood there had already been taken to near-black, and there was no tone
+ * left for a shadow to remove.
+ *
+ * One room, one light, and everything in the room is subject to it. **This overturns the
+ * note at the top of this file** that the book and the cards are untouched by the table's
+ * lighting: they are objects on the table like any other, and the exemption was what made
+ * the falloff stop being a property of the room and start being a texture on the wood.
+ *
+ * `z-index: 2` is the whole of the ordering. It clears the 1 that `.album-layout`,
+ * `.opener` and the header take below — those are stacking contexts, so everything the
+ * album, the shelf and the opener sort internally (up to 46) is confined under it — and it
+ * stays below the three fullscreen overlays that are siblings rather than descendants:
+ * `.putaway` (42), `.viewer` (45) and the portalled `.pack-note` (50). That seam is
+ * deliberate. A card held up to the light, or one in flight between the packet and the
+ * book, is not lying on the table and must not be shaded as though it were.
+ *
+ * Inert, so it cannot take a click off anything underneath it, and `border-radius:
+ * inherit` so the stops follow the slab's corners exactly as they did from the inside.
+ */
+.game-stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: var(--vignette-rim), var(--vignette-near), var(--vignette-far);
 }
 
 .game-header,

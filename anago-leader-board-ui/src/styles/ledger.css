@@ -1,8 +1,8 @@
 /* ================================================================ *
  * The signing-in ledger
  *
- * An open ruled ledger lying flat on the mahogany. It is the front door to the
- * collection, and it is a book rather than a form because the table's rule is that
+ * A ruled leaf of the register lying flat on the mahogany. It is the front door to the
+ * collection, and it is paper rather than a form because the table's rule is that
  * everything on it is either an object or engraved into the surface — a search field
  * floating in the middle of the wood is the one thing that admits to being a UI.
  *
@@ -13,9 +13,17 @@
  *    pale. Everything else on the stage is dark with light type.
  * 2. **The light comes from the same place as everywhere else** — top left, per
  *    `--drop`. Objects disagreeing about the lamp is what kills the table instantly.
- * 3. **The gutter is real.** A flat rectangle of cream reads as a card; two pages with a
- *    shadowed valley between them reads as a bound book seen from above, which is the
- *    same trick `.album__binding` plays.
+ *    That means a *lateral* offset: a shadow falling straight down is what a floating
+ *    card casts, and it is what both of these sheets used to cast.
+ * 3. **It has material, and it is cut rather than bordered.** This used to be the
+ *    gutter's job — two pages with a shadowed valley between them read as a bound book
+ *    seen from above, the same trick `.album__binding` plays. **The fold is gone**: the
+ *    form has one page, and a stitched valley down the middle of a single leaf is a
+ *    drawing of a book rather than one. What replaces it is the grain in `::before` and
+ *    the two cut edges in the shadow list — a lit hairline inside the top edge, a darker
+ *    one inside the bottom. Those are what stop a rectangle of cream from being a fill,
+ *    and they are load-bearing now rather than polish. Do not put the fold back to fix
+ *    something they should be fixing.
  *
  * Deliberately NOT reusing `.album__cover`'s leather: this is the register, not another
  * album, and two leather books on one table would look like the wrong one was open.
@@ -37,71 +45,131 @@
  * the cream, the edge or the light drifted between them, the little one would stop reading
  * as the book you signed and start reading as a note.
  *
- * A warm cream with the faintest wash across it, a hairline darker edge so the sheet has a
- * thickness rather than being a fill, and the same one lamp everything on this table is lit
- * by. Paper does not take the stage's light type, so it sets its own ink.
+ * A warm cream, a hairline darker edge so the sheet has a thickness rather than being a
+ * fill, and the grain in `::before` below. Paper does not take the stage's light type, so
+ * it sets its own ink.
+ *
+ * **Every length in here is absolute, and that is the whole of what makes "the same object
+ * at two sizes" true.** The lit edge used to be written `rgba(255,255,255,0.5) 0%` to
+ * `transparent 22%`, which is a percentage and therefore a different object at every size:
+ * on the 67px corner leaf it was a 15px cut edge catching the lamp, and on the 420px
+ * sign-in sheet the same declaration was a 93px wash of half-strength white across the top
+ * fifth of the paper. That is a gloss gradient, not a lit edge, and it is what stopped the
+ * big sheet reading as stock — cardstock under a room light is close to uniform in tone,
+ * and what says "object" is the shadow it casts and the tooth of its surface, never a
+ * sweep across its face. A lit edge is a physical distance — a fraction of a millimetre of
+ * thickness turned to the lamp — so it is written as one. If a stop here ever needs to be
+ * a percentage again, that is the signal the two sizes have stopped being one material.
+ *
+ * The rake across the face is flattened for the same reason and to about half its old
+ * swing: at 520px the old ends-to-middle range read as a band of sheen down the sheet.
+ * What is left is enough to keep the cream from being a flat fill, with `::before` doing
+ * the rest.
+ *
+ * The shadow is *not* here, and cannot be: a box-shadow list is all-or-nothing, and the two
+ * sheets throw at different reaches. Each sets its own, and both are the same lamp — the
+ * two cut-edge insets, a tight contact shadow, then `--drop`'s direction. Change one and
+ * read the other.
  */
 .ledger-paper {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 22%),
-    linear-gradient(100deg, #efe6d2 0%, #e6dbc2 48%, #efe6d2 100%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.45) 0, rgba(255, 255, 255, 0) 14px),
+    linear-gradient(100deg, #eae0ca 0%, #e6dbc2 55%, #eae0ca 100%);
   border: 1px solid #cdbf9f;
   color: #3a3222;
   font-family: Tahoma, Verdana, "MS Sans Serif", sans-serif;
+
+  /*
+   * Both of the below are here for `::before`, and they are what make the grain work at
+   * all. `position: relative` alone is *not* a stacking context at `z-index: auto`, so a
+   * `z-index: -1` child paints behind this element's own background — under the paper,
+   * invisible — and its multiply finds the mahogany instead of the cream. `isolate` gives
+   * the sandwich `.pack-note` gets for free from being `position: fixed`: grain above the
+   * background, below the printing.
+   */
+  position: relative;
+  isolation: isolate;
 }
 
+/*
+ * The sheet, quoted from `.album__page::before` by way of `.pack-note::before` — the same
+ * stock, so the register cannot drift from the book it lets you into.
+ *
+ * **Two of the four layers, and the other two are folded into the colour above**, for the
+ * reason packopen.css gives at the same place: the album's formation cloud is a 900px tile
+ * and its fibre a 700px one, and over a sheet this size those are a constant tint rather
+ * than a texture.
+ *
+ * **The tooth is lighter than the slip's `.11`.** `.pack-note` compensates for the multiply
+ * by setting its base cream ~3 points light, and that escape is closed here: the cream is
+ * in `.ledger-paper` above and is shared with a sheet at another size, where it must not
+ * drift. So the grain is turned down to where it is material without being a tint. If this
+ * paper ever looks a shade darker than it should, this alpha is the knob — not the cream.
+ *
+ * On `.ledger-paper` rather than written twice, for the same reason the cream is: these are
+ * one sheet of paper seen at two sizes. Only the fleck offset differs, below.
+ */
+.ledger-paper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background-image:
+    /* TOOTH: the fine surface, and the layer that stops the cream being a fill. */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.82' numOctaves='3' seed='7'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 .40 0 0 0 0 .36 0 0 0 0 .25 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='260' height='260' filter='url(%23n)'/%3E%3C/svg%3E"),
+    /* FLECKS: shive in a cream book paper, sparse enough to be found rather than seen. */
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='420' height='420'%3E%3Cg fill='%23796a4a' fill-opacity='.3'%3E%3Ccircle cx='58' cy='104' r='1.1'/%3E%3Ccircle cx='247' cy='63' r='.8'/%3E%3Cellipse cx='166' cy='291' rx='1.7' ry='.6' transform='rotate(-14 166 291)'/%3E%3Ccircle cx='352' cy='218' r='.9'/%3E%3Cellipse cx='94' cy='366' rx='1.4' ry='.5' transform='rotate(9 94 366)'/%3E%3C/g%3E%3C/svg%3E");
+  background-size:
+    260px 260px,
+    420px 420px;
+}
+
+/*
+ * **One page, read top to bottom.** This was a two-page spread with a stitched gutter down
+ * the middle, and the fold read as a fold: the form has one column of things to do — what
+ * this is, who you are, the names it found — and splitting them across a valley made a
+ * two-step out of a one-step and put half the sheet's width behind the crease.
+ *
+ * Narrower than the spread it replaces, and that is most of the change. 34ch of copy in an
+ * 860px sheet is a page with a hole in it; at 520 the measure fills the paper and the sheet
+ * has the proportion of something you would actually be handed to sign.
+ *
+ * The `min-height` is what stops it jumping. The list under the rule grows from nothing to
+ * eight lines as you type, and a sheet that resizes per keystroke is the one thing on this
+ * table that would read as a widget. It is a floor, not a height — past eight matches the
+ * paper is allowed to be as long as what is written on it.
+ */
 .ledger {
   position: relative;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  width: min(860px, 94%);
-  min-height: clamp(260px, 42vh, 400px);
-  box-sizing: border-box;
-  border-radius: 2px;
-
-  /* Lifted off the wood, lit from the top left, with the page block under it. */
-  box-shadow:
-    0 1px 0 #fdf8ea inset,
-    0 18px 34px rgba(14, 5, 2, 0.55),
-    0 3px 8px rgba(14, 5, 2, 0.45);
-}
-
-/* The valley at the spine. Narrow, and darkest exactly on the fold. */
-.ledger__gutter {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 46px;
-  transform: translateX(-50%);
-  pointer-events: none;
-  background: linear-gradient(
-    90deg,
-    rgba(90, 70, 38, 0) 0%,
-    rgba(90, 70, 38, 0.16) 42%,
-    rgba(60, 46, 22, 0.28) 50%,
-    rgba(90, 70, 38, 0.16) 58%,
-    rgba(90, 70, 38, 0) 100%
-  );
-}
-
-.ledger__page {
-  padding: clamp(18px, 2.6vw, 34px);
   display: flex;
   flex-direction: column;
-  min-width: 0;
-}
+  width: min(520px, 94%);
+  min-height: clamp(300px, 46vh, 440px);
+  box-sizing: border-box;
+  padding: clamp(20px, 3vw, 34px);
+  border-radius: 2px;
 
-.ledger__page--left {
-  padding-right: clamp(26px, 3.4vw, 44px);
-}
-
-.ledger__page--right {
-  padding-left: clamp(26px, 3.4vw, 44px);
+  /*
+   * Lying on the wood under the table's one lamp: the sheet's two cut edges, then a tight
+   * contact shadow at the paper and a wide one thrown down and to the right.
+   *
+   * **The offset is the whole point.** This was `0 18px 34px` — straight down, no lateral
+   * component — which is the shadow a card floating over a page casts, not the one an
+   * object on a lit table casts. `--drop`'s direction, scaled up: a sheet this size does
+   * throw further than the corner leaf does.
+   */
+  box-shadow:
+    0 1px 0 #fdf8ea inset,
+    inset 0 -1px 0 rgba(120, 100, 58, 0.22),
+    2px 2px 4px rgba(14, 5, 2, 0.5),
+    6px 18px 34px rgba(14, 5, 2, 0.55);
 }
 
 /* ---------------------------------------------------------------- *
- * The left page: what this book is for
+ * The top of the sheet: what this book is for
  * ---------------------------------------------------------------- */
 
 .ledger__heading {
@@ -117,7 +185,7 @@
   font-size: 12px;
   line-height: 1.6;
   color: #6a5c42;
-  max-width: 34ch;
+  max-width: 100ch;
 }
 
 /*
@@ -127,10 +195,17 @@
  */
 
 /* ---------------------------------------------------------------- *
- * The right page: the line you write on
+ * Further down the same sheet: the line you write on
  * ---------------------------------------------------------------- */
 
+/*
+ * The gap is here rather than in the blurb's margin because this is the seam between the
+ * two halves of the form — what it is, and what it wants — and on one page that seam is
+ * the only thing left doing the job the fold used to do.
+ */
 .ledger__label {
+  display: block;
+  margin-top: clamp(20px, 3.4vh, 34px);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 10px;
   letter-spacing: 2.5px;
@@ -254,26 +329,69 @@
   text-align: left;
   cursor: pointer;
 
-  /* Sitting flatter on the table than the full-size book: it is one leaf, not a volume. */
+  /*
+   * Lying on the wood, and the shadow is the whole of what says so.
+   *
+   * Four parts, three jobs. The sheet's own thickness first: a warm hairline inside the top
+   * edge where the light catches the cut, a darker one inside the bottom where it does not.
+   * Then a **tight contact shadow** hugging the paper — that is the part that reads as
+   * *resting*, and it is what was missing. Then `--drop`, the one shadow every object on
+   * this table casts.
+   *
+   * **It used to be `0 6px 14px` plus `0 2px 4px`: straight down, no lateral offset at
+   * all.** game.css's first convention is one light, one shadow direction, and a shadow
+   * with no direction is what a floating card casts — it was the single largest reason
+   * this read as a panel in a corner rather than a leaf on a table. A 14px blur six pixels
+   * down with nothing under it is also an object hovering an inch up; a 2px shadow tucked
+   * under the edge is one lying down.
+   *
+   * Read from `--drop` rather than copied, the way `.pack-note` does, so it cannot drift
+   * from the table. It is inherited here: every mount is inside `.game-stage`.
+   */
   box-shadow:
     0 1px 0 #fdf8ea inset,
-    0 6px 14px rgba(14, 5, 2, 0.5),
-    0 2px 4px rgba(14, 5, 2, 0.4);
+    inset 0 -1px 0 rgba(120, 100, 58, 0.22),
+    1px 1px 2px rgba(14, 5, 2, 0.55),
+    var(--drop, 3px 8px 18px rgba(14, 5, 2, 0.6));
 
   transition:
     transform calc(140ms * var(--anim, 1)) ease,
     box-shadow calc(140ms * var(--anim, 1)) ease;
 }
 
-/* Picked up an inch, like the books on the choosing table. Same light, same lift. */
+/*
+ * Picked up an inch, like the books on the choosing table. Same light, same lift.
+ *
+ * The offsets have to move *along the same diagonal* as the resting ones, not just grow:
+ * a shadow that is 3px to the right at rest and 0 on hover swings sideways on the first
+ * frame, which reads as the lamp moving rather than the paper. The contact shadow softens
+ * and spreads as the sheet leaves the wood, because that is what a contact shadow does
+ * when there stops being contact.
+ */
 .ledger-corner:hover:not(:disabled),
 .ledger-corner:focus-visible:not(:disabled) {
   transform: translateY(-3px);
   box-shadow:
     0 1px 0 #fdf8ea inset,
-    0 12px 22px rgba(14, 5, 2, 0.55),
-    0 3px 7px rgba(14, 5, 2, 0.45);
+    inset 0 -1px 0 rgba(120, 100, 58, 0.22),
+    2px 3px 5px rgba(14, 5, 2, 0.45),
+    5px 14px 26px rgba(14, 5, 2, 0.55);
   outline: none;
+}
+
+/*
+ * The flecks, walked onto this leaf.
+ *
+ * The tile is 420px square and every inclusion on it but one sits below 60px; this sheet is
+ * about 66px tall, so sampled at the origin the layer would be five specks of nothing at
+ * all. `-80px` brings the one at (58, 104) up to y≈24 and leaves the rest outside — which
+ * is the whole of what "sparse" means at this size: one speck, not five. The full-size
+ * sheet needs no offset; at 520×400 it sees four of them and that is already sparse.
+ */
+.ledger-corner::before {
+  background-position:
+    0 0,
+    0 -80px;
 }
 
 .ledger-corner:focus-visible {
@@ -348,29 +466,18 @@
 }
 
 /* ---------------------------------------------------------------- *
- * Phone: one page, not two
+ * Phone: the same sheet, with less of a margin around what is on it
  *
- * The same breakpoint as `useIsMobile` and the mobile album. Two pages side by side on a
- * 375px screen gives each of them about 150px, which is narrower than the names written
- * on them — so the book is shown as a single page and the gutter goes with the fold.
+ * The same breakpoint as `useIsMobile` and the mobile album. This block used to do the
+ * real work — collapsing two pages side by side, which on a 375px screen gave each of them
+ * about 150px, narrower than the names written on them — and there is nothing left for it
+ * to collapse: the sheet has one column at every width now. All it does is take the paper
+ * out to the edges of the screen and pull the margins in, so the measure survives.
  * ---------------------------------------------------------------- */
 
 @media (max-width: 599.95px) {
   .ledger {
-    grid-template-columns: 1fr;
     width: 96%;
-  }
-
-  .ledger__gutter {
-    display: none;
-  }
-
-  .ledger__page--left,
-  .ledger__page--right {
     padding: clamp(14px, 4vw, 22px);
-  }
-
-  .ledger__page--right {
-    border-top: 1px solid rgba(191, 174, 139, 0.6);
   }
 }

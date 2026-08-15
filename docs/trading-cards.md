@@ -2,6 +2,47 @@
 
 ## Where this stands (last updated 2026-08-15)
 
+**The packets are lit by the room, and the edge light is what does it.** A packet cast one
+soft offset shadow — `0 7px 12px rgba(0,0,0,0.6)` — which is what an object a centimetre
+*above* a surface casts, in pure black, pointing straight down. It is now three passes off
+`--lamp-*` and `--contact-*`, whose magnitudes are `--drop` taken apart **and must move
+when `--drop` moves**, plus a contact pass: the tight near-black in the millimetre where
+foil meets wood, which is the difference between resting and hovering. The offsets are
+counter-rotated through `--tilt` in `calc()`, because `filter` resolves in the element's
+own coordinates and `transform` maps the result afterwards, so `.pack--mini`'s lean was
+carrying the shadow round with it — six tilts, six directions of light. That correction is
+worth under a pixel and is there for the rule, not the look. **The shadow was never going
+to be enough on its own**, for the reason `.game-stage::after`'s note already gives: the
+shelf sits deep in `--vignette-far` where the wood is about `#0a0402`, and there is no tone
+left there for a dark shadow to take away. What separates a near-black packet from a
+near-black table is the light on its edge — a warm band off `--lit`, the polish streak's
+own white, down the side facing the lamp.
+
+**Which side that is does not come from `--drop`, and the departure is deliberate.**
+`--drop` is a fixed `3px 8px` for every object, i.e. a parallel light from up-left. The
+wood is not lit that way: both `.game-stage` radials are centred at `50% -8%` / `50% -6%`
+and the polish lands ~41% across, all describing a source above the *middle* of the table.
+The two agree only at the centre, and the pile is at `left: 0` — about a fifth of the way
+across, with that lamp some 700px to its right. So `--lit-dir` (+1 lamp-left, −1
+lamp-right, 0 overhead) drives the highlight **and** the sign of `--lamp-x`/`--contact-x`
+together, because a lit edge and the shadow it casts landing on the same side of one object
+is worse than either being wrong alone. The shelf and the flight take −1, the centred
+opener takes 0 — no side light at all, which is also what `--book-drop`'s `0 42px` says
+about the book. The seam is stated rather than hidden: a packet now disagrees with the
+docket beside it, which still takes `--drop` whole. The honest fix is one model for the
+whole table — `--book-drop`, the radials and the polish streak all moving — not a second
+model for the packets.
+
+Two build traps are written up in the CSS and both cost an afternoon: `postcss-calc` folds
+a `var()` **with a fallback** inside a `calc()` and froze `cos(0deg)` into the minified
+sheet only, so `--tilt`, `--lit` and `--lit-dir` are declared on an ancestor and read bare;
+and `:focus-visible` now swaps `--pack-ring` rather than the whole `filter`, which it used
+to restate. **Open, and both want eyes rather than arithmetic:** `--shelf-pad` is 13px and
+a leaning packet already spends ~9px of it, so the cast is clipped ~4px out — pre-existing,
+roughly doubled here (~0.15 → ~0.28 alpha at the cut); containing it wants 30px, matching
+the old severity wants 18px, at ~6px of book width. And `--lit` at 0.5 was set against the
+parallel model and has not been retuned since the flip.
+
 **The cover is written, not stamped, and the voorwoord has a versal.** The owner's name
 goes onto the leather in gilt from a pen you watch move, stroke by stroke, instead of
 being blocked in hot foil a letter at a time — which took the emboss, the uppercase and
@@ -1390,6 +1431,73 @@ you (see "The shelf stays up"). This is not tabletop-only; it is better
 under all ten stages. What makes it work is that the packet is shaped like a packet
 and scaled like the album — see the wrapper bullets under
 [Pack opening](#pack-opening).
+
+**And packets lie on the wood, which took a third shadow, an edge light and some
+trigonometry.** The first rule above says `--drop` is *the* shadow everything here casts
+and that objects disagreeing about where the light is kills the table instantly. The
+packets disagreed on every count available to them: pure black instead of `--drop`'s warm
+near-black, straight down instead of down-and-right, and — because a single 7px-offset,
+12px-blurred pass has no tight core — reading as an object hovering above the surface
+rather than one touching it. What says *resting* is the near-black in the millimetre where
+the foil meets the wood, and nothing painted it; `--contact-*` does now, under the
+`--lamp-*` cast.
+
+**But the cast was the smaller half, and on this table it could not have been otherwise.**
+The shelf sits deep in `--vignette-far`. The wood there is around `#0a0402` and a
+`rgba(14,5,2,0.6)` shadow on it moves the pixels two or three levels — invisible, exactly
+as the note on `.game-stage::after` says of the leaf in the opposite margin. A dark object
+on a dark ground is not read by its shadow; it is read by the light on its edge. So the
+packets took a rim: a warm band from `--lit` — `.game-stage::before`'s specular white
+verbatim, because a packet catching a different white from the polish beside it is the same
+failure as one casting in a different direction — down the side facing the lamp, with a
+weaker dark band opposite where the foil turns out of the light. `inset ±4px 0 6px -4px` is
+the one-edge idiom, the negative spread killing the blur on the three sides the offset does
+not point at.
+
+**And then the rim was flipped, which is the interesting part.** `--drop`'s fixed `3px 8px`
+is a *parallel* light from up-left, so a rim built off it goes down every packet's left
+edge. The wood says something else: the two `.game-stage` radials are centred at `50% -8%`
+and `50% -6%`, and the polish streak lands about 41% across — a source above the middle of
+the table, not off to one side of it. Those two models agree only for an object standing in
+the centre, and the pile is at `left: 0`, roughly a fifth of the way across an 1860px stage,
+with the lamp the timber describes some 700px to its **right**. `--lit-dir` is the one knob:
++1 for a lamp to the packet's left, −1 to its right, 0 overhead, and it signs the highlight,
+`--lamp-x` and `--contact-x` together. Together is the point — a lit edge with the shadow it
+casts coming out from under the *same* side is a worse object than one lit from the wrong
+side consistently. The shelf and the flight are −1; the opener, centred, is 0 and has no
+side light at all, which is independently what `--book-drop`'s `0 42px` claims about the
+book next to it. The flight keeps the shelf's sign rather than interpolating across the
+table: a highlight swapping edges mid-arc would be the loudest lighting on the page for the
+least reason.
+
+The seam this opens is real and is not papered over. A packet on the shelf now disagrees
+with the docket lying beside it, which still takes `--drop` whole. The table is carrying
+three light models — parallel-up-left (`--drop`), straight overhead (`--book-drop`), and
+point-above-centre (the wood) — and it was carrying all three before any of this. The fix
+is to pick one for the whole room, which moves `--book-drop`, both radials and the polish
+streak; giving the packets a fourth would be the wrong direction. Until then they agree
+with the timber they are lying on, which is the comparison a reader actually makes.
+
+The counter-rotation is the part that looks like over-engineering and is not, quite.
+`filter` resolves in the element's own coordinate system and `transform` maps the
+rendered result afterwards, so `.pack--mini`'s `rotate(var(--tilt))` took the shadow
+round with the packet: six entries in `TILTS` meant six lamps over one table. Each offset
+is therefore stated in room coordinates and rotated back through `--tilt` — for a
+clockwise θ in a y-down space, room `(X, Y)` is `(X·cos θ + Y·sin θ, Y·cos θ − X·sin θ)`
+locally. **At ±4.1° that moves the shadow's tip by about 0.6px, and it is worth saying so
+plainly**: nobody will see the corrected angle. It is in because it is free once the lamp
+is in tokens, and because the uncorrected version is a rule that holds only until someone
+widens `TILTS`. Do not delete the calcs on the grounds that they do nothing visible —
+that is the argument they were written against.
+
+Everything else about the packets' light was left alone deliberately. The travelling
+sheen is object-space at 115° and stays there; the bulge's dark sides are the packet's
+own geometry curving away and *must* turn with it. Hover still changes only `transform`,
+so a lifted packet keeps its resting shadow — wrong, and a separate change. So is
+thickness: a five is physically fatter than a one and casts a longer shadow, and does
+not. And the pile is still a tidy wrapping grid where real packets tossed down would
+overlap, which is the strongest cue of the four and the one that would cost the shelf's
+width formula, the hit targets, the scroll clip and the flight FLIP.
 
 ### Getting in: the ledger and the five books
 
@@ -4324,6 +4432,37 @@ So `--stage-w` joins `--stage-pad` on `:root`, `.game-stage` reads its `width` a
 literal. The rule the original comment was reaching for, stated
 properly: **anything that changes the stage's box changes the tokens, not the box.**
 
+#### And the shut book was overlapping it again, invisibly
+
+The same overlap, a second time, from the other side and by a different mechanism —
+found because the packets' dockets only misbehaved **when the book was shut**, which
+turned out to be the whole condition.
+
+A shut book slides half a page left so the cover reaches the middle
+(`.album--closed .album__book`, translateX of `--page-w / -2`). `transform` moves paint
+and hit-testing and never layout, so that element — `--page-w × 2` wide — hit-tests
+across `[−page-w/2 … 1.5·page-w]` while its box stays put. The left half of that is
+empty: the cover is at the centre, the binding and the left backing are at `opacity: 0`,
+which is transparent and not absent. So up to **280px of invisible book** lay over a
+margin the shelf is 26–42px away from and about 300px wide — the right column of packets
+and most of the left. And it won the pointer for the reason `.album-main`'s comment in
+game.css already gives: `.album` is `position: relative` and comes after both asides in
+the document, and positioned siblings at `z-index: auto` paint in document order with
+hit-testing following paint.
+
+The symptom was that hovering the pile only worked with the book open. Shut, packets
+under the slab never took the hover and the last one that had it kept its lift until the
+pointer crossed one that was not covered — which reads exactly like a stuck `:hover`, and
+sent the first attempt after the packets' own hover envelopes instead. It was
+`pointer-events: none` on the shut book: nothing inside one is interactive, the turn
+strips only render on an open spread, and the click that opens it is on `.album`, whose
+own box has not moved. The right margin is unaffected — the book shifts *away* from the
+register — and the mobile book never gets the class.
+
+**The rule, which is the same one as above with the word "box" doing different work:**
+anything that moves what you see has to move what you can touch, and `transform` moves
+only one of them.
+
 #### The table is 1660, not 1520
 
 Fixing the overlap exposed the second half of the same staleness: at 1920×1080 the
@@ -5459,9 +5598,30 @@ rendered with no stain set is the book as it was before there was a choice.
 
 **One binary asset**, and only one: `src/assets/rik-dev-logo.png`, the mark printed on
 the wrapper. Imported through webpack rather than dropped in `public/`, so it is
-content-hashed and cannot go stale. It is the transparent-background original, cropped
-to its alpha bounds and scaled to 320×256 — the 1024² source is 1.6 MB and the badge is
-never drawn wider than ~140 CSS px.
+content-hashed and cannot go stale. It is the transparent-background original (1024²,
+1.6 MB), cropped to its alpha bounds — `x 23, y 158, 977×781` at an alpha threshold of
+8, which is 5:4 to within 0.1% and is where `aspect-ratio: 320 / 256` comes from — and
+resampled to **640×512** with Lanczos-3 on premultiplied alpha.
+
+**It was 320×256 and that was too small.** The original note justified 320×256 with "the
+badge is never drawn wider than ~140 CSS px", which stopped being true when the packet
+grew: `--pack-w` tops out at 240px and `.pack__mark` is 84% of it, so the badge is drawn
+at up to **201.6 CSS px** — 403 device px at DPR 2, off a 320px asset. It was upscaling
+~1.25× before anything moved, and the hover `scale(1.02)` on `.pack` magnified an
+already-soft bitmap, which is what made it read as blurry rather than merely soft. 640
+covers 201.6 CSS px at DPR 3 (604.8) with margin, so the budget now has room to be wrong
+in again.
+
+The cost is 131 KiB → 431 KiB. That is the floor for this artwork at this size — the
+foil gradients and the neon glow do not compress, and trying every PNG filter against
+both deflate strategies bought 1.5%. Accepted rather than reduced: it is one asset, it
+is content-hashed and cached forever, and the alternative was a badge that is visibly
+soft on every HiDPI screen in the office.
+
+**If it is ever re-cut, the alpha threshold matters.** At threshold 0 the bounds are
+`977×808` — 26 extra rows of glow so faint it is invisible, which throws the ratio to
+1.21 and shifts the artwork inside its box. Threshold 8 is what reproduces the framing
+the packet and card back were laid out against.
 
 Sound effects are **synthesised with WebAudio** (`utils/sounds.ts`) rather than
 loaded from files — no binary assets to author, host or cache-bust, and short

@@ -1973,7 +1973,7 @@ const CollectionPage: React.FC = () => {
                     There were two shadow sliders here — `schaduw` for the drop the book
                     throws and `bladschaduw` for the light on its leaves. They did their
                     job and went with the decision, at 1.6 and 2.5, folded into the numbers
-                    in album.css: see `--book-drop` on `.album` and "How a leaf is lit".
+                    in album.css: see `--book-drop` on `:root` and "How a leaf is lit".
 
                     The lifecycle is the one utils/animationSpeed.ts argues for, and both
                     halves of it matter. They wrote to `:root` for the session only, never

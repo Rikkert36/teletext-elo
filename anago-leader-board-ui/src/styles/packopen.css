@@ -108,6 +108,107 @@
   /* Depth of one sealed end, teeth included — the blade cuts *through* the seal. */
   --crimp: calc(var(--pack-w) * 0.15);
   --pack-h: calc(var(--pack-w) * 1.4 + 2 * var(--crimp));
+
+  /*
+   * The table's one light, split into its parts.
+   *
+   * The magnitudes are `--drop` from game.css — `3px 8px 18px rgba(14, 5, 2, 0.6)` —
+   * taken apart so each offset can be counter-rotated by the packet's lean; see the
+   * filter on `.pack`. **They must move when `--drop` moves.**
+   *
+   * The horizontal *sign* does not come from `--drop`; see `--lit-dir` below.
+   *
+   * Written out here rather than read off `--drop` because `.pack-flight` is portalled
+   * to the body: it is outside `.game-stage` and inherits none of its tokens.
+   */
+  --lamp-x: calc(3px * var(--lit-dir));
+  --lamp-y: 8px;
+  --lamp-blur: 18px;
+  --lamp-ink: rgba(14, 5, 2, 0.6);
+
+  /*
+   * The same lamp seen from the other side — its colour, for the edge that faces it.
+   *
+   * The colour is `.game-stage::before`'s specular streak verbatim, because a packet
+   * catching a different white from the polish two inches away is the same failure as a
+   * packet casting in a different direction.
+   *
+   * **This exists because a shadow was not enough, and could not have been.** The shelf
+   * sits deep in `--vignette-far`, where the wood is about `#0a0402`; `--lamp-ink`
+   * painted onto that moves it two or three levels and is invisible — which game.css's
+   * own note on `.game-stage::after` says in as many words. On a near-black ground an
+   * object is read by the light on its edge, not by the shadow under it, so this and not
+   * the cast is what makes the packets objects here.
+   */
+  --lit: rgba(255, 236, 200, 0.5);
+
+  /*
+   * **Which side of the packet the lamp is on: +1 its left, −1 its right, 0 overhead.**
+   * One token, because it drives the highlight *and* the sign of `--lamp-x`, and those
+   * two disagreeing would put a lit edge and the shadow it casts on the same side of the
+   * same object — worse than either being wrong on its own.
+   *
+   * **It is not derived from `--drop`, and that is a deliberate departure.** `--drop` is
+   * a fixed `3px 8px` for everything on the table, which is a *parallel* light from up
+   * and to the left. The wood underneath is not lit that way: both radials in
+   * `.game-stage` are centred at `50% -8%` / `50% -6%` and the polish streak lands about
+   * 41% across, all of which describe a source above the middle of the table. The two
+   * models only agree for an object standing in the centre.
+   *
+   * The pile is nowhere near the centre. `.album-side` is `left: 0`, so its packets sit
+   * around a fifth of the way across an 1860px stage and the lamp the wood describes is
+   * some 700px to their **right** — so they are lit on the right and throw left, which is
+   * the opposite of what `--drop` alone would have given them. The stage packet is
+   * centred and takes 0: no side light at all, its top crimp catching everything, which
+   * is also exactly what `--book-drop`'s `0 42px` says about the book beside it.
+   *
+   * The cost is stated plainly: a packet on the shelf now disagrees with the docket
+   * lying next to it, which still takes `--drop` whole. That is a real seam, and the
+   * honest fix is to give the whole table one model rather than to give the packets a
+   * second one — `--book-drop`, the wood's radials and the polish streak would all move.
+   * Until that happens, the packets agree with the timber they are lying on, which is
+   * the comparison a reader actually makes.
+   */
+  --lit-dir: 1;
+
+  /*
+   * Where the foil meets the wood — tight, barely offset, and the darkest thing the
+   * packet paints.
+   *
+   * This is the pass that says *resting* rather than *hovering*, and it is the whole
+   * reason the packets used to read as printed on the table. One soft offset shadow on
+   * its own is what an object a centimetre above a surface casts; what says an object
+   * is touching one is the near-black in the millimetre where the two meet. `--lamp-*`
+   * alone had no such millimetre.
+   */
+  --contact-x: calc(1px * var(--lit-dir));
+  --contact-y: 2px;
+  --contact-blur: 2px;
+  --contact-ink: rgba(14, 5, 2, 0.66);
+}
+
+/*
+ * Where each of the three stands relative to the lamp — see `--lit-dir` above.
+ *
+ * A separate block rather than three values in the rule above, because that rule names
+ * all three selectors at once and this is the one thing that differs between them. It
+ * has to sit *after* it: `.opener`'s own rule is higher up the file and equal in
+ * specificity, so a value written there would lose to the shared default.
+ *
+ * `.pack-flight` takes the shelf's side rather than interpolating across the table on
+ * its way over. It is airborne for a few hundred ms and it both leaves from and lands on
+ * the pile; a highlight that swapped edges mid-flight would be the most conspicuous
+ * lighting on the page, for the least reason.
+ */
+.opener {
+  /* Centred under the lamp: no side light, the crimp takes it all. */
+  --lit-dir: 0;
+}
+
+.pack-shelf,
+.pack-flight {
+  /* A fifth of the way across the table; the lamp is well to the right of here. */
+  --lit-dir: -1;
 }
 
 /**
@@ -365,12 +466,54 @@
   overflow: hidden;
   animation: pack-sheen 2.6s linear infinite;
   /*
+   * The first pass, held in a variable because it is the one `:focus-visible` swaps —
+   * see the focus rule, and note that it must not have to restate the two ground
+   * shadows below to do it.
+   */
+  --pack-ring: drop-shadow(0 0 7px var(--glow, transparent));
+  /*
+   * Square to the table unless something says otherwise — `.pack--mini` is the only
+   * thing that does, inline, per packet.
+   *
+   * **Declared rather than left to a `var(--tilt, 0deg)` fallback in the filter below,
+   * and that is a build concern rather than a style one.** cssnano runs postcss-calc
+   * over the minified sheet; given a `var()` *with* a fallback inside a `calc()` it
+   * substitutes the fallback and folds the arithmetic, and emitted a second copy of
+   * the filter with `cos(0deg)` frozen into it — the lean correction gone, in the
+   * production bundle only, where the sheet is minified and the dev server's is not.
+   * It happened to sort after the good declaration and so happened to lose the
+   * cascade. A bare `var()` has nothing to substitute, so the calc survives intact.
+   */
+  --tilt: 0deg;
+  /*
    * A drop-shadow *filter*, not a box-shadow. A mask clips box shadows away
    * completely — the packet ended up looking pasted flat onto the wood. The filter
    * is computed from the masked silhouette instead, so the shadow is serrated too.
    *
-   * Two passes: the packet's own colour bleeding out of the foil, the way the badge
-   * glows in the logo, and then the shadow it casts on the table.
+   * Three passes: the packet's own colour bleeding out of the foil, the way the badge
+   * glows in the logo; the contact where it touches the wood; and the shadow it casts.
+   * See `--contact-*` above for why the middle one is not optional — a single soft
+   * offset shadow is what an object *above* a surface casts.
+   *
+   * **The offsets are calcs because the packet leans and the lamp does not.** `filter`
+   * resolves in the element's own coordinates and `transform` maps the result
+   * afterwards, so `.pack--mini`'s `rotate(var(--tilt))` carried the shadow round with
+   * the packet: six tilts in `TILTS` meant six directions of light on one table. Each
+   * offset is therefore written in *room* coordinates and rotated back through
+   * `--tilt`, so it comes out along the lamp's axis whichever way a packet is lying.
+   * For a clockwise rotation θ in a y-down space, a room offset (X, Y) is
+   * (X·cos θ + Y·sin θ, Y·cos θ − X·sin θ) locally.
+   *
+   * It is worth being honest that at ±4.1° this moves the shadow's tip well under a
+   * pixel. It is here because it is free once the lamp is in tokens and because the
+   * alternative is a rule that holds only while nobody widens `TILTS` — not because
+   * you can see the difference between the corrected and uncorrected angle.
+   *
+   * **Declared twice, plainly and then with the trig**, which is deliberate: CSS
+   * `cos()`/`sin()` need Chrome 111 / Safari 15.4 / Firefox 108, and an engine older
+   * than that drops the second declaration at parse time and keeps the first. That
+   * leaves the shadow at the wrong angle by a fraction of a pixel, rather than leaving
+   * the packet with no shadow at all.
    *
    * **An outline cannot go here, and it was tried.** Four zero-blur drop-shadows at one
    * pixel in each direction is the standard way to trace a silhouette, and on this element
@@ -386,8 +529,20 @@
    * straight sides, and `--seal-image` for the serrated ends, which are the crimp
    * pseudo-elements and are painted within the mask.
    */
-  filter: drop-shadow(0 0 7px var(--glow, transparent))
-    drop-shadow(0 7px 12px rgba(0, 0, 0, 0.6));
+  filter: var(--pack-ring)
+    drop-shadow(var(--contact-x) var(--contact-y) var(--contact-blur) var(--contact-ink))
+    drop-shadow(var(--lamp-x) var(--lamp-y) var(--lamp-blur) var(--lamp-ink));
+  filter: var(--pack-ring)
+    drop-shadow(
+      calc(var(--contact-x) * cos(var(--tilt)) + var(--contact-y) * sin(var(--tilt)))
+      calc(var(--contact-y) * cos(var(--tilt)) - var(--contact-x) * sin(var(--tilt)))
+      var(--contact-blur) var(--contact-ink)
+    )
+    drop-shadow(
+      calc(var(--lamp-x) * cos(var(--tilt)) + var(--lamp-y) * sin(var(--tilt)))
+      calc(var(--lamp-y) * cos(var(--tilt)) - var(--lamp-x) * sin(var(--tilt)))
+      var(--lamp-blur) var(--lamp-ink)
+    );
   transition: transform 160ms ease;
   flex: none;
 }
@@ -499,8 +654,31 @@
    * is not a highlight on dark foil, it is *the printed gold rule off the icoon card*, on
    * a white board, which is a rim and is meant to read as one. `--pack-edge` is set by
    * `packFoil` for that packet alone.
+   *
+   * **Under it, the lamp on one edge and the turn away on the other** — and this pair is
+   * what actually lifts a packet off this table. The rule above is a *printed* line: 1px,
+   * neutral, and the same on all four sides, which is a property of the wrapper and tells
+   * you nothing about where it is lying. These two are the room. See `--lit`: on wood this
+   * dark a cast shadow has no contrast to work with, and the edge light is doing the whole
+   * job of separating a near-black packet from a near-black surface.
+   *
+   * `inset ±4px 0 6px -4px` is the one-edge idiom — the negative spread cancels the blur
+   * on the three edges the offset is not pointing at, so each is a band down a single side
+   * rather than a ring. A **positive** x offset paints the band down the *left*, since the
+   * shadow's rect is what moves and the strip left behind is what you see; `--lit-dir`
+   * therefore reads +1 for a lamp on the left, and the dark band takes its negation.
+   *
+   * At `--lit-dir: 0` both collapse: a 6px blur against a −4px spread has under a pixel
+   * of reach left, so a packet centred under the lamp simply has no side light, which is
+   * the right answer rather than a special case.
+   *
+   * They are not symmetrical on purpose: the dark side is weaker, because it is the foil
+   * curving out of the light and the wood behind it is already black, so matching the
+   * highlight's strength only draws a second line.
    */
-  box-shadow: inset 0 0 0 1px var(--pack-edge, rgba(255, 255, 255, 0.14));
+  box-shadow: inset 0 0 0 1px var(--pack-edge, rgba(255, 255, 255, 0.14)),
+    inset calc(4px * var(--lit-dir)) 0 6px -4px var(--lit),
+    inset calc(-4px * var(--lit-dir)) 0 6px -4px rgba(0, 0, 0, 0.42);
 }
 
 /**
@@ -592,9 +770,13 @@
  * The rik-dev badge.
  *
  * The asset is trimmed to the artwork's own alpha bounds, so this box *is* the badge
- * — hence the odd `aspect-ratio`, which is the trimmed 320×256. Both go together: if
- * the asset is ever replaced, re-trim it or fix the ratio, or the badge letterboxes
- * inside its box and stops sitting where these percentages say it does.
+ * — hence the odd `aspect-ratio`, which is the trimmed 5:4 written as 320×256. Both go
+ * together: if the asset is ever replaced, re-trim it or fix the ratio, or the badge
+ * letterboxes inside its box and stops sitting where these percentages say it does.
+ *
+ * `width: 84%` of a `--pack-w` that reaches 240px puts the badge at 201.6 CSS px, which
+ * is what the 640×512 asset is sized for. Raising either number past that starts
+ * upscaling the artwork — check `utils/brand.ts` before doing it.
  *
  * The first version of the asset was the badge on a black field rather than on
  * transparency, and it needed a radial mask to dissolve that black into the foil or it
@@ -778,11 +960,17 @@
  * dense enough to read, and it follows the serrated silhouette. It replaces the
  * packet's own colour glow for as long as it has focus, so the two never add up
  * into an indistinct haze.
+ *
+ * It sets `--pack-ring` rather than the whole `filter`, and that is the whole of the
+ * difference: replacing the property meant restating the ground shadows underneath,
+ * and the copy went stale the moment those grew a contact pass and a lean correction.
+ * A focused packet would have dropped back onto the table on the frame it was tabbed
+ * to. Only the first pass is this rule's business, so only the first pass is a
+ * variable.
  */
 .pack--mini:focus-visible {
   outline: none;
-  filter: drop-shadow(0 0 2px #fff3c4) drop-shadow(0 0 3px #ffe9a0)
-    drop-shadow(0 7px 12px rgba(0, 0, 0, 0.6));
+  --pack-ring: drop-shadow(0 0 2px #fff3c4) drop-shadow(0 0 3px #ffe9a0);
 }
 
 /* ---------------------------------------------------------------- *

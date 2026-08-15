@@ -7,6 +7,12 @@ import logo from '../assets/rik-dev-logo.png';
  * at different files, and so the asset's shape is documented once. It is trimmed to
  * the artwork's own alpha bounds — no transparent margin — which is why anything
  * drawing it needs `aspect-ratio: 320 / 256` rather than a square box.
+ *
+ * The file is 640×512; the ratio below is that same 5:4 written in the numbers the
+ * layout was built against, so it needs no change if the asset is re-cut at another
+ * size. 640 is not decorative — the badge reaches 201.6 CSS px on a large packet
+ * (84% of a 240px `--pack-w`), and anything smaller upscales on a HiDPI screen. See
+ * "One binary asset" in `docs/trading-cards.md` before replacing it.
  */
 export const rikDevMark = logo;
 
