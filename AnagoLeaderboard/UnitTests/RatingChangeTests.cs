@@ -1,111 +1,102 @@
-﻿using AnagoLeaderboard.Models.RequestParameters;
 using AnagoLeaderboard.Models.Results;
-using System;
+using AnagoLeaderboard.Services;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace UnitTests
 {
+    /// <summary>
+    /// The Elo arithmetic: the expected score from the two team averages, the points factor
+    /// that scales a win by its goal margin, and the experience factor that doubles the swing
+    /// for someone who has just started.
+    ///
+    /// These assert on <see cref="PlayerStats.Rating"/> - the raw Elo - rather than on
+    /// <see cref="PlayerPerformance.NewRating"/>, which is the visible rating and therefore
+    /// carries the inexperience deduction on top of everything measured here.
+    /// </summary>
     [TestFixture]
     public class RatingChangeTests
     {
-        List<int> _standardGamesPlayed = new List<int> { 10, 10, 10, 10 };
+        private readonly List<int> _standardGamesPlayed = new List<int> { 10, 10, 10, 10 };
+
         [Test]
         public void RatingIsAverage_PointsFactorIsAverage()
         {
-            var firstPlayerRating = 1500;
-            var secondPlayerRating = 1500;
-            var thirdPlayerRating = 1200;
-            var fourthPlayerRating = 1200;
             var team1Goals = 10;
-            var team2Goals = 5;        
-            
-            var game = GetGame(team1Goals, team2Goals, firstPlayerRating, secondPlayerRating, thirdPlayerRating, fourthPlayerRating);
-            var ratingCalculator = new AnagoLeaderboard.Services.RatingCalculator(game);
-            //ratingCalculator.CalculateRating();
-            
-            Assert.That(game.FirstTeam.FirstPlayer.NewRating, Is.EqualTo(1508));
-            Assert.That(game.SecondTeam.FirstPlayer.NewRating, Is.EqualTo(1192));
+            var team2Goals = 5;
+
+            var updates = GetUpdates(team1Goals, team2Goals, _standardGamesPlayed, 1500, 1500, 1200, 1200);
+
+            Assert.That(updates[0].Stats.Rating, Is.EqualTo(1508));
+            Assert.That(updates[2].Stats.Rating, Is.EqualTo(1192));
         }
 
         [Test]
         public void PointsFactorIsMax()
         {
-            var firstPlayerRating = 1500;
-            var secondPlayerRating = 1500;
-            var thirdPlayerRating = 1200;
-            var fourthPlayerRating = 1200;
             var team1Goals = 10;
             var team2Goals = 0;
 
-            var game = GetGame(team1Goals, team2Goals, firstPlayerRating, secondPlayerRating, thirdPlayerRating, fourthPlayerRating);
-            var ratingCalculator = new AnagoLeaderboard.Services.RatingCalculator(game);
-            //ratingCalculator.CalculateRating();
+            var updates = GetUpdates(team1Goals, team2Goals, _standardGamesPlayed, 1500, 1500, 1200, 1200);
 
-            Assert.That(game.FirstTeam.FirstPlayer.NewRating, Is.EqualTo(1515));
-            Assert.That(game.SecondTeam.FirstPlayer.NewRating, Is.EqualTo(1185));
+            Assert.That(updates[0].Stats.Rating, Is.EqualTo(1515));
+            Assert.That(updates[2].Stats.Rating, Is.EqualTo(1185));
         }
 
         [Test]
         public void PointsFactorIsMin()
         {
-            var firstPlayerRating = 1500;
-            var secondPlayerRating = 1500;
-            var thirdPlayerRating = 1200;
-            var fourthPlayerRating = 1200;
             var team1Goals = 10;
             var team2Goals = 9;
 
-            var game = GetGame(team1Goals, team2Goals, firstPlayerRating, secondPlayerRating, thirdPlayerRating, fourthPlayerRating);
-            var ratingCalculator = new AnagoLeaderboard.Services.RatingCalculator(game);
-            //ratingCalculator.CalculateRating();
+            var updates = GetUpdates(team1Goals, team2Goals, _standardGamesPlayed, 1500, 1500, 1200, 1200);
 
-            Assert.That(game.FirstTeam.FirstPlayer.NewRating, Is.EqualTo(1502));
-            Assert.That(game.SecondTeam.FirstPlayer.NewRating, Is.EqualTo(1198));
+            Assert.That(updates[0].Stats.Rating, Is.EqualTo(1502));
+            Assert.That(updates[2].Stats.Rating, Is.EqualTo(1198));
         }
 
         [Test]
         public void RatingIsNotAverage()
         {
-            var firstPlayerRating = 1600;
-            var secondPlayerRating = 1400;
-            var thirdPlayerRating = 1100;
-            var fourthPlayerRating = 1300;
             var team1Goals = 10;
             var team2Goals = 5;
 
-            var game = GetGame(team1Goals, team2Goals, firstPlayerRating, secondPlayerRating, thirdPlayerRating, fourthPlayerRating);
-            var ratingCalculator = new AnagoLeaderboard.Services.RatingCalculator(game);
-            //ratingCalculator.CalculateRating();
+            var updates = GetUpdates(team1Goals, team2Goals, _standardGamesPlayed, 1600, 1400, 1100, 1300);
 
-            Assert.That(game.FirstTeam.FirstPlayer.NewRating, Is.EqualTo(1608));
-            Assert.That(game.FirstTeam.SecondPlayer.NewRating, Is.EqualTo(1408));
-            Assert.That(game.SecondTeam.FirstPlayer.NewRating, Is.EqualTo(1092));
-            Assert.That(game.SecondTeam.SecondPlayer.NewRating, Is.EqualTo(1292));
+            Assert.That(updates[0].Stats.Rating, Is.EqualTo(1608));
+            Assert.That(updates[1].Stats.Rating, Is.EqualTo(1408));
+            Assert.That(updates[2].Stats.Rating, Is.EqualTo(1092));
+            Assert.That(updates[3].Stats.Rating, Is.EqualTo(1292));
         }
 
         [Test]
         public void TestVaryingExperienceFactor()
         {
-            var firstPlayerRating = 1500;
-            var secondPlayerRating = 1500;
-            var thirdPlayerRating = 1200;
-            var fourthPlayerRating = 1200;
             var team1Goals = 10;
             var team2Goals = 0;
             var gamesPlayed = new List<int> { 0, 3, 6, 10 };
 
-            var game = GetGame(team1Goals, team2Goals, firstPlayerRating, secondPlayerRating, thirdPlayerRating, fourthPlayerRating);
-            
-            var ratingCalculator = new AnagoLeaderboard.Services.RatingCalculator(game);
-            //ratingCalculator.CalculateRating();
+            var updates = GetUpdates(team1Goals, team2Goals, gamesPlayed, 1500, 1500, 1200, 1200);
 
-            Assert.That(game.FirstTeam.FirstPlayer.NewRating, Is.EqualTo(1530));
-            Assert.That(game.FirstTeam.SecondPlayer.NewRating, Is.EqualTo(1526));
-            Assert.That(game.SecondTeam.FirstPlayer.NewRating, Is.EqualTo(1179));
-            Assert.That(game.SecondTeam.SecondPlayer.NewRating, Is.EqualTo(1185));
+            Assert.That(updates[0].Stats.Rating, Is.EqualTo(1530));
+            Assert.That(updates[1].Stats.Rating, Is.EqualTo(1526));
+            Assert.That(updates[2].Stats.Rating, Is.EqualTo(1179));
+            Assert.That(updates[3].Stats.Rating, Is.EqualTo(1185));
+        }
+
+        private static List<PlayerUpdate> GetUpdates(
+            int team1Goals,
+            int team2Goals,
+            IReadOnlyList<int> gamesPlayed,
+            params int[] ratings)
+        {
+            var game = GetGame(team1Goals, team2Goals, ratings);
+
+            var stats = ratings
+                .Select((rating, i) => new PlayerStats(rating, 0, gamesPlayed[i], 0, 0, 0, 0))
+                .ToList();
+
+            return new RatingCalculator(game).GetUpdates(stats);
         }
 
         private static Game GetGame(int team1Goals, int team2Goals, params int[] ratings)
@@ -142,6 +133,5 @@ namespace UnitTests
                 }
             };
         }
-
     }
 }

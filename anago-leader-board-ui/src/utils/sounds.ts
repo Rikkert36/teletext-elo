@@ -761,27 +761,50 @@ export const playSlot = (): void => {
 };
 
 /**
- * One letter taking the gold block, in the album's opening sequence.
+ * The nib crossing the leather, while the owner's name is written into the cover.
  *
- * Deliberately **not** `playSlot`, which was the first thing tried. That is eleven grains
- * over 100ms plus a 130Hz boom — at roughly 90ms a letter the grains smear into a
- * continuous wash and the booms turn into a pitched pulse train around 11Hz, so a name
- * being blocked sounded like a machine running. It is also the card-into-slot sound and
- * already means something else.
+ * **This replaced `playFoilStamp`, and the reason is that the cover stopped being
+ * stamped.** The name used to be blocked in hot foil a letter at a time, so the sound was
+ * one dry tick per letter. It is now *written* — see `hersheyScript.ts` — and writing is
+ * continuous where a press is discrete. A tick per letter under a moving pen is the one
+ * thing that would give the change away: the ear would hear a machine indexing along a
+ * line while the eye watched a hand draw.
  *
- * So: a handful of grains, brief, high, no low end at all, and quiet enough that eleven
- * of them in a row stay under the leather landing on the table afterwards. A hot foil
- * press is a small dry tick, not an impact — the weight in that sequence belongs to the
- * book, not to the letter G.
+ * **Takes its length from the caller**, the same contract as `playRebind` and for the
+ * same reason: a musical hit must not stretch, but a *gesture* must, or the pen is still
+ * moving after the sound has stopped.
+ *
+ * Three constraints carried over intact from the foil stamp, because they were right
+ * about the sequence rather than about the press:
+ *
+ * - **No low end at all.** The weight in this ceremony belongs to the book — `playCoverTurn`
+ *   lands after the name — and a nib has no mass to speak of. This is the same reason
+ *   `playSlot` was rejected for the stamp: its 130Hz boom, repeated, became a pitched
+ *   pulse train and the ceremony sounded like machinery.
+ * - **No pitch anywhere.** Every note in this file belongs to the D-minor payoff ladder,
+ *   so anything pitched here either joins that chord or fights it. Friction can do
+ *   neither.
+ * - **Among the quietest things in the module.** It runs for the better part of a second
+ *   under a sequence whose climax is the board landing, and a scratch that competes with
+ *   that has spent the arrival early.
+ *
+ * Density rather than count is what is held constant — a fixed grain count stretched over
+ * a longer name thins out into separable ticks, which is precisely the artefact this
+ * exists to avoid. At roughly 60 grains a second the cloud fuses into a continuous
+ * texture; well below that it starts to sound counted again.
  */
-export const playFoilStamp = (): void => {
+export const playPenStroke = (durationMs: number): void => {
+  const seconds = Math.max(0.12, durationMs / 1000);
+
   playGrains({
-    count: 4,
-    spread: 0.022,
-    grainMs: [3, 9],
-    hz: [2600, 6200],
-    gain: 0.028,
-    q: 3.2,
+    count: Math.round(seconds * 60),
+    spread: seconds,
+    /* Short and irregular. A nib is a hard point on a soft grain, not a brush. */
+    grainMs: [3, 11],
+    /* High and narrow — the sound of a fine point, with nothing under it. */
+    hz: [1900, 5800],
+    gain: 0.019,
+    q: 2.8,
   });
 };
 

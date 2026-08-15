@@ -1415,11 +1415,37 @@ const CollectionPage: React.FC = () => {
                     snel openen
                   </label>
                   {/*
+                    There were two shadow sliders here — `schaduw` for the drop the book
+                    throws and `bladschaduw` for the light on its leaves. They did their
+                    job and went with the decision, at 1.6 and 2.5, folded into the numbers
+                    in album.css: see `--book-drop` on `.album` and "How a leaf is lit".
+
+                    The lifecycle is the one utils/animationSpeed.ts argues for, and both
+                    halves of it matter. They wrote to `:root` for the session only, never
+                    to localStorage — a value stored while tuning outlives the UI that
+                    could correct it. And once the number was settled it moved into the
+                    stylesheet rather than sitting behind a knob parked at 1, so there is
+                    one place a shadow is described and it is the place that draws it.
+                  */}
+                  {/*
                     There was a head-band switch here, with three candidates on it. It
                     did its job — the leather won — and it went with the decision; the
                     reasoning is recorded in album.css above `.album__band`, and the
                     two rejected treatments are still standing in
                     docs/album-band-colours.html if anyone wants to see them again.
+                  */}
+                  {/*
+                    The hand switch that lived here is gone the same way the head-band one
+                    did: Florilane Cardillac won, so `--cover-hand` is a static value in
+                    album.css rather than something JS pokes onto `:root`.
+
+                    **That was not only tidiness — the switch was itself the bug.**
+                    `WrittenType` reads the variable during render to measure with, and on
+                    mount the variable was not set yet, so the first measurement ran
+                    against the fallback face. The effect that set it then re-selected the
+                    same default, `setHand` bailed out because the value had not changed,
+                    and React never re-rendered — leaving the mask aligned to one font and
+                    the letters drawn in another. A constant cannot arrive late.
                   */}
                 </div>
               </div>

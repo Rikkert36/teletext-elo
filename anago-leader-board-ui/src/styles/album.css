@@ -239,7 +239,7 @@
    * `var()` inside a custom property is substituted on the element that DECLARES it,
    * against that element's own final value. On `.album` the inline stain is that
    * value, so this resolves per book. One level up, on `:root`, it would resolve
-   * against nothing and mix the bordeaux fallback for ever — every book would print
+   * against nothing and mix the tabak fallback for ever — every book would print
    * the same band whatever it was bound in.
    *
    * Here rather than on `.album__band` because two things read it: the band, and the
@@ -256,7 +256,7 @@
    * Lightened because this is INK ON PAPER, not a patch of hide: a raw stain at 13%
    * of the leaf reads as a swatch of the cover pasted onto the page. The mix is
    * toward the paper's own cream rather than toward white, so the band stays in the
-   * book's warm family whatever the stain — a grey lightener turns bordeaux and
+   * book's warm family whatever the stain — a grey lightener turns tabak and
    * cognac muddy.
    *
    * The flat value first is a fallback, not a leftover, and the same pattern as
@@ -314,6 +314,33 @@
    * the head and a fainter one across the corner.
    */
   --board-rule-w: 2px;
+
+  /*
+   * The shadow the whole object throws on the table, stated once.
+   *
+   * **Two places draw it and they are the same shadow.** `.album__binding` carries it
+   * for the open book; shut, `.album--closed .album__binding` goes to `opacity: 0` and
+   * takes the shadow with it, so `.album--closed .album__leaf--cover` carries a copy for
+   * the duration. They were two literals that happened to match, which is a pair of
+   * numbers waiting to drift — a book casting one shadow open and a different one shut.
+   *
+   * **Set by eye on a `schaduw` slider in the test panel, then folded in at 1.6 and the
+   * slider deleted** — which is the lifecycle the note at the top of utils/animationSpeed.ts
+   * asks for, and it exists because the last sliders on that panel persisted to
+   * localStorage: a value stored while tuning then overrode the constant for ever on that
+   * browser alone, with no UI left to correct it. These wrote to `:root` for the session
+   * only, and now the numbers below are the whole of it.
+   *
+   * The geometry was multiplied through; the alpha was not, quite. `0.65 x 1.6` is `1.04`
+   * and CSS clamps an alpha at 1, so the wide shadow had been solid black from about 1.54
+   * upward and every notch past that bought blur and offset alone. Written as `1` because
+   * that is what it renders as, rather than `1.04` pretending otherwise.
+   */
+  --book-drop:
+    0 42px 80px
+      rgba(0, 0, 0, 1),
+    0 10px 22px
+      rgba(0, 0, 0, 0.8);
 }
 
 .album__book {
@@ -356,10 +383,11 @@
     var(--leather-hi, #4a3a22) 0%,
     var(--leather-mid, #33270f) 100%
   );
+  /* The drop is `--book-drop` on `.album`, because the shut book draws the same one from
+     a different element. The brass edge is this element's alone. */
   box-shadow:
     0 0 0 2px var(--board-edge, #6b5325),
-    0 26px 50px rgba(0, 0, 0, 0.65),
-    0 6px 14px rgba(0, 0, 0, 0.5);
+    var(--book-drop);
 }
 
 /* Inside covers sitting under the leaves on each half. Without these, the half
@@ -752,8 +780,7 @@
 .album--closed .album__leaf--cover {
   box-shadow:
     0 0 0 2px var(--board-edge, #6b5325),
-    0 26px 50px rgba(0, 0, 0, 0.65),
-    0 6px 14px rgba(0, 0, 0, 0.5);
+    var(--book-drop);
 }
 
 .album__leaf {
@@ -853,6 +880,243 @@
  * only do its job while every leaf is at the same depth. The page stack is drawn on the
  * boards' own faces instead — see `.album__endpaper::after`.
  */
+
+/* ---------------------------------------------------------------- *
+ * A leaf standing on edge catches no light
+ *
+ * The one thing the turn was missing that costs nothing to fix: both faces of a
+ * rotating leaf stayed lit exactly as brightly at 90° as they were lying flat, so a
+ * page swung through the vertical without the light on it changing at all.
+ *
+ * **The keyframe is a bump, and it works because each face is only ever shown for
+ * half of it.** `backface-visibility: hidden` culls a face the moment it passes the
+ * vertical, so the leaf's outgoing face sees `0 -> peak` and vanishes, and its incoming
+ * face appears at `peak` and plays `peak -> 0`. Both read as one monotonic darkening
+ * and lightening, from one set of stops, with nothing to keep in step. The two swap at
+ * exactly the peak, so the handover is continuous by construction rather than by tuning.
+ *
+ * **It is timed off `--leaf-ms`, the leaf's own clock**, which the component publishes
+ * and which shortens while the book riffles. The easing is the honest approximation
+ * here: the rotation runs on `cubic-bezier(0.4, 0.05, 0.25, 1)` and this runs
+ * `ease-in-out`, so the darkest moment lands a few milliseconds off true vertical. At
+ * this softness that is not visible, and matching it exactly would mean driving the
+ * angle from JS — which is the thing this deliberately does not do.
+ *
+ * The wash deepens toward the fold on both faces, which is the direction the page's
+ * own gutter shading already runs: a leaf bends into the gutter and the light there is
+ * occluded before anything else.
+ *
+ * On the pseudo element and never on the face. A face that took an `opacity` below 1
+ * would group, and a grouped face has no backface to hide — see the note on
+ * `.album--rebind`'s filters, which is the same trap from the other end.
+ *
+ * Nothing here is needed under reduced motion: `album__leaf--moving` is gated on it in
+ * Album.tsx, so the class never appears and the rule never matches.
+ * ---------------------------------------------------------------- */
+
+@keyframes leaf-turn-shade {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.album__leaf--moving .album__face::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  /* Over the leaf's standing light at 4 — a moving shadow lies on a still one. */
+  z-index: 5;
+  pointer-events: none;
+  opacity: 0;
+  animation: leaf-turn-shade calc(var(--leaf-ms, 620ms) * var(--anim, 1)) ease-in-out;
+}
+
+/* A front face is the right-hand page, so its fold is on the LEFT; a back face mirrors. */
+.album__leaf--moving .album__face--front::after {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.24));
+}
+
+.album__leaf--moving .album__face--back::after {
+  background: linear-gradient(270deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.24));
+}
+
+/* ---------------------------------------------------------------- *
+ * And the page it was lying on, coming up out of the leaf's shadow
+ *
+ * The rule above is a leaf shading *itself*, because it is edge-on to the light. This is
+ * the only **cast** shadow in the turn: the page underneath was in the moving leaf's
+ * shade before it lifted, and until now it simply appeared fully lit the instant it was
+ * uncovered.
+ *
+ * See `revealing` in Album.tsx for which leaf gets the class and why the direction is
+ * derived rather than stored — and for why this cannot ride on the moving leaf (it would
+ * rotate away with it) or on a flat overlay (every face is at the same `translateZ`, so
+ * no depth is above the stationary pages and below the turning one).
+ *
+ * **The shadow sweeps, and the direction it sweeps is the geometry of a hinge.** The leaf
+ * pivots at the spine, so the shade it throws reaches from the fold outward: at rest it
+ * covers the whole page, and as the leaf stands up its edge retreats *toward the fold*.
+ * The page therefore brightens from its trim inward, and the last strip to clear is the
+ * one against the gutter. A flat wash fading out would have the page lightening
+ * everywhere at once, which is the one thing a hinged occluder cannot do.
+ *
+ * **It lags the leaf's own edge, and that is the difference between a shadow you can see
+ * and one you cannot.** The first version was exact: a leaf at angle `t` covers
+ * `width x cos t` from the fold, so the shade retreated on `cos t` too and finished at the
+ * halfway point, where the leaf stands vertical. It rendered perfectly and was invisible
+ * at every frame — with the light straight overhead the shadow's boundary *is* the leaf's
+ * own projected edge, so the shade is always underneath the leaf casting it, and by the
+ * time the page is uncovered there is nothing left to see. A cast shadow is only visible
+ * when the light is off-axis and the shade reaches past the occluder's silhouette.
+ *
+ * So the stops hold near the trim while the leaf is barely off the page and then fall
+ * away a little behind it — `cos t` with a lag, which is a light low and toward the
+ * spine. What that buys is a soft band standing just outboard of the leaf's edge, growing
+ * as the leaf rises and sliding off after it.
+ *
+ * **The lag has to be small, and 45% of the leaf's clock is what makes it small.** The
+ * first version that was visible at all ran the full turn, and it was worse than the
+ * invisible one: the leaf reaches vertical at `t = 0.36` — that is the eased rotation
+ * solved for 90 degrees, not a guess — so the page is completely uncovered by then, and
+ * the shadow was still lying across 80% of it with nothing above it to cast it. A shadow
+ * that outlives its occluder is the thing that reads as unnatural, not a fast one.
+ *
+ * **What is visible is a trail, not a band beside the leaf — the leaf's own coverage
+ * collapses far too fast for that.** Modelled properly, the turning leaf hides essentially
+ * the whole page until `t = 0.25` and none of it by `t = 0.36`, so the window in which
+ * shade could sit *next to* it is about a tenth of a turn wide. Three fits aimed into that
+ * window and all three came out invisible. What works is the shadow still lying across the
+ * page once the leaf has gone: it is uncovered with roughly a third of it in shade from
+ * the fold, and that sweeps off over the next fifth of the turn.
+ *
+ * Two things had to be measured for that to come out right, and each cost a round:
+ *
+ *   - **The umbra, not the element.** What reads as the shadow's edge is where the
+ *     gradient stops being solid; the panel runs on past that for its penumbra's width.
+ *     Fitting on the element's edge overstated every band by exactly that, and at a
+ *     penumbra of 26% of the page a "19% band" was really zero at every frame. It is 10%
+ *     now — soft enough for a near occluder, small enough not to swallow the effect.
+ *   - **The projected coverage, not `cos t`.** `.album` carries `perspective: 2600px` and
+ *     the leaf's free edge swings toward the viewer, so it covers more of the page than
+ *     its flat cosine — about 13 points more at 45 degrees, which ate an 11% band whole.
+ *     The rotation axis sits on the perspective origin, so the correction is just
+ *     `cos t * P / (P - W sin t)`, and it is why the collapse is so abrupt.
+ *
+ * Fitted against the leaf's own `cubic-bezier(0.4, 0.05, 0.25, 1)` to peak near 31% of the
+ * page and be clear by `t = 0.55`; checked at a 480px and a 560px leaf, which agree to
+ * within a point. **If the leaf's easing, `--leaf-ms`, the perspective or the penumbra
+ * changes, these have to be refitted** — every stop is a position relative to that
+ * projection and nothing else.
+ *
+ * Built as a full-page panel with a soft edge, translated off toward the fold — not
+ * `scaleX`, which would squeeze the penumbra to nothing as the shadow shrank. Translating
+ * keeps the soft edge a constant width, and the region behind the panel is uncovered
+ * because the panel has simply left. The umbra does not lighten as it shrinks either,
+ * which is correct: less of the page is shadowed, not less shadowed.
+ *
+ * `linear` between the stops, because the stops are the curve — putting an easing on top
+ * of them would be shaping a shape twice, and the lag above is the whole point of where
+ * they sit.
+ *
+ * The base `transform` is already the *end* state and the fill is `forwards`, which is
+ * belt and braces on the same hazard: the class comes off with `moving`, on the turning
+ * leaf's `transitionend`, and if the animation were to finish first a bare `::after`
+ * would snap back to covering the whole page for a frame.
+ *
+ * `z-index: 4` puts it over the fore-edge, the band and the cards — a cast shadow falls
+ * on everything printed on the sheet, which is exactly the difference between this and
+ * the page's own inset shading.
+ * ---------------------------------------------------------------- */
+
+@keyframes leaf-cast-front {
+  0% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(-10%);
+  }
+  50% {
+    transform: translateX(-30%);
+  }
+  70% {
+    transform: translateX(-58%);
+  }
+  85% {
+    transform: translateX(-80%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes leaf-cast-back {
+  0% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(10%);
+  }
+  50% {
+    transform: translateX(30%);
+  }
+  70% {
+    transform: translateX(58%);
+  }
+  85% {
+    transform: translateX(80%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.album__leaf--revealing-front .album__face--front::after,
+.album__leaf--revealing-back .album__face--back::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  animation-duration: calc(var(--leaf-ms, 620ms) * 0.55 * var(--anim, 1));
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+/*
+ * A front face is the right-hand page and its fold is on the LEFT, so the umbra sits at
+ * the left with the penumbra at its right, and the panel leaves to the left. A back face
+ * is the left-hand page: `rotateY(180deg)` mirrors it, and its fold is its local RIGHT —
+ * the same edge the fold shadow in "How a leaf is lit" is keyed to.
+ */
+.album__leaf--revealing-front .album__face--front::after {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.46) 0%,
+    rgba(0, 0, 0, 0.46) 90%,
+    rgba(0, 0, 0, 0.3) 96%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  transform: translateX(-100%);
+  animation-name: leaf-cast-front;
+}
+
+.album__leaf--revealing-back .album__face--back::after {
+  background: linear-gradient(
+    270deg,
+    rgba(0, 0, 0, 0.46) 0%,
+    rgba(0, 0, 0, 0.46) 90%,
+    rgba(0, 0, 0, 0.3) 96%,
+    rgba(0, 0, 0, 0) 100%
+  );
+  transform: translateX(100%);
+  animation-name: leaf-cast-back;
+}
 
 /* ---------------------------------------------------------------- *
  * The page itself
@@ -1082,6 +1346,21 @@
  * corner is the one place a bleed shows as a mistake. A front face is the right-hand page,
  * a back face the left.
  */
+/*
+ * **The band carries no shading of its own, and the reason it once did is worth keeping.**
+ *
+ * When the leaf's light was an inset shadow on `.album__page`, it painted in that
+ * element's background layer — under every one of its children, and the band is one of
+ * them. So the paper darkened into the fold while the band, bled to that same fold,
+ * stayed flat across it: the head read as a bar floating above the shading rather than as
+ * ink printed on the sheet being shaded. It was fixed by restating the fold, trim and
+ * head on the band itself.
+ *
+ * That copy is gone, and so is the same fault on every filled card, because the shading
+ * moved to `.album__face::before` — one layer over the whole leaf. See "How a leaf is
+ * lit". A duplicate that has to track four numbers in another rule is worth deleting the
+ * moment something makes it unnecessary.
+ */
 .album__face--front .album__band {
   right: var(--edge-r, 0px);
   border-radius: 0 3px 0 0;
@@ -1090,6 +1369,22 @@
 .album__face--back .album__band {
   left: var(--edge-l, 0px);
   border-radius: 3px 0 0 0;
+  /*
+   * **And the type does not travel with the edge it is being cut away from.**
+   *
+   * `.album__list-head` is a left-aligned flex row, so on a left-hand page it starts at
+   * the band's own left edge plus the page margin — and that edge is exactly what the
+   * inset above moves. Handing the strip to the pile drawing therefore pushed COLLECTIE
+   * and its range inboard by however thick the left pile was, and since a leaf in the air
+   * takes the inset off again (see below), the heading jumped by the full `--edge-l` at
+   * the moment every left-hand page landed. Up to 6px, on the one line a reader is
+   * looking at.
+   *
+   * Taking the same amount off the padding puts the text back where the page's margin
+   * says it goes, whatever the band's box is doing. Only this face needs it: a front
+   * face is inset on its RIGHT, and nothing in the head is aligned to that side.
+   */
+  padding-left: calc(var(--page-pad-x) - var(--edge-l, 0px));
 }
 
 /*
@@ -1119,6 +1414,9 @@
 .album__leaf--moving .album__face .album__band {
   left: 0;
   right: 0;
+  /* The compensation on `.album__face--back` above goes with the inset it compensates
+     for, or the heading would move by `--edge-l` in the other direction instead. */
+  padding-left: var(--page-pad-x);
 }
 
 /* The heading, inside the band: the rule and the margins come off, the colour
@@ -1213,14 +1511,163 @@
   margin-top: var(--band-slots-gap);
 }
 
-/* Pages darken toward the spine, which is what actually sells the binding. */
-.album__face--front .album__page {
-  box-shadow: inset 12px 0 24px -12px rgba(0, 0, 0, 0.45);
+/* ---------------------------------------------------------------- *
+ * How a leaf is lit
+ *
+ * Pages darken toward the spine, which is what actually sells the binding — and the
+ * fold is no longer the only edge that is drawn, nor a constant.
+ *
+ * **The fold's depth is how much paper is under the page, and the book already knows.**
+ * It was one literal, `inset 12px 0 24px -12px` at `0.45`, on every leaf in the book.
+ * A real album does not do that: at the ends it lies nearly flat and there is barely a
+ * gutter, and in the middle it tents over two thick piles and the fold goes deep. So the
+ * voorwoord spread and the middle of the book were shaded identically, which is the same
+ * error the fore-edge exists to correct — a drawing reporting one thing while the object
+ * does another.
+ *
+ * `--pile-l` / `--pile-r` are that quantity, published by Album.tsx beside the two widths
+ * the trim hairline uses, and **each face reads its own side**: a right-hand page rests
+ * on the right pile, so how steeply it dives into the fold is that pile's business. The
+ * offset and the blur grow with it — the shadow *reaches further* — and so does the
+ * alpha, which is why the fraction had to be published unitless. A length cannot be
+ * divided back down to a number in CSS.
+ *
+ * Mid-turn the two sides disagree, because a leaf in the air is on neither pile. The
+ * spread is briefly lit unevenly and that is correct rather than a glitch: it is the
+ * same three beats the fore-edge widths already play.
+ *
+ * **The other three edges are ambient, and deliberately weak.** They are NOT a tray.
+ * The first version of this reasoned that the boards stand `--board-out` proud and the
+ * paper is recessed inside them — which is wrong once the book is open, because each
+ * board is then at the *bottom* of its pile with every page stacked on top. Nothing
+ * stands above the paper and there is no lip to cast anything. What is real is much
+ * softer: a sheet is not flat, light comes from above and behind, and its free edges sit
+ * a little darker than its middle. Built at a strength that says that and no more.
+ *
+ * The head is the weakest of them, and on a slots page it is not visible at all: an
+ * inset shadow paints under the element's children and the band is one of them, 13% of
+ * the leaf deep. It is there for the voorwoord and the checklist, which print no band.
+ *
+ * **The blur is what buys distance, not the alpha**, and getting that backwards is the
+ * easy mistake here. An inset shadow is cast by the padding box offset and then grown by
+ * `-spread`, so at `12px / -12px` the shadow's own edge sat exactly on the trim and only
+ * half the blur — six pixels — fell inside the page. The falloff read as a dark line at
+ * the fold rather than as a page bending into one.
+ *
+ * **`spread = -blur / 2` on every one of them, and that is a constraint rather than a
+ * taste.** A box-shadow's rectangle is grown by `-spread` on all FOUR sides, so widening
+ * the blur to buy horizontal reach also pushes the fold's shadow onto the head and the
+ * tail: at `blur 68 / spread -14` the top and bottom edges sat 14px out with 34px of blur
+ * on them, and ~20px of the *fold* was landing along the bottom of the leaf. It scales
+ * with `--gutter`, which is the right pile on one face and the left on the other, and
+ * those sum to 1 — so anywhere but the exact middle of the book the two pages were
+ * bleeding onto their tails by visibly different amounts. Reported as "the bottom shadow
+ * is stronger on the right", which is precisely what it was.
+ *
+ * At half the blur the cross-axis gradient ends exactly on the box edge and contributes
+ * nothing, and the reach along the intended axis comes out as **exactly the offset**.
+ * That is what makes these numbers readable: the fold reaches 26px in at an empty pile
+ * and 40px at a full one, and those two figures are the offsets and nothing else. Change
+ * a blur and the spread has to move with it.
+ *
+ * **The pile modulates the fold; it does not decide it.** The first version ran 12px to
+ * 45px and `0.28` to `0.56` — a fourfold reach and a doubled alpha between the two pages
+ * — and the spread was reported twice as the right page simply being shaded harder than
+ * the left. It was, and the range was the reason: `--pile-l` and `--pile-r` sum to 1, so
+ * anywhere but the middle of the book the two faces sit at opposite ends of whatever
+ * range this is given. The scale was the mistake, not the mapping. **The whole text block
+ * is drawn as six pixels** — `EDGE_MIN` 2 plus `EDGE_RANGE` 4, see the fore-edge in
+ * Album.tsx — so the height a page gains from sitting on a full pile rather than a bare
+ * board is a couple of millimetres, and a couple of millimetres cannot quadruple a
+ * crease. The band it swings through is now narrow enough to be honest about that: a
+ * quarter more depth and half again the reach, which says the book lies flatter at its
+ * ends without claiming the two halves are lit differently.
+ *
+ * The alphas moved barely at all, and only to hold the darkest point steady as the same
+ * ink spread over more paper.
+ *
+ * All four alphas were set by eye on a `bladschaduw` slider and folded in at 2.5; see
+ * `--book-drop` on `.album` for why that knob is gone rather than parked at 1.
+ * ---------------------------------------------------------------- */
+
+/*
+ * **It is an overlay over the leaf, not a shadow inside the page, and that is the whole
+ * of what makes it light rather than paint.**
+ *
+ * It lived on `.album__page` as `box-shadow: inset`, which paints in an element's
+ * background layer — under every one of its children. So the fold crossed an empty slot,
+ * whose card sits at `opacity: 0.55`, and stopped dead at a filled one, which is opaque:
+ * the shading was behind the collection instead of falling on it. The head band had the
+ * same fault and was given its own restated copy; that copy is gone, because one layer
+ * above everything is what both of them needed.
+ *
+ * `.album__face::before` is the only free pseudo on a face — `::after` is the turn and
+ * cast shades — and the face is the right box: exactly the leaf, and outside
+ * `.album__page`, so outside the page's children. `z-index: 4` clears the slots at 1, the
+ * band at 2 and the fore-edge at 3; the two animated shades sit at 5, so a moving shadow
+ * lies over a standing one.
+ *
+ * **`pointer-events: none` is load-bearing.** This covers the whole leaf, and every card
+ * under it is a button.
+ *
+ * Paper leaves only. The two boards carry endpapers with their own hinge and turn-in
+ * shading, and a second set over them would be counting the same light twice.
+ */
+.album__leaf:not(.album__leaf--cover):not(.album__leaf--back) .album__face::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/*
+ * **Settled at what the slider called 2.5**, multiplied into the alphas. One consequence
+ * is written down rather than left to be rediscovered: the fold comes to `0.9 + 0.3` and
+ * CSS clamps an alpha at 1, so past about a third of a pile it stops getting darker. The
+ * pile still moves the fold's *reach* across the whole range — that is the offset, and an
+ * offset does not clamp — but its depth saturates over most of the book. If the fold
+ * wants its full swing back, re-spread the band under the new level (`0.72 + 0.28` has
+ * the same midpoint and does not clip) rather than raising the top.
+ *
+ * A front face is the right-hand page, so its fold is on the LEFT and its pile is the
+ * right one. Halfway as a fallback: a book that never published one is a book at rest.
+ */
+.album__face--front::before {
+  --gutter: var(--pile-r, 0.5);
+  box-shadow:
+    /* The fold. */
+    inset calc(26px + 14px * var(--gutter)) 0 calc(60px + 30px * var(--gutter))
+      calc(-30px - 15px * var(--gutter))
+      rgba(0, 0, 0, calc(0.9 + 0.3 * var(--gutter))),
+    /* The trim, the tail and the head — ambient, and in that order of strength. */
+      inset -12px 0 34px -17px rgba(0, 0, 0, 0.55),
+    inset 0 -12px 34px -17px rgba(0, 0, 0, 0.45),
+    inset 0 12px 34px -17px rgba(0, 0, 0, 0.35);
   border-radius: 0 3px 3px 0;
 }
 
+/* The leaf keeps its own corners, and the shading matches them so the fold does not
+   square off where the page is round. */
+.album__face--front .album__page {
+  border-radius: 0 3px 3px 0;
+}
+
+/* A back face is the left-hand page: the fold is on its RIGHT and its pile is the left
+   one. Only the horizontal signs and the pile mirror; the head and tail are the same. */
+.album__face--back::before {
+  --gutter: var(--pile-l, 0.5);
+  box-shadow:
+    inset calc(-26px - 14px * var(--gutter)) 0 calc(60px + 30px * var(--gutter))
+      calc(-30px - 15px * var(--gutter))
+      rgba(0, 0, 0, calc(0.9 + 0.3 * var(--gutter))),
+    inset 12px 0 34px -17px rgba(0, 0, 0, 0.55),
+    inset 0 -12px 34px -17px rgba(0, 0, 0, 0.45),
+    inset 0 12px 34px -17px rgba(0, 0, 0, 0.35);
+  border-radius: 3px 0 0 3px;
+}
+
 .album__face--back .album__page {
-  box-shadow: inset -12px 0 24px -12px rgba(0, 0, 0, 0.45);
   border-radius: 3px 0 0 3px;
 }
 
@@ -2071,12 +2518,38 @@
  * leather beside it darkens, which reads as the sheet being lit from somewhere the
  * board is not.
  */
+/*
+ * ...and the turn-in on the other three, which is the one place in the book where a
+ * page really does sit in a well.
+ *
+ * **This is the tray that an ordinary leaf does not have.** A page in the text block is
+ * the top of a pile with nothing standing over it — its outer edges take ambient falloff
+ * and no more, which is why "How a leaf is lit" keeps them weak. A pastedown is the
+ * opposite case and it is structural: the covering skin wraps the board's edges and folds
+ * over onto the inside, so the paper is glued into a rebate with leather standing proud
+ * of it on every side but the hinge. `--board-out` is exactly that rim. So these run at
+ * roughly half again what a leaf's edges do, and they are the same on both faces except
+ * for which side the trim is, because a turn-in is uniform.
+ *
+ * The gum stays what it was — `inset 0 0 4px 1px` at `0.16`, a 4px darkening all round
+ * where the adhesive soaks the sheet's border. It is a different thing from this at a
+ * different scale, and the two read as adhesive and shadow rather than as one gradient
+ * only while they stay that far apart.
+ *
+ * Set on the same `bladschaduw` slider as the leaves and folded in at the same 2.5, since
+ * it is light on an open page and gets judged in the same glance. The hinge above was
+ * deliberately left out of that — it predates the knob, and it is the hinge rather than
+ * the lighting.
+ */
 .album__face--back .album__endpaper::before {
-  /* Mirrored face: the gutter is its local RIGHT edge. */
+  /* Mirrored face: the gutter is its local RIGHT edge, so the trim is its local LEFT. */
   right: 0;
   box-shadow:
     0 0 0 1px rgba(30, 18, 4, 0.4),
     inset -14px 0 26px -14px rgba(0, 0, 0, 0.5),
+    inset 11px 0 22px -12px rgba(0, 0, 0, 0.85),
+    inset 0 11px 22px -12px rgba(0, 0, 0, 0.85),
+    inset 0 -11px 22px -12px rgba(0, 0, 0, 0.85),
     inset 0 0 4px 1px rgba(30, 18, 4, 0.16);
 }
 
@@ -2086,6 +2559,9 @@
   box-shadow:
     0 0 0 1px rgba(30, 18, 4, 0.4),
     inset 14px 0 26px -14px rgba(0, 0, 0, 0.5),
+    inset -11px 0 22px -12px rgba(0, 0, 0, 0.85),
+    inset 0 11px 22px -12px rgba(0, 0, 0, 0.85),
+    inset 0 -11px 22px -12px rgba(0, 0, 0, 0.85),
     inset 0 0 4px 1px rgba(30, 18, 4, 0.16);
 }
 
@@ -2131,15 +2607,41 @@
      first. Every line it saves is a line the page does not have to find room
      for, which is what lets the block centre instead of piling up at the top. */
   padding: 0;
-  font-family: Georgia, "Times New Roman", serif;
+  /*
+   * **A book face, not the screen face the rest of the album is set in.**
+   *
+   * Everything else here is Georgia, and on every other page that is right: Georgia was
+   * drawn for small sizes on low-resolution screens — large x-height, low stroke contrast,
+   * sturdy and even — which is exactly what a 9px checklist entry and a slot's name want.
+   *
+   * This is the only extended prose in the book, and it is where those compromises turn
+   * into costs: the big x-height crowds a paragraph and the flat contrast makes the block
+   * go grey. Palatino is a text face with real stroke contrast, and Zapf drew it out of
+   * Renaissance chancery hands — so it is also the closest printed type in reach to the
+   * written name on the cover, and the two now rhyme instead of merely coexisting.
+   *
+   * **The versal is what makes it load-bearing rather than a preference.** A calligraphic
+   * initial over an even screen face has nothing in the body to belong to and reads as
+   * bolted on; over a face with contrast it reads as the same hand at a different size.
+   *
+   * Georgia stays in the stack and is not a defeat: Android has neither Palatino nor Book
+   * Antiqua and lands there, which is precisely what this page rendered as before, so
+   * there is no viewport where this is worse than what it replaced.
+   */
+  font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia,
+    "Times New Roman", serif;
   /*
    * Rounded off the page width, as on the checklist, so the type stays crisp.
    *
    * Set a shade smaller than the rest of the book's prose: the voorwoord is six
    * paragraphs and has to come in under the trim on the short phone page.
+   *
+   * **The floor is 11px and not 10px, and that is Palatino's bill.** Its finer strokes go
+   * thin and grey below about 11px where Georgia stays solid — the same contrast that
+   * earns it the page costs it the bottom of the range.
    */
   font-size: 11px;
-  font-size: clamp(10px, round(down, calc(var(--page-w) * 0.0245), 1px), 14px);
+  font-size: clamp(11px, round(down, calc(var(--page-w) * 0.0245), 1px), 14px);
   line-height: 1.55;
   color: #4a3f2a;
 }
@@ -2149,6 +2651,86 @@
   /* A measure, not the full page: prose set to the trim reads as a form. Wider
      than it was, now that the block carries no padding of its own. */
   max-width: 40em;
+}
+
+/* ---------------------------------------------------------------- *
+ * The versal
+ *
+ * **A decorated initial is printed, which is the whole reason it can be here.**
+ *
+ * The case against setting this page in a hand was two things: six paragraphs of script
+ * at ~11px is unreadable, and a foreword in a real album is *printed* — struck with the
+ * same press as the checklist — so a written body would be the page claiming a medium it
+ * does not have. A versal answers both. One letter at three lines deep is legible in any
+ * face, and an initial is not a different hand at all: it is a different sort in the same
+ * forme, which is exactly what a book's first page of prose has always carried.
+ *
+ * So the page keeps its two hands, the same division the checklist runs on:
+ *
+ *   the press   the body, the title, the rule, this initial
+ *   a person    the signature at the foot
+ *
+ * **Brass, not the paper's own brown.** `--board-rule` is the binding's metal, and
+ * spending it here is the one moment the gold from the cover appears inside the book —
+ * rubrication in a second colour, which is what a versal is for. It is emitted by
+ * `albumLeather` on every stain unconditionally, so this needs no icon-binding variant.
+ *
+ * **Contrast is not the constraint people expect.** Brass on cream is around 3:1, which
+ * would be far too little for body copy and is ample at four ems — large type buys
+ * legibility with size, and a versal that matched the body's weight would stop being an
+ * ornament and start being a shout.
+ * ---------------------------------------------------------------- */
+
+.album__foreword p:first-of-type::first-letter {
+  float: left;
+  /*
+   * Sized by eye against the cap, not by arithmetic off the line box.
+   *
+   * The tempting formula is `3 lines × 1.55 = 4.65em` with `line-height: 1`, and it is
+   * wrong: that makes the em *box* three lines deep, and a serif cap fills only about
+   * 0.7 of its em — so the letter draws barely two lines tall with a line of air stacked
+   * over it. Sizing so the visible cap spans the three lines is what these two numbers
+   * do, and the pair has to move together.
+   */
+  font-size: 4.15em;
+  line-height: 0.74;
+  /* Right and bottom only. The text has to clear the letter's side without the initial
+     drifting off the top margin, which a symmetrical inset does immediately. */
+  margin: 0.02em 0.07em 0 0;
+  color: var(--board-rule, #a98b4c);
+  /* The body face is already the calligraphic one — the versal is the same type at
+     four times the size, not a second font arriving on the page. */
+  font-weight: normal;
+}
+
+/*
+ * The words after the initial, in small capitals.
+ *
+ * Without this the page jumps from a four-em brass E straight into 11px lowercase, which
+ * is the standard ugly seam at a drop cap: nothing bridges the two sizes. A few words of
+ * small caps is the standard fix and is as old as the versal itself.
+ *
+ * `font-variant-caps` rather than `text-transform: uppercase` — real small capitals where
+ * the face has them, and the lowercase left alone rather than scaled-down full caps.
+ */
+.album__foreword-open {
+  font-variant-caps: small-caps;
+  letter-spacing: 0.06em;
+  color: #43391f;
+}
+
+/*
+ * Two lines on a phone, not three.
+ *
+ * The page is at its narrowest here, so a three-line float eats enough of the measure
+ * that the first three lines rag badly around it — the versal stops being an ornament on
+ * a paragraph and becomes a column the paragraph has to get past.
+ */
+@media (max-width: 599.95px) {
+  .album__foreword p:first-of-type::first-letter {
+    font-size: 2.8em;
+    line-height: 0.78;
+  }
 }
 
 .album__foreword-eyebrow {
@@ -2185,7 +2767,7 @@
  *
  * The leather is tokenised because the owner chooses it — five stains, one product
  * line, all of them brass-edged and gold-blocked. `utils/albumLeather.ts` is the only
- * place the actual colours live; every `var()` here falls back to bordeaux, which is
+ * place the actual colours live; every `var()` here falls back to tabak, which is
  * what the book was bound in before there was a choice, so a cover rendered with no
  * stain set is the original book rather than a transparent one.
  *
@@ -2249,16 +2831,228 @@
   opacity: 0.75;
 }
 
+/* ---------------------------------------------------------------- *
+ * The name, written
+ *
+ * **The cover is no longer stamped, and everything below follows from that.** The name
+ * used to be blocked in hot foil: uppercase, letter-spaced, with a hard 2px emboss under
+ * it because a die dents the leather it strikes. It is now written in gilt with a pen —
+ * see `WrittenName.tsx` and `hersheyScript.ts` — and a shop that letters a book by hand
+ * is a better account of a personal album than a press that somehow knew your name.
+ *
+ * Three properties went, and none of them is a matter of taste:
+ *
+ * - **The emboss.** It described leather being displaced, and ink displaces nothing. On a
+ *   monoline hairline a 2px offset does not read as depth at all — it separates from the
+ *   stroke and becomes the drop shadow the old comment here was written to avoid. Killed
+ *   rather than softened, because there is nothing left for it to describe.
+ * - **`text-transform: uppercase`.** A script hand has no capitals worth the name and the
+ *   letters have to join; caps is the one setting that guarantees they cannot.
+ * - **`letter-spacing`.** Tracking a cursive is pulling the joins apart by definition.
+ *
+ * `font-kerning: none` further up stays, and its reason changed: it was there because the
+ * ceremony set one inline-block per character and could not kern across the boxes. There
+ * are no character boxes any more — the name is one drawing — so it now only governs the
+ * kicker, where it is harmless and keeps the two sides of the handover identical.
+ *
+ * Sized by **width**, not by font-size: the name is a picture with its own aspect, and the
+ * cover decides how much of itself to give it.
+ * ---------------------------------------------------------------- */
+
 .album__cover-title {
-  font-family: Georgia, "Times New Roman", serif;
+  display: flex;
+  justify-content: center;
+  /* Generous, because a hairline needs the size back that the blocking used to carry as
+     weight. Not 100%: a name running to the trim reads as a label printed across the
+     board rather than as something written on it, and the cover's own padding is not
+     margin enough at this width. */
+  width: 76%;
+}
+
+/* The name fills the box the cover gives it. `.written-type` is the SVG; it auto-fits,
+   so the cover decides the width and the drawing decides its own height. */
+.album__cover-title .written-type {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/*
+ * The fallback, for a name the font cannot set — see `writeName`.
+ *
+ * Printed rather than blocked. The premise is ink on this cover now, so a name that
+ * cannot be written is set in type and *not* given the old foil treatment back; a
+ * blocked title beside a written one would be two different books.
+ */
+.album__cover-title > span {
+  font-family: Palatino, "Palatino Linotype", "Book Antiqua", Georgia, serif;
   font-size: clamp(18px, 2.2vw, 28px);
-  font-weight: bold;
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  /* The emboss is the leather taking the block, so it moves with the stain — left
-     literal, gold letters on cognac get a cold black-brown edge that reads as a drop
-     shadow rather than as pressed in. */
-  text-shadow: 0 2px 0 var(--foil-emboss, #241a05), 0 3px 8px rgba(0, 0, 0, 0.7);
+  font-style: italic;
+}
+
+/*
+ * **`.written__stroke` and `.written__stroke--writing` lived here and are gone.**
+ *
+ * They styled a visible Hershey drawing of the name — the stroke font rendered directly,
+ * back when a test-panel switch chose between it and the outline candidates. Florilane
+ * Cardillac won that comparison, so nothing draws Hershey glyphs any more.
+ *
+ * The stroke font itself did not go: it is what `WrittenType` builds the reveal mask
+ * from, because "where does a pen travel through the letter a" has an answer independent
+ * of which typeface draws the a. See `.written__nib` below — that is the same dash
+ * animation, moved from the ink to the mask.
+ */
+
+
+
+@keyframes album-write {
+  from {
+    stroke-dashoffset: var(--len);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Land on the finished state, never play it stilled — the rule the rest of the book
+   follows. A name half-written and frozen is worse than a name simply present. */
+@media (prefers-reduced-motion: reduce) {
+  .written__nib {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * The hand the cover is lettered in
+ *
+ * **Florilane Cardillac, self-hosted from src/fonts/ like the Teletext face.** Four
+ * calligraphic faces were compared against the Hershey strokes on a test-panel switch;
+ * this one won and the switch is gone, along with the two runners-up that were vendored
+ * only to be looked at.
+ *
+ * **A static value, and that is load-bearing rather than tidy.** It was set from JS onto
+ * :root, and WrittenType reads it during render to measure the mask with — so on mount,
+ * before the effect had run, the first measurement was taken against the fallback face.
+ * Re-selecting the already-current default was then a no-op React did not re-render for,
+ * which left the mask aligned to one font while the letters were drawn in another. A
+ * constant cannot arrive late.
+ *
+ * **PERSONAL USE ONLY.** Florilane Cardillac is free for personal use; a commercial
+ * licence comes from Octotype (octotypeone@gmail.com), and an office leaderboard is not
+ * personal use. The package that shipped it says so in LICENSE REQUEST.txt. That is a
+ * purchase, not a code change, and it is the one item here no edit can settle.
+ * ---------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'Florilane Cardillac';
+  src: url('../fonts/FlorilaneCardillac.ttf') format('truetype');
+  /* Block rather than swap: the mask is measured from this face, so a paint in the
+     fallback would be a paint the geometry does not describe. */
+  font-display: block;
+}
+
+/*
+ * **On `:root`, not on `.album__cover`, and that is a requirement rather than a
+ * preference.** `WrittenType` resolves this with
+ * `getComputedStyle(document.documentElement)` — it has to hand canvas a real family
+ * string, since a `var()` would leave the context on its default face and every
+ * measurement would then describe the wrong font. Declared on the cover, the lookup finds
+ * nothing and silently measures `cursive`, which is the same class of failure the JS
+ * switch used to cause.
+ */
+:root {
+  --cover-hand: 'Florilane Cardillac', cursive;
+}
+
+/*
+ * The plain-text fallback, shown only in the moment before the webfont resolves and the
+ * name can be measured. Not sized against the cover: the real rendering is an SVG that
+ * auto-fits its box, so this only has to be unobtrusive rather than to match.
+ */
+.written__type {
+  display: block;
+  font-family: var(--cover-hand, cursive);
+  font-size: clamp(20px, calc(var(--page-w, 420px) * 0.1), 64px);
+  line-height: 1.05;
+  color: inherit;
+}
+
+/* ---------------------------------------------------------------- *
+ * Revealing type as though it were written
+ *
+ * **This replaced a left-to-right wipe, and the difference is what the mask follows.**
+ * The wipe crossed the name at a constant rate and knew nothing about where the letters
+ * were; it was honest about being a wipe. The glyphs here are the real typeface and never
+ * move — what moves is a thick stroke running the route a pen takes *through* each
+ * letter, uncovering it in the order a hand would have made it.
+ *
+ * The route is a Hershey centreline fitted to that letter's own advance box, measured
+ * from the loaded font at runtime. See `WrittenType.tsx` for why the mask is fitted to the
+ * type rather than the type stretched onto the mask — at matched cap height the two fonts
+ * differ in width by about a factor of two, so the naive alignment flings the letters
+ * apart.
+ * ---------------------------------------------------------------- */
+
+.written__nib {
+  fill: none;
+  /* White uncovers. The mask's own black rect is what hides everything to begin with. */
+  stroke: #fff;
+  /* Round, so the reveal has no corners in it — a nib leaves no square ends, and a butt
+     cap shows up immediately as a straight edge sweeping through a curve. */
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: var(--len);
+  stroke-dashoffset: var(--len);
+  animation-name: album-write;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+/*
+ * The wipe that follows the pen, guaranteeing the letter ends up whole.
+ *
+ * **Butt cap, and it has to be a class rather than the attribute it started as.** CSS wins
+ * over SVG presentation attributes, so `strokeLinecap="butt"` on the element was silently
+ * overridden by `.written__nib`'s `round` — which extends the column half its own
+ * stroke-width past each end, and since that width is the height of the whole name, the
+ * overhang uncovers a good part of the *next* letter before the pen has reached it.
+ */
+.written__nib--wipe {
+  stroke-linecap: butt;
+}
+
+/* The glyphs themselves: the chosen face, in the cover's own ink. */
+.written__glyphs {
+  fill: currentColor;
+  dominant-baseline: alphabetic;
+}
+
+/*
+ * The measured SVG itself.
+ *
+ * **Deliberately not named `.written`**, and not a modifier of it either. While the test
+ * switch existed, `.written` was the Hershey drawing and a rule hid it in type mode — a
+ * type SVG carrying that class was hidden by the same rule, blanking the cover, and the
+ * mirror of that bug printed the name twice. The switch is gone but the naming stays
+ * separate: one class, one thing.
+ *
+ * No `display` here: sizing is `.album__cover-title`'s decision, and repeating it
+ * on the child is how the earlier version overrode its own default and showed both
+ * renderings at once.
+ */
+.written-type {
+  width: 100%;
+  height: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .written__nib {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none;
+  }
 }
 
 .album__cover-rule {
@@ -2501,9 +3295,18 @@
   opacity: 1;
 }
 
-.album--icons .album__cover-title {
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
-}
+/*
+ * **Nothing to do here any more, and the empty rule is the note.**
+ *
+ * This used to invert the emboss for the icon binding: a dark shadow under dark type on a
+ * light board reads as dirt, so the blocked title got a hairline of white below it
+ * instead. The title is drawn rather than set now, so there is no text-shadow either way
+ * — the re-ink happens on its own, because `.written__glyphs` fills `currentColor` and
+ * `.album--icons .album__cover` above already moves the colour to `--board-ink`.
+ *
+ * Left as a comment rather than deleted so the next person to look for the icon
+ * binding's title treatment finds the answer here, where it used to be.
+ */
 
 .album--icons .album__cover-rule {
   background: linear-gradient(
@@ -2566,7 +3369,7 @@
  * foil and the blocked type blow out together, and there is nothing to align.
  *
  * `saturate(0)` comes **first**, and the order is not cosmetic. Filters apply left to right,
- * and brightness alone on the bordeaux mid-tone clips the channels unevenly: (53, 39, 15)
+ * and brightness alone on the tabak mid-tone clips the channels unevenly: (53, 39, 15)
  * times nine lands on (255, 255, 120), which is yellow. Desaturating to grey first means all
  * three channels clip together, and the result is white.
  *
@@ -3043,6 +3846,42 @@
   opacity: 0;
   transition: opacity 90ms ease;
   border-radius: 3px;
+  /*
+   * **And it comes almost all the way off over the head band, because there it is not
+   * light — it is paint.**
+   *
+   * The wash is cream at half alpha over the width of the margin, which is invisible on
+   * cream paper and doing its whole job by contrast with the felt. The band is the one
+   * dark thing it crosses, and it bleeds to this exact trim: a cream film over it lifts
+   * the last few pixels of the head toward the paper's own colour, so the band reads as
+   * stopping short of the edge. It looked like a fore-edge fault and is not one — it is
+   * the control, and a **pointer left resting on the strip after a click keeps it lit**,
+   * which is why it never appears when the book is turned from the keyboard.
+   *
+   * A mask rather than a shorter element: the light still has to reach the trim beside
+   * the band, or it stops at a visible line partway down the page and reads as two
+   * controls. **Fully off over the band and not merely dimmed** — a gleam was the first
+   * try, on the argument that light falls on ink too, and at any strength that could
+   * still be seen it was the same pale notch in the head, only fainter. Cream over the
+   * one dark thing on the page has no honest weak setting. The ramp clears the band's
+   * foot before going to full, so on a page that prints no band the step falls on
+   * cream-over-cream and cannot be seen at all.
+   *
+   * `--band-h` is on `:root`, so the strip reads the same depth the band is drawn at and
+   * the two cannot drift.
+   */
+  -webkit-mask-image: linear-gradient(
+    180deg,
+    transparent 0,
+    transparent var(--band-h),
+    #000 calc(var(--band-h) + 14px)
+  );
+  mask-image: linear-gradient(
+    180deg,
+    transparent 0,
+    transparent var(--band-h),
+    #000 calc(var(--band-h) + 14px)
+  );
 }
 
 /* Inset back off the outer edge by the reach: the button is wider than the book, the
@@ -3073,15 +3912,42 @@
  * not a focus ring. Inset, because an outline outside the trim would float over
  * the felt beside the book.
  *
- * On the pseudo element rather than the button, now that the button is `--turn-reach`
+ * On a pseudo element rather than the button, now that the button is `--turn-reach`
  * wider than the book: a ring on the button — inset or not — would be drawn out on the
  * felt on one side. The pseudo element is exactly the margin, so a ring on it is a ring
- * on the paper. It is only visible because `:focus-visible` also lifts the wash to full
- * opacity; opacity applies to an element's outline as well as its background.
+ * on the paper.
+ *
+ * **Its own element, and no longer the wash's.** It used to ride on `::before` and be
+ * revealed by the same `opacity` the light is — neat, since opacity applies to an
+ * element's outline as well as its background. The mask that keeps the wash off the head
+ * band would have taken 70% of the ring's top with it, and a focus ring that fades along
+ * one edge is worse than a slightly less clever one. Carrying its own transparent outline
+ * at rest means only the colour changes on focus, so there is nothing to lay out or fade.
  */
-.album__turn:focus-visible::before {
-  outline: 2px solid var(--accent, #a9853c);
+.album__turn::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+  pointer-events: none;
+  outline: 2px solid transparent;
   outline-offset: -3px;
+}
+
+/* Exactly the margin, the same inset the wash takes and for the same reason. */
+.album__turn--prev::after {
+  left: var(--turn-reach);
+  right: 0;
+}
+
+.album__turn--next::after {
+  right: var(--turn-reach);
+  left: 0;
+}
+
+.album__turn:focus-visible::after {
+  outline-color: var(--accent, #a9853c);
 }
 
 /*

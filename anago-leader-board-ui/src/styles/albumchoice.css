@@ -1,9 +1,10 @@
 /* ================================================================ *
  * Getting your album
  *
- * Five shut albums lying side by side on the mahogany, and you pick one up. Five beats:
- * the others are taken off the table, the survivor slides to the middle, it comes up to
- * full size, its owner's name is blocked into the cover a letter at a time, and it rests.
+ * Ten shut albums laid out on the mahogany, five across and two down, and you pick one
+ * up. Five beats: the others are taken off the table, the survivor slides to the middle,
+ * it comes up to full size, its owner's name is blocked into the cover a letter at a
+ * time, and it rests.
  *
  * Three rules this file follows, each one arrived at by getting it wrong:
  *
@@ -27,20 +28,42 @@
 
 .choice {
   /*
-   * How much of a real book one on the shelf is. Five across have to fit the table
-   * without clipping — `.game-stage` is `overflow: hidden`, so a sixth of a book off the
-   * edge is unreachable rather than scrollable.
+   * How much of a real book one on the shelf is.
    *
-   * At 1920x1080 that is 5 x 273px plus gaps against 1592px of usable table; at 1366x768
-   * it is 5 x 194px against 1271px. Both comfortable.
+   * **The binding constraint is height, not width, and that is what changed at ten.** At
+   * five in a row the scale was 0.55 and the only question was whether the row fitted
+   * across the table; `.game-stage` is `overflow: hidden`, so a sixth of a book off the
+   * edge is unreachable rather than scrollable. At ten the row wraps to two, and the
+   * whole block now has to fit inside `--page-h` — the well's own height — or the well
+   * grows past the album's and the handover moves the book. Two rows is
+   * `2 x (--choice-h + --choice-cap) + --choice-row-gap`, which at 0.40 is 492px against
+   * a 537px page at 1366x768. Written out, the budget is `0.8H + 62px <= H`, so this
+   * scale holds down to a page 310px tall and there is no viewport in the desktop
+   * branch that goes near it. Ten in one row would have needed 0.27 — half the size of
+   * the book it hands over to — so height is the cheaper axis to spend, even though it
+   * is the scarce one.
+   *
+   * Width is now the slack axis: 5 x 198px plus gaps is 1100px against 1592px of usable
+   * table at 1920x1080.
    */
-  --choice-scale: 0.55;
+  --choice-scale: 0.4;
   --choice-w: calc(var(--page-w) * var(--choice-scale));
   --choice-h: calc(var(--page-h) * var(--choice-scale));
   --choice-gap: clamp(8px, 1.4vw, 28px);
-  /* Set by the component: how many slots left (+) or right (-) the row must slide to put
-     the chosen book where the middle one was. */
-  --picked-offset: 0;
+  --choice-row-gap: 16px;
+  /*
+   * The caption under each book, as a reserved height rather than as whatever the line
+   * happens to measure. `.choice__slot` gaps 8px and `.choice__caption` is a 12px line at
+   * 1.2, so 8 + 15 rounds to 23 — and the centring transform below has to know it, since
+   * a slot is a book *and* its caption and only the book has to land in the middle.
+   */
+  --choice-cap: 23px;
+  --choice-slot-h: calc(var(--choice-h) + var(--choice-cap));
+  /* Set by the component: how many slots across (+ = right) and down (+ = down) the grid
+     must slide to put the chosen book in the middle of the table. The vertical one is a
+     half-integer, because two rows have no middle row — see `.choice__row`. */
+  --picked-cols: 0;
+  --picked-rows: 0;
 }
 
 /*
@@ -85,20 +108,44 @@
 }
 
 /* ---------------------------------------------------------------- *
- * The shelf of five
+ * The shelf of ten
+ *
+ * A five-column grid rather than a wrapping flex row. Wrapping would give the same
+ * picture and none of the arithmetic: the slide below has to know which column and row a
+ * book is in, and a wrapped row only knows that after layout.
  * ---------------------------------------------------------------- */
 
 .choice__row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  gap: var(--choice-gap);
+  display: grid;
+  grid-template-columns: repeat(5, var(--choice-w));
+  align-items: start;
+  justify-items: center;
+  column-gap: var(--choice-gap);
+  row-gap: var(--choice-row-gap);
   /*
-   * Slides so the chosen book lands where the middle one was. The whole row moves rather
-   * than the single book, so the survivor travels in a straight line at a constant speed
-   * instead of appearing to be dragged by a container that is also collapsing.
+   * Slides so the chosen book lands in the middle of the table. The whole grid moves
+   * rather than the single book, so the survivor travels in a straight line at a constant
+   * speed instead of appearing to be dragged by a container that is also collapsing.
+   *
+   * **Two rows have no middle row, so the vertical target is the seam between them** —
+   * which is also the centre of the well, and therefore exactly where `.choice__stage`
+   * will bring the full-size book up. `--picked-rows` is a half-integer for that reason.
+   *
+   * The trailing `--choice-cap / 2` is the correction for a slot being a book *and* the
+   * caption under it: centring slot boxes would leave the book itself half a caption high
+   * of where the finished cover appears. It is a constant — same for both rows — which is
+   * the only reason it can live in the transform rather than in the grid. It applies
+   * while choosing as well, and that is right rather than a leak: the well centres slot
+   * boxes, so without it the shelf's books sit half a caption above the middle of the
+   * table before anything has been picked.
    */
-  transform: translateX(calc(var(--picked-offset) * (var(--choice-w) + var(--choice-gap))));
+  transform: translate(
+    calc(var(--picked-cols) * (var(--choice-w) + var(--choice-gap))),
+    calc(
+      var(--picked-rows) * (var(--choice-slot-h) + var(--choice-row-gap)) +
+        var(--choice-cap) / 2
+    )
+  );
   transition: transform calc(300ms * var(--anim, 1)) cubic-bezier(0.3, 0.8, 0.3, 1);
 }
 
@@ -109,7 +156,7 @@
 
 /* The row fades out under the full-size book coming up in front of it. */
 .choice--lifting .choice__row,
-.choice--stamping .choice__row,
+.choice--writing .choice__row,
 .choice--resting .choice__row {
   opacity: 0;
   transition:
@@ -207,12 +254,18 @@
 /*
  * The stain's name, set on the wood under the book rather than printed on it.
  *
- * This is what makes a single row of five work on a phone: nothing on the shelf has to be
- * legible at the book's own scale, so the books can go as small as they need to.
+ * This is what makes ten books work on a phone: nothing on the shelf has to be legible at
+ * the book's own scale, so the books can go as small as they need to.
+ *
+ * **`line-height` is a length, not a ratio, and that is load-bearing.** `--choice-cap` is
+ * the reserve this row is assumed to take and the centring transform is derived from it,
+ * so a line box that shrank with the clamped font would put the slide a few pixels out at
+ * one viewport and not at another. 8px of slot gap plus 15px of line is the 23px up top.
  */
 .choice__caption {
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(9px, 1vw, 12px);
+  line-height: 15px;
   letter-spacing: 1px;
   color: var(--ink-dim, #c3a281);
   text-align: center;
@@ -293,7 +346,7 @@
 }
 
 .choice--lifting .choice__stage,
-.choice--stamping .choice__stage,
+.choice--writing .choice__stage,
 .choice--resting .choice__stage {
   opacity: 1;
   transform: scale(1);
@@ -314,55 +367,50 @@
  */
 
 /*
- * One word, unbreakable. A break is allowed between any two inline-blocks, so a name set as
- * loose letters wraps mid-word — and then jumps to the right break the moment the album
- * takes the cover over and sets it as plain text. Keeping each word in one box means the
- * ceremony wraps exactly where the finished book does, and the only break opportunities
- * left are the real spaces the component renders between words.
+ * **`.choice__word` and `.choice__letter` are gone, and so is the arrival they described.**
+ *
+ * Each letter used to be an inline-block that came in slightly large and settled — the way
+ * a press lifts off leather — and `.choice__word` existed only to stop the line breaking
+ * between two of those boxes mid-word.
+ *
+ * The name is written now, as one drawing whose strokes carry their own delays; see
+ * `.written__stroke--writing` in album.css. There are no letter boxes, so there is nothing
+ * to break between and nothing to settle: a pen does not lift off and drop into place, it
+ * simply arrives at the end of the stroke. The wrap decision moved into `writeName`, which
+ * takes it from the measured width because an SVG cannot reflow.
+ *
+ * The `font-kerning: none` note above still holds, for a smaller reason than it was
+ * written for: there are no character boxes left on this side of the handover, so it now
+ * only governs the kicker — which is set identically on both sides and must stay that way.
  */
-.choice__word {
-  white-space: nowrap;
-}
-
-.choice__letter {
-  display: inline-block;
-  /* Blocked, not faded in: it arrives slightly large and settles, the way a press lifts
-     off leather. */
-  opacity: 0;
-  transform: translateY(-3px) scale(1.14);
-  transition:
-    opacity calc(90ms * var(--anim, 1)) ease-out,
-    transform calc(110ms * var(--anim, 1)) cubic-bezier(0.2, 0.9, 0.3, 1);
-}
-
-.choice__letter--set {
-  opacity: 1;
-  transform: none;
-}
 
 /* ---------------------------------------------------------------- *
  * Phone
  *
- * Same breakpoint as `useIsMobile` and the mobile album. Five books in one row at 375px
- * leaves about 62px each, which is a tappable target but a mean-looking shelf — so they
- * wrap to three and two, which buys back a third of the width.
+ * Same breakpoint as `useIsMobile` and the mobile album. The layout is the desktop one —
+ * five across, two down — and only the scale and the gaps move, which is the whole reason
+ * the shelf is a fixed grid rather than a wrapping row.
  *
- * The row's centring slide is dropped here rather than corrected: it is derived from a
- * single row of equal slots and means nothing across two. The full-size book still comes
- * up in the middle of the well, which is the beat that was carrying it anyway.
+ * **Width is the binding constraint here, where on the desktop it is height.** `--page-w`
+ * is `80vw` on a phone, so five of them plus gaps has to fit `--stage-w` less its padding:
+ * at 375px that is 5 x 60px + 4 x 5px = 320px against 343.5px, and the ratio holds down to
+ * 320px and up to the 600px breakpoint because both sides are viewport fractions. 0.22
+ * came out at 345px against that same 343.5px and would have been clipped by
+ * `.game-stage`'s `overflow: hidden` — invisibly, since it is the fifth column's outer
+ * edge. A 60 x 83px book is small but comfortably past a 44px tap target, and the caption
+ * is on the wood rather than on the cover, so nothing has to be readable at that size.
+ *
+ * **The centring slide survives the phone now, where it used to be dropped here.** It was
+ * derived from a single row of equal slots and meant nothing once the row wrapped; the
+ * grid states its columns, so the same arithmetic is true at both breakpoints and the
+ * survivor travels to the middle on a phone as well.
  * ---------------------------------------------------------------- */
 
 @media (max-width: 599.95px) {
   .choice {
-    --choice-scale: 0.36;
-    --choice-gap: 10px;
-  }
-
-  .choice__row {
-    flex-wrap: wrap;
-    max-width: calc(var(--choice-w) * 3 + var(--choice-gap) * 2);
-    row-gap: 14px;
-    transform: none;
+    --choice-scale: 0.2;
+    --choice-gap: 5px;
+    --choice-row-gap: 14px;
   }
 
   /*
@@ -393,7 +441,6 @@
   .choice__row,
   .choice__book,
   .choice__stage,
-  .choice__letter,
   .choice__caption {
     transition-duration: 1ms !important;
   }
@@ -406,7 +453,7 @@
     transform: none;
   }
 
-  .choice__letter {
-    transform: none;
-  }
+  /* The name itself is handled where it is drawn — `.written__stroke--writing` in
+     album.css lands on the finished strokes rather than drawing them. It has to be there
+     rather than here, because the album's own cover uses the same rule. */
 }

@@ -303,6 +303,11 @@ export const httpCardsClient: CardsClient = {
     // and an omitted `size` is what says "this is a guaranteed single", so filling either in
     // here would take the choice away from the caller and make the server's refusal of an
     // ambiguous request unreachable.
+    //
+    // No key is sent, so this **404s outside Development** — the route is the one thing in the
+    // app behind the caretaker's key, and a secret in a browser bundle is not a secret. That is
+    // fine because the only caller is the test panel, which is a development tool; presents on
+    // a real server are handed out by hand. See "The caretaker's key" in docs/trading-cards.md.
     return request<GiftResult>('/api/collections/gifts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -28,11 +28,17 @@ interface LockedAlbumProps {
  * waiting, and the only thing missing is games. A padlocked object says that in one
  * look, where a centred paragraph of Dutch says "something went wrong".
  *
- * **The leather is bordeaux and it is not a choice yet.** No cover has been picked — that
+ * **The leather is tabak and it is not a choice yet.** No cover has been picked — that
  * ceremony is on the other side of the gate — so this uses the incumbent stain and blocks
- * the cover *blind*, exactly as the five books on the choosing table do: a kicker and a
+ * the cover *blind*, exactly as the ten books on the choosing table do: a kicker and a
  * rule, no name. Printing the name on it would hand over the one beat `AlbumChoice`
  * exists to deliver.
+ *
+ * The id below is `tobacco`, which is the brown this stain has always been — it held the
+ * id `oxblood` until that name was given to an actual oxblood. See the note in
+ * `albumLeather.ts`, and keep it equal to `AlbumCovers.Default`: this book is what a
+ * player sees before they have chosen anything, so it has to be the stain the server
+ * would hand them.
  *
  * The register comes along, because this screen would otherwise be a dead end: the pick
  * is remembered in this browser, so without a way out a mistyped name locks the page to
@@ -51,7 +57,7 @@ const LockedAlbum: React.FC<LockedAlbumProps> = ({ name, games, minGames, onSign
     <div className="locked">
       {/* The album's nav-label row, in the same place, so arriving here does not move
           the book relative to where an open one sits. */}
-      <div className="locked__book" style={albumLeather('oxblood')}>
+      <div className="locked__book" style={albumLeather('tobacco')}>
         <div className="locked__face">
           <span className="locked__kicker">Verzamelalbum</span>
           <span className="locked__rule" />

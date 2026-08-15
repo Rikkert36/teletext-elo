@@ -2,6 +2,7 @@ import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } f
 import { unstable_batchedUpdates } from 'react-dom';
 import { Card, CardPlayer, splitName, toCard } from '../mock/cardMock';
 import PlayerCard, { ownedLabel } from './PlayerCard';
+import WrittenName from './WrittenName';
 import useIsMobile from '../hooks/useIsMobile';
 import { albumLeather } from '../utils/albumLeather';
 import { ms, prefersReducedMotion } from '../utils/animationSpeed';
@@ -636,7 +637,25 @@ const PageFace: React.FC<{
    * hole is already filled by the time the card arrives at it. See `PutAway`.
    */
   held?: ReadonlySet<string>;
-}> = ({ page, index, visible, onCardOpen, binding, held }) => {
+  /**
+   * A pack is being put away, so load the portraits up front.
+   *
+   * A slot goes from held to filled in a single commit — the clone unmounts and the card
+   * appears in the same render, which is what makes the landing a landing. But the card in
+   * the slot is a **fresh element**: while it was held it drew a `Silhouette`, so the
+   * `Portrait` and its `<img>` are mounted at that moment for the first time. A lazy image
+   * never paints on its element's first frame, not even from cache, so the slot spent a
+   * frame or two as bare tier metal under the name band — a placeholder, exactly where the
+   * card was supposed to arrive.
+   *
+   * The portrait is in the browser's cache by then (the clone that flew across the table
+   * loaded the same url, eagerly), so eager here is a decode rather than a fetch.
+   *
+   * Only for the length of the sequence. The album renders the whole pool at once and most
+   * of it is off screen, which is the case lazy loading is for — see `eager` on `PlayerCard`.
+   */
+  filling?: boolean;
+}> = ({ page, index, visible, onCardOpen, binding, held, filling }) => {
   if (!page) return <div className="album__page" />;
 
   if (page.kind === 'cover') {
@@ -662,7 +681,18 @@ const PageFace: React.FC<{
         {binding ? <div className="album__cover-icons" /> : null}
 
         {page.kicker ? <div className="album__cover-kicker">{page.kicker}</div> : null}
-        <div className="album__cover-title">{page.title}</div>
+        {/*
+          The name in the owner's own ink, and **never drawing itself here**.
+
+          `writing` stays false on this cover unconditionally. The album is the book you
+          own, not the moment it was bound: a mount is not a re-binding, and a cover that
+          re-wrote its own name on every reload — or on every turn back to leaf 0 — would
+          be a book performing rather than a book. The one place it is watched being
+          written is `AlbumChoice`, once, and it hands over a name already finished.
+        */}
+        <div className="album__cover-title">
+          <WrittenName name={page.title ?? ''} />
+        </div>
         {/*
           The rule now closes the cover instead of dividing it: it used to have the
           tally under it (see `buildPages`), so with that gone it reads as a
@@ -709,8 +739,16 @@ const PageFace: React.FC<{
       <div className="album__page album__page--foreword">
         <div className="album__foreword">
           <h2 className="album__foreword-title">Voorwoord</h2>
+          {/*
+            The opening words carry the versal — see `.album__foreword p:first-of-type`
+            in album.css. The initial itself is `::first-letter` and needs no markup;
+            this span is only the small capitals that bridge it into the body, and it
+            has to be the paragraph's first inline content or the E it hands over to
+            is not the E the versal styles.
+          */}
           <p>
-            Er hoeft maar iemand “potje?” te zeggen en het ritueel begint vanzelf.
+            <span className="album__foreword-open">Er hoeft maar iemand</span> “potje?”
+            te zeggen en het ritueel begint vanzelf.
             Vier mensen verzamelen, de optocht richting de tafel, Chwazi openen, vingers erop en kijken wie met wie
             opgescheept zit. Daarna volgt meestal precies waarvoor je gekomen bent:
             een paar minuten tafelvoetbal, een hoop onzin en iets meer fanatisme dan
@@ -944,7 +982,12 @@ const PageFace: React.FC<{
               onClick={() => onCardOpen?.(slot.card.player.id)}
               aria-label={`${slot.card.player.name} — ${ownedLabel(slot.count)}`}
             >
-              <PlayerCard card={slot.card} empty={empty} count={slot.count} />
+              <PlayerCard
+                card={slot.card}
+                empty={empty}
+                count={slot.count}
+                eager={filling}
+              />
             </button>
           );
         })}
@@ -1178,6 +1221,16 @@ const Album: React.FC<AlbumProps> = ({
     () => (holdSlots && holdSlots.length > 0 ? new Set(holdSlots) : undefined),
     [holdSlots],
   );
+
+  /**
+   * A put-away is running — see `filling` on `PageFace`.
+   *
+   * Off `holdSlots` rather than off `held`, and that is the whole point: a card's own id
+   * leaves the hold in the same commit that fills its slot, so the **last** card of a pack
+   * would find `held` already empty on precisely the frame it needed the portrait for. The
+   * caller keeps handing an (empty) array for as long as the sequence is on the table.
+   */
+  const filling = holdSlots !== undefined;
 
   const [flipped, setFlipped] = useState(() =>
     openAtPage >= 0
@@ -1710,6 +1763,33 @@ const Album: React.FC<AlbumProps> = ({
     return index < flipped ? index + 1 : leafCount - index;
   };
 
+  /* ---------------------------------------------------------------- *
+   * The leaf a turn is uncovering, so the page underneath can be shaded
+   *
+   * The moving leaf shades *itself* — it is edge-on to the light for a moment, which is
+   * `leaf-turn-shade` in album.css. This is the other half: a leaf lifting off a pile
+   * uncovers a page that was lying in its shadow, and that page has to come up out of it.
+   *
+   * **It cannot be done in CSS alone**, and both of the obvious ways fail for structural
+   * reasons worth recording. It cannot ride on the moving leaf, because everything inside
+   * `.album__leaf` rotates with it — a shadow meant for the page below would swing away
+   * with the page above. And it cannot be a flat overlay pinned to the book like the turn
+   * strips are, because every face sits at `translateZ(1px)`: there is no single depth
+   * that is above the stationary pages and below the turning one.
+   *
+   * So the revealed face has to be named, which needs the turn's direction — and that
+   * does not need storing, because `moving` and `flipped` already carry it. Every call
+   * site sets `moving` to `Math.min(from, to)` and `flipped` to `to` in the same commit,
+   * so going forward the moving leaf is `flipped - 1` and going back it is `flipped`.
+   * Adding a `turnDir` state would be a second source for something already determined.
+   *
+   * The uncovered leaf is then the neighbour on the pile the moving one left: forward it
+   * is the next leaf's FRONT face, back it is the previous leaf's BACK face. Out of range
+   * at either end of the book, where the class simply matches no rendered leaf.
+   */
+  const turnForward = moving !== null && moving === flipped - 1;
+  const revealing = moving === null ? null : turnForward ? moving + 1 : moving - 1;
+
   const onTouchStart = (event: React.TouchEvent) => {
     touchStartX.current = event.touches[0].clientX;
   };
@@ -1908,9 +1988,27 @@ const Album: React.FC<AlbumProps> = ({
     Array.from({ length: Math.max(rightLeaves - 1, 0) }, (_, i) => leafCount - rightLeaves + i),
   );
 
+  /**
+   * How much paper is on a side, as a fraction of the text block — the same ratio
+   * `stackWidth` turns into a hairline, published unitless so the CSS can scale things a
+   * length cannot reach.
+   *
+   * The fore-edge only ever needed a width, so a px value was enough. The gutter needs
+   * an **alpha** as well: a fold gets darker as the piles thicken, not merely wider, and
+   * there is no way to divide a length back down to a plain number in CSS. Publishing the
+   * fraction itself costs one line and keeps the two drawings deriving from one quantity
+   * rather than from two that have to be kept in agreement.
+   *
+   * A side holding nothing but a board is 0, exactly as its width is: no paper, no fold.
+   */
+  const pileDepth = (leaves: number): number =>
+    paperLeaves === 0 ? 0 : leaves / paperLeaves;
+
   const edgeStyle = {
     '--edge-l': `${stackWidth(leftLeaves)}px`,
     '--edge-r': `${stackWidth(rightLeaves)}px`,
+    '--pile-l': `${pileDepth(leftLeaves)}`,
+    '--pile-r': `${pileDepth(rightLeaves)}`,
     '--band-l': `${leftPile.cover}`,
     '--band-r': `${rightPile.cover}`,
     '--white-l': `${leftPile.white}`,
@@ -2079,6 +2177,7 @@ const Album: React.FC<AlbumProps> = ({
                       onCardOpen={onCardOpen}
                       binding={showBinding}
                       held={held}
+                      filling={filling}
                     />
                   </div>
                 );
@@ -2115,6 +2214,18 @@ const Album: React.FC<AlbumProps> = ({
                     moving === leaf && !prefersReducedMotion()
                       ? 'album__leaf--moving'
                       : '',
+                    /*
+                      And the leaf being uncovered by that turn, which shades the face the
+                      moving leaf was lying on. See `revealing` above for why the direction
+                      is derived rather than stored, and which face each direction means.
+
+                      Gated on motion for the same reason `--moving` is: the class is taken
+                      off by the moving leaf's `transitionend`, which never fires when there
+                      is no transition, so under reduced motion it would latch for good.
+                    */
+                    revealing === leaf && !prefersReducedMotion()
+                      ? `album__leaf--revealing-${turnForward ? 'front' : 'back'}`
+                      : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
@@ -2131,6 +2242,7 @@ const Album: React.FC<AlbumProps> = ({
                       onCardOpen={onCardOpen}
                       binding={showBinding}
                       held={held}
+                      filling={filling}
                     />
                   </div>
                   <div className="album__face album__face--back">
@@ -2140,6 +2252,7 @@ const Album: React.FC<AlbumProps> = ({
                       visible={leaf === flipped - 1}
                       onCardOpen={onCardOpen}
                       held={held}
+                      filling={filling}
                     />
                   </div>
                 </div>

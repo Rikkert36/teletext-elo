@@ -1,6 +1,24 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-14)
+## Where this stands (last updated 2026-08-15)
+
+**The cover is written, not stamped, and the voorwoord has a versal.** The owner's name
+goes onto the leather in gilt from a pen you watch move, stroke by stroke, instead of
+being blocked in hot foil a letter at a time — which took the emboss, the uppercase and
+the letter-spacing with it, because ink displaces nothing and a cursive has to join. It is
+drawn from **vendored Hershey script simplex** (`hersheyScriptData.ts`, generated from the
+`.jhf`, never hand-typed), and *simplex* is the load-bearing word: complex script and any
+ordinary outline font animate as the pen tracing the letter's silhouette rather than
+writing it. Timing comes from path length, so the pen holds one speed; the sound is one
+`playPenStroke` per stroke, and `playFoilStamp` is retired. Facing it, the voorwoord moved
+to a book face (Palatino, Georgia behind it) and took a three-line brass versal on "Er",
+with the following words in small capitals — the versal is what makes the type change
+load-bearing rather than a preference. All of it is under "The name is written, not
+stamped" and "The voorwoord is set in a book face, and carries a versal".
+
+**Not yet checked in a browser.** The build is green and the geometry was verified by
+rasterising `writeName`'s real output, but the two numbers that want eyes are the versal's
+`font-size`/`line-height` pair and the pen's `stroke-width` on cognac's highlight corner.
 
 **A slots page has a head band, and it is the book's own leather.** The head is now a
 printed band bled to three trims with the rating range reversed out of it, on rebuilt
@@ -433,7 +451,7 @@ sized by how well they did, and collections build toward a icons unlock.
 | Signing in | A **ruled ledger** lying open on the table, not a searchbar. Still a type-ahead — you write your name on the line. |
 | Signing out | The **register stays on the table**, small, in the margin opposite the packet shelf. Clicking it crosses your name out. There is no player picker anywhere. |
 | Sound | Synthesised, **on, and no mute button** — the browser and the OS both already have one. Reachable from `cardDebug`. |
-| Starting a collection | A **ceremony, not an absence**. Five shut albums lie on the table, you pick one up, and your name is blocked into the cover in gold foil before the shelf and the empty book appear. |
+| Starting a collection | A **ceremony, not an absence**. Shut albums lie on the table, you pick one up, and your name is **written** into the cover in gilt — stroke by stroke, by a pen you watch move — before the shelf and the empty book appear. |
 | Album cover | Five leather stains — bordeaux, cognac, bosgroen, marineblauw, antraciet — brass edge and gold foil on all five. **Chosen once**, with no preview. |
 | Access gate | Collection page unlocks once that player has **≥5 games** — symmetric with the card pool. **Signing in is never refused**; an under-gate name lands on a shut, padlocked album that says how many games are left. |
 | Pack recipients | **All four participants** of a game. |
@@ -1520,8 +1538,8 @@ negative.
 
 Five shut albums lying side by side, blank covers, one per stain. Click one: the other
 four are taken off the table, the survivor slides to the middle, comes up to full size,
-and the owner's name is blocked into the cover a letter at a time. Then the shelf and
-the book appear.
+and the owner's name is **written** into the cover in gilt, stroke by stroke, by a pen
+you watch moving. Then the shelf and the book appear.
 
 - **Five books, not a swatch row, and no preview.** Choosing is picking an object up off
   a table; a control that restains a book in place is a settings widget with leather
@@ -1594,11 +1612,79 @@ the book appear.
   hairline is a box-shadow on a square board — while `.album__cover` inside it is rounded
   `0 3px 3px 0`. A shut album is rounded leather with a square hairline just outside it. A
   radius on the stage rounded the hairline too, and those two corners popped square.
-- **The name is stamped with `playFoilStamp`, which is new.** `playSlot` per letter was
-  tried and is audibly wrong: eleven grains over 100ms plus a 130Hz boom, so at ~45ms a
-  letter (base) the grains smear into a wash and the booms become a pitched pulse train.
-  A hot foil press is a small dry tick. The one heavy sound is `playCoverTurn`, and it
-  lands *after* the name rather than under it. Spaces take no block and make no sound.
+- **The name is written with `playPenStroke`, one call per stroke.** This replaced
+  `playFoilStamp`, which ticked once per letter — see "The name is written, not stamped"
+  below for why the press went. The rejection that produced the stamp still stands and now
+  protects the pen: `playSlot` per letter is eleven grains over 100ms plus a 130Hz boom, so
+  the grains smear into a wash and the booms become a pitched pulse train. The one heavy
+  sound is `playCoverTurn`, and it lands *after* the name rather than under it.
+
+#### The name is written, not stamped
+
+The cover used to be blocked in hot foil, a letter at a time, with a 2px emboss under the
+type because a die dents the leather it strikes. It is now **written in gilt with a pen**,
+and the change is not a restyle: a shop that letters a book by hand is a better account of
+a personal album than a press that somehow knew your name in advance.
+
+- **Nothing about the old emboss was salvageable, and softening it was the wrong instinct.**
+  It described displaced leather, and ink displaces nothing. On a monoline hairline a 2px
+  offset does not read as depth at all — it detaches from the stroke and becomes precisely
+  the drop shadow the old comment on that rule existed to warn against. It is gone rather
+  than reduced. `--foil-emboss` survives for the kicker only.
+- **Uppercase and letter-spacing went with it.** A script hand has to join, and caps is the
+  one setting that guarantees it cannot; tracking a cursive is pulling the joins apart by
+  definition. `font-kerning: none` stays but now means much less — it was there because the
+  ceremony set one inline-block per character, and there are no character boxes any more.
+- **You cannot animate the drawing of text, and this is the whole reason for a stroke
+  font.** `stroke-dashoffset` needs a path; text is not one. The obvious escape — take a
+  script webfont and convert its glyphs to paths — is a trap that looks right until it
+  runs, because font outlines are filled **contours**: a dash offset walks the letter's
+  silhouette, so it reads as the letter being circled rather than written.
+- **Hershey script simplex, vendored, and simplex is load-bearing.** `scriptc.jhf`
+  (complex) draws every stem as two parallel strokes to fake weight, which under a dash
+  offset animates as the pen going up one side of the letter and back down the other — the
+  same silhouette failure by another route. Simplex glyphs are true centrelines: one stroke
+  is one movement of a pen, so drawing them in order simply *is* handwriting. The data is
+  in `hersheyScriptData.ts`, **generated from the `.jhf` and never hand-typed** — ninety-six
+  lines of packed coordinates is exactly where a transcription slip hides, and one wrong
+  character is one malformed letter in somebody's name that nothing would ever surface.
+  The Hershey licence requires its acknowledgement to travel with the data, so it lives in
+  that file.
+- **Timing comes from path length, not letter count.** The pen holds one speed across the
+  whole name, so a wide letter genuinely takes longer than a narrow one. Letter-count
+  timing was right for a press indexing along a line and is wrong for a hand. Pen *lifts*
+  are charged against the same budget (`PEN_LIFT_COST`), because otherwise the pen
+  teleports between strokes and the dot of an i lands in the same instant as its stem.
+- **The sound follows strokes, not letters, and not the whole name either.** One long
+  scratch is simpler and wrong: it would keep scratching through every lift, including the
+  one between two words where the pen is demonstrably off the leather.
+- **`--ink` is its own token, and shares `--foil`'s hex today.** Sharing the *value* is
+  right — one shop, one pot of gilt. Sharing the *token* is not: `--foil` means hot foil
+  blocking, which still has a job (the rule, and the spine on the icon binding), and the
+  name is no longer struck. This is the same trap `--foil-rule` already exists to avoid.
+- **One gold on all ten stains.** Measured, rather than assumed: gold runs from about
+  6.2:1 on cognac, the lightest, to 9.6:1 on petrol, so there is no stain where it fails
+  and no case for a second ink. The one genuinely soft spot is cognac's *highlight corner*
+  at ~3.5:1, which is one corner of one book, and the fix there is stroke weight or a dark
+  sister-stroke — not colour. A per-stain ink was considered and rejected: it would make
+  the shelf ten different products rather than one line in ten dyes, which is the rule
+  `albumLeather.ts` is built on.
+- **The album's own cover never animates this.** `writing` is false there unconditionally.
+  A mount is not a re-binding, and a cover that re-wrote its own name on every reload — or
+  every time you turned back to leaf 0 — would be a book performing rather than a book.
+  The handover is invisible because both sides draw the same strokes from the same pure
+  function; `AlbumChoice` computes the duration once and hands it to the component so the
+  ear and the eye cannot disagree.
+- **A name the font cannot set falls back to printed type.** `writeName` folds diacritics
+  (José → Jose, which is what a binder with one set of dies would have done) and returns
+  null for anything left over. The fallback is set in italic Palatino and is deliberately
+  *not* given the old foil treatment back — a blocked title beside a written one would be
+  two different books. **A name is never rendered with characters missing.**
+- **The wrap moved into the layout.** An SVG cannot reflow, so `writeName` decides the
+  break from the measured width. This is kept rather than dropped: the per-letter version
+  wrapped "Anneloes Ernest" as "ANNELOES ERNES / T" until it was made to break on spaces,
+  and a cover setting that name as one hairline nine ems wide is the same illegibility by
+  another route. `.choice__word` and `.choice__letter` are gone.
 
 #### The sequence ends by opening the book on the voorwoord
 
@@ -1796,8 +1882,15 @@ Five beats, base (so half their real length at `--anim = 2`), ≈2450 total — 
 | `shutting` | 620 | `flipped` forced to 0; the existing closed-book transform and leaf flip do the work | `playCoverTurn` |
 | `settling` | 200 | held shut, nothing moving — a press has a pause before it | — |
 | `binding` | 900 | the build: the new binding drawn across the board from the spine | `playRebind(900)` |
-| `blocking` | 45 × 6 | `ICONEN` foil-blocked a letter at a time | `playFoilStamp` per letter |
 | `resting` | 460 | the board settles — **the accent** | `playCoverTurn` at +120 |
+
+> **A `blocking` beat used to sit between `binding` and `resting`**, foil-blocking `ICONEN`
+> across the new boards a letter at a time with `playFoilStamp` under each one. Both the
+> beat and the word are gone — the binding is what tells you the book holds icons, and a
+> caption under it is the cover explaining itself, the same objection that removed the
+> `legende` pill from the card face. `playFoilStamp` itself has since been retired
+> altogether: the album cover is written rather than stamped now, and the function's last
+> caller went with it. See "The name is written, not stamped".
 
 What accumulates is one continuous quantity, the binding travelling across the board, so the
 build looks identical at any timestamp — the load-bearing rule. The single accent is the last
@@ -2246,6 +2339,55 @@ rather than overruled** — the page is not empty, it carries the voorwoord:
   numerals, and that is not solved. And a **stored reading position from before this
   change lands one leaf earlier** in content terms; it is clamped and harmless, so no
   migration.
+
+#### The voorwoord is set in a book face, and carries a versal
+
+Two changes to the one page in the album that is extended prose, and they depend on each
+other: neither is worth doing alone.
+
+- **Palatino, not Georgia — and the rest of the book stays Georgia.** Everything else here
+  is Georgia and on every other page that is correct: it was drawn for small sizes on
+  low-resolution screens, with a large x-height and low stroke contrast, which is exactly
+  what a 9px checklist entry wants. The voorwoord is the only place those compromises turn
+  into costs — the big x-height crowds a paragraph and the flat contrast makes the block go
+  grey. This was never a decision before; it was a default that propagated.
+  - The bill is the **size floor, raised from 10px to 11px**. Palatino's finer strokes go
+    thin below about 11px where Georgia stays solid: the same contrast that earns it the
+    page costs it the bottom of the range. The floor only binds on the narrowest phones.
+  - Georgia stays in the stack and that is not a defeat. Android has neither Palatino nor
+    Book Antiqua and lands on it, which is precisely what this page rendered as before, so
+    there is no viewport where this is worse than what it replaced.
+- **A versal on the first paragraph, in brass.** The case *against* setting this page in a
+  hand was two things, and a decorated initial answers both: six paragraphs of script at
+  ~11px is unreadable, and a foreword in a real album is **printed** — struck with the same
+  press as the checklist — so a written body would be the page claiming a medium it does
+  not have. One letter at three lines deep is legible in any face, and an initial is not a
+  second hand at all; it is a different sort in the same forme.
+  - So the page keeps the **two hands** the checklist already runs on: the press sets the
+    body, the title, the rule and this initial; a person signs the foot. The signature is
+    the only mark on the page with someone behind it.
+  - **Brass (`--board-rule`), not the paper's own brown.** This is the one moment the gold
+    from the cover appears inside the book, which is what rubrication is for. Press brown
+    would make it merely a big letter. Emitted on every stain unconditionally, so there is
+    no icon-binding variant to keep in step.
+  - **Contrast is not the constraint people reach for.** Brass on cream is around 3:1,
+    which would be far too little for body copy and is ample at four ems — large type buys
+    legibility with size, and a versal matching the body's weight stops being an ornament.
+  - **Sized by eye against the cap, not by arithmetic off the line box.** The tempting
+    formula is `3 lines × 1.55 = 4.65em` with `line-height: 1`, and it is wrong: that makes
+    the em *box* three lines deep, and a serif cap fills only about 0.7 of its em, so the
+    letter draws barely two lines tall with a line of air stacked over it. `font-size` and
+    `line-height` move together here.
+  - **Two lines on a phone, not three.** At the narrowest measure a three-line float stops
+    being an ornament on a paragraph and becomes a column the paragraph has to get past.
+  - **The words after it are small capitals** (`.album__foreword-open`). Without them the
+    page jumps from a four-em brass E straight into 11px lowercase, which is the standard
+    ugly seam at a drop cap. `font-variant-caps`, not `text-transform` — real small capitals
+    where the face has them.
+  - **The versal is what makes Palatino load-bearing rather than a preference.** A
+    calligraphic initial over an even screen face has nothing in the body to belong to and
+    reads as bolted on; over a face with real stroke contrast it reads as the same hand at
+    a different size. It also rhymes with the cover, which is now written by a pen.
 
 #### The mount is a recess, and the book has a thickness
 
@@ -4617,6 +4759,15 @@ swells overlap and would otherwise clip.
   leaf 0 on desktop and page 0 on mobile.
 - **The shimmer phase has its own sound** (`playShimmerSweep`), scaled to the
   shimmer length so it lands on the phase boundary.
+- **The pen has its own sound** (`playPenStroke`), one call per stroke while the owner's
+  name is written into the cover. It **takes its length from the caller**, the same
+  contract as `playRebind` and `playRareRise`: a musical hit must not stretch, but a
+  gesture must, or the pen is still moving after the sound has stopped. What is held
+  constant is *density* rather than count — a fixed number of grains spread over a longer
+  name thins out into separable ticks, which is the one artefact it exists to avoid.
+  High, dry, no low end and no pitch, and among the quietest things in the module: it runs
+  for the better part of a second under a sequence whose climax is the board landing.
+  It replaced `playFoilStamp`, which is retired.
 - **The face reveal is a rising arpeggio** (`playNameReveal`): D5 · F5 · A5 · D6,
   45ms apart, rising in gain into the accent, over an air sweep and with the
   sparkle released on the landing. Chosen over three others — the shipped single
@@ -4691,6 +4842,15 @@ swells overlap and would otherwise clip.
 > Left in place rather than deleted because the reasoning is exactly right and will be
 > wanted again if the per-character write comes back. **Read it as a specification, not
 > as a description of the code.**
+>
+> **It was wanted again, and it paid for itself.** `playPenStroke` — the album cover being
+> written — was built straight off the constraints below, and `playFoilStamp`, the sound
+> this section produced the first time it was read as a spec, has now been retired by it.
+> One constraint did *not* carry over and the difference is worth stating, because it is
+> the thing that makes a pen not a press: these ticks are **per character**, and the pen is
+> **per stroke**. A press indexes along a line and strikes once per letter; a hand lays ink
+> while it is down and none while it is lifted, so the sound has to follow the strokes.
+> The "granular, non-pitched, quietest in the module" constraints carried over intact.
 
 The beat was silent in its first version, and that is most of why it read as a
 glitch: nothing was happening and nothing said anything was about to. It now has

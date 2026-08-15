@@ -132,7 +132,7 @@ const NavBar = () => {
             wedstrijden
           </Button>
           <Button component={Link} to="/collectie" className={classes.button + ' ' + classes.albumButton}>
-            album
+            verzamelalbum
           </Button>
           {isMobile ? secondaryMenu : secondaryButtons}
         </div>

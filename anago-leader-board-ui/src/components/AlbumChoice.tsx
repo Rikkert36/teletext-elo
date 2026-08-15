@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { COVERS, CoverId, albumLeather } from '../utils/albumLeather';
 import { ms } from '../utils/animationSpeed';
-import { playCoverTurn, playFoilStamp } from '../utils/sounds';
+import { playCoverTurn, playPenStroke } from '../utils/sounds';
+import WrittenName, { durationFor } from './WrittenName';
+import { writeName } from '../utils/hersheyScript';
 /*
  * The finished book's face is the album's own `.album__cover`, so those rules have to be
  * loaded even though the album itself is not mounted during the ceremony — this component
@@ -18,50 +20,66 @@ import '../styles/albumchoice.css';
  * sequence.
  */
 
-/** The four unchosen books leaving, each one `CLEAR_STEP` behind the last. */
+/**
+ * The nine unchosen books leaving, each one `CLEAR_STEP` behind the last.
+ *
+ * `CLEAR_STEP` went from 55 to 26 when the shelf went from five books to ten, so that the
+ * sweep still takes about the same half second end to end — at 55 it ran 735ms base,
+ * which is 1.5s real against `--anim`, and a table being cleared for that long stops
+ * reading as a beat and starts reading as a wait. The stagger is by index, so it runs
+ * left to right and top to bottom, which is the order the books are laid out in.
+ */
 const CLEAR_MS = 240;
-const CLEAR_STEP = 55;
+const CLEAR_STEP = 26;
 /** The survivor sliding to the middle of the table. */
 const CENTRE_MS = 300;
 /** The book coming up to full size in front of you, as the row fades out under it. */
 const LIFT_MS = 380;
-/** Held still before the first letter. A press has a pause before it. */
+/** Held still before the pen touches down. A hand pauses before it writes. */
 const SETTLE_MS = 200;
-/** Per letter. */
-const STAMP_STEP_MS = 45;
-/** After the last letter, before handing the book to the album. */
+/**
+ * How long the writing takes when the name cannot be set as strokes.
+ *
+ * A name outside the font falls back to printed type — see `writeName` — so there is
+ * nothing to draw and nothing to listen to. It still gets a beat rather than appearing
+ * under the settle: the ceremony's rhythm belongs to the ceremony, not to whether this
+ * particular name happened to be spellable in a script hand.
+ */
+const PRINTED_MS = 520;
+/** After the name is finished, before handing the book to the album. */
 const REST_MS = 460;
 
-/** Which slot the row centres on. Five books, so the middle one is index 2. */
-const CENTRE_INDEX = 2;
+/**
+ * The shape of the shelf, and it has to be the same five as `grid-template-columns` in
+ * albumchoice.css — the grid states the columns and this states which one is the middle,
+ * and a disagreement slides the survivor to the wrong place rather than failing.
+ *
+ * `COVERS.length` is 10, so the rows work out at two. The horizontal target is the middle
+ * column; the vertical one is `(rows − 1) / 2`, which is the seam between the two rows
+ * rather than a row — there is no middle row and the centre of the table is between them.
+ * That is where `.choice__stage` brings the full-size book up, so it is the right target
+ * even though it is a half-integer.
+ */
+const COLUMNS = 5;
+const CENTRE_COL = (COLUMNS - 1) / 2;
+const CENTRE_ROW = (Math.ceil(COVERS.length / COLUMNS) - 1) / 2;
 
 /**
- * The name, cut into words, each letter keeping the position it has in the whole name —
- * that position is what the stamping run counts, so it has to survive the split.
+ * **`splitIntoWords` lived here and is gone, along with the whole per-letter apparatus.**
  *
- * Split rather than laid out as a flat run of letters because every letter is its own
- * inline-block, and a line break is allowed between any two of them: "Anneloes Ernest"
- * wrapped as "ANNELOES ERNES / T" while the name was going on and only snapped to the
- * right break once the album took the cover over and set it as plain text.
+ * The cover was blocked in hot foil a letter at a time, so the name had to be one
+ * inline-block per character; that in turn allowed a line break between any two of them,
+ * which wrapped "Anneloes Ernest" as "ANNELOES ERNES / T" until this function grouped the
+ * characters into unbreakable words. All of it existed to serve a press indexing along a
+ * line.
+ *
+ * The name is **written** now, as one drawing — see `hersheyScript.ts`. There are no
+ * character boxes to break between, so there is nothing to group; the line break moved
+ * into `writeName`, which decides it from the name's measured width because an SVG cannot
+ * reflow. `.choice__word` and `.choice__letter` went with this.
  */
-const splitIntoWords = (name: string): { char: string; index: number }[][] => {
-  const words: { char: string; index: number }[][] = [];
-  let word: { char: string; index: number }[] = [];
 
-  Array.from(name).forEach((char, index) => {
-    if (char.trim().length === 0) {
-      if (word.length > 0) words.push(word);
-      word = [];
-      return;
-    }
-    word.push({ char, index });
-  });
-
-  if (word.length > 0) words.push(word);
-  return words;
-};
-
-type Phase = 'choosing' | 'clearing' | 'centring' | 'lifting' | 'stamping' | 'resting';
+type Phase = 'choosing' | 'clearing' | 'centring' | 'lifting' | 'writing' | 'resting';
 
 interface AlbumChoiceProps {
   /**
@@ -87,27 +105,30 @@ interface AlbumChoiceProps {
 }
 
 /**
- * Getting your album: five of them lying on the table, and you pick one up.
+ * Getting your album: ten of them lying on the table, and you pick one up.
  *
  * This exists because an album that is simply *there* has never been acquired. The page
  * used to go straight from typing a name to a fully-formed book, which made the start of
  * a collection the one thing on this screen with no moment attached to it — and a
  * collection is entirely built out of moments.
  *
- * Five books rather than a swatch row, and **no preview**: choosing is picking an object
- * up off a table, and a control that restains a book in place is a settings widget with
+ * Books rather than a swatch row, and **no preview**: choosing is picking an object up
+ * off a table, and a control that restains a book in place is a settings widget with
  * leather printed on it. The cost is that you commit before seeing your name on it, which
  * is the same deal a real shop gives you.
  *
+ * **Ten is where the objects stop being objects, and the layout is what pays for it.**
+ * Five in a row was one shelf; ten in a row would be a swatch strip in all but name, at
+ * 27% of a real book. Laid out five by two it stays a display of things on a table, and
+ * the cost is a scale of 0.40 rather than 0.55 — see the budget in albumchoice.css.
+ *
  * The blank covers carry no name and their captions are set *outside* the scaled book, so
- * nothing on the shelf depends on being readable at 33% — which is what makes a single
- * row of five work on a phone as well as on a desk.
+ * nothing on the shelf depends on being readable at 20% — which is what makes ten of them
+ * work on a phone as well as on a desk.
  */
 const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }) => {
   const [phase, setPhase] = useState<Phase>('choosing');
   const [pickedIndex, setPickedIndex] = useState<number | null>(null);
-  /** How many characters of the name have taken the block. */
-  const [stamped, setStamped] = useState(0);
 
   const timers = useRef<number[]>([]);
 
@@ -123,9 +144,19 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
     [],
   );
 
-  // The flat run still drives the timing — one beat per character, spaces included.
-  const letters = stampName ? Array.from(stampName) : [];
-  const words = stampName ? splitIntoWords(stampName) : [];
+  /*
+   * The same layout the cover is drawn from, used here only to time the sound.
+   *
+   * Calling `writeName` twice — once here, once inside `WrittenName` — is deliberate and
+   * safe in a way a second copy of the *timings* would not be: it is a pure function of
+   * the name, so the two calls cannot disagree about where the strokes are. What must not
+   * be recomputed is the total duration, because that is the number the ear and the eye
+   * share; it is worked out once below and handed to the component.
+   */
+  const written = useMemo(() => (stampName ? writeName(stampName) : null), [stampName]);
+  /* Through `ms()` like every other duration on this page, so the speed control moves the
+     pen along with the rest of the ceremony. */
+  const writeMs = ms(written ? durationFor(written.totalLength) : PRINTED_MS);
   const picked = pickedIndex === null ? null : COVERS[pickedIndex];
 
   const choose = (cover: CoverId, index: number) => {
@@ -145,33 +176,42 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
 
     const lifted = centred + ms(LIFT_MS);
     after(lifted, () => {
-      setPhase('stamping');
+      setPhase('writing');
 
-      if (letters.length === 0) {
+      if (!stampName) {
         after(ms(REST_MS), onDone);
         return;
       }
 
       /*
-       * One timer per letter rather than one interval: the run has to end on a known
-       * beat, and an interval that drifts a frame per letter is most of a beat out by the
-       * end of "Daan van der Beek".
+       * **One sound per stroke, scheduled off the same geometry the pen is drawn from.**
        *
-       * A space takes no block and makes no sound — it is the gap between two words, and
-       * ticking on it is what made the first pass sound like a machine running.
+       * The foil version ticked once per letter, which was right for a die coming down on
+       * one character at a time. A pen does not move that way: it lays ink while it is
+       * down and lays none while it is lifted, so the sound has to follow the *strokes*
+       * rather than the letters. Dotting an i is a separate small noise from the stem it
+       * belongs to, and the gap between them is the lift.
+       *
+       * This is also why one long scratch across the whole name is wrong even though it is
+       * simpler — it would keep scratching through every lift, including the one between
+       * two words, where the pen is demonstrably off the leather.
+       *
+       * One timer per stroke rather than an interval, for the reason the letter run had:
+       * the beat this ends on is known and an interval drifts.
        */
-      letters.forEach((letter, index) => {
-        after(ms(SETTLE_MS + STAMP_STEP_MS * index), () => {
-          setStamped(index + 1);
-          if (letter.trim().length > 0) playFoilStamp();
+      if (written) {
+        written.strokes.forEach((stroke) => {
+          after(ms(SETTLE_MS) + stroke.start * writeMs, () =>
+            playPenStroke(stroke.span * writeMs),
+          );
         });
-      });
+      }
 
-      const written = ms(SETTLE_MS + STAMP_STEP_MS * letters.length);
+      const finished = ms(SETTLE_MS) + writeMs;
       // The book settling onto the table: the one heavy sound here, and it lands *after*
-      // the name rather than under it so the letters stay small and dry.
-      after(written + ms(120), playCoverTurn);
-      after(written + ms(REST_MS), () => {
+      // the name rather than under it so the writing stays small and dry.
+      after(finished + ms(120), playCoverTurn);
+      after(finished + ms(REST_MS), () => {
         setPhase('resting');
         onDone();
       });
@@ -184,14 +224,17 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
     <div
       className={`choice choice--${phase}`}
       /*
-        The row slides so that whichever book was picked ends up where the middle one was.
-        Done here rather than by re-ordering, because the books must not move at the moment
-        of the click — only afterwards, and only the one that is left.
+        The grid slides so that whichever book was picked ends up in the middle of the
+        table. Done here rather than by re-ordering, because the books must not move at the
+        moment of the click — only afterwards, and only the one that is left.
       */
       style={
         pickedIndex === null
           ? undefined
-          : ({ '--picked-offset': String(CENTRE_INDEX - pickedIndex) } as React.CSSProperties)
+          : ({
+              '--picked-cols': String(CENTRE_COL - (pickedIndex % COLUMNS)),
+              '--picked-rows': String(CENTRE_ROW - Math.floor(pickedIndex / COLUMNS)),
+            } as React.CSSProperties)
       }
     >
       {/*
@@ -236,7 +279,7 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
                   disabled={busy}
                   aria-label={`Album in ${stain.label}`}
                 >
-                  {/* Blocked blind — a rule and no name. Putting the name on all five
+                  {/* Blocked blind — a rule and no name. Putting the name on all ten
                       would spend the payoff before it happens. */}
                   <span className="choice__face">
                     <span className="choice__face-kicker">Verzamelalbum</span>
@@ -263,28 +306,22 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
           <div className="choice__stage" style={albumLeather(picked.id)}>
             <div className="album__cover">
               <div className="album__cover-kicker">Verzamelalbum van</div>
+              {/*
+                The name going onto the cover.
+
+                **`writing` is keyed to the phase, so the pen only moves once.** Before the
+                book is lifted there is no name to write; from `writing` onward the strokes
+                carry their own delays and the CSS animation's `both` fill-mode holds the
+                finished name in place through `resting` and across the handover. That last
+                part is what makes the swap to the real album invisible: the album draws the
+                same strokes from the same layout, already complete.
+              */}
               <div className="album__cover-title">
-                {words.map((word, wordIndex) => (
-                  <React.Fragment key={wordIndex}>
-                    {/* An ordinary space, and the only place the line is allowed to
-                        break — the word itself is one unbreakable box. */}
-                    {wordIndex > 0 ? ' ' : null}
-                    <span className="choice__word">
-                      {word.map(({ char, index }) => (
-                        <span
-                          // Position is the identity: the same letter turns up twice in
-                          // plenty of names, so it cannot be the key.
-                          key={index}
-                          className={`choice__letter${
-                            index < stamped ? ' choice__letter--set' : ''
-                          }`}
-                        >
-                          {char}
-                        </span>
-                      ))}
-                    </span>
-                  </React.Fragment>
-                ))}
+                <WrittenName
+                  name={stampName ?? ''}
+                  writing={phase === 'writing' || phase === 'resting'}
+                  durationMs={writeMs}
+                />
               </div>
               <div className="album__cover-rule" />
             </div>

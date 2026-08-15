@@ -116,16 +116,22 @@
    *
    * It used to be `min-height: 78vh` and then whatever the content came to, so the slab
    * grew and shrank as the page moved between its seven states: the ledger, the
-   * hourglass, the padlock, the five shut albums, the book and the opener were each a
+   * hourglass, the padlock, the shut albums, the book and the opener were each a
    * different-sized piece of furniture. A table is an object with a size — the whole
    * premise of this stage — and an object that changes shape depending on what you put
    * on it is a panel with wood painted on it.
    *
    * So the room is reserved once, by **the album**, and everything else lies inside it:
-   * `--page-h` plus 40px for the nav-label row and `.album`'s own 4px a side. The five
-   * shut albums come to the same figure within a pixel, deliberately
+   * `--page-h` plus 40px for the nav-label row and `.album`'s own 4px a side. The shut
+   * albums come to the same figure within a pixel, deliberately
    * (`.choice__label` + `.choice__well`, see albumchoice.css), which used to be two
    * components agreeing and is now one box they both sit in.
+   *
+   * **This is the ceiling `--choice-scale` is solved against**, and the reason going from
+   * five books to ten cost a scale rather than a row of height: `.choice__well` reserves
+   * `--page-h` as a *minimum*, so a shelf taller than that grows the well, grows this box
+   * past the album's, and moves the book at the handover. Two rows of five have to fit
+   * inside `--page-h`. See the budget at the top of albumchoice.css.
    *
    * The opener is the one occupant that had a mind of its own — `min-height: 62vh`,
    * which on a tall window is well past the book. It reads this instead, and takes the

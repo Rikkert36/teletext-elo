@@ -3,22 +3,43 @@ import { CSSProperties } from 'react';
 /**
  * What leather an album is bound in.
  *
- * **One product line in five dyes.** The brass edge, the gold foil and the rule are
- * identical on all five, and only the stain moves — the same reasoning as the packet
- * hues in [packFoil.ts](./packFoil.ts): five books lying side by side have to read as
- * five of the same thing in different colours, not as five unrelated objects. So the
- * board edge stays brass rather than being tinted per stain, even though that would be
- * more "designed"; a green book with a green edge stops being an album from this series.
+ * **One product line in ten dyes.** The brass edge, the gold foil and the rule are
+ * identical on all of them, and only the stain moves — the same reasoning as the packet
+ * hues in [packFoil.ts](./packFoil.ts): ten books lying side by side have to read as ten
+ * of the same thing in different colours, not as ten unrelated objects. So the board edge
+ * stays brass rather than being tinted per stain, even though that would be more
+ * "designed"; a green book with a green edge stops being an album from this series.
  *
- * The album has always been bordeaux. It is still the first entry here, unchanged down
- * to the hex, so nothing about an existing book moves when this lands.
+ * **Every `mid` has to land between roughly 11% and 16% lightness, and that is a hard
+ * constraint rather than a house style.** `--band` in album.css mixes `--leather-mid`
+ * toward cream and reverses cream type out of the result, so one mix has to serve every
+ * stain: too light and the head band cannot hold the reversed type, too dark and it goes
+ * near-black. Cognac at 23% is the one stain outside the band and is grandfathered — it
+ * is the reason the mix is off `mid` and not off `hi` in the first place. A new stain
+ * that wants a lighter body than cognac's is not a new stain, it is a second `--band`.
+ *
+ * Three more colours were designed and rejected, and are worth not re-deriving:
+ * **perkament** (undyed calf) breaks the band rule above at the light end *and* would
+ * make the icon binding's spine vanish into its own ivory boards; **okergeel** is
+ * `--foil` (#e6c98a) with the lights out, so the blocking would disappear into the
+ * cover; **chocolade** is real but sits between tabak and cognac, which are already here.
  *
  * Applied by spreading the result onto an element as `style`, the same way `packFoil`
  * is. Read from a prop on every render rather than frozen at mount, so a cover that
  * changes re-stains in place — see the note on transitions below.
  */
 
-export type CoverId = 'oxblood' | 'forest' | 'navy' | 'tan' | 'charcoal';
+export type CoverId =
+  | 'tobacco'
+  | 'tan'
+  | 'oxblood'
+  | 'claret'
+  | 'aubergine'
+  | 'olive'
+  | 'forest'
+  | 'petrol'
+  | 'navy'
+  | 'charcoal';
 
 interface Stain {
   id: CoverId;
@@ -33,15 +54,41 @@ interface Stain {
 }
 
 /**
- * Ordered light to dark within their own families rather than by hue, so the row on the
- * table reads as a spread of choices rather than a colour wheel. Bordeaux first because
- * it is the incumbent.
+ * **This order is the shelf.** `AlbumChoice` lays the books out as five across and two
+ * down in exactly this sequence, so the first five are the top row and the last five the
+ * bottom one: warm above, cool below. The top row runs brown → red-brown → wine → violet,
+ * which is what keeps `ossenbloed` and `bordeaux` legible as two decisions rather than as
+ * one colour printed twice — they are the closest neighbours on the table and the ramp is
+ * doing the work. A book moved in this list moves on the table.
+ *
+ * `tobacco` is first because `COVERS[0]` is the fallback for an unknown id and
+ * `AlbumCovers.Default` on the server is the same stain — see `albumLeather` below.
+ *
+ * **`oxblood` used to be this brown, and the id was moved rather than the colour.** The
+ * first stain was labelled "bordeaux", is `#5a4526 / #35270f / #4a3820`, and is hue 34–38°
+ * at ~40% saturation — a tobacco brown, about 50° around the wheel from any real oxblood
+ * and at a third of its saturation. Nothing surfaced that until a genuine bordeaux was
+ * added and two entries claimed the name. So the brown is now `tobacco` / *tabak*, the id
+ * `oxblood` was freed and given to an actual oxblood, and
+ * `20260815_RenameOxbloodCoverToTobacco` repoints every album already bound in it. The
+ * migration is what makes this safe: without it, freeing the id would have restained
+ * every existing book from brown to dark red on the next page load.
+ *
+ * **`crimson` / karmozijn was here for exactly one session and is gone.** `oxblood` took
+ * its slot: a scarlet and a dark blood red are the same decision, and of the two the one
+ * that is a real binding leather is oxblood. It never shipped, so there is nothing in any
+ * database bound in it and no migration for it.
  */
 export const COVERS: readonly Stain[] = [
-  { id: 'oxblood', label: 'bordeaux', hi: '#5a4526', mid: '#35270f', lo: '#4a3820' },
+  { id: 'tobacco', label: 'tabak', hi: '#5a4526', mid: '#35270f', lo: '#4a3820' },
   { id: 'tan', label: 'cognac', hi: '#8a6134', mid: '#5b3c1b', lo: '#754f27' },
+  { id: 'oxblood', label: 'ossenbloed', hi: '#6b2a22', mid: '#3c110b', lo: '#551f16' },
+  { id: 'claret', label: 'bordeaux', hi: '#5c2136', mid: '#300f1c', lo: '#4a1a2b' },
+  { id: 'aubergine', label: 'aubergine', hi: '#4a3350', mid: '#271a2c', lo: '#3c2942' },
+  { id: 'olive', label: 'olijf', hi: '#565229', mid: '#2b2911', lo: '#46421f' },
   { id: 'forest', label: 'bosgroen', hi: '#2f4a2c', mid: '#182c17', lo: '#274023' },
-  { id: 'navy', label: 'marineblauw', hi: '#2b3a55', mid: '#151f33', lo: '#233149' },
+  { id: 'petrol', label: 'petrol', hi: '#2a4a4c', mid: '#10282a', lo: '#21403f' },
+  { id: 'navy', label: 'marineblauw', hi: '#223049', mid: '#101828', lo: '#1b2740' },
   { id: 'charcoal', label: 'antraciet', hi: '#3a3a3c', mid: '#1c1c1e', lo: '#2e2e30' },
 ];
 
@@ -55,7 +102,7 @@ export const coverLabel = (cover: string | null | undefined): string =>
  * behind it and the board edge of the shut leaf, which all have to agree or the book
  * comes apart at the spine.
  *
- * Falls back to bordeaux for an unknown id rather than trusting the value: this comes
+ * Falls back to tabak for an unknown id rather than trusting the value: this comes
  * off the wire, and returning nothing would leave every token unset and the cover
  * transparent. Same reason `packFoil` has a fallback hue.
  *
@@ -79,17 +126,43 @@ export const albumLeather = (cover: string | null | undefined): CSSProperties =>
     '--board-edge': '#6b5325',
     '--foil': '#e6c98a',
     '--foil-rule': '#a9853c',
+    /*
+     * The gilt the owner's name is **written** in, and its own token rather than `--foil`.
+     *
+     * It carries the same hex today, and sharing the *value* is right — one shop, one pot
+     * of ink, and the name should belong to the same metal as the rule under it. Sharing
+     * the *token* is not: `--foil` means hot foil blocking, which still has a job on this
+     * cover (the rule) and on the icon binding (the spine), and the name is no longer
+     * struck. The two will need tuning apart almost immediately, because a monoline
+     * hairline and a 2px rule at one identical colour do not read as the same weight.
+     *
+     * This is exactly why `--foil-rule` already exists — the rule is a shade down from
+     * the blocking on every book, and one shared value flattened the two together. Same
+     * trap, one object further along.
+     *
+     * **Identical on all ten stains**, like every other mark on the cover. Gold measures
+     * between roughly 6.2:1 (cognac, the lightest) and 9.6:1 (petrol) against the leather
+     * it sits on, so there is no stain where it fails and no case for a second ink. Where
+     * a stain runs soft — cognac's highlight corner, which drops to about 3.5:1 — the fix
+     * is stroke weight, not colour. A per-stain ink would make the shelf ten different
+     * products instead of one line in ten dyes; see the note at the top of this file.
+     */
+    '--ink': '#e6c98a',
     /* The emboss under the blocked title. Dark and warm, so it reads as pressed into
-       the leather rather than as a drop shadow floating over it. */
+       the leather rather than as a drop shadow floating over it.
+
+       **Only the kicker uses this now.** The name above it is written rather than
+       pressed, and ink displaces nothing — see `.album__cover-title` in album.css for
+       why the emboss came off it entirely rather than being softened. */
     '--foil-emboss': '#241a05',
     /*
      * The boards of the icon binding — a half-bound book, so these are the paper-covered
      * boards and the stain above stays on as its spine and corners.
      *
      * Warm rather than white. A true white next to brass reads as paper stock, and the
-     * object has to stay a book; ivory keeps it bound in something. Identical on all five
-     * stains for the same reason `--board-edge` is: five upgraded books have to read as
-     * five of the same thing, and a green book with green-tinted boards leaves the series.
+     * object has to stay a book; ivory keeps it bound in something. Identical on every
+     * stain for the same reason `--board-edge` is: ten upgraded books have to read as ten
+     * of the same thing, and a green book with green-tinted boards leaves the series.
      *
      * Emitted unconditionally rather than behind a flag. There is no second code path to
      * fall out of step, and an unused custom property costs nothing — the half-binding is
@@ -108,7 +181,7 @@ export const albumLeather = (cover: string | null | undefined): CSSProperties =>
      * where it belongs — on the leather spine, which still reads `--foil`.
      *
      * Deep bronze rather than black, so it still belongs to the same warm family as the
-     * brass; and identical on all five stains, for the same reason `--board-edge` is.
+     * brass; and identical on every stain, for the same reason `--board-edge` is.
      */
     '--board-ink': '#6a5124',
     '--board-rule': '#a98b4c',

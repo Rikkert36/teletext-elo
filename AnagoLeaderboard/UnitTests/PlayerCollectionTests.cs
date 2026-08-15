@@ -131,14 +131,35 @@ namespace UnitTests
             Assert.That(stored.Cover, Is.EqualTo("navy"));
         }
 
-        [TestCase("oxblood")]
-        [TestCase("forest")]
-        [TestCase("navy")]
+        // One case per entry in COVERS in albumLeather.ts, in that order. The frontend is
+        // where a stain is designed and this is where it is allowed, so the two lists have
+        // to be copied by hand - which is exactly why they are enumerated here rather than
+        // asserted against AlbumCovers.All. Adding a stain to the UI and forgetting this
+        // file has to fail a test, not a user's first click.
+        [TestCase("tobacco")]
         [TestCase("tan")]
+        [TestCase("oxblood")]
+        [TestCase("claret")]
+        [TestCase("aubergine")]
+        [TestCase("olive")]
+        [TestCase("forest")]
+        [TestCase("petrol")]
+        [TestCase("navy")]
         [TestCase("charcoal")]
         public void AlbumCovers_KnowsEveryStainTheUiOffers(string cover)
         {
             Assert.That(AlbumCovers.IsKnown(cover), Is.True);
+        }
+
+        [Test]
+        public void AlbumCovers_OffersNothingTheUiDoesNot()
+        {
+            // The other direction of the same pairing: a stain allowed by the server that
+            // no book can be bound in is a value that will turn up in the database and
+            // paint nothing. The count is the cheap half of that check - the case list
+            // above is the expensive half.
+            Assert.That(AlbumCovers.All, Has.Count.EqualTo(10));
+            Assert.That(AlbumCovers.All, Is.Unique);
         }
 
         [TestCase("purple")]
