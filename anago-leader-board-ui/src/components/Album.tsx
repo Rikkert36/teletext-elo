@@ -1804,22 +1804,6 @@ const Album: React.FC<AlbumProps> = ({
   const atStart = isMobile ? mobilePage === 0 : flipped === 0;
   const atEnd = isMobile ? mobilePage >= pages.length - 1 : flipped >= maxFlipped;
 
-  /** Content pages, excluding the cover at index 0. */
-  const sheetCount = Math.max(pages.length - 1, 0);
-
-  /**
-   * At `flipped === 0` the book is shut and there is no page to name. Otherwise
-   * the spread shows pages 2f-1 and 2f, and the last one can be a single page.
-   */
-  const spreadLabel = (): string => {
-    if (flipped === 0) return '';
-    const low = flipped * 2 - 1;
-    const high = Math.min(flipped * 2, sheetCount);
-    return low === high
-      ? `pagina ${low} / ${sheetCount}`
-      : `pagina ${low}–${high} / ${sheetCount}`;
-  };
-
   /** Shut, showing only the front cover. Where a first visit starts. */
   const closed = isMobile ? mobilePage === 0 : flipped === 0;
 
@@ -2015,29 +1999,6 @@ const Album: React.FC<AlbumProps> = ({
     '--white-r': `${rightPile.white}`,
   } as React.CSSProperties;
 
-  /*
-   * The line above the book, and the only chrome the album has. It says where you are and
-   * nothing else — `gesloten` for the shut book, `pagina …` for a spread.
-   *
-   * **There used to be an invitation in front of both**, shown while a just-bound book had
-   * never been opened, on the argument that the album has no arrows and nothing drawn on its
-   * turn strips so the line is the only place discoverability can live. That argument was
-   * answered by doing rather than saying: the book now opens itself on the voorwoord the
-   * first time, which performs the cover turn instead of describing it. See `justBound`.
-   */
-  const pageLabel = isMobile
-    ? mobilePage === 0
-      ? 'gesloten'
-      : `pagina ${mobilePage} / ${sheetCount}`
-    : spreadLabel();
-
-  /*
-   * Blank for the length of the ceremony: a book that shuts itself and changes colour with
-   * the label still reading "gesloten" reads as a fault. It keeps its box either way, so
-   * nothing shifts when it changes.
-   */
-  const label = rebindingNow ? '' : pageLabel;
-
   return (
     <>
       {/*
@@ -2069,7 +2030,17 @@ const Album: React.FC<AlbumProps> = ({
         </>
       ) : null}
 
-      <div className="album__nav-label">{label}</div>
+      {/*
+        Empty, and still here on purpose.
+
+        This row used to be the only chrome the album had — `gesloten` for the shut book,
+        `pagina …` for a spread — and the text is gone. The box is not: `.choice__label`
+        is this same row during the opening ceremony and does carry text ("Kies je album"),
+        the handover between the two is a hard swap with nothing crossfading, and the height
+        the album reserves in game.css counts this row in. Dropping the element shifts the
+        book up by a line at the handover, so what goes is the words alone.
+      */}
+      <div className="album__nav-label" aria-hidden="true" />
 
       <div className={`album-row${rebindingNow ? ' album-row--rebinding' : ''}`}>
         <div

@@ -1,85 +1,43 @@
-import React, { useEffect, useId, useLayoutEffect, useState } from 'react';
-import { HERSHEY_CAP, dashLength, hersheyGlyph } from '../utils/hersheyScript';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
 
 /**
- * A name in a real typeface, revealed as though it were being written.
+ * The owner's name on the cover, lit rather than written.
  *
- * **Why this exists.** An outline font cannot be drawn on: `stroke-dashoffset` walks a
- * path, and a glyph is a filled contour, so animating it traces the letter's silhouette
- * and reads as the letter being circled. The glyphs here are the real typeface and never
- * move — what moves is a **mask**, driven by the route a pen takes through each letter,
- * which is exactly what a Hershey centreline is. The stroke font stopped being the thing
- * you see and became the thing that decides what you see when.
+ * **This replaced four attempts at making an outline font look hand-written, and why each
+ * failed is worth keeping, because each one will otherwise be proposed again.** An outline
+ * glyph cannot be drawn on: `stroke-dashoffset` walks a path, and a filled contour
+ * animated that way traces its own silhouette. Masking it with a pen-route fails
+ * differently — a Hershey centreline is the wrong *shape* for a Florilane letter, so the
+ * mask wanders off the ink and only a very fat stroke still covers it, which uncovers
+ * round blobs several letters wide. Computing Florilane's **own** centreline (Zhang-Suen
+ * thinning on the rasterised glyph, width from a distance transform) fixed the shape and
+ * still fell short, because stroke *order* cannot be recovered from an outline — a hand
+ * has one and the algorithm can only guess at it.
  *
- * Two faults in the first version are worth keeping written down, because both are
- * invisible in review and obvious on screen.
+ * The way out was to stop imitating. Florilane is a high-contrast face — its stems are
+ * over three times its hairlines — and that contrast is exactly what makes any reveal read
+ * as revealing rather than as drawing. A *monoline* script would genuinely draw, its
+ * letter being a stroke already; two were measured (Grand Hotel at 1.36, Sacramento at
+ * 1.50, against Florilane's 3.33) and neither was the right letter for this book.
  *
- * **Widths were summed per character with `measureText`, and that is wrong for a script.**
- * Connecting faces carry large *negative* side bearings so the letters join, which makes
- * the sum of individual advances substantially wider than the kerned string really is.
- * The mask spread rightward while the text stayed compact: early letters roughly aligned,
- * later ones missed entirely. Horizontal placement now comes from `getExtentOfChar` on the
- * rendered `<text>` — the authoritative answer, because it measures the very element being
- * masked rather than a canvas approximation of it.
+ * So the name is not written at all now. It is **lit** — the album's own silhouette beat
+ * from `card.css`, in the gold variant an icoon uses. The shape of it is in
+ * `.written__glyphs--lighting` in album.css.
  *
- * **A centreline cannot cover a swash.** A pen-route runs through the skeleton of a
- * letter; Florilane's flourishes reach well outside it. Any ink beyond the stroke's width
- * was therefore never uncovered — permanently, since the animation ends with the mask
- * fully drawn, which is why the finished name was missing pieces rather than merely
- * arriving oddly. So the route no longer covers on its own: each character also gets a
- * **wipe** across its own column, union'd into the same mask and on the same clock. The
- * route leads and describes the hand; the wipe follows and guarantees the letter is whole.
+ * All that survives here is the measurement, and it exists to size the box: the name is an
+ * SVG so it auto-fits the cover the way a drawing does, rather than being set at a
+ * font-size that only ever suits one name length.
  */
 
-/**
- * How fat the revealing stroke is, as a fraction of cap height.
- *
- * This is about how much of the letter the *pen* uncovers ahead of the wipe, not about
- * coverage — coverage is the wipe's job now. Too thin and the route stops reading as a
- * nib; too fat and it swallows the wipe and the whole thing flattens into a bar crossing
- * the name.
- */
-const MASK_WIDTH = 0.62;
-
-/**
- * How far the wipe trails the pen, as a fraction of each character's own duration.
- *
- * Zero would put the two exactly in step, and the wipe — being a solid column — would then
- * be all you ever saw. Trailing it lets the route get into the letter first, so a flourish
- * arrives as the hand reaches it rather than before.
- */
-const WIPE_LAG = 0.35;
-
-interface CharPiece {
-  routes: { d: string; length: number }[];
-  wipe: { d: string; length: number; width: number };
-  /** Fraction of the whole name written before this character starts. */
-  start: number;
-  /** Fraction of the whole name this character takes. */
-  span: number;
-}
-
-interface Measured {
-  pieces: CharPiece[];
-  viewBox: string;
-  width: number;
-  height: number;
-  cap: number;
-}
-
-const lengthOf = (points: number[][]): number => {
-  let total = 0;
-  for (let i = 0; i + 1 < points.length; i++) {
-    total += Math.hypot(points[i + 1][0] - points[i][0], points[i + 1][1] - points[i][1]);
-  }
-  return total;
-};
+/** Measured at this size and then scaled by the viewBox, so nothing recomputes on resize. */
+const NOMINAL = 100;
 
 /**
  * Resolve `--cover-hand` to a real family string.
  *
- * Canvas needs a resolved shorthand — handing it `var(--cover-hand)` silently leaves the
- * context on its default face, and the cap height would then describe the wrong font.
+ * Read off the root, where album.css declares it as a constant. It used to be set from JS,
+ * and a variable that arrives one render late is a measurement taken against the fallback
+ * face — which is a mask, or a box, built for the wrong letters.
  */
 const resolveHand = (): string => {
   if (typeof window === 'undefined') return 'cursive';
@@ -89,26 +47,43 @@ const resolveHand = (): string => {
   return value.length > 0 ? value : 'cursive';
 };
 
-const NOMINAL = 100;
+interface Measured {
+  viewBox: string;
+  width: number;
+  height: number;
+  /** Cap height, which the glow radii are proportional to. */
+  cap: number;
+}
 
 interface WrittenTypeProps {
   name: string;
+  /** Play the reveal. False on the album's own cover — see `WrittenName`. */
   writing: boolean;
+  /**
+   * Measured, but not on the cover yet.
+   *
+   * **A third state, because two were not enough and the missing one was visible.** The
+   * album's own cover is `writing: false` and shows the name at rest, which is right —
+   * but the ceremony passes through the same state on its way *to* the reveal, so the
+   * name sat there in finished gold from the moment the book came up, and the light then
+   * bloomed over a name that was already present.
+   *
+   * Kept mounted rather than rendered later, so the font is loaded and the box is
+   * measured before the beat starts. Mounting it at the downbeat instead would spend the
+   * first frames of the reveal measuring.
+   */
+  pending?: boolean;
   durationMs: number;
 }
 
-const WrittenType: React.FC<WrittenTypeProps> = ({ name, writing, durationMs }) => {
+const WrittenType: React.FC<WrittenTypeProps> = ({ name, writing, pending, durationMs }) => {
   const fontFamily = resolveHand();
-  const maskId = useId().replace(/:/g, '');
   const [ready, setReady] = useState(false);
   const [measured, setMeasured] = useState<Measured | null>(null);
 
   /*
-   * Wait for the webfont before measuring anything.
-   *
-   * Without this the first measurement runs against the fallback face and every route is
-   * placed on the wrong letters. `load` is called explicitly because `ready` alone can
-   * settle before a font nothing has requested yet has been fetched.
+   * Wait for the webfont before measuring. Without this the box is sized from the fallback
+   * face and the name is laid out to a width it will not have.
    */
   useEffect(() => {
     let live = true;
@@ -135,13 +110,11 @@ const WrittenType: React.FC<WrittenTypeProps> = ({ name, writing, durationMs }) 
     if (!ready) return;
 
     /*
-     * Measured on a **probe** rather than on the rendered text, and that is not incidental.
+     * Measured on a throwaway probe rather than on the rendered text.
      *
-     * The component shows plain text until it has a viewBox (see below), so measuring the
-     * rendered `<text>` would deadlock: no measurement without the element, no element
-     * without the measurement. A throwaway SVG breaks the cycle and costs one layout.
-     *
-     * It has to be *in the document* — `getBBox` and `getExtentOfChar` report zero for a
+     * The component shows plain text until it has a viewBox, so measuring the rendered
+     * `<text>` would deadlock: no measurement without the element, no element without the
+     * measurement. The probe has to be *in the document* — `getBBox` reports zero for a
      * detached tree — so it is attached off-screen and removed in the same effect.
      */
     const probe = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -157,13 +130,10 @@ const WrittenType: React.FC<WrittenTypeProps> = ({ name, writing, durationMs }) 
     probe.appendChild(el);
     document.body.appendChild(probe);
 
-    const done = () => document.body.removeChild(probe);
+    const bbox = el.getBBox();
 
-    /*
-     * Cap height from a canvas: the one measurement SVG will not give directly, and the
-     * one place kerning cannot interfere because it is a single glyph's ascent. Everything
-     * horizontal comes from the text element itself.
-     */
+    /* Cap height from a canvas — the one measurement SVG will not give directly, and the
+       one place kerning cannot interfere, being a single glyph's ascent. */
     let cap = NOMINAL * 0.7;
     const ctx = document.createElement('canvas').getContext('2d');
     if (ctx) {
@@ -171,90 +141,18 @@ const WrittenType: React.FC<WrittenTypeProps> = ({ name, writing, durationMs }) 
       cap = ctx.measureText('H').actualBoundingBoxAscent || cap;
     }
 
-    const bbox = el.getBBox();
-    if (bbox.width === 0) {
-      done();
-      return;
-    }
+    document.body.removeChild(probe);
+    if (bbox.width === 0) return;
 
-    const chars = Array.from(name);
-    const raw: { routes: number[][][]; x: number; w: number }[] = [];
-
-    chars.forEach((char, index) => {
-      if (char.trim().length === 0) return;
-      let ext: DOMRect;
-      try {
-        ext = el.getExtentOfChar(index);
-      } catch {
-        return;
-      }
-      const glyph = hersheyGlyph(char);
-      if (!glyph || glyph.advance <= 0 || ext.width <= 0) return;
-
-      /* Fit this letter's pen-route into the box the letter actually occupies. Per
-         character, so nothing accumulates: the route over the fourth letter is over the
-         fourth letter however much the two fonts disagree about widths. */
-      const sx = ext.width / glyph.advance;
-      const sy = cap / HERSHEY_CAP;
-      raw.push({
-        routes: glyph.strokes.map((stroke) => stroke.map(([x, y]) => [ext.x + x * sx, y * sy])),
-        x: ext.x,
-        w: ext.width,
-      });
-    });
-
-    if (raw.length === 0) {
-      done();
-      return;
-    }
-
-    /* Budget the whole name by pen travel, so a wide letter genuinely takes longer. */
-    const travel = raw.map((c) => c.routes.reduce((sum, s) => sum + lengthOf(s), 0));
-    const lift = cap * 0.5;
-    const budget = travel.reduce((a, b) => a + b, 0) + lift * Math.max(0, raw.length - 1);
-
-    /* The wipe spans the full height of the drawn name rather than each glyph's own box:
-       swashes and descenders routinely leave their character's column vertically, and a
-       wipe short by a few units leaves a hairline of the flourish behind. */
-    const wipeY = bbox.y + bbox.height / 2;
-    const wipeH = bbox.height * 1.06;
-
-    let elapsed = 0;
-    const pieces: CharPiece[] = raw.map((piece, index) => {
-      const start = elapsed / budget;
-      const span = (travel[index] + lift) / budget;
-      elapsed += travel[index] + lift;
-
-      /* A little overlap either side, so consecutive columns cannot leave a seam of
-         unrevealed ink where two letters join. */
-      const bleed = piece.w * 0.12;
-      const x0 = piece.x - bleed;
-      const x1 = piece.x + piece.w + bleed;
-
-      return {
-        routes: piece.routes.map((stroke) => ({
-          d: stroke
-            .map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(2)} ${p[1].toFixed(2)}`)
-            .join(' '),
-          length: lengthOf(stroke),
-        })),
-        wipe: {
-          d: `M${x0.toFixed(2)} ${wipeY.toFixed(2)} L${x1.toFixed(2)} ${wipeY.toFixed(2)}`,
-          length: x1 - x0,
-          width: wipeH,
-        },
-        start,
-        span,
-      };
-    });
-
-    done();
-
-    
-
-    const pad = cap * 0.28;
+    /*
+     * A modest pad only. The glow reaches far beyond this and is **not** contained by
+     * growing the box — `.album__cover-title .written-type` sets `overflow: visible`
+     * instead. Padding the viewBox enough to hold the bloom would shrink the letters
+     * inside a fixed-width box; clipping it draws a bright rectangle on the cover, which
+     * is what an SVG does at its viewport by default.
+     */
+    const pad = cap * 0.18;
     setMeasured({
-      pieces,
       viewBox: `${bbox.x - pad} ${bbox.y - pad} ${bbox.width + pad * 2} ${bbox.height + pad * 2}`,
       width: bbox.width + pad * 2,
       height: bbox.height + pad * 2,
@@ -262,91 +160,71 @@ const WrittenType: React.FC<WrittenTypeProps> = ({ name, writing, durationMs }) 
     });
   }, [ready, name, fontFamily]);
 
-  const masking = writing && measured !== null;
-
   /*
-   * Before the font has loaded and the name has been measured there is no viewBox, and an
-   * SVG without one cannot size itself — so the name is set as ordinary text until then.
-   *
-   * This is also the failure mode if measurement never succeeds at all (no `document.fonts`,
-   * a `getBBox` of zero in a detached tree). A cover that has not finished measuring shows
-   * its name in the right typeface at roughly the right size; it does not show nothing.
-   * `font-display: block` means the face is never the wrong one, only briefly unsized.
+   * Plain text until the font has loaded and the name has been measured — an SVG with no
+   * viewBox cannot size itself. This is also the failure mode if measurement never
+   * succeeds: a cover mid-measurement shows its name in the right typeface at roughly the
+   * right size, rather than showing nothing.
    */
   if (!measured) {
     return (
-      <span className="written__type" style={{ fontFamily }}>
+      <span
+        className={`written__type${pending ? ' written__type--pending' : ''}`}
+        style={{ fontFamily }}
+      >
         {name}
       </span>
     );
   }
 
+  const style = {
+    fontFamily,
+    fontSize: NOMINAL,
+    /* The glow radii scale with the type, so the beat reads the same on a phone as on a
+       desk. The keyframes read these rather than hard-coding pixel sizes. */
+    '--glow-near': `${(measured.cap * 0.3).toFixed(1)}px`,
+    '--glow-far': `${(measured.cap * 0.8).toFixed(1)}px`,
+    '--bloom-far': `${(measured.cap * 0.85).toFixed(1)}px`,
+    '--bloom-near': `${(measured.cap * 0.35).toFixed(1)}px`,
+    ...(writing ? { animationDuration: `${durationMs}ms` } : {}),
+  } as React.CSSProperties;
+
   return (
     <svg
       className="written-type"
-      viewBox={measured?.viewBox}
+      viewBox={measured.viewBox}
       preserveAspectRatio="xMidYMid meet"
       role="img"
       aria-label={name}
-      style={measured ? { aspectRatio: `${measured.width} / ${measured.height}` } : undefined}
+      style={{ aspectRatio: `${measured.width} / ${measured.height}` }}
     >
-      {masking && measured ? (
-        <defs>
-          <mask id={maskId} maskUnits="userSpaceOnUse" x="-9999" y="-9999" width="19998" height="19998">
-            {/* Black hides, white uncovers. Deliberately enormous: the mask has to cover
-                every part of the text box whatever the viewBox turns out to be. */}
-            <rect x="-9999" y="-9999" width="19998" height="19998" fill="black" />
-            {measured.pieces.map((piece, index) => (
-              <g key={index}>
-                {/* The wipe: trails the pen and guarantees the letter ends up whole,
-                    swashes included. Butt cap, so a column does not bleed into the next
-                    letter's before that letter has been reached. */}
-                <path
-                  d={piece.wipe.d}
-                  className="written__nib written__nib--wipe"
-                  strokeWidth={piece.wipe.width}
-                  style={
-                    {
-                      '--len': dashLength(piece.wipe.length),
-                      animationDuration: `${Math.max(
-                        1,
-                        Math.round(piece.span * (1 - WIPE_LAG) * durationMs),
-                      )}ms`,
-                      animationDelay: `${Math.round(
-                        (piece.start + piece.span * WIPE_LAG) * durationMs,
-                      )}ms`,
-                    } as React.CSSProperties
-                  }
-                />
-                {/* The pen: leads, and is what makes this read as a hand rather than as a
-                    bar crossing the name. */}
-                {piece.routes.map((route, routeIndex) => (
-                  <path
-                    key={routeIndex}
-                    d={route.d}
-                    className="written__nib"
-                    strokeWidth={measured.cap * MASK_WIDTH}
-                    style={
-                      {
-                        '--len': dashLength(route.length),
-                        animationDuration: `${Math.max(1, Math.round(piece.span * durationMs))}ms`,
-                        animationDelay: `${Math.round(piece.start * durationMs)}ms`,
-                      } as React.CSSProperties
-                    }
-                  />
-                ))}
-              </g>
-            ))}
-          </mask>
-        </defs>
+      {/*
+        The bloom: the same name under a blur wide enough that no letter can be read in it,
+        so what arrives first is *light* rather than lettering.
+
+        **This layer is why the beat works on leather at all.** One layer fading from
+        invisible to white cannot: white at low opacity over warm brown blends to tan,
+        which is the colour of the gilt — so the ramp read as nothing → gold → white →
+        gold, with a phantom gold phase before any light had arrived. Every interpolation
+        from transparent to white over a warm ground goes through it. Formless light first,
+        with letters that resolve quickly once inside it, is the way out.
+
+        Rendered only while lighting. An invisible filtered element is still a rasterised
+        one, and there is no reason to carry it at rest.
+      */}
+      {writing ? (
+        <text className="written__bloom" x={0} y={0} style={style}>
+          {name}
+        </text>
       ) : null}
 
       <text
+        className={`written__glyphs${writing ? ' written__glyphs--lighting' : ''}${
+          pending ? ' written__glyphs--pending' : ''
+        }`}
         x={0}
         y={0}
-        className="written__glyphs"
-        style={{ fontFamily, fontSize: NOMINAL }}
-        mask={masking ? `url(#${maskId})` : undefined}
+        style={style}
       >
         {name}
       </text>

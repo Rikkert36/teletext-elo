@@ -591,23 +591,28 @@
  * Type cut into the surface. Every one of these sits directly on timber, so they
  * all need the same faint relief under them or they float.
  *
- * Written as descendants of `.game-stage` rather than bare, because `.opener__hint`
- * hard-codes a warm grey of its own in packopen.css: at equal specificity which of
- * the two wins would come down to the order the bundler happens to concatenate the
- * files in, which is not a thing to depend on.
+ * Written as descendants of `.game-stage` rather than bare, because these set colours of
+ * their own elsewhere: at equal specificity which of the two wins would come down to the
+ * order the bundler happens to concatenate the files in, which is not a thing to depend on.
  */
 .game-stage .game-notice,
 .game-stage .game-readout,
 .game-stage .game-muted,
 .game-stage .game-check,
 .game-stage .album__nav-label,
-.game-stage .opener__hint,
+.game-stage .opener__tally,
 .game-stage .hourglass__caption {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
 }
 
-.game-stage .opener__hint {
-  color: var(--ink-dim);
+/*
+ * **A shade up from `--ink-dim`, which is what the hint line under the row used to take.**
+ * That one was a caption and wanted to recede; this is what the reveal comes to, and it is
+ * the only thing on the table once the stage is empty. Warm rather than white — everything
+ * written in this world is ink or gilt, and a total is ink.
+ */
+.game-stage .opener__tally {
+  color: #dcc79c;
 }
 
 /*
@@ -760,7 +765,7 @@
  *
  * The argument it was carrying is worth keeping, because the next thing on this page will
  * want it: something taken off screen mid-sequence must keep its box, or the column
- * changes height at the worst possible moment. `.opener__hint`'s `&nbsp;` during the tear
+ * changes height at the worst possible moment. `.opener__tally`'s empty box before the tear
  * is the surviving example.
  */
 

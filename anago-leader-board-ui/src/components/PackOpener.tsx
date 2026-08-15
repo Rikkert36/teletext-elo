@@ -100,6 +100,91 @@ const CEREMONY_LEAD_MS = 320;
 /** How long the revealed card takes to travel down into the row. */
 const SETTLE_MS = 460;
 
+/**
+ * The beat between the last card settling and the tally being written above the stage.
+ *
+ * `.album-side`'s own number, and they must not be tuned apart: the shelf stands back up
+ * over 420ms after a 320ms wait, and these are the same statement made by two objects at
+ * opposite ends of the table. Where a packet is left on the pile they land together.
+ *
+ * It has to be a beat rather than the same frame as the last card. The card arriving and
+ * the count of them are two facts, and stacking them puts the second one under a card that
+ * is still moving.
+ */
+const TALLY_MS = 320;
+
+/**
+ * How long the line takes to be written on, left to right.
+ *
+ * **Must match `.opener__tally-ink`'s transition and `tally-nib`'s duration**, which are the
+ * mask sweeping the ink in and the light riding at its edge — three clocks describing one
+ * stroke, and the only reason they are three is that CSS cannot read a constant. Both sides
+ * scale by the same `--anim`, so the pacing slider cannot pull them apart.
+ *
+ * It is what this component holds the nib mounted for; a keyframe left running under an
+ * element nobody removes is a keyframe that replays the next time anything re-renders it.
+ */
+const NIB_MS = 400;
+
+/**
+ * Dutch for the count, spelled out to twelve.
+ *
+ * **Words rather than a numeral, and that is the whole of why this line is allowed back.**
+ * A numeral on a table is a readout — it belongs to a scoreboard, and this page has spent
+ * four rounds removing the last things that looked like UI. Written out, it is a sentence
+ * about what you have, which is what somebody would actually say.
+ *
+ * Twelve because that is where the Dutch stops being short: *dertien* is fine but the pack
+ * sizes make it rare, and past it the words are longer than the line wants. A sitting big
+ * enough to need one is a sitting where the exact figure has stopped mattering anyway.
+ *
+ * Zero is a real answer and gets a word of its own. All-duplicates happens, and the line
+ * that reports it honestly is better than a line that goes missing on the one pull the
+ * reader is most likely to be puzzled by.
+ */
+const COUNTED = [
+  'geen',
+  'één',
+  'twee',
+  'drie',
+  'vier',
+  'vijf',
+  'zes',
+  'zeven',
+  'acht',
+  'negen',
+  'tien',
+  'elf',
+  'twaalf',
+];
+
+/**
+ * What the line says: **what this packet gave you**, and the sitting's total after it.
+ *
+ * **The packet's own count is the sentence**, and that follows from how the line arrives.
+ * It is written on, left to right, at the end of a reveal — which is a narration of what
+ * just happened, not a summary. A sitting total in that position is not merely the wrong
+ * register, it is sometimes false: on a second packet the line would re-write itself to
+ * announce a figure that is mostly historical, and a packet that yields nothing new would
+ * still write on a number inherited from the packet before it, as though that had just
+ * happened. The fuller a collection gets the more often that is the case, which is exactly
+ * when a reader is watching for it.
+ *
+ * **The total is a second clause, and only from the second packet on.** On the first the two
+ * figures are identical and printing both is silly. From the second, the row underneath has
+ * cards in it from before and genuinely stops being countable at a glance — which was the
+ * whole argument for having any text here at all. `total` is null when it would be the same
+ * as `pack`.
+ *
+ * "geen nieuwe kaarten" therefore becomes a real and frequent ending, and it should: it is
+ * the honest report of an all-duplicates pull, and precisely the outcome a running total
+ * would have papered over.
+ */
+const tallyText = (pack: number, total: number | null): string => {
+  const line = `${COUNTED[pack] ?? pack} ${pack === 1 ? 'nieuwe kaart' : 'nieuwe kaarten'}`;
+  return total === null ? line : `${line} — ${COUNTED[total] ?? total} in totaal`;
+};
+
 /* ------------------------------------------------------------------ *
  * Beat 6 — the row waits, and the reader decides
  *
@@ -522,6 +607,28 @@ const PackOpener: React.FC<PackOpenerProps> = ({
   const [cursor, setCursor] = useState(0);
   /** How many cards have been handed off to the row. Trails `cursor`. */
   const [landed, setLanded] = useState(0);
+  /**
+   * The line is showing.
+   *
+   * **False at mount, always**, and that follows from the line belonging to a *packet*. It
+   * was briefly initialised from `table.length` so a second packet would inherit the
+   * previous one's line rather than blinking it out — and that cannot survive the line
+   * naming this packet's count, because a fresh opener has no idea how many of the cards on
+   * the table came out of the packet before it. It would have to print a figure it cannot
+   * know, or a differently-worded line on the same frame, which is a visible flip.
+   *
+   * So picking up a packet clears the narration, which is right anyway: the line describes
+   * what just happened, and reaching for the next packet is you doing something else. It
+   * goes at the moment of the click rather than at the tear, which is the moment the reader
+   * caused.
+   */
+  const [told, setTold] = useState(false);
+  /**
+   * The line is being written on — the nib is travelling. Mounted for `NIB_MS` and no
+   * longer, like the reveal's flash: a keyframe on an element nobody takes away replays the
+   * next time anything re-renders it.
+   */
+  const [writing, setWriting] = useState(false);
   /** False during the hand-off gap, so the centre is briefly empty. */
   const [heroVisible, setHeroVisible] = useState(true);
   const [faceUp, setFaceUp] = useState(false);
@@ -969,11 +1076,35 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     playSlot();
     onFinished(cardsRef.current);
     /*
-     * And that is the end of what this component does on its own. **Nothing is scheduled
-     * here**: the cards stay on the table and what happens next is the reader's — another
-     * packet, or filing them. See the beat 6 block.
+     * And that is the end of what this component *does*: the cards stay on the table and
+     * what happens next is the reader's — another packet, or filing them. See the beat 6
+     * block.
+     *
+     * **The one thing scheduled here is the tally**, and it is a statement rather than a
+     * step: nothing is waiting on it and nothing it does can be interrupted. After
+     * `clearTimers`, deliberately — everything before this belonged to the reveal and is
+     * finished with. Unmounting still clears it, which is all that matters.
      */
-  }, [clearTimers, onFinished]);
+    if (fastMode || prefersReducedMotion()) {
+      setTold(true);
+      return;
+    }
+
+    after(TALLY_MS, () => {
+      /*
+       * One commit. `index.tsx` mounts with legacy `ReactDOM.render`, which does not batch
+       * state set from a timeout — and unbatched, the nib mounts a commit after the mask
+       * starts sweeping, so the light sets off from behind the edge it is supposed to be at.
+       */
+      unstable_batchedUpdates(() => {
+        setTold(true);
+        setWriting(true);
+      });
+    });
+
+    /* The nib is a one-shot layer and this is the only thing that takes it away again. */
+    after(TALLY_MS + NIB_MS, () => setWriting(false));
+  }, [after, clearTimers, fastMode, onFinished]);
 
   /**
    * Mutual recursion between the two halves of the reveal, held in a ref so
@@ -1298,6 +1429,12 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     if (phase !== 'sealed' || started.current) return;
     started.current = true;
 
+    /*
+     * Nothing to clear here. The line belongs to this packet and `told` starts false, so a
+     * reveal cannot begin with one showing — the previous packet's went with the opener that
+     * wrote it. See the flag.
+     */
+
     // Before the roll, not after: the pile must not stay clickable across it.
     onStart?.();
 
@@ -1324,6 +1461,21 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    * are still coming out of the packet and the row is not a finished thing to act on.
    */
   const canFile = (phase === 'sealed' || phase === 'done') && table.length + cards.length > 0;
+
+  /**
+   * What the line counts: this packet, and the sitting it belongs to.
+   *
+   * `cards` rather than `cards.slice(0, landed)`: both are only ever read while `told`,
+   * which cannot be true mid-reveal, so they are the same set at every moment that matters.
+   * The unsliced version is what the tally is *about*, and a partial count would be a
+   * spoiler if it were ever shown early.
+   *
+   * `sittingNew` is null on the first packet of a sitting — `table` empty means there is
+   * nothing for a total to add up that the sentence has not already said.
+   */
+  const packNew = cards.filter((card) => card.isNew).length;
+  const sittingNew =
+    table.length > 0 ? packNew + table.filter((card) => card.isNew).length : null;
 
   /**
    * **A click on the table, which is anywhere in the middle of it.**
@@ -1496,14 +1648,13 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     /*
       **The table takes the click, wherever on it you happen to click.** The cards are lying
       there and putting them away is the only thing this screen does with them, so there is
-      nothing to aim at and nothing that says so — see `tableClick`, and the note over the
-      hint line for why no line explains it. The packet on the stage is the only thing that
-      does something else, and it stops the click itself.
+      nothing to aim at and nothing that says so — see `tableClick`. The packet on the stage
+      is the only thing that does something else, and it stops the click itself.
     */
     <div className="opener" onClick={tableClick}>
       {/*
-        Three rows in one column, always: the stage, the table, and the line under it. Only
-        the stage changes with the phase — the other two are rendered once, below.
+        Three rows in one column, always: the stage, the tally, and the table. Only the stage
+        changes with the phase — the other two are rendered once, below.
 
         The column re-laid itself out at the tear when the wrapper phase was shorter and had
         no row beneath it: `justify-content: center` put the packet lower than the stage it
@@ -1511,6 +1662,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
         just clicked. The stage's fixed `--pack-h` is the other half of that, and the row's
         `min-height` — one card, whether it holds any or not — is the third; see packopen.css.
       */}
+
       {phase === 'sealed' ? (
         <div className="opener__stage">
           <div
@@ -1745,6 +1897,57 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       ) : null}
 
       {/*
+        **The tally, and it is the only text on this table.**
+
+        The reveal used to end on nothing: the last card lands and the column simply holds,
+        which reads as a page that has hung rather than one that is waiting for you. It is
+        worst with an empty shelf, where there is not even a pile brightening beside it. Two
+        wordless endings were built for this and both were thrown away — a 5px lift of the
+        row, which was invisible, and the whole row travelling up into the stage's reserved
+        space, which was the pre-`PutAway` ending restored and still did not carry it.
+
+        So the count comes back. **It is the one fact about a sitting the table cannot show
+        you**: a duplicate and a new card lie there looking identical apart from a rim, and
+        nothing else on this page ever adds them up. That is the difference between this and
+        every line that has been taken off this column — "toegevoegd aan je album" narrated a
+        thing you had just watched, and "klik op de kaarten…" explained a gesture. A total is
+        neither.
+
+        **Directly over the cards, not at the top of the column.** It was first put above the
+        stage, which on a tall window is most of a packet's height away from the row — so it
+        read as a banner across the top of the screen rather than as a note about the cards
+        underneath it. Here it is between the stage and the row: the last thing above the
+        things it counts, and the cards fly through its box on the way down, which is empty
+        for the whole of the reveal.
+
+        **It is the whole sitting, not this packet**, for the same reason the row is: two
+        packets opened back to back are one visit to the table. `table` holds the earlier
+        packets' cards and `cards` this one's, which is exactly the row underneath it.
+
+        It takes the reserved box the hint line used to hold under the row, so the column
+        still has its three boxes and its height is what it always was — that box only ever
+        existed to stop the layout changing at the tear, and it had spent months holding an
+        `&nbsp;`.
+
+        **The ink is masked, the nib is not.** The wipe that writes the line on is a mask, and
+        a mask clips its element's children too — so a nib inside it would be cut in half by
+        the very edge it is meant to be riding. Hence two elements: the mask lives on the ink,
+        and the light sits outside it in the tally's own box.
+      */}
+      <div className={`opener__tally${told ? ' opener__tally--told' : ''}`}>
+        <span className="opener__tally-ink">{told ? tallyText(packNew, sittingNew) : ' '}</span>
+        {/*
+          Mounted for the length of the stroke and no longer, like the reveal's flash. It has
+          to be a keyframe rather than a transition — it fades *out* at the end of its own
+          travel, which two ends of a transition cannot describe — and a keyframe on a
+          permanent element would replay on the second packet of a sitting, where the line is
+          already written and must simply be there. `writing` is never raised at mount, so
+          that cannot happen. See `finish`.
+        */}
+        {writing ? <span className="opener__nib" /> : null}
+      </div>
+
+      {/*
         **The table, and it belongs to the sitting rather than to the packet.** One row for
         every phase: the cards from earlier packets first, then whatever this one has
         turned over so far. That is what makes a second packet add to the row instead of
@@ -1803,18 +2006,6 @@ const PackOpener: React.FC<PackOpenerProps> = ({
         </div>
       </div>
 
-      {/*
-        **This line says nothing, and it is kept for its box.** It is a spacer as much as it
-        ever was a caption: the column's heights are reserved to the pixel, and dropping the
-        element would shorten it at the tear and again at the ending.
-
-        Everything it used to carry is gone, each for the same reason. "klik op het pakje"
-        told you to click a packet lying alone in the middle of a bare table. "toegevoegd aan
-        je album" and "2 nieuwe kaarten voor je album" reported a count the row in front of
-        you *is*. "klik op de kaarten om ze in je album te leggen" explained a gesture that is
-        now the whole tabletop — there is nothing to aim at, so there is nothing to be told.
-      */}
-      <div className="opener__hint">&nbsp;</div>
     </div>
   );
 };

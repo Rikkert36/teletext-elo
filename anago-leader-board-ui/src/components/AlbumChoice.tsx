@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { COVERS, CoverId, albumLeather } from '../utils/albumLeather';
 import { ms } from '../utils/animationSpeed';
-import { playCoverTurn, playPenStroke } from '../utils/sounds';
 import WrittenName, { durationFor } from './WrittenName';
 import { writeName } from '../utils/hersheyScript';
 /*
@@ -184,33 +183,16 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
       }
 
       /*
-       * **One sound per stroke, scheduled off the same geometry the pen is drawn from.**
+       * **The whole ceremony is silent, and that is the finished state of it.**
        *
-       * The foil version ticked once per letter, which was right for a die coming down on
-       * one character at a time. A pen does not move that way: it lays ink while it is
-       * down and lays none while it is lifted, so the sound has to follow the *strokes*
-       * rather than the letters. Dotting an i is a separate small noise from the stem it
-       * belongs to, and the gap between them is the lift.
-       *
-       * This is also why one long scratch across the whole name is wrong even though it is
-       * simpler — it would keep scratching through every lift, including the one between
-       * two words, where the pen is demonstrably off the leather.
-       *
-       * One timer per stroke rather than an interval, for the reason the letter run had:
-       * the beat this ends on is known and an interval drifts.
+       * There were two sounds here and both are deleted. `playPenStroke` fired once per
+       * stroke, off this same geometry — the strokes are short and the lifts between them
+       * shorter, so the grain clouds ran together and the pen read as *smacking* rather
+       * than as a nib. And a `playCoverTurn` at +120 laid the finished book on the table,
+       * which with the name already written is a page rustling for no reason anyone can
+       * see. `written` stays: the timings still come from the real stroke geometry.
        */
-      if (written) {
-        written.strokes.forEach((stroke) => {
-          after(ms(SETTLE_MS) + stroke.start * writeMs, () =>
-            playPenStroke(stroke.span * writeMs),
-          );
-        });
-      }
-
       const finished = ms(SETTLE_MS) + writeMs;
-      // The book settling onto the table: the one heavy sound here, and it lands *after*
-      // the name rather than under it so the writing stays small and dry.
-      after(finished + ms(120), playCoverTurn);
       after(finished + ms(REST_MS), () => {
         setPhase('resting');
         onDone();
@@ -244,8 +226,8 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
         That is a non-breaking space rather than an ordinary one, which would collapse. It
         no longer decides the height — `.choice__label` reserves a full line box now, so an
         empty row and a filled one come out the same on both sides of the handover, which
-        the album needs regardless: `spreadLabel()` returns `''` at `flipped === 0`, so a
-        shut book's row is genuinely empty. Kept because a row whose height depends on
+        the album needs regardless: its own copy of this row carries no text at all any more,
+        so it is empty in every state. Kept because a row whose height depends on
         whether its content collapses is one that will go short again the next time either
         reserve is touched, and this is the cheap half of not learning that from a 2px jump.
         The same character, for the same reason, as the hint line the pack opener renders
@@ -320,6 +302,9 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
                 <WrittenName
                   name={stampName ?? ''}
                   writing={phase === 'writing' || phase === 'resting'}
+                  /* Everything before the downbeat: the book is on the table but the
+                     name has not gone on it yet. */
+                  pending={phase !== 'writing' && phase !== 'resting'}
                   durationMs={writeMs}
                 />
               </div>

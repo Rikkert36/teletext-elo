@@ -29,6 +29,20 @@ tiers lost, and what the bleed did to the fore-edge are under "The head band, an
 colours it"; the spreads it was designed on are `docs/album-headband.html` and
 `docs/album-band-colours.html`.
 
+**The reveal ends on a count, written in over the cards.** The row waiting is right and is not
+on its own an *ending* — the last card lands, nothing changes state, and it reads as a page
+that has hung, worst of all on the last packet of a pile where there is not even a shelf
+brightening beside it. Two wordless endings were built for it and both are deleted: a 5px
+lift of the row, which is invisible for a reason worth knowing, and the whole row travelling
+up into the stage's reserved space, which is the pre-`PutAway` ending restored and still did
+not carry it. What is there now is `.opener__tally`, on the line **between the stage and the
+row** — how many new cards the **sitting** has produced, spelled out in words, set in the
+book's face in roman lower case, and *written on* left to right by a mask with the light of a
+nib riding at its edge. It earns the place four captions under the row did not because it is
+the one fact about a sitting the table cannot show you. It takes the reserved box
+`.opener__hint` used to hold, so the column's geometry is unchanged, and that element is gone.
+See "The tally, written in over the cards".
+
 **The last button on the table is gone, and the cards do its job.** A reveal ends with the
 row of cards still lying there and the shelf live over it, so there are two things on the
 table: another packet — which **adds its cards to the same row** — or this row, which you
@@ -1589,6 +1603,9 @@ you watch moving. Then the shelf and the book appear.
       filled are the same height. The `line-height` is stated rather than inherited on
       purpose: a reserve derived from a figure that lives in another package is a reserve
       that silently goes short again.
+    - The album's row **carries no text at all now** — the page counter was dropped, see
+      below — so it is empty in every state and the reserve is the only thing setting its
+      height. The element stays for exactly that reason.
     - **Neither figure was found by reading the CSS**, and the second one survived a careful
       read that "proved" the rows matched. They came out of a harness that renders both DOMs
       against the real stylesheets and diffs `getBoundingClientRect()` — the discrepancy is
@@ -1612,12 +1629,12 @@ you watch moving. Then the shelf and the book appear.
   hairline is a box-shadow on a square board — while `.album__cover` inside it is rounded
   `0 3px 3px 0`. A shut album is rounded leather with a square hairline just outside it. A
   radius on the stage rounded the hairline too, and those two corners popped square.
-- **The name is written with `playPenStroke`, one call per stroke.** This replaced
-  `playFoilStamp`, which ticked once per letter — see "The name is written, not stamped"
-  below for why the press went. The rejection that produced the stamp still stands and now
-  protects the pen: `playSlot` per letter is eleven grains over 100ms plus a 130Hz boom, so
-  the grains smear into a wash and the booms become a pitched pulse train. The one heavy
-  sound is `playCoverTurn`, and it lands *after* the name rather than under it.
+- **Nothing here makes a sound, and `AlbumChoice` imports nothing from `sounds.ts`.** Two
+  designs were tried and both are deleted — see "The name is written, not stamped" below.
+  The rejection that killed the first of them still stands and is why nothing per-letter
+  comes back: `playSlot` per letter is eleven grains over 100ms plus a 130Hz boom, so the
+  grains smear into a wash and the booms become a pitched pulse train. Per *stroke* was no
+  better in the end — it read as smacking.
 
 #### The name is written, not stamped
 
@@ -1655,9 +1672,16 @@ a personal album than a press that somehow knew your name in advance.
   timing was right for a press indexing along a line and is wrong for a hand. Pen *lifts*
   are charged against the same budget (`PEN_LIFT_COST`), because otherwise the pen
   teleports between strokes and the dot of an i lands in the same instant as its stem.
-- **The sound follows strokes, not letters, and not the whole name either.** One long
-  scratch is simpler and wrong: it would keep scratching through every lift, including the
-  one between two words where the pen is demonstrably off the leather.
+- **The ceremony is silent, and it is the third sound design here rather than the absence
+  of one** (2026-08-15). It went foil tick per letter → grain cloud per stroke
+  (`playPenStroke`) → nothing. The per-stroke version was right about *what* to follow —
+  one long scratch would keep scratching through every lift, including the one between two
+  words where the pen is demonstrably off the leather — and still wrong in the ear: the
+  strokes are short and the lifts shorter, so the clouds ran together into a series of
+  smacks rather than into a nib. `playPenStroke` is deleted along with its last caller.
+  The `playCoverTurn` that laid the finished book down at the end went at the same time —
+  with the name already written there is nothing on screen for a rustle to belong to. What
+  remains is a hand drawing a name in silence, which is what the picture always was.
 - **`--ink` is its own token, and shares `--foil`'s hex today.** Sharing the *value* is
   right — one shop, one pot of gilt. Sharing the *token* is not: `--foil` means hot foil
   blocking, which still has a job (the rule, and the spine on the icon binding), and the
@@ -1729,8 +1753,22 @@ along with `hint`, `everOpened` and the effect that latched it.
   shut book, because `justBound` is session state and their saved position is leaf 0. That
   is deliberate — the ceremony is what earns the automatic opening, and there is none on a
   reload.
-- `.album__nav-label` still reserves a line's height, which now only matters for keeping
-  `gesloten` and `pagina …` from moving the book.
+- `.album__nav-label` still reserves a line's height, which now matters only as a spacer —
+  see below.
+
+**The album has no label at all any more.** The row above the book said `gesloten` shut and
+`pagina 3–4 / 18` on a spread; both are gone, and the album now presents as a book and
+nothing else. Two things it is worth knowing:
+
+- **The `<div>` stays, empty.** `.choice__label` is the same row during the opening ceremony
+  and does carry text ("Kies je album"), the handover between the two is a hard swap with
+  nothing crossfading, and `--stage-h` in game.css budgets the album's height with this row
+  counted in. Removing the element shifts the book up by a line at the handover and puts the
+  height arithmetic out by the same amount, so what went is the words alone.
+- **Nothing replaced it as a "where am I" indicator**, and that is the point rather than an
+  omission. The fore-edge already shows the pile thinning on the left and thickening on the
+  right, which is how a real book tells you, and a book that also prints its own page count
+  above itself is a UI wearing a book costume.
 
 #### Getting back to the start of the story
 
@@ -1898,6 +1936,14 @@ letter landing together with the board. `playRebind` takes its length from the c
 `playRareRise`, and is friction and air with **no pitch and no low end**: every note in
 `sounds.ts` belongs to the D-minor payoff ladder, so a pitched riser would either join that
 chord or fight it, and a boom would spend the arrival early.
+
+> **And there is now no boom in the ceremony at all.** `playCoverTurn` used to end on a
+> landing — an impact plus a 76 Hz boom at a fixed +0.55s — and it is deleted (2026-08-15).
+> One delay cannot suit four callers: no cover animation here is 550ms long, so the thud
+> never arrived *with* the board. It read as a stray *dook* after the move was over, and the
+> two places it was worst are the two where the book is already lying still — this `resting`
+> accent, and the finished album being laid down at the end of the choosing ceremony. The
+> arc's own decay ends the turn. `playImpact` and `playBoom` both survive for the payoffs.
 
 **Half-bound, and that is what makes the spine free.** Ivory boards with the chosen stain
 kept as the spine strip and four corner triangles. `albumLeather.ts` warns that the cover,
@@ -2351,9 +2397,30 @@ other: neither is worth doing alone.
   what a 9px checklist entry wants. The voorwoord is the only place those compromises turn
   into costs — the big x-height crowds a paragraph and the flat contrast makes the block go
   grey. This was never a decision before; it was a default that propagated.
-  - The bill is the **size floor, raised from 10px to 11px**. Palatino's finer strokes go
+  - The bill is a **size floor** the checklist does not pay. Palatino's finer strokes go
     thin below about 11px where Georgia stays solid: the same contrast that earns it the
-    page costs it the bottom of the range. The floor only binds on the narrowest phones.
+    page costs it the bottom of the range. The floor is 11px on a phone and 9px elsewhere
+    — see the next point for why those are the same number.
+- **The type is a fixed fraction of the page, and that is a stricter rule here than
+  anywhere else in the book.** Every page sizes its type off `--page-w`, but the others
+  hold a grid and can afford to pin at the ends of the range; this one has six paragraphs
+  that have to come in under the trim, and they only do that at every size if the type
+  scales with the page. So the voorwoord has **no ceiling at all** and a floor that only
+  binds on a genuinely small page.
+  - What it replaced was `clamp(11px, page-w × 0.0245, 14px)`, live over page widths of
+    449–571px — four whole-pixel steps, and the book is outside that band nearly
+    everywhere. 1080p at 100% sits on the 14px cap, so zooming *out* grew the page and
+    left the voorwoord behind at 14px, and zooming *in* shrank the page onto the 11px
+    floor and pushed the last paragraphs through the bottom of the leaf.
+  - **Palatino's floor is in device pixels, and a CSS pixel is only one of those at 100%
+    zoom on an unscaled display.** Both of the things that drive the size down here —
+    browser zoom, and the Windows display scaling that shrinks the CSS viewport the same
+    way — make a CSS pixel *larger* than the one the limit was measured against. So 9px
+    off the desktop rule and 11px off the phone rule are the same physical limit stated
+    twice: the phone is the one viewport with no zoom behind it and no headroom to spend.
+  - Everything else on the page is already in `em` and follows for free — the versal, the
+    small caps, the title's tracking. The one length that does not scale is
+    `--page-pad-x`, which is the whole book's margin and not this page's to change.
   - Georgia stays in the stack and that is not a defeat. Android has neither Palatino nor
     Book Antiqua and lands on it, which is precisely what this page rendered as before, so
     there is no viewport where this is worse than what it replaced.
@@ -3501,6 +3568,142 @@ the last card settling); `placing` is non-null for the filing. Every path that u
 opener still has to lower `revealing`, or the shelf stays dimmed and inert for the rest of
 the session.
 
+#### The tally, written in over the cards
+
+The row waiting is right and it is not, on its own, an *ending*. The last card lands and the
+column simply holds: nothing on screen changes state, and it reads as a page that has hung
+rather than one that is waiting for you. It is worst on the last packet of a pile, where
+`shelfPacks` excludes the packet in your hands so there is not even a shelf brightening
+beside it — the case that turns up at the end of every session.
+
+**Two wordless endings were built for it and both were thrown away**, and they are recorded
+because both look obvious from a standing start:
+
+- **The row lifts 5px and takes a shadow and a pointer**, a beat after the last card, on
+  `.album-side`'s 320/420. It was invisible. A uniform displacement of a group has no
+  reference to be seen against — every card moves the same vector at the same moment relative
+  to nothing. To register, a move has to change the *sequence*, the *relationship between the
+  cards*, or *where the group sits in the frame*, and that changed none of them.
+- **The whole row travels up into the stage's reserved space**, which is the pre-`PutAway`
+  ending restored: `.opener__results` was a grid the column centred once the reveal subtree
+  unmounted, and the argument for it is real — the column reserves three boxes and at `done`
+  fills two, so the ending is composed as a packet-sized hole above a row of cards. Built,
+  including the detail that makes it work (`risen` set inside `revealFrom`'s batch for the
+  last card, so the FLIP carries that card from the hero *straight to the middle* instead of
+  down into the row and up out of it again). It still did not sell the ending, and it cost a
+  reversal on every subsequent packet to give the middle back. Both are in the history at
+  `0266a8e`'s parent if they are ever wanted again.
+
+**So the count is written on instead**, and the reason it earns a place where four lines under
+the row did not is that **it is the one fact about a sitting the table cannot show you**. A
+duplicate and a new card lie there looking identical apart from a rim, and nothing else on
+this page ever adds them up. "toegevoegd aan je album" narrated something you had just
+watched; "klik op de kaarten…" explained a gesture; "2 nieuwe kaarten voor je album" was the
+same figure as this one but printed *under* the cards it was counting, as a receipt for the
+transaction rather than as the point of it. A total over them is what the sitting came to.
+
+- **Words, not a numeral** — `COUNTED`, spelled out to twelve. A numeral on a table is a
+  readout, and it belongs to a scoreboard; written out it is a sentence somebody would say.
+  Past twelve it falls back to the figure, which is a sitting where the exact number has
+  stopped mattering anyway. Zero gets a word of its own — "geen nieuwe kaarten" — because
+  all-duplicates happens and is the one pull a reader is most likely to be puzzled by.
+- **This packet's count is the sentence; the sitting's total is a second clause, and only
+  from the second packet on.** `twee nieuwe kaarten — vijf in totaal`. It said the sitting's
+  total alone for one build, and that is wrong for the reason the *entrance* is right: a line
+  written on left to right at the end of a reveal narrates what just happened, and a total in
+  that position is not merely the wrong register but sometimes false — a second packet would
+  re-write the line to announce a figure that is mostly historical, and a packet yielding
+  nothing new would still write on a number inherited from the one before it. The fuller a
+  collection gets, the more often that is the case.
+  - The total earns its clause from the second packet because that is when the row underneath
+    stops being countable at a glance, which was the whole argument for having text here. On
+    the first packet the two figures are identical, so `sittingNew` is null and the clause is
+    not printed.
+  - "geen nieuwe kaarten" therefore becomes a frequent ending rather than a rare one, and it
+    should: it is the honest report of an all-duplicates pull and exactly what a running total
+    papered over.
+- **`told` is false at mount, always.** It was initialised from `table.length` so a second
+  packet would inherit the previous line rather than blinking it out, and that cannot survive
+  the line naming *this packet's* count: a fresh opener has no idea how many of the cards on
+  the table came out of the packet before it, so it would have to print a figure it cannot
+  know or a differently-worded line on the same frame. Picking up a packet clears the
+  narration instead, which is right — the line describes what just happened, and reaching for
+  the next packet is you doing something else. `start` has nothing to clear as a result.
+- **Between the stage and the row, not at the top of the column.** It was put above the stage
+  first, and on a tall window the stage is most of a packet's height — so the line ended up
+  against the top of the screen and read as a banner rather than as a note about the cards
+  under it. It is now the last thing above the things it counts. The cards fly through its
+  box on the way down, which is empty for the whole of the reveal.
+- **It takes the box the hint line used to hold**, so the column still has its three boxes and
+  its geometry is unchanged. That box only ever existed to stop the layout changing at the
+  tear, and it had been holding an `&nbsp;` since the last caption came off. `.opener__hint`
+  is gone.
+- **Set in the book's face, in roman lower case**, not Georgia at 13px — that was what this
+  said when it was a caption under a row, and it read as one. Palatino is what everything
+  printed in this world uses. Small capitals were tried for a build and are wrong here: caps
+  are the checklist's and the head band's voice, for headings and ranges, and a sentence about
+  what you have wants to be a sentence. The relief comes from game.css with every other piece
+  of type on the timber, and the colour is a shade up from `--ink-dim` — the hint receded on
+  purpose, and this does not.
+- **It is written on, left to right, with the light of a nib at the leading edge.** Not a
+  fade, and not the tracking-settle that was here for a build: a `mask-image` slid from one
+  end of the line to the other, and a separate element carrying the light. **Two elements
+  because a mask clips its own children** — a nib inside the masked box would be bisected by
+  the very edge it is riding.
+  - **What the nib tracks is the middle of the fade, not the opaque stop**, and getting that
+    wrong is what kept it looking slow through two goes. The eye reads the ink's edge at about
+    half alpha, and the fully-opaque boundary is a whole tail-width behind that. The stop was
+    55% first — the boundary a tenth of a width ahead of the nib *and* a quarter-width tail on
+    top of it — then 50%, which fixed the boundary and still left the nib half a tail behind.
+  - So the fade is **centred** on 50% of the mask, and the stroke **over-travels at both
+    ends**: the point starts left of the first letter with nothing showing, and finishes right
+    of the last one with that letter solid rather than sitting mid-fade at half alpha.
+  - **`mask-size: 250%`, position `90% → 10%`, and both halves of that are forced.** It was
+    first written as `200%` with the position running `105% → −10%` — the same sweep, and
+    broken. `mask-repeat: no-repeat` makes everything outside the mask image *transparent*,
+    and with `offset = p × (W − 2W) = −pW` a negative `p` slides the image right and drops the
+    leftmost `pW` of the element off it: at −10% the line rendered with its first tenth cut
+    away, so "vijf nieuwe" wrote itself on as "jf nieuwe" and stayed that way. **`p` must stay
+    inside `[0, 1]`.**
+  - At `mask-size: k` the edge travels `(k − 1)W` over the full range of `p`, so `k = 2` can
+    only ever move it exactly one width with nothing either side. `k = 2.5` buys 1.5 widths,
+    of which the stroke spends 1.2 and keeps 0.3 as margin: at `p = 90%` the transparent end
+    of the fade is at `x = −0.025W` so nothing shows, at `p = 10%` the opaque stop has reached
+    `x = 1.025W` so the last letter is solid, and the element samples `[1.35W, 2.35W]` and
+    `[0.15W, 1.15W]` at those ends — inside the image both times.
+  - The nib's range is that same line evaluated at the two ends: `−10%` to `110%`. It starts a
+    hair off the first letter and lifts off past the last, which is where a pen's point
+    actually is. **Change any one of the size, the stops or the two positions and all of it
+    has to be re-solved**, the nib included.
+  - **Linear, deliberately.** A pen holds one speed, which is the principle the cover's name
+    is written on and why its timing comes from path length. An ease-out here is a wipe
+    pretending to be a hand.
+  - **The nib is light, not a caret.** A hard block is a terminal's cursor, which is the one
+    thing this page has spent four rounds refusing to look like. It is struck up at the start
+    and spent by the end, so it reads as the stroke finishing rather than as a control
+    blinking off — which is also why it is a keyframe: fading *out* at the end of its own
+    travel is not something two ends of a transition can describe.
+  - **`writing` mounts it and takes it away**, like the reveal's flash. A keyframe on an
+    element nobody removes replays the next time anything re-renders it.
+  - The opacity fade on the line is 130ms against the stroke's 400 — quick enough that the
+    line is *there* to be written on. Much past a third and the two read as one dissolve, and
+    the left-to-right stops registering at all.
+- **`NIB_MS` is in three places** — the constant, the ink's transition and the keyframe's
+  duration — because CSS cannot read the constant. All three scale by `--anim`, so the pacing
+  slider cannot pull them apart.
+- **`TALLY_MS` is 320**, the shelf's own beat, so where a packet is left on the pile the words
+  and the pile arrive together. It has to be a beat rather than the last card's own frame: the
+  card arriving and the count of them are two facts, and stacking them puts the second under a
+  card that is still moving.
+- **`told` starts true when there are already cards on the table** — the second packet of a
+  sitting, where the previous opener left a count standing and this one replaces it in the
+  same commit; starting false would blink it out and write it again. `start` clears it at the
+  tear, or a total from before this packet would stand over a reveal of it.
+- **Under reduced motion it is simply there**, with the mask taken off entirely and no nib.
+  The mask has to be *removed* rather than left unanimated: with no transition it would sit
+  at `100%` for ever and the line would never appear at all. The ending has to land, not be
+  taken away.
+
 #### The table, and who owns it
 
 The row belongs to the **sitting**, not to the packet, which is the one structural
@@ -3767,12 +3970,13 @@ the shelf.**
   was in the tab order for free; a stretch of table and a row of cards are not, and a keyboard
   reader must not lose the way out.
 
-**The line under the row says what can be done and never what happened** — the cards are the
-record of that. It went "toegevoegd aan je album" → "klik om ze in je album te leggen" →
-"2 nieuwe kaarten voor je album" → *"klik op de kaarten om ze in je album te leggen"*, and
-each step removed the same mistake: the page saying in words something the reader either
-already knows or is about to be shown. It names the alternative while a packet is lying there
-sealed, which is the one moment two things are on offer.
+**There is no line under the row any more.** It went "toegevoegd aan je album" → "klik om ze
+in je album te leggen" → "2 nieuwe kaarten voor je album" → "klik op de kaarten om ze in je
+album te leggen" → nothing, and each step removed the same mistake: the page saying in words
+something the reader either already knows or is about to be shown. The last of those was
+briefly put back on the grounds that with an empty shelf nothing said the row was live, and
+came straight out again — see "The tally, written in over the cards", which is where the words went
+instead, and why the one thing worth saying is not down there at all.
 
 One number moved with all this: `.opener`'s `min-height` was `min(62vh, --album-room − 30px)`,
 the 30 being the exit row. It takes the whole of `--album-room` now.

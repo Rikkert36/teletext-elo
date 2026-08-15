@@ -699,8 +699,14 @@ export const playPageTurn = (): void => {
  * - **A dark, slow arc.** An octave and a half below the page's, over nearly
  *   twice the time, and only a thin skin of paper rustle on top — board is
  *   laminated and has almost no fibre noise of its own.
- * - **It lands.** This is the one turn in the album that *does* get a boom: mass
- *   dropping onto the table, through the shared reverb so the room answers it.
+ * - **It does not land.** There used to be a landing here — an impact, a 76 Hz
+ *   boom and a settle at +0.55s — and it is deleted. No caller's cover animation
+ *   is 550ms long, so the thud never arrived with the board: it read as a *dook*
+ *   after the move had finished, and worst on the two shuts where the book is
+ *   already still (the rebind's `resting` beat and the album being laid down at
+ *   the end of the choosing ceremony). A fixed delay cannot be in time with four
+ *   different durations, and the arc's own decay ends the turn well enough
+ *   without one.
  */
 export const playCoverTurn = (): void => {
   playGrains({
@@ -733,18 +739,6 @@ export const playCoverTurn = (): void => {
     q: 2,
     delay: 0.06,
   });
-
-  playImpact(0.085, 0.3, 0.55);
-  playBoom(76, 0.28, 0.07, 0.55);
-  playGrains({
-    count: 8,
-    spread: 0.085,
-    grainMs: [5, 20],
-    hz: [420, 1900],
-    gain: 0.03,
-    q: 1.6,
-    delay: 0.55,
-  });
 };
 
 /** A card sliding into its slot: brief friction, then a tiny stop. */
@@ -760,53 +754,16 @@ export const playSlot = (): void => {
   playBoom(130, 0.08, 0.05, 0.085);
 };
 
-/**
- * The nib crossing the leather, while the owner's name is written into the cover.
- *
- * **This replaced `playFoilStamp`, and the reason is that the cover stopped being
- * stamped.** The name used to be blocked in hot foil a letter at a time, so the sound was
- * one dry tick per letter. It is now *written* — see `hersheyScript.ts` — and writing is
- * continuous where a press is discrete. A tick per letter under a moving pen is the one
- * thing that would give the change away: the ear would hear a machine indexing along a
- * line while the eye watched a hand draw.
- *
- * **Takes its length from the caller**, the same contract as `playRebind` and for the
- * same reason: a musical hit must not stretch, but a *gesture* must, or the pen is still
- * moving after the sound has stopped.
- *
- * Three constraints carried over intact from the foil stamp, because they were right
- * about the sequence rather than about the press:
- *
- * - **No low end at all.** The weight in this ceremony belongs to the book — `playCoverTurn`
- *   lands after the name — and a nib has no mass to speak of. This is the same reason
- *   `playSlot` was rejected for the stamp: its 130Hz boom, repeated, became a pitched
- *   pulse train and the ceremony sounded like machinery.
- * - **No pitch anywhere.** Every note in this file belongs to the D-minor payoff ladder,
- *   so anything pitched here either joins that chord or fights it. Friction can do
- *   neither.
- * - **Among the quietest things in the module.** It runs for the better part of a second
- *   under a sequence whose climax is the board landing, and a scratch that competes with
- *   that has spent the arrival early.
- *
- * Density rather than count is what is held constant — a fixed grain count stretched over
- * a longer name thins out into separable ticks, which is precisely the artefact this
- * exists to avoid. At roughly 60 grains a second the cloud fuses into a continuous
- * texture; well below that it starts to sound counted again.
+/*
+ * **The choosing ceremony is silent, and there is no pen sound here to find.**
+ * `playPenStroke` stood here — a grain cloud per stroke, held at ~60 grains a second so it
+ * would fuse rather than tick — and `playFoilStamp` before it. Both are gone. Per stroke it
+ * read as smacking, not as a nib: the strokes are short and the gaps between them are
+ * shorter, so the clouds ran together into a series of slaps instead of one continuous
+ * scratch, and no amount of quieting fixed a texture that was wrong about what it was.
+ * The `playCoverTurn` that closed the sequence went with it — see that note. Writing is a
+ * quiet act and this one now plays as one.
  */
-export const playPenStroke = (durationMs: number): void => {
-  const seconds = Math.max(0.12, durationMs / 1000);
-
-  playGrains({
-    count: Math.round(seconds * 60),
-    spread: seconds,
-    /* Short and irregular. A nib is a hard point on a soft grain, not a brush. */
-    grainMs: [3, 11],
-    /* High and narrow — the sound of a fine point, with nothing under it. */
-    hz: [1900, 5800],
-    gain: 0.019,
-    q: 2.8,
-  });
-};
 
 /**
  * The book being re-cased: the icon binding drawn across the board.
@@ -905,15 +862,21 @@ export const playRebind = (durationMs: number): void => {
  * A5 · D6 is a D-minor arpeggio**, the same chord the payoff ladder is built on.
  * F natural, not F♯, for exactly the reason the payoff gives.
  *
- * Four layers:
+ * Two layers:
  *
- * 1. **Air opening**, under the whole thing — a bandpass climbing 700 → 5200 Hz.
- * 2. **The run.** 45ms apart and rising in gain, so the last note is both the
+ * 1. **The run.** 45ms apart and rising in gain, so the last note is both the
  *    loudest and the one on the accent. Short decays: at `playBell`'s 5.6s tail
  *    the four would be a chord rather than a run, which is what `playPing` is
  *    for.
- * 3. **Sparkle**, released on the accent rather than spread across the build, so
+ * 2. **Sparkle**, released on the accent rather than spread across the build, so
  *    the glitter belongs to the landing.
+ *
+ * **There was a third, under the whole thing — an air opening, a bandpass climbing
+ * 700 → 5200 Hz — and it is deleted.** Filtered noise sweeping up through the mids
+ * is a *scrape*: it starts exactly as the silhouette lights, so the one moment the
+ * card is still nobody came with the sound of a shovel going into sand. The run
+ * already opens the moment on its own, and it opens it as light rather than as
+ * friction, which is what the picture is doing.
  *
  * **The reverb send opens as the run climbs**, 0.72 → 1.02, rather than sitting
  * at one value for all four. Uniformly wet, the run arrives already in a large
@@ -935,7 +898,6 @@ export const playRebind = (durationMs: number): void => {
 export const playNameReveal = (rimAtMs = 250): void => {
   const rim = rimAtMs / 1000;
 
-  playNoise(rim * 0.8, 700, 5200, 0.04, 'bandpass');
   [D5, F5, A5, D6].forEach((note, i) => {
     const at = rim - (3 - i) * 0.045;
     playPing(note, 0.02 + i * 0.005, Math.max(0, at), 0.42 + i * 0.2, 0.72 + i * 0.1);

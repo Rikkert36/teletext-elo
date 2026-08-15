@@ -106,12 +106,178 @@
   --pack-h: calc(var(--pack-w) * 1.4 + 2 * var(--crimp));
 }
 
-.opener__hint {
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 13px;
-  color: #a89b7c;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
-  min-height: 16px;
+/* ---------------------------------------------------------------- *
+ * The tally, written in over the cards
+ *
+ * How many new cards the sitting has produced, on the line between the stage and the row.
+ * **The only text on this table**, and it holds the box the hint line used to hold under
+ * the row — that box existed to stop the layout changing at the tear and had been holding
+ * an `&nbsp;` for months, so the column still has its three and its height is unchanged.
+ *
+ * It sat above the stage for one build and that was wrong: on a tall window the stage is
+ * most of a packet's height, so the line ended up against the top of the screen reading as
+ * a banner rather than as a note about the cards. Here it is the last thing above the things
+ * it counts.
+ *
+ * **The type is the book's, not the interface's.** Georgia at 13px was what this said when
+ * it was a hint under a row — a caption, and it read as one. This is the face the voorwoord
+ * is set in, which is what everything printed in this world uses. Roman lower case, not the
+ * small capitals this wore for a build: caps are the checklist's and the head band's voice,
+ * for headings and ranges, and a sentence about what you have wants to be a sentence. The
+ * relief under it comes from game.css with every other piece of type on the timber.
+ *
+ * **It is written on rather than faded in**, left to right, with the light of the nib at the
+ * leading edge. The mask does the writing and a separate element carries the light, because
+ * a mask clips its own children — a nib inside the masked box would be bisected by the very
+ * edge it is riding. Both run at `NIB_MS`, which PackOpener also holds the nib mounted for.
+ *
+ * **Linear, and deliberately.** A pen holds one speed; the cover's name is written on that
+ * principle and takes its timing from path length for exactly this reason. An ease-out here
+ * would be a wipe pretending to be a hand.
+ * ---------------------------------------------------------------- */
+
+.opener__tally {
+  position: relative;
+  font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  font-size: 16px;
+  /* A whisper of tracking, which lower-case Palatino wants at this size on a dark ground.
+     Not animated: the wipe is the entrance now, and two entrances is one too many. */
+  letter-spacing: 0.03em;
+  min-height: 22px;
+  opacity: 0;
+  /*
+   * Quicker than the stroke, so the line is *there* to be written on rather than arriving
+   * as it is written. Past about a third of `NIB_MS` the two read as one dissolve and the
+   * left-to-right stops registering at all.
+   */
+  transition: opacity calc(130ms * var(--anim, 1)) ease-out;
+}
+
+.opener__tally--told {
+  opacity: 1;
+}
+
+/*
+ * The ink, and the mask that writes it on.
+ *
+ * **What the nib has to track is the middle of the fade, not the opaque stop**, and getting
+ * that wrong is what kept it looking slow through two goes. The eye reads the ink's edge at
+ * about half alpha; the fully-opaque boundary is a whole tail-width behind that, so a nib
+ * pinned to the boundary trails the visible edge by however wide the tail is. First the stop
+ * was 55% (the boundary a tenth of a width ahead of the nib *and* a quarter-width tail on
+ * top of it), then 50% — which fixed the boundary but still left the nib half a tail behind.
+ *
+ * So the fade is centred at 50% of the mask and the stroke over-travels at both ends: the
+ * point has to start left of the first letter with nothing showing, and finish right of the
+ * last one with that letter solid rather than sitting mid-fade at half alpha.
+ *
+ * **The mask is 250% and the position runs 90% → 10%, and both halves of that are forced.**
+ * The over-travel was first written as `200%` with the position running `105% → −10%`, which
+ * is the same sweep and is broken: `mask-repeat: no-repeat` means anything outside the mask
+ * image is *transparent*, and with `offset = p × (W − 2W) = −pW`, a negative `p` slides the
+ * image right and drops the leftmost `pW` of the element off it. At −10% the line rendered
+ * with its first tenth cut away — "vijf nieuwe" wrote itself on as "jf nieuwe" and stayed
+ * that way. **`p` must stay inside `[0, 1]`**, or the element samples past an edge.
+ *
+ * At `mask-size: k`, `offset = −p(k − 1)W`, so element `x` samples at `x + p(k − 1)W` and the
+ * visible edge — the *middle* of the fade — sits at `x = mkW − p(k − 1)W`, a straight line in
+ * `p`. The edge therefore travels `(k − 1)W` over the full range of `p`, so `k = 2` can only
+ * ever move it exactly one width with no room either side. `k = 2.5` buys 1.5 widths, of
+ * which the stroke spends 1.2 and holds the remaining 0.3 back as margin at the two ends:
+ *
+ * - `p = 90%`: the transparent end of the fade is at `x = −0.025W`, so nothing shows at all;
+ * - `p = 10%`: the opaque stop has reached `x = 1.025W`, so the last letter is solid;
+ * - the element samples `[1.35W, 2.35W]` and `[0.15W, 1.15W]` at those ends — inside the
+ *   image, with room to spare, which is the property the 200% version did not have.
+ *
+ * The nib's range is that same line evaluated at the two ends: `−10%` to `110%`. It starts a
+ * hair off the first letter and lifts off past the last, which is where a pen's point
+ * actually is. **Change any one of the size, the stops or the two positions and all of it
+ * has to be re-solved**, the nib included.
+ *
+ * `-webkit-` in full, including in the transition. Autoprefixer adds the prefixed
+ * *properties* but will not expand a transition's property list, so a bare `mask-position`
+ * there animates nothing on Safari and the line simply appears.
+ */
+.opener__tally-ink {
+  -webkit-mask-image: linear-gradient(90deg, #000 0 47%, transparent 53%);
+  mask-image: linear-gradient(90deg, #000 0 47%, transparent 53%);
+  -webkit-mask-size: 250% 100%;
+  mask-size: 250% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: 90% 0;
+  mask-position: 90% 0;
+  transition:
+    -webkit-mask-position calc(400ms * var(--anim, 1)) linear,
+    mask-position calc(400ms * var(--anim, 1)) linear;
+}
+
+.opener__tally--told .opener__tally-ink {
+  -webkit-mask-position: 10% 0;
+  mask-position: 10% 0;
+}
+
+/*
+ * The nib: the light at the point of the pen, not a caret.
+ *
+ * A hard block would be a terminal's cursor, which is the one thing this page has spent
+ * four rounds refusing to look like. This is a smear of warm light with no edges of its
+ * own — gilt, like everything else written in this world — struck up at the start and
+ * spent by the end, so it reads as the stroke finishing rather than as a control blinking
+ * off.
+ *
+ * Outside `.opener__tally-ink`, or the mask it rides would cut it in half.
+ */
+.opener__nib {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 2px;
+  margin-left: -1px;
+  height: 1.15em;
+  margin-top: -0.575em;
+  border-radius: 1px;
+  background: linear-gradient(
+    180deg,
+    rgba(246, 230, 189, 0) 0%,
+    rgba(246, 230, 189, 0.9) 24%,
+    rgba(255, 246, 220, 1) 50%,
+    rgba(246, 230, 189, 0.9) 76%,
+    rgba(246, 230, 189, 0) 100%
+  );
+  box-shadow:
+    0 0 6px rgba(246, 230, 189, 0.8),
+    0 0 15px rgba(230, 196, 120, 0.45);
+  filter: blur(0.4px);
+  pointer-events: none;
+  animation: tally-nib calc(400ms * var(--anim, 1)) linear both;
+}
+
+/*
+ * `left` rather than a transform, because these percentages mean *the width of the text* and
+ * the text is a different width for every count. A translate would need that width measured
+ * and published, which is a resize observer for a line of four words.
+ *
+ * −10% to 110%, which is the mask's own travel evaluated at its ends — see
+ * `.opener__tally-ink` above, and do not move one without the other. `margin-left` centres
+ * the 2px on the edge rather than hanging it off the right of it.
+ */
+@keyframes tally-nib {
+  0% {
+    left: -10%;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 1;
+  }
+  100% {
+    left: 110%;
+    opacity: 0;
+  }
 }
 
 /* ---------------------------------------------------------------- *
@@ -1955,9 +2121,28 @@
   .opener__particle,
   .opener__revealed .card,
   .opener__stage .card,
-  .opener__slot .card {
+  .opener__slot .card,
+  /* The line is simply there. It still says what it says — the ending has to land, not be
+     taken away — it just is not written on. */
+  .opener__tally,
+  .opener__tally-ink {
     animation: none;
     transition: none;
+  }
+
+  /*
+   * And the mask comes off entirely rather than being left at whichever end it happens to
+   * be: with no transition it would sit at `100%` for ever and the line would never appear
+   * at all. The nib is not rendered here either — `writing` is only ever raised on the path
+   * that animates — but this is the half that cannot depend on that.
+   */
+  .opener__tally-ink {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .opener__nib {
+    display: none;
   }
 
   /* Appear and disappear without the swell, but are still there. */

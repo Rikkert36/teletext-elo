@@ -2636,12 +2636,32 @@
    * Set a shade smaller than the rest of the book's prose: the voorwoord is six
    * paragraphs and has to come in under the trim on the short phone page.
    *
-   * **The floor is 11px and not 10px, and that is Palatino's bill.** Its finer strokes go
-   * thin and grey below about 11px where Georgia stays solid — the same contrast that
-   * earns it the page costs it the bottom of the range.
+   * **No ceiling, and a floor two points lower than the checklist's, because this is the
+   * one page whose fit is vertical.** The other pages hold a grid: pinning their type at
+   * the ends of the range costs a little proportion and nothing else. Six paragraphs have
+   * to come in under the trim, and they only do that at every size if the type is a fixed
+   * fraction of the page — the fit tuned at one page width is then the fit at all of them.
+   *
+   * A `clamp(11px, …, 14px)` bounded it to page widths of 449–571px, four whole-pixel
+   * steps, and the book is outside that band nearly everywhere: 1080p at 100% lands on
+   * the 14px cap, so every zoom *out* grew the page and left the voorwoord behind, and
+   * every zoom *in* shrank the page onto the 11px floor and pushed the last paragraphs
+   * through the bottom of the leaf.
+   *
+   * **The 11px floor was Palatino's bill, and the bill is in device pixels.** Its finer
+   * strokes do go thin and grey below about 11px where Georgia stays solid — but that is
+   * a rasterisation limit, and a CSS pixel is only a device pixel at 100% zoom on an
+   * unscaled display. Both of the cases that drive the size down here — browser zoom, and
+   * the Windows display scaling that shrinks the CSS viewport the same way — make a CSS
+   * pixel *larger* than the one the 11px was measured against, so the floor was charging
+   * for a legibility problem the viewport had already paid off. 9px is the same limit
+   * restated with that headroom, and it only binds on a genuinely small page: a narrow
+   * desktop window at 100%, which is where the rest of the book pins too.
+   *
+   * The phone keeps the old floor exactly — see the `max-width: 599.95px` block below.
    */
   font-size: 11px;
-  font-size: clamp(11px, round(down, calc(var(--page-w) * 0.0245), 1px), 14px);
+  font-size: max(9px, round(down, calc(var(--page-w) * 0.0245), 1px));
   line-height: 1.55;
   color: #4a3f2a;
 }
@@ -2727,6 +2747,18 @@
  * a paragraph and becomes a column the paragraph has to get past.
  */
 @media (max-width: 599.95px) {
+  /*
+   * The phone page is small enough that the proportional term wants ~7px, so it has
+   * always run on the floor and the page is tuned around that. It keeps the original
+   * 11px rather than the 9px above: this is the one viewport with no zoom behind it —
+   * a phone's CSS pixel is the pixel Palatino's limit was measured against, and there
+   * is no headroom to spend.
+   */
+  .album__foreword {
+    font-size: 11px;
+    font-size: max(11px, round(down, calc(var(--page-w) * 0.0245), 1px));
+  }
+
   .album__foreword p:first-of-type::first-letter {
     font-size: 2.8em;
     line-height: 0.78;
@@ -2744,7 +2776,9 @@
 .album__foreword-title {
   font-size: 1.7em;
   font-weight: bold;
-  letter-spacing: 1px;
+  /* Tracked in em, like the small caps below the versal: 1px was the right letterfit
+     at the one size the page used to be stuck on, and 1/17th of an em everywhere. */
+  letter-spacing: 0.055em;
   margin: 0 0 0.4em;
   color: #4a3a1c;
 }
@@ -2859,6 +2893,38 @@
  * cover decides how much of itself to give it.
  * ---------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------- *
+ * The hand the cover is lettered in
+ *
+ * **Florilane Cardillac, self-hosted from src/fonts/ like the Teletext face.** Four
+ * calligraphic faces were compared against the Hershey strokes on a test-panel switch;
+ * this one won and the switch is gone.
+ *
+ * **A static value on `:root`, and both of those are load-bearing.** `WrittenType` reads
+ * this with `getComputedStyle(document.documentElement)` to measure with, so declaring it
+ * anywhere below the root means the lookup finds nothing and silently measures the
+ * fallback face. It also used to be *set from JS*, which was worse: the variable arrived
+ * one render after the first measurement, so the box was built for a font the letters
+ * were not drawn in. A constant cannot arrive late.
+ *
+ * **PERSONAL USE ONLY.** Florilane Cardillac is free for personal use; a commercial
+ * licence comes from Octotype (octotypeone@gmail.com), and an office leaderboard is not
+ * personal use. The package that shipped it says so in LICENSE REQUEST.txt. That is a
+ * purchase, not a code change, and it is the one item here no edit can settle.
+ * ---------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'Florilane Cardillac';
+  src: url('../fonts/FlorilaneCardillac.ttf') format('truetype');
+  /* Block rather than swap: the name's box is measured from this face, so a paint in the
+     fallback would be a paint the geometry does not describe. */
+  font-display: block;
+}
+
+:root {
+  --cover-hand: 'Florilane Cardillac', cursive;
+}
+
 .album__cover-title {
   display: flex;
   justify-content: center;
@@ -2875,6 +2941,16 @@
   display: block;
   width: 100%;
   height: auto;
+  /*
+   * **`overflow: visible`, or the reveal draws a bright rectangle on the cover.**
+   *
+   * An SVG clips to its viewport, and the bloom reaches several times further than the
+   * viewBox pads — so the light stopped dead at the box edge and outlined it. Padding the
+   * viewBox to contain it is the obvious alternative and is wrong: the box is a fixed
+   * width, so more padding means smaller letters. Letting the light spill onto the
+   * leather is both the cheaper fix and what light actually does.
+   */
+  overflow: visible;
 }
 
 /*
@@ -2890,156 +2966,135 @@
   font-style: italic;
 }
 
-/*
- * **`.written__stroke` and `.written__stroke--writing` lived here and are gone.**
- *
- * They styled a visible Hershey drawing of the name — the stroke font rendered directly,
- * back when a test-panel switch chose between it and the outline candidates. Florilane
- * Cardillac won that comparison, so nothing draws Hershey glyphs any more.
- *
- * The stroke font itself did not go: it is what `WrittenType` builds the reveal mask
- * from, because "where does a pen travel through the letter a" has an answer independent
- * of which typeface draws the a. See `.written__nib` below — that is the same dash
- * animation, moved from the ink to the mask.
- */
 
 
-
-@keyframes album-write {
-  from {
-    stroke-dashoffset: var(--len);
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-/* Land on the finished state, never play it stilled — the rule the rest of the book
-   follows. A name half-written and frozen is worse than a name simply present. */
-@media (prefers-reduced-motion: reduce) {
-  .written__nib {
-    stroke-dasharray: none;
-    stroke-dashoffset: 0;
-    animation: none;
-  }
-}
-
-/* ---------------------------------------------------------------- *
- * The hand the cover is lettered in
+  /* ---------------------------------------------------------------- *
+ * The name is lit, not written
  *
- * **Florilane Cardillac, self-hosted from src/fonts/ like the Teletext face.** Four
- * calligraphic faces were compared against the Hershey strokes on a test-panel switch;
- * this one won and the switch is gone, along with the two runners-up that were vendored
- * only to be looked at.
+ * The album's own silhouette beat from card.css, in the gold variant an icoon uses,
+ * because this cover is lettered in gilt. `WrittenType` carries the whole history of
+ * why nothing here draws a pen any more.
  *
- * **A static value, and that is load-bearing rather than tidy.** It was set from JS onto
- * :root, and WrittenType reads it during render to measure the mask with — so on mount,
- * before the effect had run, the first measurement was taken against the fallback face.
- * Re-selecting the already-current default was then a no-op React did not re-render for,
- * which left the mask aligned to one font while the letters were drawn in another. A
- * constant cannot arrive late.
+ * The beat, and the two decisions inside it:
  *
- * **PERSONAL USE ONLY.** Florilane Cardillac is free for personal use; a commercial
- * licence comes from Octotype (octotypeone@gmail.com), and an office leaderboard is not
- * personal use. The package that shipped it says so in LICENSE REQUEST.txt. That is a
- * purchase, not a code change, and it is the one item here no edit can settle.
+ *     0-12%    nothing on the cover
+ *     4-30%    a formless bloom gathers and tightens
+ *     26-42%   the letters resolve, white, fast
+ *     42-60%   the hold — this is the moment
+ *     60-100%  the light leaves; the gilt is what it leaves behind
+ *
+ * **It settles rather than drains.** On a card the silhouette goes to zero opacity
+ * because a photograph waits underneath and the two must never read as a crossfade.
+ * Nothing waits under this: the same letters stay put and only their colour changes.
+ * That is the analogous decision, not the identical one.
+ *
+ * **The gold lags the light.** Colour settles on a squared curve while the glow is
+ * already leaving, so the light reads as uncovering the gilt rather than becoming it.
  * ---------------------------------------------------------------- */
 
-@font-face {
-  font-family: 'Florilane Cardillac';
-  src: url('../fonts/FlorilaneCardillac.ttf') format('truetype');
-  /* Block rather than swap: the mask is measured from this face, so a paint in the
-     fallback would be a paint the geometry does not describe. */
-  font-display: block;
-}
-
-/*
- * **On `:root`, not on `.album__cover`, and that is a requirement rather than a
- * preference.** `WrittenType` resolves this with
- * `getComputedStyle(document.documentElement)` — it has to hand canvas a real family
- * string, since a `var()` would leave the context on its default face and every
- * measurement would then describe the wrong font. Declared on the cover, the lookup finds
- * nothing and silently measures `cursive`, which is the same class of failure the JS
- * switch used to cause.
- */
-:root {
-  --cover-hand: 'Florilane Cardillac', cursive;
-}
-
-/*
- * The plain-text fallback, shown only in the moment before the webfont resolves and the
- * name can be measured. Not sized against the cover: the real rendering is an SVG that
- * auto-fits its box, so this only has to be unobtrusive rather than to match.
- */
-.written__type {
-  display: block;
-  font-family: var(--cover-hand, cursive);
-  font-size: clamp(20px, calc(var(--page-w, 420px) * 0.1), 64px);
-  line-height: 1.05;
-  color: inherit;
-}
-
-/* ---------------------------------------------------------------- *
- * Revealing type as though it were written
- *
- * **This replaced a left-to-right wipe, and the difference is what the mask follows.**
- * The wipe crossed the name at a constant rate and knew nothing about where the letters
- * were; it was honest about being a wipe. The glyphs here are the real typeface and never
- * move — what moves is a thick stroke running the route a pen takes *through* each
- * letter, uncovering it in the order a hand would have made it.
- *
- * The route is a Hershey centreline fitted to that letter's own advance box, measured
- * from the loaded font at runtime. See `WrittenType.tsx` for why the mask is fitted to the
- * type rather than the type stretched onto the mask — at matched cap height the two fonts
- * differ in width by about a factor of two, so the naive alignment flings the letters
- * apart.
- * ---------------------------------------------------------------- */
-
-.written__nib {
-  fill: none;
-  /* White uncovers. The mask's own black rect is what hides everything to begin with. */
-  stroke: #fff;
-  /* Round, so the reveal has no corners in it — a nib leaves no square ends, and a butt
-     cap shows up immediately as a straight edge sweeping through a curve. */
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-dasharray: var(--len);
-  stroke-dashoffset: var(--len);
-  animation-name: album-write;
-  animation-timing-function: linear;
-  animation-fill-mode: both;
-}
-
-/*
- * The wipe that follows the pen, guaranteeing the letter ends up whole.
- *
- * **Butt cap, and it has to be a class rather than the attribute it started as.** CSS wins
- * over SVG presentation attributes, so `strokeLinecap="butt"` on the element was silently
- * overridden by `.written__nib`'s `round` — which extends the column half its own
- * stroke-width past each end, and since that width is the height of the whole name, the
- * overhang uncovers a good part of the *next* letter before the pen has reached it.
- */
-.written__nib--wipe {
-  stroke-linecap: butt;
-}
-
-/* The glyphs themselves: the chosen face, in the cover's own ink. */
+/* The glyphs: the chosen face, in the cover's own ink. */
 .written__glyphs {
   fill: currentColor;
   dominant-baseline: alphabetic;
 }
 
+.written__glyphs--lighting {
+  animation-name: album-name-lit;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
 /*
- * The measured SVG itself.
+ * Measured, but not on the cover yet — see `pending` in WrittenType.
  *
- * **Deliberately not named `.written`**, and not a modifier of it either. While the test
- * switch existed, `.written` was the Hershey drawing and a rule hid it in type mode — a
- * type SVG carrying that class was hidden by the same rule, blanking the cover, and the
- * mirror of that bug printed the name twice. The switch is gone but the naming stays
- * separate: one class, one thing.
+ * The ceremony brings the book up before the name goes on it, and without this the name
+ * was simply *there*, finished, in gold, from the moment the cover appeared; the light
+ * then bloomed over something already present. Hidden rather than unmounted so the font
+ * is loaded and the box is measured before the beat starts.
+ */
+.written__glyphs--pending,
+.written__type--pending {
+  opacity: 0;
+}
+
+/*
+ * The formless light. A blur wide enough that no letter can be read in it, which is the
+ * whole point: what arrives first has to be light rather than lettering.
  *
- * No `display` here: sizing is `.album__cover-title`'s decision, and repeating it
- * on the child is how the earlier version overrode its own default and showed both
+ * White at low opacity over warm brown blends to TAN — the colour of the gilt. So a
+ * single layer ramping from invisible to white read as nothing to gold to white to
+ * gold, with a phantom gold phase before any light had arrived. Every interpolation
+ * from transparent to white over a warm ground passes through it.
+ */
+.written__bloom {
+  fill: var(--reveal-peak, #fffefa);
+  dominant-baseline: alphabetic;
+  opacity: 0;
+  animation-name: album-name-bloom;
+  animation-timing-function: linear;
+  animation-fill-mode: both;
+}
+
+@keyframes album-name-bloom {
+  0% {
+    opacity: 0;
+    filter: blur(var(--bloom-far, 60px));
+  }
+  /* Broad and gathering, then tightening — light arriving on the cover rather than a
+     lamp being turned up. */
+  30% {
+    opacity: 0.9;
+    filter: blur(var(--bloom-near, 24px));
+  }
+  60% {
+    opacity: 0.9;
+    filter: blur(var(--bloom-near, 24px));
+  }
+  100% {
+    opacity: 0;
+    filter: blur(var(--bloom-near, 24px));
+  }
+}
+
+@keyframes album-name-lit {
+  /* Late and steep. A slow ramp would spend its first half at the tan the bloom exists
+     to avoid; by the time these are legible they are already bright. */
+  0%,
+  26% {
+    opacity: 0;
+    fill: var(--reveal-peak, #fffefa);
+  }
+  42% {
+    opacity: 1;
+    fill: var(--reveal-peak, #fffefa);
+    filter: drop-shadow(0 0 var(--glow-near, 20px) rgba(255, 248, 210, 0.95))
+      drop-shadow(0 0 var(--glow-far, 55px) rgba(255, 244, 190, 0.5));
+  }
+  /* The hold. Nothing moves. */
+  60% {
+    opacity: 1;
+    fill: var(--reveal-peak, #fffefa);
+    filter: drop-shadow(0 0 var(--glow-near, 20px) rgba(255, 248, 210, 0.95))
+      drop-shadow(0 0 var(--glow-far, 55px) rgba(255, 244, 190, 0.5));
+  }
+  /*
+   * **Ends on `filter: none`, not on a zero-radius shadow.** A filter forces the element
+   * to be rasterised, so type still carrying an invisible drop-shadow renders visibly
+   * softer than type carrying none — the finished name looked blurred next to the same
+   * name set plainly. The glow is dropped, not faded to nothing.
+   */
+  100% {
+    opacity: 1;
+    fill: currentColor;
+    filter: none;
+  }
+}
+
+/*
+ * The measured SVG.
+ *
+ * No `display` here: sizing is `.album__cover-title`'s decision, and repeating it on
+ * the child is how an earlier version overrode its own default and showed two
  * renderings at once.
  */
 .written-type {
@@ -3047,11 +3102,16 @@
   height: auto;
 }
 
+/* Land on the finished state, never play it stilled — the rule the rest of the book
+   follows. A name caught mid-bloom and frozen is worse than a name simply present. */
 @media (prefers-reduced-motion: reduce) {
-  .written__nib {
-    stroke-dasharray: none;
-    stroke-dashoffset: 0;
+  .written__glyphs--lighting,
+  .written__bloom {
     animation: none;
+  }
+
+  .written__bloom {
+    display: none;
   }
 }
 
@@ -3960,17 +4020,20 @@
 }
 
 /*
- * The one piece of chrome the album has. It says where you are, and on a shut desktop book
- * it says **nothing at all** — `spreadLabel()` returns an empty string at `flipped === 0`,
- * and the re-binding blanks it too.
+ * The row above the book. It used to be the album's one piece of chrome and said where you
+ * were — `gesloten` shut, `pagina …` on a spread — and **it is empty now**, kept only for
+ * the height it reserves. `.choice__label` is this row during the opening ceremony and does
+ * carry text, the handover is a hard swap, and game.css budgets the album's height with this
+ * row in it; deleting the box moves the book, so only the words went.
  *
- * `min-height` is what holds the row open through that, because the label sits above the
- * book and anything that changes its height moves the book. **So the reserve has to be at
- * least one line box, and it was not**: `calc(1.35em + 6px)` is 24.891px against a real
- * line's `1.5 × 14px + 6px` = 27px, so the row stood 2.109px short whenever it was empty
- * and the whole book rode up by that much. Measured, twice: the book jumped up 2.1px as
- * the cover ceremony handed over to a shut album, and back down 2.1px the moment that album
- * was opened and the row gained `pagina 1 / …`.
+ * `min-height` is what holds the row open, because it sits above the book and anything that
+ * changes its height moves the book. **So the reserve has to be at least one line box, and
+ * it was not**: `calc(1.35em + 6px)` is 24.891px against a real line's `1.5 × 14px + 6px`
+ * = 27px, so the row stood 2.109px short whenever it was empty and the whole book rode up by
+ * that much. Measured, twice: the book jumped up 2.1px as the cover ceremony handed over to
+ * a shut album, and back down 2.1px the moment that album was opened and the row gained
+ * `pagina 1 / …`. With the text gone the row is empty in every album state, so that reserve
+ * is now the only thing setting its height — it cannot be trimmed to fit the text.
  *
  * `line-height` is stated rather than inherited so the reserve can be written in terms of
  * it. It inherits 1.5 from MUI's `CssBaseline` today, and a reserve derived from a figure

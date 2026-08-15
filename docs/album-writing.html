@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="nl"><head><meta charset="utf-8">
+<title>De naam op het omslag — hoe hij geschreven wordt</title>
+<style>
+@font-face{font-family:'FC';src:url('../anago-leader-board-ui/src/fonts/FlorilaneCardillac.ttf') format('truetype');font-display:block}
+@font-face{font-family:'SAC';src:url('../anago-leader-board-ui/src/fonts/Sacramento-Regular.ttf') format('truetype');font-display:block}
+@font-face{font-family:'GH';src:url('../anago-leader-board-ui/src/fonts/GrandHotel-Regular.ttf') format('truetype');font-display:block}
+:root{--leather-hi:#5a4526;--leather-mid:#35270f;--leather-lo:#4a3820;--ink:#e6c98a}
+*{box-sizing:border-box}
+body{margin:0;background:#16171a;color:#d8d2c4;font:14px/1.55 Georgia,serif;padding:26px}
+h1{font-size:21px;margin:0 0 4px}
+p.sub{margin:0 0 22px;opacity:.62;max-width:70ch}
+.controls{display:flex;flex-wrap:wrap;gap:18px;align-items:center;background:#1e2024;border:1px solid #2c2f35;
+  padding:12px 16px;border-radius:4px;margin-bottom:22px;font-family:ui-monospace,monospace;font-size:12px}
+.controls label{display:flex;gap:7px;align-items:center}
+input[type=range]{width:130px}
+button{font:inherit;background:#2f333a;color:#e8e2d4;border:1px solid #444a54;border-radius:3px;padding:5px 13px;cursor:pointer}
+button:hover{background:#3a3f47}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:20px}
+.card{background:#1e2024;border:1px solid #2c2f35;border-radius:4px;overflow:hidden}
+.card h2{font-size:13px;margin:0;padding:10px 14px;background:#24272c;border-bottom:1px solid #2c2f35;
+  font-family:ui-monospace,monospace;font-weight:600;letter-spacing:.3px}
+.card .note{padding:9px 14px 12px;font-size:12px;opacity:.6;line-height:1.5}
+.cover{margin:14px;padding:26px 20px;border-radius:2px 5px 5px 2px;
+  background:linear-gradient(150deg,var(--leather-hi) 0%,var(--leather-mid) 55%,var(--leather-lo) 100%);
+  box-shadow:inset 12px 0 24px -12px rgba(0,0,0,.7);display:flex;justify-content:center;align-items:center;min-height:150px}
+/* **overflow:visible, or the glow draws a rectangle.** An SVG clips to its viewport, and
+   the bloom reaches far further than the viewBox pads — so the light stopped dead at the
+   box edge and outlined it. Letting it spill onto the leather is also what light does. */
+.cover svg{display:block;width:88%;height:auto;color:var(--ink);overflow:visible}
+.g{fill:currentColor}
+.nib{fill:none;stroke:#fff;stroke-linecap:round;stroke-linejoin:round}
+/* Chunks of a variable-width centreline. BUTT caps, and that is the whole point: a round
+   cap extends half the stroke-width past each end, so on a thick stem the mask ran a good
+   ten pixels ahead of the pen and every stroke ended in a blunt dome. Consecutive chunks
+   share an endpoint, so butt caps abut exactly and the ribbon stays continuous. */
+.nibv{fill:none;stroke:#fff;stroke-linecap:butt;stroke-linejoin:round}
+.wipe{fill:none;stroke:#fff;stroke-linecap:butt}
+.ink{fill:none;stroke:currentColor;stroke-linecap:round;stroke-linejoin:round}
+.sk{fill:none;stroke:#ff5c8a;stroke-width:1.4;stroke-linecap:round;opacity:.35}
+.sk.on{stroke:#4ce0b3;stroke-width:2.6;opacity:1}
+.sk.done{stroke:#ff5c8a;opacity:.2}
+.pen{fill:#4ce0b3}
+.legend{font-family:ui-monospace,monospace;font-size:11px;opacity:.5;margin-top:26px;max-width:80ch;line-height:1.6}
+</style></head><body>
+
+<h1>De naam op het omslag</h1>
+<p class="sub">Drie manieren om dezelfde naam tevoorschijn te laten komen. Alleen de derde
+volgt de letter zelf. Zet <em>voortgang</em> op handmatig om er doorheen te schuiven.</p>
+
+<div class="controls">
+  <label>naam <input id="name" value="Fraser" size="14"></label>
+  <label>letter <select id="face">
+    <option value="GH">Grand Hotel (monoline 1.36)</option>
+    <option value="SAC">Sacramento (monoline 1.50)</option>
+    <option value="FC">Florilane (contrast 3.33)</option>
+  </select></label>
+  <label>voortgang <input id="t" type="range" min="0" max="1" step="0.005" value="1"><span id="tv">1.00</span></label>
+  <label>maskerbreedte <input id="mw" type="range" min="0.5" max="2.5" step="0.05" value="1.1"><span id="mwv">1.10</span></label>
+  <label>duur <input id="dur" type="range" min="600" max="20000" step="200" value="2600"><span id="durv">2.6s</span></label>
+  <label><input id="sk" type="checkbox"> skelet tonen</label>
+  <button id="play">afspelen</button>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<p class="legend">
+1 — Hershey: een echte lijnfont, dus de pen wordt <em>getekend</em>. Overtuigend, maar de
+letters zijn die van een plotter.<br>
+2 — Florilane met een schuine veeg: schoon, maar het blijft onthullen; de rand weet niets
+van de letter.<br>
+3 — Florilane langs zijn <em>eigen</em> hartlijn, berekend met Zhang-Suen-verdunning op de
+gerasterde letter. De letter groeit over zijn eigen pad, met zijn volle contrast.
+</p>
+
+<script>
+const JHF=["  699  1JZ"," 2764 17MXUFTGRS RUGRS RUFVGRS RPYOZP[QZPY"," 2778 12I[PFNM RQFNM RYFWM RZFWM","  733 12H]SBLb RYBRb RLOZO RKUYU"," 2769 41H]TBL_ RYBQ_ RZJYKZL[K[JZHYGVFRFOGMIMKNMONVRXT RMKOMVQWRXTXWWYVZS[O[LZKYJWJVKULVKW"," 2271 32F^[FI[ RNFPHPJOLMMKMIKIIJGLFNFPGSHVHYG[F RWTUUTWTYV[X[ZZ[X[VYTWT"," 2768 55E_\\N[O\\P]O]N\\M[MYNWPRXPZN[K[HZGXGVHTISKRPPROTMUKUITGRFPGOIOLPRQUSXUZW[Y[ZYZX RK[IZHXHVITJSPP ROLPQQTSWUYWZYZZY"," 2767  8MXUHTGUFVGVHUJSL"," 2771 20KZZBVESHQKOONTNXO]P`Qb RVESIQMPPOUOZP_Qb"," 2772 20JYSBTDUGVLVPUUSYQ\\N_Jb RSBTEUJUOTTSWQ[N_"," 2773  9J[TFTR ROIYO RYIOO","  725  6E_RIR[ RIR[R"," 2761  8MXP[OZPYQZQ[P]N_","  724  3E_IR[R","  710  6MWRYQZR[SZRY"," 2770  3G]_BEb"," 2750 42H]TFQGOIMLLOKSKVLYMZO[Q[TZVXXUYRZNZKYHXGVFTF RTFRGPINLMOLSLVMYO[ RQ[SZUXWUXRYNYKXHVF"," 2751 15H]TJO[ RVFP[ RVFSIPKNL RUIQKNL"," 2752 42H]OJPKOLNKNJOHPGSFVFYGZIZKYMWOTQPSMUKWI[ RVFXGYIYKXMVOPS RJYKXMXRZUZWYXW RMXR[U[WZXW"," 2753 50H]OJPKOLNKNJOHPGSFVFYGZIZKYMVOSP RVFXGYIYKXMVO RQPSPVQWRXTXWWYVZS[O[LZKYJWJVKULVKW RSPUQVRWTWWVYUZS["," 2754 10H]XGR[ RYFS[ RYFJUZU"," 2755 39H]QFLP RQF[F RQGVG[F RLPMOPNSNVOWPXRXUWXUZR[O[LZKYJWJVKULVKW RSNUOVPWRWUVXTZR["," 2756 46H]YIXJYKZJZIYGWFTFQGOIMLLOKSKWLYMZO[R[UZWXXVXSWQVPTOQOOPMRLT RTFRGPINLMOLSLXMZ RR[TZVXWVWRVP"," 2757 30H]NFLL R[FZIXLSRQUPWO[ RXLRRPUOWN[ RMIPFRFWI RNHPGRGWIYIZH[F"," 2758 63H]SFPGOHNJNMOOQPTPXOYNZLZIYGVFSF RSFQGPHOJOMPOQP RTPWOXNYLYIXGVF RQPMQKSJUJXKZN[R[VZWYXWXTWRVQTP RQPNQLSKUKXLZN[ RR[UZVYWWWSVQ"," 2759 46H]YMXOVQTRQROQNPMNMKNIPGSFVFXGYHZJZNYRXUVXTZQ[N[LZKXKWLVMWLX ROQNONKOIQGSF RXGYIYNXRWUUXSZQ["," 2762 11MXSMRNSOTNSM RPYOZP[QZ"," 2763 14MXSMRNSOTNSM RP[OZPYQZQ[P]N_"," 2241  4F^ZIJRZ[","  726  6E_IO[O RIU[U"," 2242  4F^JIZRJ["," 2765 34H]OJPKOLNKNJOHPGSFWFZG[I[KZMYNSPQQQSRTTT RWFYGZIZKYMXNVO RPYOZP[QZPY"," 2273 56E`WNVLTKQKOLNMMPMSNUPVSVUUVS RQKOMNPNSOUPV RWKVSVUXVZV\\T]Q]O\\L[JYHWGTFQFNGLHJJILHOHRIUJWLYNZQ[T[WZYYZX RXKWSWUXV","  551 20G[G[IZLWOSSLVFV[UXSUQSNQLQKRKTLVNXQZT[Y[","  552 41F]SHTITLSPRSQUOXMZK[J[IZIWJRKOLMNJPHRGUFXFZG[I[KZMYNWOTP RSPTPWQXRYTYWXYWZU[R[PZOX","  553 24H\\TLTMUNWNYMZKZIYGWFTFQGOIMLLNKRKVLYMZO[Q[TZVXWV","  554 35G^TFRGQIPMOSNVMXKZI[G[FZFXGWIWKXMZP[S[VZXXZT[O[KZHYGWFTFRHRJSMUPWRZT\\U","  555 28H\\VJVKWLYLZKZIYGVFRFOGNINLONPOSPPPMQLRKTKWLYMZP[S[VZXXYV","  556 28H\\RLPLNKMINGQFTFXG[G]F RXGVNTTRXPZN[L[JZIXIVJULUNV RQPZP","  557 29G^G[IZMVPQQNRJRGQFPFOGNINLONQOUOXNYMZKZQYVXXVZS[O[LZJXIVIT","  558 38F^MMKLJJJIKGMFNFPGQIQKPONULYJ[H[GZGX RMRVOXN[L]J^H^G]F\\FZHXLVRUWUZV[W[YZZY\\V","  559 25IZWVUTSQROQLQIRGSFUFVGWIWLVQTVSXQZO[M[KZJXJVKUMUOV","  560 25JYT^R[PVOPOJPGRFTFUGVJVMURR[PaOdNfLgKfKdLaN^P\\SZWX","  561 39F^MMKLJJJIKGMFNFPGQIQKPONULYJ[H[GZGX R^I^G]F\\FZGXIVLTNROPO RROSQSXTZU[V[XZYY[V","  562 29I\\MRORSQVOXMYKYHXFVFUGTISNRSQVPXNZL[J[IZIXJWLWNXQZT[V[YZ[X","  563 45@aEMCLBJBICGEFFFHGIIIKHPGTE[ RGTJLLHMGOFPFRGSISKRPQTO[ RQTTLVHWGYFZF\\G]I]K\\PZWZZ[[\\[^Z_YaV","  564 32E]JMHLGJGIHGJFKFMGNINKMPLTJ[ RLTOLQHRGTFVFXGYIYKXPVWVZW[X[ZZ[Y]V","  565 29H]TFQGOIMLLNKRKVLYMZO[Q[TZVXXUYSZOZKYHXGVFTFRHRKSNUQWSZU\\V","  566 31F_SHTITLSPRSQUOXMZK[J[IZIWJRKOLMNJPHRGUFZF\\G]H^J^M]O\\PZQWQUPTO","  567 32H^ULTNSOQPOPNNNLOIQGTFWFYGZIZMYPWSSWPYNZK[I[HZHXIWKWMXPZS[V[YZ[X","  568 38F_SHTITLSPRSQUOXMZK[J[IZIWJRKOLMNJPHRGUFYF[G\\H]J]M\\O[PYQVQSPTQUSUXVZX[ZZ[Y]V","  569 28H\\H[JZLXOTQQSMTJTGSFRFQGPIPKQMSOVQXSYUYWXYWZT[P[MZKXJVJT","  570 25H[RLPLNKMINGQFTFXG[G]F RXGVNTTRXPZN[L[JZIXIVJULUNV","  571 33E]JMHLGJGIHGJFKFMGNINKMOLRKVKXLZN[P[RZSYUUXMZF RXMWQVWVZW[X[ZZ[Y]V","  572 32F]KMILHJHIIGKFLFNGOIOKNOMRLVLYM[O[QZTWVTXPYMZIZGYFXFWGVIVKWNYP[Q","  573 25C_HMFLEJEIFGHFIFKGLILLK[ RUFK[ RUFS[ RaF_G\\JYNVTS[","  574 36F^NLLLKKKILGNFPFRGSISLQUQXRZT[V[XZYXYVXUVU R]I]G\\FZFXGVITLPUNXLZJ[H[GZGX","  575 38F]KMILHJHIIGKFLFNGOIOKNOMRLVLXMZN[P[RZTXVUWSYM R[FYMVWT]RbPfNgMfMdNaP^S[VY[V","  576 40H]ULTNSOQPOPNNNLOIQGTFWFYGZIZMYPWTTWPZN[K[JZJXKWNWPXQYR[R^QaPcNfLgKfKdLaN^Q[TYZV"," 2223 12KYOBOb RPBPb ROBVB RObVb","  804  3KYKFY^"," 2224 12KYTBTb RUBUb RNBUB RNbUb"," 2262 11JZPLRITL RMORJWO RRJR[","  999  3JZJ]Z]"," 2766  8MXVFTHSJSKTLUKTJ","  651 22L\\UUTSRRPRNSMTLVLXMZO[Q[SZTXVRUWUZV[W[YZZY\\V","  652 23M[MVOSRNSLTITGSFQGPIOMNTNZO[P[RZTXUUURVVWWYW[V","  653 14MXTTTSSRQROSNTMVMXNZP[S[VYXV","  654 24L\\UUTSRRPRNSMTLVLXMZO[Q[SZTXZF RVRUWUZV[W[YZZY\\V","  655 17NXOYQXRWSUSSRRQROSNUNXOZQ[S[UZVYXV","  656 24OWOVSQUNVLWIWGVFTGSIQQNZKaJdJfKgMfNcOZP[R[TZUYWV","  657 28L[UUTSRRPRNSMTLVLXMZO[Q[SZTY RVRTYPdOfMgLfLdMaP^S\\U[XY[V","  658 29M\\MVOSRNSLTITGSFQGPIOMNSM[ RM[NXOVQSSRURVSVUUXUZV[W[YZZY\\V","  659 16PWSMSNTNTMSM RPVRRPXPZQ[R[TZUYWV","  660 20PWSMSNTNTMSM RPVRRLdKfIgHfHdIaL^O\\Q[TYWV","  661 33M[MVOSRNSLTITGSFQGPIOMNSM[ RM[NXOVQSSRURVSVUTVQV RQVSWTZU[V[XZYY[V","  662 18OWOVQSTNULVIVGUFSGRIQMPTPZQ[R[TZUYWV","  663 33E^EVGSIRJSJTIXH[ RIXJVLSNRPRQSQTPXO[ RPXQVSSURWRXSXUWXWZX[Y[[Z\\Y^V","  664 23J\\JVLSNROSOTNXM[ RNXOVQSSRURVSVUUXUZV[W[YZZY\\V","  665 23LZRRPRNSMTLVLXMZO[Q[SZTYUWUUTSRRQSQURWTXWXYWZV","  666 24KZKVMSNQMUGg RMUNSPRRRTSUUUWTYSZQ[ RMZO[R[UZWYZV","  667 27L[UUTSRRPRNSMTLVLXMZO[Q[SZ RVRUUSZPaOdOfPgRfScS\\U[XY[V","  668 15MZMVOSPQPSSSTTTVSYSZT[U[WZXYZV","  669 16NYNVPSQQQSSVTXTZR[ RNZP[T[VZWYYV","  670 16OXOVQSSO RVFPXPZQ[S[UZVYXV RPNWN","  671 19L[LVNRLXLZM[O[QZSXUU RVRTXTZU[V[XZYY[V","  672 17L[LVNRMWMZN[O[RZTXUUUR RURVVWWYW[V","  673 25I^LRJTIWIYJ[L[NZPX RRRPXPZQ[S[UZWXXUXR RXRYVZW\\W^V","  674 20JZJVLSNRPRQSQZR[U[XYZV RWSVRTRSSOZN[L[KZ","  675 23L[LVNRLXLZM[O[QZSXUU RVRPdOfMgLfLdMaP^S\\U[XY[V","  676 23LZLVNSPRRRTTTVSXQZN[P\\Q^QaPdOfMgLfLdMaP^S\\WYZV"," 2225 40KYTBRCQDPFPHQJRKSMSOQQ RRCQEQGRISJTLTNSPORSTTVTXSZR[Q]Q_Ra RQSSUSWRYQZP\\P^Q`RaTb","  723  3NVRBRb"," 2226 40KYPBRCSDTFTHSJRKQMQOSQ RRCSESGRIQJPLPNQPURQTPVPXQZR[S]S_Ra RSSQUQWRYSZT\\T^S`RaPb"," 2246 24F^IUISJPLONOPPTSVTXTZS[Q RISJQLPNPPQTTVUXUZT[Q[O","  718 14KYQFOGNINKOMQNSNUMVKVIUGSFQF"],O=82,HC=14,N=100,SLANT=22;
+/* Which face panels 2 and 3 are set in. Read everywhere a font is named, including the
+   skeleton cache key — a skeleton belongs to a glyph *in a face*, not to a character. */
+let FACE='GH';
+
+/* ---- Hershey ---- */
+const HG=JHF.map(l=>{const L=l.charCodeAt(8)-O,R=l.charCodeAt(9)-O,b=l.slice(10);const s=[];let c=[];
+for(let i=0;i+1<b.length;i+=2){if(b[i]===' '&&b[i+1]==='R'){if(c.length)s.push(c);c=[];continue;}
+c.push([b.charCodeAt(i)-O,b.charCodeAt(i+1)-O]);}if(c.length)s.push(c);return{L,R,s};});
+const hg=ch=>{const i=ch.charCodeAt(0)-32;if(i<0||i>=HG.length)return null;const g=HG[i];
+return{adv:g.R-g.L,st:g.s.map(s=>s.map(([x,y])=>[x-g.L,y]))};};
+
+/* ---- Zhang-Suen thinning ---- */
+function thin(g,w,h){const I=(x,y)=>y*w+x;
+ const nb=(x,y)=>[g[I(x,y-1)],g[I(x+1,y-1)],g[I(x+1,y)],g[I(x+1,y+1)],g[I(x,y+1)],g[I(x-1,y+1)],g[I(x-1,y)],g[I(x-1,y-1)]];
+ let ch=true;
+ while(ch){ch=false;
+  for(let st=0;st<2;st++){const del=[];
+   for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+    if(!g[I(x,y)])continue;const p=nb(x,y),B=p.reduce((a,b)=>a+b,0);
+    if(B<2||B>6)continue;let A=0;for(let i=0;i<8;i++)if(p[i]===0&&p[(i+1)%8]===1)A++;
+    if(A!==1)continue;const[p2,p3,p4,p5,p6,p7,p8,p9]=p;
+    if(st===0){if(p2*p4*p6!==0)continue;if(p4*p6*p8!==0)continue;}
+    else{if(p2*p4*p8!==0)continue;if(p2*p6*p8!==0)continue;}
+    del.push(I(x,y));}
+   if(del.length){ch=true;del.forEach(i=>g[i]=0);}}}
+ return g;}
+
+function traceSkel(g,w,h){const I=(x,y)=>y*w+x;const seen=new Uint8Array(w*h);
+ const free=(x,y)=>{const r=[];for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;
+  const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=w||ny>=h)continue;if(g[I(nx,ny)]&&!seen[I(nx,ny)])r.push([nx,ny]);}return r;};
+ const deg=(x,y)=>{let c=0;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;
+  const nx=x+dx,ny=y+dy;if(nx<0||ny<0||nx>=w||ny>=h)continue;if(g[I(nx,ny)])c++;}return c;};
+ const walk=(sx,sy)=>{const pts=[];let cx=sx,cy=sy;
+  for(;;){seen[I(cx,cy)]=1;pts.push([cx,cy]);const n=free(cx,cy);if(!n.length)break;
+   let best=n[0];
+   if(pts.length>1){const px=pts[pts.length-2][0],py=pts[pts.length-2][1];const dx=cx-px,dy=cy-py;let bs=-9;
+    n.forEach(([nx,ny])=>{const ex=nx-cx,ey=ny-cy;
+     const s=(dx*ex+dy*ey)/((Math.hypot(dx,dy)*Math.hypot(ex,ey))||1);if(s>bs){bs=s;best=[nx,ny];}});}
+   cx=best[0];cy=best[1];}
+  return pts;};
+ const out=[];
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(g[I(x,y)]&&!seen[I(x,y)]&&deg(x,y)===1){const p=walk(x,y);if(p.length>3)out.push(p);}
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(g[I(x,y)]&&!seen[I(x,y)]){const p=walk(x,y);if(p.length>3)out.push(p);}
+ return out;}
+
+const SKCACHE=new Map();
+function skeleton(ch){
+ const key=FACE+ch;
+ if(SKCACHE.has(key))return SKCACHE.get(key);
+ const pad=10,pr=document.createElement('canvas').getContext('2d');pr.font=N+"px '"+FACE+"'";
+ const m=pr.measureText(ch);
+ const L=Math.ceil(m.actualBoundingBoxLeft),R=Math.ceil(m.actualBoundingBoxRight);
+ const A=Math.ceil(m.actualBoundingBoxAscent),D=Math.ceil(m.actualBoundingBoxDescent);
+ const w=L+R+pad*2,h=A+D+pad*2;
+ if(w<=2||h<=2){SKCACHE.set(key,[]);return[];}
+ const c=document.createElement('canvas');c.width=w;c.height=h;
+ const x=c.getContext('2d');x.font=N+"px '"+FACE+"'";x.fillStyle='#fff';
+ const ox=pad+L,oy=pad+A;x.fillText(ch,ox,oy);
+ const d=x.getImageData(0,0,w,h).data;const g=new Uint8Array(w*h);
+ for(let i=0;i<w*h;i++)g[i]=d[i*4+3]>110?1:0;
+ /* Distance transform BEFORE thinning, on a copy, because thin() eats the bitmap.
+    For each ink pixel this is the distance to the nearest edge — so at a point on the
+    skeleton it is the local HALF-WIDTH of the stroke. That is where a variable-width
+    mask comes from: the letter states its own thickness everywhere along its spine.
+    Chamfer 3-4, two passes, divided back to pixels. */
+ const dt=new Float32Array(w*h);
+ for(let i=0;i<w*h;i++)dt[i]=g[i]?1e9:0;
+ for(let y=1;y<h;y++)for(let x=1;x<w-1;x++){const i=y*w+x;if(!g[i])continue;
+  dt[i]=Math.min(dt[i],dt[i-1]+3,dt[i-w]+3,dt[i-w-1]+4,dt[i-w+1]+4);}
+ for(let y=h-2;y>=0;y--)for(let x=w-2;x>=1;x--){const i=y*w+x;if(!g[i])continue;
+  dt[i]=Math.min(dt[i],dt[i+1]+3,dt[i+w]+3,dt[i+w+1]+4,dt[i+w-1]+4);}
+ for(let i=0;i<w*h;i++)dt[i]/=3;
+ thin(g,w,h);
+ /* Thinning leaves short spurs at every stroke end and at junctions; they are noise,
+    not pen movements, and each one would otherwise be revealed as its own little dash. */
+ const pruned=traceSkel(g,w,h).filter(p=>p.length>=9);
+ /* The skeleton is a pixel walk, so it staircases. A 5-point moving average takes the
+    jitter out without moving the line off the letter. */
+ const smooth=p=>{if(p.length<5)return p;const o=[];
+  for(let i=0;i<p.length;i++){let sx=0,sy=0,n=0;
+   for(let k=-2;k<=2;k++){const j=i+k;if(j<0||j>=p.length)continue;sx+=p[j][0];sy+=p[j][1];n++;}
+   o.push([sx/n,sy/n]);}
+  return o;};
+ /* Each point carries its own half-width, sampled off the distance transform at the
+    pixel it came from — third component, so it travels with the geometry. */
+ const res=pruned.map(p=>smooth(p).map(([px,py])=>{
+  const sx=Math.max(0,Math.min(w-1,Math.round(px))),sy=Math.max(0,Math.min(h-1,Math.round(py)));
+  return [px-ox,py-oy,dt[sy*w+sx]||1];
+ }));
+ SKCACHE.set(key,res);return res;}
+
+/* Chain strokes into pen order.
+   Sorting by leftmost x was the bug behind the scattered fragments: the far end of a
+   capital's swash sorts after parts of the *next* letter, so the reveal jumped about. A
+   hand instead goes to whatever is nearest where it just lifted — and it will happily run
+   a stroke backwards if that end is closer, which is why each candidate is tested from
+   both of its ends. */
+function chain(strokes){
+ if(strokes.length<2)return strokes;
+ const rem=strokes.slice();
+ let bi=0,bv=Infinity;
+ rem.forEach((s,i)=>{const v=s[0][0]+s[0][1]*0.3;if(v<bv){bv=v;bi=i;}});
+ const out=[rem.splice(bi,1)[0]];
+ while(rem.length){
+  const prev=out[out.length-1],end=prev[prev.length-1];
+  let best=0,bd=Infinity,rev=false;
+  rem.forEach((s,i)=>{
+   const a=s[0],b=s[s.length-1];
+   const d0=Math.hypot(a[0]-end[0],a[1]-end[1]);
+   const d1=Math.hypot(b[0]-end[0],b[1]-end[1]);
+   if(d0<bd){bd=d0;best=i;rev=false;}
+   if(d1<bd){bd=d1;best=i;rev=true;}
+  });
+  const s=rem.splice(best,1)[0];
+  out.push(rev?s.slice().reverse():s);
+ }
+ return out;}
+
+/* ---- shared measurement ---- */
+const len=p=>{let s=0;for(let i=0;i+1<p.length;i++)s+=Math.hypot(p[i+1][0]-p[i][0],p[i+1][1]-p[i][1]);return s;};
+const dpath=p=>{const step=p.length>40?3:1;return p.filter((_,i)=>i%step===0||i===p.length-1).map((q,k)=>(k?'L':'M')+q[0].toFixed(1)+' '+q[1].toFixed(1)).join(' ');};
+const DASH=L=>L*1.02+1;
+const off=(l,st,sp,T)=>{const u=sp<=0?1:Math.min(1,Math.max(0,(T-st)/sp));return DASH(l)*(1-u);};
+
+function measure(name){
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ svg.setAttribute('style','position:absolute;left:-9999px;top:0;width:4000px;height:600px;visibility:hidden');
+ const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+ t.setAttribute('x',0);t.setAttribute('y',0);t.setAttribute('style','font-family:'+FACE+';font-size:'+N+'px');
+ t.textContent=name;svg.appendChild(t);document.body.appendChild(svg);
+ const bb=t.getBBox();
+ const cx=document.createElement('canvas').getContext('2d');cx.font=N+"px '"+FACE+"'";
+ const cap=cx.measureText('H').actualBoundingBoxAscent||70;
+ const chars=[];
+ Array.from(name).forEach((ch,i)=>{if(!ch.trim())return;let e;try{e=t.getExtentOfChar(i)}catch(_){return}
+  if(e.width<=0)return;
+  let pen;try{pen=t.getStartPositionOfChar(i)}catch(_){pen={x:e.x}}
+  chars.push({ch,x:e.x,w:e.width,pen:pen.x});});
+ document.body.removeChild(svg);
+ return{bb,cap,chars};}
+
+function timeline(routes,cap){
+ const lens=routes.map(len);const lift=cap*0.35;
+ const budget=lens.reduce((a,b)=>a+b,0)+lift*Math.max(0,routes.length-1);
+ let el=0;return routes.map((r,i)=>{const st=el/budget,sp=lens[i]/budget;el+=lens[i]+lift;
+  return{d:dpath(r),pts:r,l:lens[i],st,sp};});}
+
+/* ---- the three strategies ---- */
+function build(name,mw,showSkel){
+ const{bb,cap,chars}=measure(name);
+ const pad=cap*0.3;const vb=[bb.x-pad,bb.y-pad,bb.width+pad*2,bb.height+pad*2].join(' ');
+ const midY=bb.y+bb.height/2,hgt=bb.height*1.06,tan=Math.tan(SLANT*Math.PI/180);
+
+ // 1. Hershey, drawn as visible ink
+ let hx=0;const hrs=[];
+ chars.forEach(c=>{const g=hg(c.ch);if(!g||g.adv<=0)return;
+  const sx=c.w/g.adv,sy=cap/HC;g.st.forEach(s=>hrs.push(s.map(([x,y])=>[c.x+x*sx,y*sy])));});
+ const ht=timeline(hrs,cap);
+
+ // 2. slanted wipe over Florilane
+ const wt=chars.map((c,i)=>({x0:c.x-c.w*0.12,x1:c.x+c.w*1.12,i}));
+ const wlens=wt.map(w=>w.x1-w.x0);
+ const wl=timeline(wt.map(w=>[[w.x0,midY],[w.x1,midY]]),cap);
+
+ // 3. Florilane's own skeleton
+ const srs=[];
+ chars.forEach(c=>{const sk=skeleton(c.ch);if(!sk.length)return;
+  /* No scaling. The glyph was rasterised at the same size the text is set at, so the
+     skeleton is already the right size — it only has to be moved to this glyph's pen
+     origin. Scaling it onto getExtentOfChar's box was the bug: that box is the ADVANCE,
+     and a script capital's swash reaches well outside its advance, so fitting ink-range
+     to advance-range squashed the skeleton off its own letter and left the F's tail
+     uncovered. */
+  chain(sk.map(p=>p.map(([x,y,hw])=>[c.pen+x,y,hw]))).forEach(r=>srs.push(r));});
+
+ /* Cut each centreline into short chunks so the mask can change width along it.
+    SVG stroke-width is constant per path, so a single stroke per letter can only ever be
+    one thickness — which is the bluntness: on a hairline a constant fat mask reaches
+    sideways into the neighbouring part of the letter and uncovers it early. Per chunk the
+    width follows the distance transform, so the mask is thick on a stem and thin on a
+    hairline, and round caps keep consecutive chunks continuous. */
+ const CHUNK=3;
+ const chunks=[];
+ srs.forEach(p=>{
+  let cur=[p[0]],acc=0;
+  for(let i=0;i+1<p.length;i++){
+   acc+=Math.hypot(p[i+1][0]-p[i][0],p[i+1][1]-p[i][1]);
+   cur.push(p[i+1]);
+   /* The next chunk starts one point EARLIER, so consecutive chunks overlap by a single
+      segment. Butt caps that merely abut leave a wedge-shaped gap on the outside of every
+      bend — which speckles the whole letter — and a round cap closes it only by
+      overshooting half a stroke-width past the pen. A ~3px overlap closes it for 3px. */
+   if(acc>=CHUNK){chunks.push({pts:cur});cur=[p[i],p[i+1]];acc=0;}
+  }
+  if(cur.length>1)chunks.push({pts:cur});
+  if(chunks.length)chunks[chunks.length-1].last=true;   // a lift belongs after a stroke
+ });
+
+ /* Timed over the chunks, with the pen-lift charged only where one centreline ends and
+    the next begins — not between chunks of the same stroke, which is one movement. */
+ const clen=chunks.map(c=>len(c.pts));
+ const clift=cap*0.35;
+ const cbudget=clen.reduce((a,b)=>a+b,0)+clift*chunks.filter(c=>c.last).length;
+ let cel=0;
+ const st3=chunks.map((c,i)=>{
+  const st=cel/cbudget,sp=clen[i]/cbudget;
+  cel+=clen[i]+(c.last?clift:0);
+  const hw=c.pts.reduce((s,q)=>s+(q[2]||1),0)/c.pts.length;
+  return{d:dpath(c.pts),pts:c.pts,l:clen[i],st,sp,w:hw*2};
+ });
+
+ return{vb,cap,midY,hgt,tan,ht,wl,st3,hrs};}
+
+function render(T,mw,showSkel,M,name){
+ const{vb,cap,midY,hgt,tan,ht,wl,st3}=M;
+ const cover=(inner)=>'<div class="cover"><svg viewBox="'+vb+'">'+inner+'</svg></div>';
+
+ // 1 Hershey: visible strokes
+ const one=cover(ht.map(r=>'<path class="ink" d="'+r.d+'" stroke-width="1.5" '
+  +'stroke-dasharray="'+DASH(r.l)+'" stroke-dashoffset="'+off(r.l,r.st,r.sp,T)+'"/>').join(''));
+
+ // 2 slanted wipe
+ const m2='w'+Math.random().toString(36).slice(2,8);
+ const two=cover('<defs><mask id="'+m2+'" maskUnits="userSpaceOnUse" x="-9999" y="-9999" width="19998" height="19998">'
+  +'<rect x="-9999" y="-9999" width="19998" height="19998" fill="black"/><g transform="skewX(-'+SLANT+')">'
+  +wl.map(r=>{const p=r.d.match(/M([-\d.]+) ([-\d.]+) L([-\d.]+)/);
+    const x0=parseFloat(p[1])+midY*tan,x1=parseFloat(p[3])+midY*tan;
+    return '<path class="wipe" d="M'+x0+' '+midY+' L'+x1+' '+midY+'" stroke-width="'+hgt+'" '
+      +'stroke-dasharray="'+DASH(r.l)+'" stroke-dashoffset="'+off(r.l,r.st,r.sp,T)+'"/>';}).join('')
+  +'</g></mask></defs><text class="g" x="0" y="0" mask="url(#'+m2+')" style="font-family:'+FACE+';font-size:'+N+'px">'+name+'</text>');
+
+ /* ---- 3. The glow reveal ----
+    Modelled on the card silhouette beat in card.css (reveal-charge), in its GOLD
+    variant — the one an icoon uses — because this cover is lettered in gilt.
+
+    **One difference from the card, and it is the load-bearing one.** There the
+    silhouette drains to nothing, because a photograph is waiting underneath and the
+    two must never read as a crossfade. Here nothing is underneath: the same letters
+    stay put and only their colour changes. So this SETTLES from white into gold
+    rather than draining, which is the analogous decision, not the identical one. */
+ const lerp=(a,b,u)=>a+(b-a)*u;
+ const clamp=(u)=>Math.min(1,Math.max(0,u));
+ const hex=(c)=>[parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16)];
+ const mix=(a,b,u)=>{const A=hex(a),B=hex(b);
+  return "rgb("+Math.round(lerp(A[0],B[0],u))+","+Math.round(lerp(A[1],B[1],u))+","+Math.round(lerp(A[2],B[2],u))+")";};
+
+ /* The beat, as fractions of the whole:
+      0.00-0.12  nothing on the cover
+      0.12-0.46  the letters come up, white, halo growing — slow to start
+      0.46-0.60  the hold: full white, widest halo. This is the moment.
+      0.60-1.00  the light leaves and the gilt is what is left behind */
+ /* **The light has to arrive as light, and that is why there are two layers.**
+
+    A single layer fading from invisible to white cannot work on this cover, and the
+    reason is the leather: white at 30% over a warm brown blends to TAN, which is the
+    colour of the gilt. So a slow opacity ramp reads as nothing -> gold -> white -> gold,
+    with a phantom gold phase before any light has arrived. Every interpolation from
+    transparent to white over a warm ground passes through it.
+
+    So the bloom comes first and is deliberately FORMLESS — the same text under a blur
+    wide enough that no letter can be read in it, which is light rather than lettering.
+    The sharp letters then resolve inside that light, and they resolve QUICKLY: a steep
+    ramp spends almost no time in the dim tan window the slow one lived in. */
+ const PEAK="#fffefa", GOLD="#e6c98a";
+
+ /* The bloom: early, wide, and tightening. Starting broad and focusing is what makes it
+    read as light gathering onto the cover rather than as a lamp being turned up. */
+ const bloomUp=clamp((T-0.04)/0.26);
+ const bloomOut=clamp((T-0.60)/0.38);
+ const bloom=(bloomUp*bloomUp*(3-2*bloomUp))*(1-bloomOut);
+ const blur=cap*(0.85-0.5*clamp(T/0.46));
+
+ /* The letters: late and steep, so there is no long dim phase to look tan. */
+ const litUp=clamp((T-0.26)/0.16);
+ const lit=litUp*litUp*(3-2*litUp);
+
+ const settle=clamp((T-0.60)/0.40);
+ const halo=T<0.46?bloom:(T<0.60?1:1-bloomOut);
+ const fill=mix(PEAK,GOLD,settle*settle); /* colour lags the halo, so the gold arrives last */
+
+ /* **No filter at all once the light has gone.** A filter forces the element to be
+    rasterised, so text carrying even a zero-radius drop-shadow renders softer than text
+    carrying none — which is why the finished name looked blurrier than the panel beside
+    it. The glow is dropped rather than faded to zero, and the letters end as plain sharp
+    type. Same reason the bloom layer is omitted outright once it is invisible. */
+ const glowOn=halo>0.002;
+ const three=cover(
+  /* Formless light first. */
+  (bloom>0.002
+   ? '<text class="g" x="0" y="0" style="font-family:'+FACE+';font-size:'+N+'px;fill:'+PEAK
+     +';opacity:'+(bloom*0.9).toFixed(3)
+     +';filter:blur('+blur.toFixed(1)+'px)">'+name+'</text>'
+   : '')
+  /* Then the letters inside it. */
+  +'<text class="g" x="0" y="0" style="font-family:'+FACE+';font-size:'+N+'px;fill:'+fill
+  +';opacity:'+lit.toFixed(3)
+  +(glowOn
+    ? ';filter:drop-shadow(0 0 '+(cap*0.30*halo).toFixed(1)+'px rgba(255,248,210,'+(0.95*halo).toFixed(2)+'))'
+      +' drop-shadow(0 0 '+(cap*0.8*halo).toFixed(1)+'px rgba(255,244,190,'+(0.5*halo).toFixed(2)+'))'
+    : '')
+  +'">'+name+'</text>'
+ );
+
+ document.getElementById('grid').innerHTML=
+   '<div class="card"><h2>1 — Hershey, getekend</h2>'+one
+   +'<p class="note">Een echte lijnfont: de pen wordt getekend, niet onthuld. Dit is wat overtuigde — maar het zijn plotterletters.</p></div>'
+  +'<div class="card"><h2>2 — Florilane, schuine veeg</h2>'+two
+   +'<p class="note">Schoon, en de rand ligt in de as van de letter. Maar het is onthullen: de rand weet niets van de letter eronder.</p></div>'
+  +'<div class="card"><h2>3 — Florilane, oplichten</h2>'+three
+   +'<p class="note">Geen pen. De letters komen wit op met een halo, houden even vast, en het licht zakt weg tot alleen het bladgoud overblijft — de silhouetbeat van de kaart, in goud.</p></div>';
+}
+
+let M=null,cur='Fraser',raf=0;
+const $=id=>document.getElementById(id);
+function rebuild(){cur=$('name').value||'Fraser';M=build(cur,parseFloat($('mw').value),$('sk').checked);draw();}
+function draw(){$('tv').textContent=parseFloat($('t').value).toFixed(2);
+ $('durv').textContent=(parseInt($('dur').value,10)/1000).toFixed(1)+'s';$('mwv').textContent=parseFloat($('mw').value).toFixed(2);
+ render(parseFloat($('t').value),parseFloat($('mw').value),$('sk').checked,M,cur);}
+function play(){cancelAnimationFrame(raf);const dur=parseInt($('dur').value,10),t0=performance.now();
+ const step=now=>{const u=Math.min(1,(now-t0)/dur);$('t').value=u;draw();if(u<1)raf=requestAnimationFrame(step);};
+ raf=requestAnimationFrame(step);}
+
+document.fonts.load(N+"px '"+FACE+"'","Fraser").then(()=>document.fonts.ready).then(()=>{
+ rebuild();
+ $('name').addEventListener('change',rebuild);
+ $('face').addEventListener('change',function(){FACE=$('face').value;document.fonts.load(N+"px '"+FACE+"'",cur).then(function(){rebuild();});});
+ $('mw').addEventListener('input',draw);
+ $('sk').addEventListener('change',draw);
+ $('dur').addEventListener('input',draw);
+ $('t').addEventListener('input',draw);
+ $('play').addEventListener('click',play);
+ /* Opens finished. Autoplay meant landing on a blank cover mid-write, which reads as
+    'the letters are gone' rather than as an animation you arrived early for. */
+});
+</script></body></html>

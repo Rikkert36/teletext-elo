@@ -58,6 +58,8 @@ interface WrittenNameProps {
    * the page mounts is a book performing rather than a book.
    */
   writing?: boolean;
+  /** Measured but not yet on the cover — see WrittenType. */
+  pending?: boolean;
   /** Total time the writing takes. Ignored unless `writing`. */
   durationMs?: number;
   className?: string;
@@ -66,6 +68,7 @@ interface WrittenNameProps {
 const WrittenName: React.FC<WrittenNameProps> = ({
   name,
   writing = false,
+  pending,
   durationMs,
   className,
 }) => {
@@ -79,7 +82,7 @@ const WrittenName: React.FC<WrittenNameProps> = ({
 
   const total = durationMs ?? durationFor(written?.totalLength ?? 0);
 
-  return <WrittenType name={name} writing={writing} durationMs={total} />;
+  return <WrittenType name={name} writing={writing} pending={pending} durationMs={total} />;
 };
 
 export default WrittenName;
