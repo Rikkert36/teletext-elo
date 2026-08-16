@@ -2919,6 +2919,37 @@
     var(--leather-mid, #35270f) 55%,
     var(--leather-lo, #4a3820) 100%
   );
+  /*
+   * **Its own raster layer, and this is the cure for the hairline down the cover.**
+   *
+   * A faint vertical line kept appearing on the closed book — after it had been opened and
+   * shut and then hovered, never reliably, never twice in the same place. It was chased as
+   * geometry first, on the reading that it was the edge of the name's `<svg>` box; that is
+   * wrong and `WrittenType` records why. It moves, and it has been seen where no element
+   * has an edge at all.
+   *
+   * What it actually is: the seam of a **partial repaint of this gradient**. The leather is
+   * one broad 150deg ramp across the whole board, so the steps between its stops are far
+   * wider than 8-bit colour can express and the browser dithers them. Dithering is computed
+   * per damage rectangle — so when something invalidates only part of the cover (a leaf
+   * settling out of its rotation, a hover repainting a strip) the re-dithered rect meets the
+   * old one along a straight line, and on a ramp this shallow that line is visible. It sits
+   * wherever the damage happened to fall, which is exactly the behaviour observed.
+   *
+   * `will-change: transform` gives the cover a compositing layer of its own, so it is
+   * rasterised whole and re-used rather than being repainted in pieces along with its
+   * neighbours. Two of these exist at a time and both are small; the memory is not a
+   * consideration.
+   *
+   * **Safe here specifically, and check this before copying it elsewhere.** It makes an
+   * element a containing block and a stacking context, which on this one changes nothing:
+   * `position: relative` above already made it the containing block for
+   * `.album__cover-icons` and `::after`, and a stacking context on a parent does not
+   * reorder its own children. `.album__face` does not set `preserve-3d`, so its contents
+   * are flattened and this cannot escape into the leaf's 3D space — the trap documented
+   * on `.album__cover-icons` further down.
+   */
+  will-change: transform;
   /* Inherited by the kicker, the title and the sub, which only set opacity. */
   color: var(--foil, #e6c98a);
   text-align: center;

@@ -1,6 +1,17 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-15)
+## Where this stands (last updated 2026-08-16)
+
+**The one, the three and the five are printed artwork now**, not painted CSS — see "The
+one, the three and the five are printed, not painted" under Pack opening, which is the
+section to read before touching `pack-{1,3,5}.png`, `.pack--art` or `PackFace`. Two things
+in it will otherwise be undone. The panel is **placed inside the asset**, so each PNG is
+the packet's box with the render laid on it and the CSS draws it at a flat `100% 100%`;
+stretching a raw render to the box puts the coloured panel 4% off the card behind it. And
+the artwork is used **twice** — as the background and as the mask — because its alpha
+channel is the serrated silhouette, so the conic tooth mask has to go and the sheen has to
+be clipped by something. Everything below about the wrapper still holds for the packets
+that have no front: gifts of odd sizes, guaranteed packets, and the icoon packet.
 
 **The packets are lit by the room, and the edge light is what does it.** A packet cast one
 soft offset shadow — `0 7px 12px rgba(0,0,0,0.6)` — which is what an object a centimetre
@@ -3474,6 +3485,67 @@ Five beats: wrapper → tear → the card arrives → reveal → hand-off to the
     gone; `.album-side` states its width and the book is solved against it. See "The
     table is one object, and the book is solved against it".
 
+#### The one, the three and the five are printed, not painted
+
+The three packets you actually earn are **artwork** — a photograph of a foil sachet,
+alpha channel and all, in `src/assets/pack-{1,3,5}.png`. Everything the paint above
+was reaching for is in the render: the pinked ends, the seals, the bulge over the
+cards, the badge and the numeral. So `.pack--art` takes all of it back off — the four
+gradients, the two crimp pseudo-elements, the inset edge line — and `PackFace` renders
+nothing at all, because a second badge over a wrapper that already has one is the whole
+failure mode. What is left of the painted wrapper is the geometry, the shadow and the
+travelling sheen.
+
+- **The art is both the background and the mask.** The asset is trimmed to the
+  packet's own alpha bounds, so its alpha channel already *is* the serrated silhouette
+  — which means the conic tooth mask has to go, or a second set of teeth is cut through
+  the ones in the picture. Masking with the same image hands the shape back, and it is
+  also what keeps the sheen honest: a background layer paints the whole box whatever
+  the layer under it is doing, so an unmasked sheen shows as a pale diagonal in the
+  empty notches between the teeth.
+- **The panel is placed in the asset, not fitted in CSS, and this is the thing to know
+  before replacing a front.** Each PNG is 480 × 816 — the box at 480 wide — with the
+  render laid inside it so that *its own* coloured panel lands on the box's panel: 0.15
+  down, 1.40 tall, 0.15 of seal at each end. At 480 wide that is **72 / 672 / 72**; the
+  renders are commissioned at 1000 × 1700, where it is **150 / 1400 / 150**. The CSS
+  then draws it at a flat `100% 100%` and is right by construction. The first pass
+  stretched the whole render to the box instead, which put the panel 4% out and the
+  seals 20% shallow — a packet with too much front and not enough end. The rule above is
+  why it matters: the panel is the part with a card behind it.
+  - **Commission them on the box and there is nothing left to do but downscale.** The
+    reprinted one arrived as an exact 1000 × 1700 with its seams on 150 and 1550, so it
+    is only resized — *premultiplied*, or the transparent notches between the teeth
+    fringe the chrome seal with whatever colour the background carried.
+  - The first set's seals came out at ~`0.11` instead of `0.15`, so the three and the
+    five are each scaled ~4% and offset to land their panel right, which leaves them a
+    few percent short of the full box with transparent slack at both ends. A three or a
+    five therefore stands very slightly lower than the one beside it. The panels are
+    identical, which is the half that had to be, and it goes away as they are reprinted.
+- **No `box-shadow` on a printed packet.** The painted wrapper is lit by the room: a
+  printed 1px rule, the lamp down one side and the turn away down the other. A render
+  carries its own lighting, and these have bright speculars on both edges, so the
+  room's edge light would be a second highlight on an edge that already has one. The
+  cast shadow and the packet's own neon still run — those are the `filter`, not the
+  `box-shadow`.
+- **Only these three.** A gift can be any size up to ten, a guaranteed packet is the
+  flame orange, and the set-completion packet is white board with a gold rule — none of
+  those has a front, and all of them keep the painted wrapper. That is a real seam on a
+  shelf that holds both, and it is the honest one: an unprinted product does not get to
+  borrow another one's face. An ordinary *gift* of three is not excluded, deliberately:
+  it is a real packet of three drawn on the real odds, and printing it like one is the
+  whole reason a three from a colleague looks like a three.
+- **The size hues read off the artwork**, and `SIZE_HUES` follows the fronts rather than
+  leading them: it is the median hue sampled from each printed field, and the only thing
+  it still drives on a printed packet is the neon bleeding off the edges — a green halo
+  around a blue packet is worse than no halo. Nothing derives a size from a colour, so
+  the table is the only place a colour lives.
+  - **Open: the one and the three are both green.** The reprinted one came back green
+    where its first front was blue; the three is still the green from the first set. Two
+    of the three packets on the shelf are the same colour, which breaks the one thing the
+    palette is for — that you know a five before you have read the number on it. It
+    resolves when the three is reprinted. Do not paper over it by inventing a hue in
+    `SIZE_HUES`: it would disagree with the front it is glowing off.
+
 **The book does not move.** `.album-layout` was a two-column flex row, so the book
 centred inside whatever width the shelf left rather than on the stage: it sat
 `(aside + gap) / 2` — about 190px at 1600×900 — right of centre while you held
@@ -3548,10 +3620,19 @@ truer reading of "objects lying next to the book".
     dissolve that black into the foil, or it read as a sticker stuck on the packet.
     A transparent version replaced it and the mask went with it.)
 - **The card back is the back of the wrapper.** Same near-black foil, same chrome, same
-  badge — you tear open a black-and-chrome packet and a black-and-chrome card comes out,
+  mark — you tear open a black-and-chrome packet and a black-and-chrome card comes out,
   which is what a real card product does and what makes the five beats one object rather
   than two. It replaced a brown leather field with a serif "T7" monogram, which belonged
   to neither the packet nor the site and competed with the album's binding.
+  - **The mark on the back is the wordmark, not the shield badge.** `rik-dev-wordmark.png`
+    at 78% of the card's width, dead in the pool of light. A 5:4 crest inside a 5:7 card
+    is a portrait shape stacked in a portrait shape and never filled the width it was
+    given; a 3:1 band does, and it is what the packet reprint prints across its own front,
+    so the wrapper and the card still carry the same thing. Two numbers moved with it and
+    both are load-bearing: `aspect-ratio` is `3 / 1` (the asset's own ratio — see
+    `utils/brand.ts`), and the pool of light went from `66% 48%` to `84% 34%`, because a
+    pool cut for a crest leaves the ends of a band — the raked "r" and the ball — unlit.
+    The packet's `.pack__mark` still uses the badge; only the back changed.
   Chosen from seven rendered side by side — mosaic to the edge, mosaic vignetted, this
   one, rings from behind the badge, the table's steel rods, the playfield, and a blind
   emboss — on all three grounds it has to survive (opener, tabletop, teletekst black).
@@ -3567,8 +3648,10 @@ truer reading of "objects lying next to the book".
   - **Solid black by the edge**, as the topmost background layer: clear over the middle,
     black by the border, so the light pools and stops. That is the frame — no chrome rule
     inside the art, nothing for the eye to catch on. An inset rule was tried and cut.
-  - **No text.** It carried "TAFELVOETBAL" in the Teletekst face for one revision; a back
-    does not need to name the product it is the back of, and it crowded the badge.
+  - **No set text.** It carried "TAFELVOETBAL" in the Teletekst face for one revision; a
+    back does not need to name the product it is the back of, and it crowded the mark. The
+    wordmark is not a counter-example — it is the maker's mark, drawn artwork rather than
+    type the page sets, and it is still the only thing on the back.
   - The vignette goes **in the background stack**, and the 1px edge is a `::before`
     element rather than an inset shadow, for two separate reasons. `.card::after` is the
     foil sheen every card carries, so a `.card--back::after` inherits that gradient and
@@ -3647,12 +3730,39 @@ truer reading of "objects lying next to the book".
   as the album's leaves do. `backface-visibility: hidden` is ignored on an element that is
   not itself 3D-transformed, and the back face had none — so it was never culled and
   showed through the front. It went unnoticed for as long as the back was a dark brown
-  field with nothing bright on it; putting the badge there made it obvious. There is no
+  field with nothing bright on it; putting the mark there made it obvious. There is no
   `perspective` in the opener, so the translate costs nothing visually and changes no
   measurement the FLIP takes.
   - Nothing inside a face should carry a `z-index` it does not need, for the same reason:
     it makes the element a candidate for promotion out of the flattened subtree that
     back-face culling depends on.
+- **But the 3D exists only while the card is turning** — `.opener__flip--turning`, added
+  for the 320ms of the transition and taken away after. **Anything 3D in that subtree
+  makes Chrome rasterize the card at roughly CSS resolution and scale it up to the
+  device's pixels**, and the card back is then visibly soft on any HiDPI screen, in the
+  one state it is ever looked at: still, face down, waiting to be clicked. While it is
+  turning it is soft too, and that cannot be seen, because it is rotating.
+  - Bisected, not guessed — `docs/card-back-sharpness.html` and `-2.html`, one variable
+    per tile. **No property is innocent and no workaround helps**: `preserve-3d` alone did
+    it, `translateZ(1px)` alone did it even under a flat parent, and `rotateY(0deg)` did
+    it with no depth at all. `perspective: 4000px` did not fix it; `will-change: transform`
+    did not fix it. Only `backface-visibility: hidden` was free, and alone it is inert.
+  - **It was mistaken for an asset problem twice**, which is the expensive part of this
+    entry. The wordmark was resampled 2172 → 642 to stop an 11× minification, and the mark
+    was measured crisper at 1:1 than the badge. Neither moved it. What settled it was that
+    a bare `<img>` was sharp, and that the *badge* went soft the moment it was put in the
+    same slot — the artwork was never involved. Suspect the layer before the file.
+  - `--turning` and `--up` **must land in the same commit**: `transform` and `transition`
+    are both declared under `--turning`, so the class is what starts the animation. The
+    two `setFaceUp(true)` sites wrap it in `unstable_batchedUpdates` for that reason, on
+    top of the unbatched-timeout hazard `playCard` already documents.
+  - At rest, which face shows is decided by `visibility` on `.opener__face--back` /
+    `--front` instead of by culling, since there is no 3D context left to cull in.
+    **Both rules declare `hidden` and neither declares `visible`.** Visibility is
+    inherited and a descendant's `visible` overrides a hidden *ancestor*, so a `visible`
+    on a face defeats the inline `visibility: hidden` that `heroVisible` puts on
+    `.opener__riser` for the hand-off — the card then flies down to the revealed row and
+    stays in the centre too, one card in two places. It shipped that way for one revision.
 - **Hold is counted from the end of the flip**, not the start. A single "dwell"
   measured from the turn left the card readable for about 40ms.
 - **Hold depends on newness only** (340ms, +340ms if new). Rarity is expressed in
@@ -5596,9 +5706,48 @@ outside is painted with, following `utils/packFoil.ts` exactly. It is the only p
 the leather colours live; `album.css` reads them with bordeaux fallbacks, so a cover
 rendered with no stain set is the book as it was before there was a choice.
 
-**One binary asset**, and only one: `src/assets/rik-dev-logo.png`, the mark printed on
-the wrapper. Imported through webpack rather than dropped in `public/`, so it is
-content-hashed and cannot go stale. It is the transparent-background original (1024²,
+**The brand marks are two assets, and they are not interchangeable.** Both live in
+`src/assets/` and both are re-exported from `utils/brand.ts`, which exists so nothing
+imports one of them by hand and no two places end up pointing at different files.
+
+`rik-dev-logo.png` is the **badge**, the shield, 5:4 — described in full below. It is
+printed on the wrapper (`.pack__mark`).
+
+`rik-dev-wordmark.png` is the **wordmark**, the name alone, `642×214` and so exactly 3:1.
+It is printed on the card back (`.card--back__mark`). It is trimmed horizontally; the ~4
+transparent rows top and bottom (true bounds `642×207` at threshold 8, or 3.10:1) are
+under 2% and deliberately left in, so `aspect-ratio: 3 / 1` is the file's own ratio and
+`contain` cannot letterbox it.
+
+**The delivered artwork was 2172×724 and came down to 642, but read the next paragraph
+before concluding anything from that.** The back is drawn only by the opener, where the
+card is `--pack-w`, so the mark tops out at 187 CSS px — 561 device px at DPR 3. A 2172px
+source therefore had to be minified 6–9×, which is real waste and 1.6 MB of it. Resampled
+with **Lanczos-3 on premultiplied alpha**, as the badge was: premultiplied because the
+artwork is a neon glow over transparency and filtering straight RGBA lets the colour of
+fully transparent pixels bleed into the fringe, and with the alpha clamped before
+unpremultiplying because Lanczos overshoots at the hard gold-on-black contour and the
+ringing would otherwise leave out-of-range colour on the edge. 1.6 MB → 175 KiB, artwork
+unharmed: edge ramps measure 3px median at 642, where the badge measures 4px at 640.
+
+**It was done to fix a soft card back, and it did not fix it.** The softness was the
+flip's 3D layer rasterizing the whole card below device resolution — see "the 3D exists
+only while the card is turning" in the opener section, which is where that was finally
+run to ground. The resample is kept because 1.6 MB for a 187px mark is indefensible on
+its own terms, not because it bought any sharpness. **The lesson is worth more than the
+KiB: when something looks soft, prove the layer is innocent before touching the file.**
+A bare `<img>` of the same asset was sharp the whole time.
+
+**Both marks are now at their ceiling, and the rule is the same for either.** Size the
+asset at the largest it is drawn times the highest DPR worth serving, and no further. Too
+small upscales; too large hands a hostile reduction to a compositor that will not do it
+well. If the back is ever shown somewhere bigger than the opener — the viewer, say, at
+380px — this file needs re-cutting upward before that ships.
+
+Both are imported through webpack rather than dropped in `public/`, so they are
+content-hashed and cannot go stale.
+
+The badge, in detail. It is the transparent-background original (1024²,
 1.6 MB), cropped to its alpha bounds — `x 23, y 158, 977×781` at an alpha threshold of
 8, which is 5:4 to within 0.1% and is where `aspect-ratio: 320 / 256` comes from — and
 resampled to **640×512** with Lanczos-3 on premultiplied alpha.

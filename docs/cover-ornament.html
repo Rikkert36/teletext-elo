@@ -1,0 +1,1300 @@
+<title>Reliëf op het omslag — 1-2-3-5 in de kleur van de band</title>
+<style>
+/* ================================================================
+   Het reliëf-ornament, nagebouwd.
+
+   Vier stangen (1-2-3-5) over het omslag, in een tint die iets lichter
+   is dan het leer, met opstaande randen: een hoogsel linksboven en een
+   schaduw rechtsonder, per vorm. Zo lijken de poppetjes uit de huid
+   omhoog geduwd in plaats van erop gedrukt.
+
+   De tekening komt uit de referentie-SVG (v4) en is niet hertekend —
+   zelfde maten, zelfde drie randstreken per vorm, zelfde toonwaarden.
+   Wat hier wél anders is:
+
+     · de toonwaarden staan in CSS-variabelen (--edge, --tint) in plaats
+       van in vaste getallen, zodat de schuiven hieronder werken;
+     · `vector-effect: non-scaling-stroke` staat standaard UIT, want dat
+       is precies wat de kleine boekjes van de kiestafel sloopt — zie §4,
+       waar het naast elkaar staat;
+     · `fill="none"` op de wortel is een `fill: none` op de <svg> geworden,
+       zodat de randvormen niet volgelopen raken met currentColor;
+     · de tweeëntwintig stangsegmenten zijn niet uitgeschreven maar worden
+       gerekend uit de plek van de poppetjes — zie ROD_ROWS onderin.
+
+   De stang is sinds v4 een balk die BIJ ELKE ROMP OPHOUDT in plaats van
+   erachter door te lopen, en dat is meer dan een detail: twee vormen van
+   24% over elkaar geven 42%, dus een doorlopende stang tekende een lichte
+   band dwars door elk poppetje. Nu raakt niets elkaar en klopt de dekking
+   overal. De prijs staat hieronder: de stang is niet langer één vorm die
+   je kunt hergebruiken.
+
+   Dezelfde wereld als docs/cover-ideas.html: een werkbank onder een warme
+   lamp, geen lichte modus. Het omslag zelf is uit dat bestand overgenomen
+   zonder een getal te veranderen, zodat deze pagina een diff is en geen
+   tweede mening over het leer. De nerf is hier procedureel (feTurbulence)
+   in plaats van een ingesloten foto, puur om het bestand klein te houden.
+   ================================================================ */
+
+:root {
+  --bench: #4e1d12;
+  --ink: #e8d9c6;
+  --foil: #e6c98a;
+  --brass: #a9853c;
+  --display: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --body-face: Palatino, "Palatino Linotype", Georgia, serif;
+  --mono: Consolas, "SF Mono", Menlo, monospace;
+
+  /* De drie knoppen van het ornament.
+     --edge   vermenigvuldigt het wit en het zwart: hoe hoog de rand staat.
+     --tint   vermenigvuldigt de leerkleur zelf: hoe zichtbaar de vorm is.
+     --relief is de diepte in CSS-pixels, en geldt alleen voor de
+              drop-shadow-variant (zie [data-relief="shadow"]).
+
+     0,80 en 0,10 is de gekozen stand, niet het midden van de schuif. De
+     leerkleur staat daarmee vrijwel uit — het lichaam van een poppetje is
+     0,24 × 0,10 ≈ 2,4% — en het hele ornament bestaat dus uit niets dan
+     licht en schaduw op de huid. Dat is ook precies wat een blinde
+     inslag is: er is geen tweede kleur, er is alleen reliëf. */
+  --edge: 0.8;
+  --tint: 0.1;
+  --relief: 1.1px;
+
+  /* De nerf: fractale ruis, geen foto. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background-color: var(--bench);
+  background-image:
+    radial-gradient(ellipse 56% 34% at 50% -4%, rgba(255, 216, 162, 0.2), transparent 70%),
+    radial-gradient(ellipse 112% 90% at 50% -8%, #833926 0%, #4c1c11 52%, #250c06 100%);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-family: var(--body-face);
+  font-size: 17px;
+  line-height: 1.62;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 56px 26px 120px; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--foil);
+  opacity: 0.8;
+}
+
+h1 {
+  font-family: var(--display);
+  font-weight: normal;
+  font-size: clamp(38px, 6vw, 62px);
+  line-height: 1.04;
+  margin: 14px 0 0;
+  color: #fff4e2;
+  text-wrap: balance;
+}
+h1 em { color: var(--foil); font-style: italic; }
+
+h2 {
+  font-family: var(--display);
+  font-weight: normal;
+  font-size: clamp(24px, 3vw, 32px);
+  margin: 0 0 6px;
+  color: #fff4e2;
+}
+
+p { max-width: 66ch; }
+.standfirst { font-size: 19.5px; color: #f0dfc9; max-width: 62ch; }
+.standfirst em { color: var(--foil); font-style: italic; }
+
+section { margin-top: 78px; }
+.col > p { margin: 0 0 14px; }
+
+strong { color: #fff4e2; }
+em { color: #f3e3cc; }
+a { color: var(--foil); }
+
+code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  color: var(--foil);
+  background: rgba(0, 0, 0, 0.28);
+  padding: 1px 4px;
+  border-radius: 2px;
+}
+
+.rule-brass {
+  border: none;
+  height: 1px;
+  margin: 26px 0;
+  background: linear-gradient(90deg, var(--brass), rgba(169, 133, 60, 0));
+}
+
+.aside {
+  border-left: 2px solid var(--brass);
+  padding: 2px 0 2px 16px;
+  color: #ddc9b1;
+}
+
+/* ================================================================
+   HET OMSLAG — uit docs/cover-ideas.html, ongewijzigd
+   ================================================================ */
+
+.cover-scale {
+  position: relative;
+  width: calc(560px * var(--z));
+  height: calc(718px * var(--z));
+  flex: none;
+}
+.cover-scale > .cover { transform: scale(var(--z)); transform-origin: top left; }
+
+.cover {
+  --page-w: 560px;
+  --page-h: 718px;
+  --board-roll: 8px;
+  --joint-w: 24px;
+
+  position: relative;
+  width: var(--page-w);
+  height: var(--page-h);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  border-radius: 0 3px 3px 0;
+  font-kerning: none;
+  color: var(--foil);
+  isolation: isolate;
+  background: linear-gradient(150deg, var(--leather-hi) 0%, var(--leather-mid) 55%, var(--leather-lo) 100%);
+  box-shadow: 0 42px 80px rgba(0, 0, 0, 0.7), 0 10px 22px rgba(0, 0, 0, 0.55);
+}
+
+.cover__layer { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+
+.cover__skin {
+  z-index: 2;
+  mix-blend-mode: overlay;
+  opacity: 0.5;
+  background-image: var(--grain);
+  background-size: 220px 220px;
+}
+.cover--nograin .cover__skin { display: none; }
+
+.cover__print {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.cover__kicker {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  font-style: italic;
+  letter-spacing: 1px;
+  opacity: 0.75;
+}
+
+.cover__name {
+  width: 76%;
+  font-family: "Segoe Script", "Brush Script MT", "Apple Chancery", Palatino, Georgia, serif;
+  font-style: italic;
+  font-size: 62px;
+  line-height: 1.1;
+}
+
+.cover__rule {
+  width: 60%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--brass) 50%, transparent);
+}
+
+.cover__form {
+  z-index: 6;
+  background:
+    linear-gradient(to bottom, rgba(255, 246, 224, 0.05) 3px, rgba(255, 246, 224, 0) 22px),
+    linear-gradient(to left, rgba(0, 0, 0, 0.16) 3px, rgba(0, 0, 0, 0) 26px),
+    linear-gradient(to top, rgba(0, 0, 0, 0.18) 3px, rgba(0, 0, 0, 0) 28px),
+    radial-gradient(125% 108% at 50% 46%, rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.09) 74%, rgba(0, 0, 0, 0.3) 100%),
+    radial-gradient(130% 115% at 28% 16%, rgba(255, 246, 224, 0.075), rgba(255, 246, 224, 0.022) 42%, rgba(255, 246, 224, 0) 72%);
+}
+
+.cover__roll {
+  z-index: 7;
+  background:
+    linear-gradient(to right,
+      rgba(255, 244, 219, 0) 4px, rgba(255, 244, 219, 0.065) 7.5px,
+      rgba(255, 244, 219, 0) 10.5px, rgba(255, 244, 219, 0) 16px,
+      rgba(255, 244, 219, 0.03) 19.5px, rgba(255, 244, 219, 0) var(--joint-w)),
+    linear-gradient(to right,
+      rgba(0, 0, 0, 0.72) 0, rgba(0, 0, 0, 0.42) 2.5px, rgba(0, 0, 0, 0.12) 5px,
+      rgba(0, 0, 0, 0.02) 7.5px, rgba(0, 0, 0, 0.16) 10.5px, rgba(0, 0, 0, 0.32) 13.5px,
+      rgba(0, 0, 0, 0.1) 18px, rgba(0, 0, 0, 0) 22px),
+    linear-gradient(to left,
+      rgba(0, 0, 0, 0.55) 0, rgba(0, 0, 0, 0.3) 2px,
+      rgba(0, 0, 0, 0.1) 4px, rgba(0, 0, 0, 0) var(--board-roll)),
+    linear-gradient(to top,
+      rgba(0, 0, 0, 0.62) 0, rgba(0, 0, 0, 0.34) 2px,
+      rgba(0, 0, 0, 0.12) 5px, rgba(0, 0, 0, 0) calc(var(--board-roll) + 2px)),
+    linear-gradient(to bottom,
+      rgba(255, 244, 219, 0.11) 0, rgba(255, 244, 219, 0.055) 1.5px, rgba(255, 244, 219, 0) 3.5px),
+    linear-gradient(to bottom,
+      rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.1) 4.5px, rgba(0, 0, 0, 0) 9px);
+}
+
+/* De tonale detailkleur. Eén regel voor alle tien de banden — zie §3.
+   Hier op [data-stain] en niet op .cover, zodat de vergrote figuren
+   verderop dezelfde kleur uit dezelfde rekensom krijgen; in de app
+   hoort hij gewoon op .album__cover, naast de andere tokens. */
+[data-stain] { --detail: color-mix(in srgb, var(--leather-hi) 82%, #ffffff); }
+
+/* ---- de tien banden, letterlijk uit utils/albumLeather.ts ---------- */
+[data-stain="tobacco"]   { --leather-hi: #5a4526; --leather-mid: #35270f; --leather-lo: #4a3820; }
+[data-stain="tan"]       { --leather-hi: #8a6134; --leather-mid: #5b3c1b; --leather-lo: #754f27; }
+[data-stain="oxblood"]   { --leather-hi: #6b2a22; --leather-mid: #3c110b; --leather-lo: #551f16; }
+[data-stain="claret"]    { --leather-hi: #5c2136; --leather-mid: #300f1c; --leather-lo: #4a1a2b; }
+[data-stain="aubergine"] { --leather-hi: #4a3350; --leather-mid: #271a2c; --leather-lo: #3c2942; }
+[data-stain="olive"]     { --leather-hi: #565229; --leather-mid: #2b2911; --leather-lo: #46421f; }
+[data-stain="forest"]    { --leather-hi: #2f4a2c; --leather-mid: #182c17; --leather-lo: #274023; }
+[data-stain="petrol"]    { --leather-hi: #2a4a4c; --leather-mid: #10282a; --leather-lo: #21403f; }
+[data-stain="navy"]      { --leather-hi: #223049; --leather-mid: #101828; --leather-lo: #1b2740; }
+[data-stain="charcoal"]  { --leather-hi: #3a3a3c; --leather-mid: #1c1c1e; --leather-lo: #2e2e30; }
+
+/* ================================================================
+   HET ORNAMENT
+
+   De toonwaarden uit de referentie-SVG, één op één, met alleen de vaste
+   getallen door --edge en --tint vermenigvuldigd. Wat wit en zwart is
+   blijft wit en zwart op alle tien de banden: dat is de lamp boven de
+   werkbank, en die verandert niet mee met de huid.
+
+   `fill: none` op de <svg> is niet optioneel. De randvormen (.edge-*)
+   zijn dezelfde rechthoeken en paden als de vlakken, alleen omtrokken —
+   zonder dit lopen ze vol met currentColor en is het poppetje een blok.
+
+   ----------------------------------------------------------------
+   ALLES LOOPT VIA GEËRFDE EIGENSCHAPPEN, EN DAT IS GEEN STIJLKEUZE
+
+   De tekening staat één keer in <defs> en wordt met <use> elf keer per
+   omslag gekloond. Een CSS-selector komt die kloongrens niet over: een
+   regel als `.fig[data-show="edges"] .shape-fill` matcht niets, want in
+   de documentboom hangt .shape-fill onder <defs> en niet onder .fig.
+   Wat er wél doorheen gaat is overerving — en dus ook custom properties.
+
+   Daarom is elke toonwaarde een `calc()` van drie factoren:
+
+     --a-*      de basiswaarde uit de referentie-SVG
+     --edge / --tint   de twee schuiven
+     --g-*      welke laag dit exemplaar laat zien (0 of 1)
+
+   en zijn wit en zwart --tone-hi / --tone-lo in plaats van #fff / #000,
+   zodat «ingeperst» een omwisseling van twee variabelen is. Alles wat
+   per exemplaar verschilt wordt op de <svg> gezet en zakt vanzelf naar
+   binnen.
+   ================================================================ */
+
+.cover__rods,
+.fig {
+  color: var(--detail);
+  fill: none;
+  stroke: none;
+
+  /* de basiswaarden van de lagen die currentColor dragen */
+  --a-face: 0.24;
+  --a-rod: 0.23;
+  --a-edge: 0.42;
+  --a-detail: 0.26;
+
+  /* het licht boven de werkbank */
+  --tone-hi: #fff;
+  --tone-lo: #000;
+
+  /* welke lagen dit exemplaar toont */
+  --g-face: 1;
+  --g-rod: 1;
+  --g-rod-edge: 1;
+  --g-edge: 1;
+  --g-detail: 1;
+  --g-relief: 1;
+
+  /* welke van de twee stangen. Beide staan in dezelfde sprite en worden
+     hier aan- en uitgezet, want een selector komt de <use>-grens niet
+     over en §2 laat ze naast elkaar zien. */
+  --g-rod5: 1;
+  --g-rod4: 0;
+}
+
+.cover__rods {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* ---- de stang, v5 -------------------------------------------------
+ * Een rechte balk van acht eenheden hoog. Geen afgeronde hoeken en geen
+ * ronde uiteinden — dat staat er met zoveel woorden bij in de bron, en
+ * het is de reden dat hij bij de poppetjes hoort: die hebben ook harde
+ * hoeken (rx 1,8 op een romp van 32 is bijna niets).
+ *
+ * Vier horizontale randen in plaats van drie: hoogsel op de bovenkant,
+ * de leerkleur er net onder, een lichte schaduw net boven de onderkant,
+ * en zwart op de onderkant zelf. Dat is een vlakke bovenkant met een
+ * afgeschuinde rand eromheen — een balk — waar drie randen een buis
+ * beschrijven.
+ *
+ * De koppen staan alleen aan de BUITENUITEINDEN van een rij. Waar een
+ * segment bij een romp ophoudt is er geen kop, en dus loopt de stang
+ * daar niet dood maar verdwijnt hij achter het poppetje.
+ *
+ * De schaduw ligt alleen omlaag (y -3,2 tegen -4 van de balk zelf), niet
+ * rondom: licht van linksboven werpt geen schaduw naar boven.
+ * ------------------------------------------------------------------- */
+.rod-shadow       { fill: var(--tone-lo);   fill-opacity: calc(0.09 * var(--edge) * var(--g-rod) * var(--g-rod5) * var(--g-relief)); }
+.rod-face         { fill: currentColor;     fill-opacity: calc(var(--a-rod) * var(--tint) * var(--g-rod) * var(--g-rod5)); }
+.rod-top          { stroke: var(--tone-hi); stroke-opacity: calc(0.19 * var(--edge) * var(--g-rod) * var(--g-rod5) * var(--g-relief)); stroke-width: 1.05; }
+.rod-top-inner    { stroke: currentColor;   stroke-opacity: calc(0.48 * var(--tint) * var(--g-rod) * var(--g-rod5) * var(--g-rod-edge)); stroke-width: 0.75; }
+.rod-bottom-inner { stroke: var(--tone-lo); stroke-opacity: calc(0.16 * var(--edge) * var(--g-rod) * var(--g-rod5) * var(--g-relief)); stroke-width: 0.8; }
+.rod-bottom       { stroke: var(--tone-lo); stroke-opacity: calc(0.32 * var(--edge) * var(--g-rod) * var(--g-rod5) * var(--g-relief)); stroke-width: 1.1; }
+.rod-left         { stroke: var(--tone-hi); stroke-opacity: calc(0.16 * var(--edge) * var(--g-rod) * var(--g-rod5) * var(--g-relief)); stroke-width: 1; }
+.rod-left-inner   { stroke: currentColor;   stroke-opacity: calc(0.42 * var(--tint) * var(--g-rod) * var(--g-rod5) * var(--g-rod-edge)); stroke-width: 0.75; }
+.rod-right-inner  { stroke: var(--tone-lo); stroke-opacity: calc(0.14 * var(--edge) * var(--g-rod) * var(--g-rod5) * var(--g-relief)); stroke-width: 0.75; }
+.rod-right        { stroke: var(--tone-lo); stroke-opacity: calc(0.28 * var(--edge) * var(--g-rod) * var(--g-rod5) * var(--g-relief)); stroke-width: 1; }
+
+/* ---- de stang, v4 -------------------------------------------------
+ * De vorige, bewaard om naast de nieuwe te kunnen zetten (§2). Een buis
+ * van zes eenheden met afgeronde hoeken en ronde uiteinden, een lichte
+ * strook over de bovenste derde en drie randen. De klassenamen zijn
+ * hernoemd zodat de twee naast elkaar kunnen bestaan; de getallen zijn
+ * die van v4, op --a-rod na, die van v5 komt (0,23 tegen 0,22 — één
+ * honderdste, en het scheelt een variabele).
+ * ------------------------------------------------------------------- */
+.rodv4-shadow   { fill: var(--tone-lo);   fill-opacity: calc(0.08 * var(--edge) * var(--g-rod) * var(--g-rod4) * var(--g-relief)); }
+.rodv4-base     { fill: currentColor;     fill-opacity: calc(var(--a-rod) * var(--tint) * var(--g-rod) * var(--g-rod4)); }
+.rodv4-hi-fill  { fill: var(--tone-hi);   fill-opacity: calc(0.055 * var(--edge) * var(--g-rod) * var(--g-rod4) * var(--g-relief)); }
+.rodv4-hi-edge  { stroke: var(--tone-hi); stroke-opacity: calc(0.18 * var(--edge) * var(--g-rod) * var(--g-rod4) * var(--g-relief)); stroke-width: 1; stroke-linecap: round; }
+.rodv4-mid-edge { stroke: currentColor;   stroke-opacity: calc(0.38 * var(--tint) * var(--g-rod) * var(--g-rod4) * var(--g-rod-edge)); stroke-width: 0.95; stroke-linecap: round; }
+.rodv4-lo-edge  { stroke: var(--tone-lo); stroke-opacity: calc(0.28 * var(--edge) * var(--g-rod) * var(--g-rod4) * var(--g-relief)); stroke-width: 1.05; stroke-linecap: round; }
+
+/* De stangkeuze op het grote omslag. In §2 staat hij per exemplaar
+   als inline-stijl, want daar staan ze naast elkaar. */
+[data-rod="v4"] :is(.cover__rods, .fig) { --g-rod4: 1; --g-rod5: 0; }
+
+/* De vlakken: het lichaam van het poppetje, met een schaduwvorm eronder
+   en een hoogselvorm erop, allebei een fractie verschoven. */
+.shape-fill   { fill: currentColor;  fill-opacity: calc(var(--a-face) * var(--tint) * var(--g-face)); }
+.shape-hiFill { fill: var(--tone-hi); fill-opacity: calc(0.05 * var(--edge) * var(--g-face) * var(--g-relief)); }
+.shape-loFill { fill: var(--tone-lo); fill-opacity: calc(0.09 * var(--edge) * var(--g-face) * var(--g-relief)); }
+
+/* De opstaande rand: dezelfde omtrek drie keer, een halve eenheid uit
+   elkaar. Dit is wat er van een silhouet een reliëf maakt. */
+.edge-hi  { stroke: var(--tone-hi); stroke-opacity: calc(0.18 * var(--edge) * var(--g-edge) * var(--g-relief)); stroke-width: 1.05; stroke-linecap: round; stroke-linejoin: round; }
+.edge-mid { stroke: currentColor;   stroke-opacity: calc(var(--a-edge) * var(--tint) * var(--g-edge)); stroke-width: 0.95; stroke-linecap: round; stroke-linejoin: round; }
+.edge-lo  { stroke: var(--tone-lo); stroke-opacity: calc(0.30 * var(--edge) * var(--g-edge) * var(--g-relief)); stroke-width: 1.1; stroke-linecap: round; stroke-linejoin: round; }
+
+/* De breuken in het gietstuk: kniebreuk, schouderlijn, bovenkant voet. */
+.detail-hi  { stroke: var(--tone-hi); stroke-opacity: calc(0.09 * var(--edge) * var(--g-detail) * var(--g-relief)); stroke-width: 0.8; stroke-linecap: round; }
+.detail-mid { stroke: currentColor;   stroke-opacity: calc(var(--a-detail) * var(--tint) * var(--g-detail)); stroke-width: 0.72; stroke-linecap: round; }
+.detail-lo  { stroke: var(--tone-lo); stroke-opacity: calc(0.19 * var(--edge) * var(--g-detail) * var(--g-relief)); stroke-width: 0.84; stroke-linecap: round; }
+
+/* ---- ingeperst ----------------------------------------------------
+ * Een kuil in plaats van een bult. De vormen blijven staan waar ze staan
+ * en alleen wit en zwart wisselen van kant — dat ís de inversie, want de
+ * randen liggen al naar twee kanten verschoven. Het lichaam zakt onder de
+ * leerkleur, want de bodem van een stempel is donkerder dan het leer
+ * eromheen en niet lichter.
+ * ------------------------------------------------------------------- */
+[data-relief="pressed"] :is(.cover__rods, .fig) {
+  --tone-hi: #000;
+  --tone-lo: #fff;
+  color: color-mix(in srgb, var(--leather-lo) 84%, #000);
+}
+
+/* ---- opgehoogd met drop-shadow ------------------------------------
+ * De vorige aanpak, als vergelijking blijven staan: één plat silhouet met
+ * het reliëf uit twee `drop-shadow()`s. Die rekenen in CSS-pixels, dus de
+ * diepte blijft gelijk op elke maat — maar het is één bult om de hele
+ * vorm heen in plaats van een rand per vlak, en juist die randen zijn wat
+ * de referentie doet.
+ *
+ * Hoogsel eerst, schaduw daarna: de láátste drop-shadow ligt achteraan.
+ * De alfa's kloppen doordat het silhouet zelf op 0,38 staat: een
+ * drop-shadow vermenigvuldigt daarmee, dus zwart op 1 geeft 0,38 en wit
+ * op 0,32 geeft 0,12.
+ * ------------------------------------------------------------------- */
+[data-relief="shadow"] :is(.cover__rods, .fig) {
+  --g-relief: 0;
+  --g-edge: 0;
+  --g-detail: 0;
+  --a-face: 0.38;
+  --a-rod: 0.38;
+  --g-rod-edge: 0;
+  filter:
+    drop-shadow(calc(-1 * var(--relief)) calc(-1 * var(--relief)) 0 rgba(255, 250, 240, 0.32))
+    drop-shadow(var(--relief) calc(var(--relief) * 1.15) 0.3px rgba(0, 0, 0, 1));
+}
+
+/* ---- vlak ---------------------------------------------------------
+ * Alleen de tint, geen reliëf van welke soort ook. Dit is de sticker.
+ * ------------------------------------------------------------------- */
+[data-relief="flat"] :is(.cover__rods, .fig) {
+  --g-relief: 0;
+  --g-edge: 0;
+  --g-detail: 0;
+  --a-face: 0.38;
+  --a-rod: 0.38;
+  --g-rod-edge: 0;
+}
+
+[data-ornament="off"] .cover__rods { display: none; }
+
+/* ================================================================
+   DE WERKBANK — bank, knoppen, panelen
+   ================================================================ */
+
+.bench {
+  display: flex;
+  gap: 40px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+
+.controls {
+  flex: 1 1 300px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(230, 201, 138, 0.16);
+  border-radius: 4px;
+  padding: 20px 22px 24px;
+}
+
+.controls__row { display: flex; flex-direction: column; gap: 9px; }
+
+.controls__legend {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--foil);
+  opacity: 0.75;
+}
+.controls__legend b { color: #fff4e2; font-weight: normal; opacity: 1; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chip {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(230, 201, 138, 0.22);
+  border-radius: 3px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+.chip[aria-pressed="true"] { color: #2a1408; background: var(--foil); border-color: var(--foil); }
+.chip:focus-visible, .stain:focus-visible, .slider:focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
+
+.stains { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.stain {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 0 1px rgba(230, 201, 138, 0.15);
+  padding: 0;
+  cursor: pointer;
+  background: linear-gradient(150deg, var(--leather-hi), var(--leather-lo));
+}
+.stain[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--foil); }
+
+.slider { width: 100%; accent-color: var(--brass); cursor: pointer; }
+
+/* ---- vergrote figuren -------------------------------------------- */
+
+.figs { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 26px; }
+
+.fig-cell { flex: 1 1 170px; min-width: 150px; }
+
+.fig-cell__plate {
+  height: 230px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(150deg, var(--leather-hi) 0%, var(--leather-mid) 55%, var(--leather-lo) 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.5), 0 10px 22px rgba(0, 0, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+.fig-cell__plate::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: overlay;
+  opacity: 0.5;
+  background-image: var(--grain);
+  background-size: 220px 220px;
+}
+
+.fig {
+  width: 110px;
+  height: 200px;
+  position: relative;
+  z-index: 1;
+}
+
+/* Welke van de vier lagen dit paneel laat zien. Na de reliëf-standen
+   hierboven, zodat een paneel zijn eigen lagen houdt; en met de
+   --g-schakelaars in plaats van `display`, want een selector komt de
+   <use>-grens niet over. */
+.fig[data-show="faces"]   { --g-edge: 0; --g-detail: 0; --g-rod: 0; }
+.fig[data-show="edges"]   { --g-face: 0; --g-detail: 0; --g-rod: 0; }
+.fig[data-show="details"] { --g-face: 0; --g-edge: 0; --g-rod: 0; }
+
+.fig-cell__cap {
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: #d6c2aa;
+  margin-top: 10px;
+}
+.fig-cell__cap b { display: block; color: var(--foil); font-weight: normal; letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px; }
+
+/* ---- de plank ----------------------------------------------------- */
+
+.shelf {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px 22px;
+  margin-top: 30px;
+  padding: 30px 26px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.12));
+  box-shadow: inset 0 1px 0 rgba(255, 220, 170, 0.06);
+}
+.shelf__item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.shelf__label { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; color: #cbb79c; }
+
+/* ---- tabel -------------------------------------------------------- */
+
+table { border-collapse: collapse; margin-top: 24px; font-family: var(--mono); font-size: 12.5px; }
+th, td { text-align: left; padding: 7px 16px 7px 0; border-bottom: 1px solid rgba(230, 201, 138, 0.14); }
+th { color: var(--foil); font-weight: normal; letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; }
+td.hex { color: #e8d9c6; }
+td.same { color: #9fd18a; }
+.swatch { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 7px; vertical-align: -1px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5); }
+
+/* ---- code --------------------------------------------------------- */
+
+pre {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #e6dccb;
+  background: rgba(0, 0, 0, 0.34);
+  border: 1px solid rgba(230, 201, 138, 0.14);
+  border-left: 2px solid var(--brass);
+  border-radius: 3px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  max-width: 900px;
+}
+pre .c { color: #9c8a70; }
+pre .p { color: var(--foil); }
+
+.verdict {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 2px;
+  vertical-align: 3px;
+  margin-left: 12px;
+}
+.verdict--do { background: rgba(120, 170, 100, 0.18); color: #b7dca4; border: 1px solid rgba(150, 200, 130, 0.4); }
+.verdict--no { background: rgba(190, 90, 70, 0.16); color: #ecab98; border: 1px solid rgba(210, 120, 100, 0.4); }
+</style>
+
+<!-- ================================================================
+     De tekening, één keer, als sprite. Elke <svg> op de pagina is een
+     <use> hierheen: één geometrie, tien kleuren.
+
+     Overgenomen uit de referentie-SVG (v4) zonder een coördinaat te
+     veranderen. De classes staan in het stijlblad hierboven in plaats
+     van in een <style> binnen de SVG, want dan kunnen de schuiven eraan
+     rekenen. Zie §5 voor wat dat in de app betekent.
+
+     Alleen het poppetje staat hier; de vier stangen worden onderin
+     gerekend uit de plek van de poppetjes, want sinds v4 hangt hun
+     geometrie daarvan af.
+     ================================================================ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Het poppetje. Kop, blokkige romp, taps onderlijf, voet — elk
+         vier keer getekend: schaduwvorm eronder, vulling, hoogselvorm
+         erop, en dan drie omtrekken die de opstaande rand maken. -->
+    <g id="player">
+      <!-- schaduwvorm, een fractie naar rechtsonder -->
+      <circle class="shape-loFill" cx="0.9" cy="-30.2" r="10.5" />
+      <rect class="shape-loFill" x="-16.1" y="-16.0" width="32" height="37" rx="1.8" />
+      <path class="shape-loFill" d="M-9.9 21.0 L9.9 21.0 L6.8 38.8 L3.9 53.0 L-3.9 53.0 L-6.8 38.8 Z" />
+      <rect class="shape-loFill" x="-10.6" y="53.0" width="21.2" height="10.2" rx="0.9" />
+
+      <!-- het lichaam zelf -->
+      <circle class="shape-fill" cx="0" cy="-31" r="10.5" />
+      <rect class="shape-fill" x="-16" y="-16" width="32" height="37" rx="1.8" />
+      <path class="shape-fill" d="M-10 21 L10 21 L6.9 38.6 L4.0 52.0 L-4.0 52.0 L-6.9 38.6 Z" />
+      <rect class="shape-fill" x="-10.5" y="52" width="21" height="10" rx="0.9" />
+
+      <!-- hoogselvorm: het vlak dat naar de lamp toe staat -->
+      <circle class="shape-hiFill" cx="-0.8" cy="-31.8" r="9.7" />
+      <rect class="shape-hiFill" x="-15.2" y="-16.7" width="29.2" height="34.0" rx="1.5" />
+      <path class="shape-hiFill" d="M-9.0 21.2 L8.4 21.2 L5.8 37.2 L3.3 49.3 L-3.4 49.3 L-5.8 37.3 Z" />
+      <rect class="shape-hiFill" x="-9.5" y="52.2" width="18.6" height="8.4" rx="0.7" />
+
+      <!-- de opstaande rand: licht linksboven, donker rechtsonder -->
+      <circle class="edge-hi" cx="-0.45" cy="-31.45" r="10.0" />
+      <circle class="edge-mid" cx="0" cy="-31" r="10.1" />
+      <circle class="edge-lo" cx="0.55" cy="-30.45" r="10.15" />
+
+      <rect class="edge-hi" x="-15.35" y="-16.55" width="30.2" height="35.2" rx="1.5" />
+      <rect class="edge-mid" x="-15.7" y="-16.2" width="31.0" height="36.0" rx="1.6" />
+      <rect class="edge-lo" x="-15.25" y="-15.75" width="31.8" height="36.8" rx="1.7" />
+
+      <path class="edge-hi" d="M-9.2 21.1 L8.7 21.1 L6.0 37.5 L3.4 50.3 L-3.4 50.3 L-6.0 37.5 Z" />
+      <path class="edge-mid" d="M-9.6 21.1 L9.2 21.1 L6.4 38.0 L3.7 51.1 L-3.7 51.1 L-6.4 38.0 Z" />
+      <path class="edge-lo" d="M-9.95 21.45 L9.8 21.45 L6.9 38.55 L3.95 52.0 L-3.95 52.0 L-6.9 38.55 Z" />
+
+      <rect class="edge-hi" x="-9.7" y="52.2" width="19.1" height="8.6" rx="0.8" />
+      <rect class="edge-mid" x="-10.0" y="52.25" width="19.8" height="9.1" rx="0.8" />
+      <rect class="edge-lo" x="-10.35" y="52.55" width="20.4" height="9.4" rx="0.85" />
+
+      <!-- de breuken in het gietstuk: kniebreuk, schouder, voetrand.
+           De kniebreuk lag tot v4 verticaal (een beensplit) en ligt nu
+           dwars: een gietvorm heeft een naad waar de mal opent, en die
+           loopt om het been heen en niet erlangs. -->
+      <line class="detail-hi"  x1="-7.9" y1="36.0" x2="6.7" y2="36.0" />
+      <line class="detail-mid" x1="-7.4" y1="36.5" x2="7.3" y2="36.5" />
+      <line class="detail-lo"  x1="-6.8" y1="37.1" x2="7.9" y2="37.1" />
+
+      <line class="detail-hi"  x1="-13.6" y1="-15.1" x2="12.5" y2="-15.1" />
+      <line class="detail-mid" x1="-13.0" y1="-14.4" x2="13.0" y2="-14.4" />
+      <line class="detail-lo"  x1="-12.4" y1="-13.7" x2="13.6" y2="-13.7" />
+
+      <line class="detail-hi"  x1="-8.2" y1="52.9" x2="7.0" y2="52.9" />
+      <line class="detail-mid" x1="-7.6" y1="53.4" x2="7.6" y2="53.4" />
+      <line class="detail-lo"  x1="-7.0" y1="54.0" x2="8.2" y2="54.0" />
+    </g>
+  </defs>
+</svg>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">teletext-elo · omslagvoorstel · 16 augustus 2026</div>
+  <h1>Zelfde leer,<br><em>iets meer licht.</em></h1>
+  <p class="standfirst">
+    Vier stangen over het omslag — één, twee, drie, vijf — met de naam in het gat
+    ertussen. Ze staan niet <em>op</em> het leer in een tweede kleur; ze zijn hetzelfde
+    leer, omhoog geduwd, met een lichte rand aan de kant waar de lamp staat en een
+    donkere aan de andere. Zet die randen uit en je houdt een sticker over.
+  </p>
+  <hr class="rule-brass">
+  <p class="aside">
+    <strong>Het reliëf zit in de tekening en niet in een filter.</strong> Elk vlak van het
+    poppetje — kop, romp, benen, voet — is vier keer getekend: een schaduwvorm eronder, de
+    vulling, een hoogselvorm erop, en dan drie omtrekken op een halve eenheid van elkaar
+    voor de opstaande rand. Dat is duurder dan één <code>feOffset</code> om het silhouet
+    heen, en het is ook het enige dat werkt: een bult om de <em>buitenrand</em> maakt van
+    het poppetje een stempel, terwijl de randen per vlak het een gietstuk maken dat licht
+    vangt. De schakelaar <em>Opgehoogd</em> hieronder zet de goedkope variant ernaast.
+  </p>
+  <p class="aside">
+    <strong>En de stang loopt niet meer achter de poppetjes door.</strong> Hij houdt bij elke
+    romp op en begint er aan de andere kant weer, zoals op een echte tafel waar de pop óm de
+    stang zit geklemd. Dat is niet alleen anatomie: twee doorschijnende vormen van 24% over
+    elkaar geven 42%, dus een doorlopende stang tekende een lichte band dwars door elk
+    poppetje heen — het enige plekje op het hele omslag waar de dekking niet klopte.
+  </p>
+</header>
+
+<!-- =============================================================== -->
+<section>
+  <h2>Het omslag<span class="verdict verdict--do">Voorstel</span></h2>
+
+  <div class="col">
+    <p>
+      Marineblauw, op ware grootte geschaald. De schakelaars veranderen één ding tegelijk.
+      <em>Vlak</em> haalt alleen het reliëf weg en laat de tint precies staan waar hij stond
+      — dat is de vergelijking die telt, want daar zie je dat «nauwelijks zichtbaar» en
+      «een beetje lichter» twee verschillende dingen zijn.
+    </p>
+    <p>
+      <em>Ingeperst</em> is dezelfde tekening als kuil in plaats van als verhoging: wit en
+      zwart wisselen van kant en het lichaam zakt onder de leerkleur, want de bodem van een
+      stempel is donkerder dan het leer eromheen. Beide zijn verdedigbaar; het beeld waar dit
+      uit komt is opgehoogd, en dat staat hier voor.
+    </p>
+    <p>
+      De twee schuiven zijn de enige twee getallen die je nog hoeft te draaien.
+      <em>Rand</em> schaalt al het wit en zwart — hoe hoog de vorm staat. <em>Vorm</em>
+      schaalt de leerkleur zelf — hoe zichtbaar de stangen überhaupt zijn. Ze horen niet
+      samen aan één knop: een hoge rand op een bijna onzichtbare vorm is precies het
+      subtiele effect, en een lage rand op een sterke vorm is de sticker.
+    </p>
+  </div>
+
+  <div class="bench">
+    <div class="cover-scale" style="--z: 0.78">
+      <div class="cover" data-stain="navy" id="hero">
+        <div class="cover__layer cover__skin"></div>
+        <svg class="cover__rods" viewBox="0 0 780 1000" preserveAspectRatio="none" aria-hidden="true">
+          <use href="#rods" />
+        </svg>
+        <div class="cover__print">
+          <div class="cover__kicker">Verzamelalbum van</div>
+          <div class="cover__name">Rik Maas</div>
+          <div class="cover__rule"></div>
+        </div>
+        <div class="cover__layer cover__form"></div>
+        <div class="cover__layer cover__roll"></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="controls__row">
+        <span class="controls__legend">Band</span>
+        <div class="stains" id="stains"></div>
+      </div>
+      <div class="controls__row">
+        <span class="controls__legend">Reliëf</span>
+        <div class="chips" id="reliefs"></div>
+      </div>
+      <div class="controls__row">
+        <span class="controls__legend">Rand <b id="edge-out">1.00×</b></span>
+        <input class="slider" id="edge" type="range" min="0" max="2.5" step="0.05" value="1"
+               aria-label="Sterkte van het wit en het zwart in de rand">
+      </div>
+      <div class="controls__row">
+        <span class="controls__legend">Vorm <b id="tint-out">1.00×</b></span>
+        <input class="slider" id="tint" type="range" min="0" max="2.5" step="0.05" value="1"
+               aria-label="Sterkte van de leerkleur in de vorm">
+      </div>
+      <div class="controls__row">
+        <span class="controls__legend">Diepte <b id="relief-out">1.10px</b> · alleen «opgehoogd»</span>
+        <input class="slider" id="relief" type="range" min="0" max="3" step="0.05" value="1.1"
+               aria-label="Diepte van de drop-shadow in CSS-pixels">
+      </div>
+      <div class="controls__row">
+        <span class="controls__legend">Aan tafel</span>
+        <div class="chips">
+          <button class="chip" id="t-ornament" aria-pressed="true">Ornament</button>
+          <button class="chip" id="t-grain" aria-pressed="true">Nerf</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+  <h2>Vier lagen, en elk van de vier is bijna niets</h2>
+
+  <div class="col">
+    <p>
+      Vergroot, op hetzelfde leer. Los van elkaar stelt geen van de lagen iets voor — en dat
+      hoort: als één laag op zichzelf al leesbaar is, staat hij te hard. Alleen de derde is
+      een verrassing. <strong>De binnenlijnen doen onevenredig veel werk</strong>: de
+      kniebreuk, de schouderlijn en de bovenkant van de voet zijn drie breuken in drie tonen,
+      negen haarlijnen bij elkaar, en zonder die negen is het poppetje een silhouet in plaats
+      van een gietstuk. De kniebreuk ligt sinds v4 dwars over het been in plaats van erlangs,
+      en dat is de betere lezing: een gietvorm heeft een naad waar de mal opengaat, en die
+      loopt om het been heen.
+    </p>
+    <p>
+      De asymmetrie is de andere helft. Het zwart staat op alle drie de niveaus sterker dan
+      het wit — 30 tegen 18 in de rand, 28 tegen 18 op de stang, 19 tegen 9 in de details —
+      want leer is mat: het slikt licht en geeft schaduw terug. Even veel licht als donker
+      is de standaardinstelling van elk emboss-filter, en dat leest als plastic.
+    </p>
+  </div>
+
+  <div class="figs" data-stain="navy" id="figs"></div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+  <h2>Tien banden, één token</h2>
+
+  <div class="col">
+    <p>
+      Bij het voorstel zat een tabel met tien detailkleuren, één per band. Die tabel hoeft niet
+      in de code: alle tien zijn tot op de laatste hex
+      <code>--leather-hi</code> gemengd met <strong>18% wit</strong>. Niet ongeveer — exact, op
+      alle dertig kanalen. De tabel is dus geen ontwerpbeslissing per band maar één rekensom,
+      en die hoort in CSS te staan en niet in tien regels die uit elkaar kunnen lopen:
+    </p>
+    <pre><span class="c">/* op .album__cover, naast de bestaande tokens */</span>
+<span class="p">--detail</span>: color-mix(in srgb, var(<span class="p">--leather-hi</span>) 82%, #ffffff);</pre>
+    <p>
+      Dat het <code>--leather-hi</code> is en niet <code>--leather-mid</code> is bovendien geen
+      toeval maar precies goed: <code>hi</code> is de hoek waar de lamp op valt, en een verhoging
+      vangt datzelfde licht. Een band die morgen wordt bijgesteld sleept zijn ornament vanzelf mee.
+    </p>
+    <p class="aside" style="margin-top:20px">
+      <strong>Wat hier niet in meegaat is de bult zelf.</strong> Het wit en het zwart blijven op
+      alle tien identiek — geen tint per band. Dat is dezelfde regel als voor het messing en het
+      bladgoud in <code>albumLeather.ts</code>: één werkplaats, tien kleuren leer. Het licht in
+      die werkplaats verandert niet mee met de huid. Alleen <code>currentColor</code> beweegt, en
+      dat zijn precies vier classes: <code>.shape-fill</code>, <code>.edge-mid</code>,
+      <code>.rod-base</code> en <code>.rod-mid-edge</code>.
+    </p>
+  </div>
+
+  <table id="palette">
+    <thead>
+      <tr><th>Band</th><th>--leather-hi</th><th>hi + 18% wit</th><th>Uit het voorstel</th><th>Δ</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <div class="shelf" id="shelf"></div>
+</section>
+
+<!-- =============================================================== -->
+<section id="maat">
+  <h2>Op maat<span class="verdict verdict--no">Let op</span></h2>
+
+  <div class="col">
+    <p>
+      Het omslag staat op drie maten in de app: open op de leestafel (tot 560px breed), als
+      dicht boekje op de kiestafel (<code>--choice-scale: 0.4</code>, dus 224px) en op de
+      telefoon op 0,2 — 112px.
+    </p>
+    <p>
+      <strong><code>vector-effect="non-scaling-stroke"</code> moet eraf, en dat is geen detail.</strong>
+      Het hele reliëf bestaat uit streken van 0,72 tot 1,1 eenheid die een halve eenheid uit
+      elkaar liggen. Houd je de streek op één pixel terwijl de tekening krimpt, dan lopen de drie
+      randen op 0,4× over elkaar heen en op 0,2× zijn ze één dikke lijn: het poppetje wordt een
+      vlek. De laatste twee boekjes hieronder zijn allebei 112px, het derde zonder het attribuut
+      en het vierde ermee.
+    </p>
+    <p>
+      De stang lijdt er minder onder dan in v2, en dat is een gratis meevaller van de balk: hij
+      is nu <em>meetkunde</em> — drie rechthoeken — en die schalen gewoon mee. Alleen de drie
+      streken op zijn randen zitten in de klem. Waar de stang eerst uit niets dan streken
+      bestond en op 0,2× een balk van drie pixels werd, blijft er nu een stang van de goede
+      dikte over met randen die te dik zijn.
+    </p>
+    <p>
+      Zonder het attribuut klopt de verhouding wel, maar dan is het volgende probleem de tekening
+      zelf: vier stangen met elf poppetjes op een boekje van een duim breed is ruis, en de randen
+      zijn dan dunner dan de nerf waar ze in liggen. <strong>Onder ongeveer 160px hoort het
+      ornament eraf</strong> — de kiestafel toont daar tien banden náást elkaar, en wat je daar
+      moet kunnen zien is het verschil tussen bordeaux en ossenbloed, niet een tafeltje.
+    </p>
+  </div>
+
+  <div class="shelf" id="sizes" style="align-items:flex-end"></div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+  <h2>Zo zet je het erin</h2>
+
+  <div class="col">
+    <p>
+      Drie plekken. Het token in <code>albumLeather.ts</code> zodat het van de wire meekomt
+      met de rest van de band; de classes in <code>album.css</code>; en één element in
+      <code>Album.tsx</code>, tussen de nerf en de druk in.
+    </p>
+    <p>
+      <strong>De <code>&lt;style&gt;</code> uit de SVG mag niet mee.</strong> Die zet classes
+      als <code>.edge-hi</code> en <code>.rod-base</code> in de globale scope, en de app heeft
+      één stylesheet voor alles — dat is een naam als <code>.chip</code> claimen. Ze horen in
+      <code>album.css</code>, genest onder <code>.album__cover-rods</code>. Dat is ook wat de
+      schuiven op deze pagina mogelijk maakt: zolang de getallen in de SVG staan kan er niets
+      aan rekenen.
+    </p>
+    <p>
+      <strong>De <code>id</code>'s ook niet.</strong> <code>#player</code> in een component dat
+      tien keer op de kiestafel staat, is tien keer dezelfde <code>id</code> in één document, en
+      <code>&lt;use href="#player"&gt;</code> pakt dan altijd de eerste. Eén sprite in de
+      app-wortel (zoals hierboven op deze pagina) of de poppetjes uitgeschreven zonder
+      <code>&lt;use&gt;</code> — het eerste, want elf keer twintig vormen per omslag is anders
+      elf keer twintig knopen in de DOM.
+    </p>
+    <p>
+      <strong>De stangen zijn een <code>map</code>, geen tweeëntwintig rechthoeken.</strong>
+      Sinds v4 houdt de stang bij elke romp op, dus elk segment loopt van de vorige romp tot de
+      volgende: <code>[100, …rompranden…, 682]</code> met de romphelft van 16 eraf en erbij. Met
+      de hand uitgeschreven staat de plek van een poppetje op twee plekken tegelijk — in de
+      <code>translate</code> en in twee segmentbreedtes — en dan is één poppetje verschuiven een
+      stang die door een romp steekt. Op deze pagina staat dat als <code>ROD_ROWS</code> onderin;
+      in een component is het dezelfde vijftien regels.
+    </p>
+    <p>
+      <strong>De laagvolgorde is niet vrij.</strong> Alles in <code>.album__cover</code>
+      stapelt op boomvolgorde — <code>.album__face</code> zet geen <code>preserve-3d</code>,
+      dus <code>z-index</code> koopt daar niets. Het ornament moet dus ná de nerf en vóór
+      <code>.album__cover-kicker</code> in de markup staan, en <code>.album__cover::after</code>
+      (de boardrand) blijft er als laatste overheen liggen. Dat is ook wat je wilt: de rand
+      van het bord is een echte rand en de bult ligt op het vlak binnen die rand.
+    </p>
+
+    <pre><span class="c">/* album.css — bij .album__cover */</span>
+.album__cover {
+  <span class="c">/* … */</span>
+  <span class="p">--detail</span>: color-mix(in srgb, var(<span class="p">--leather-hi</span>) 82%, #ffffff);
+}
+
+.album__cover-rods {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none;
+  color: var(<span class="p">--detail</span>);
+  <span class="c">/* Niet optioneel: de randvormen zijn omtrekken van dezelfde
+     rechthoeken als de vlakken, en lopen zonder dit vol. */</span>
+  fill: none; stroke: none;
+}
+
+<span class="c">/* De toonwaarden. Wit en zwart op alle tien de banden gelijk;
+   alleen currentColor beweegt mee met het leer. */</span>
+.album__cover-rods .rod-base     { fill: currentColor; fill-opacity: .22; }
+.album__cover-rods .rod-hi-fill  { fill: #fff; fill-opacity: .055; }
+.album__cover-rods .rod-shadow   { fill: #000; fill-opacity: .08; }
+.album__cover-rods .rod-mid-edge { stroke: currentColor; stroke-opacity: .38; stroke-width: .95; }
+<span class="c">/* … en zo voor .shape-*, .edge-* en .detail-*; zie het stijlblad
+   van deze pagina, dat is de bron. */</span>
+
+<span class="c">/* Het halfleren icoonband heeft ivoren platten. Een reliëf in de
+   leerkleur op ivoor is een vlek, en de stangen horen bij het leer —
+   dus eraf, net als de rest van de kill list daar. */</span>
+.album--icons .album__cover-rods { display: none; }
+
+<span class="c">/* En eraf zodra het boekje te klein is: zie §4. */</span>
+.choice__book .album__cover-rods { display: none; }</pre>
+
+    <p class="aside">
+      <strong>Eén ding om te controleren zodra dit erin staat:</strong> de herbind-wissel.
+      <code>.album__cover-icons</code> onthult het icoonband met een <code>clip-path</code>,
+      en het ornament ligt daar in de huidige boomvolgorde <em>onder</em>. De stangen moeten
+      met die veeg mee verdwijnen en niet er dwars overheen blijven liggen — dezelfde val als
+      waar <code>.album__cover::after</code> voor bestaat.
+    </p>
+  </div>
+</section>
+
+</div>
+
+<script>
+/* ------------------------------------------------------------------
+   Eén bron voor de banden: overgenomen uit utils/albumLeather.ts, in
+   dezelfde volgorde, want die volgorde ís de kiestafel.
+   ------------------------------------------------------------------ */
+const COVERS = [
+  { id: 'tobacco',   label: 'tabak',        hi: '#5a4526', suggested: '#78664d' },
+  { id: 'tan',       label: 'cognac',       hi: '#8a6134', suggested: '#9f7d59' },
+  { id: 'oxblood',   label: 'ossenbloed',   hi: '#6b2a22', suggested: '#86504a' },
+  { id: 'claret',    label: 'bordeaux',     hi: '#5c2136', suggested: '#79495a' },
+  { id: 'aubergine', label: 'aubergine',    hi: '#4a3350', suggested: '#6b5870' },
+  { id: 'olive',     label: 'olijf',        hi: '#565229', suggested: '#747150' },
+  { id: 'forest',    label: 'bosgroen',     hi: '#2f4a2c', suggested: '#546b52' },
+  { id: 'petrol',    label: 'petrol',       hi: '#2a4a4c', suggested: '#506b6c' },
+  { id: 'navy',      label: 'marineblauw',  hi: '#223049', suggested: '#4a556a' },
+  { id: 'charcoal',  label: 'antraciet',    hi: '#3a3a3c', suggested: '#5d5d5f' },
+];
+
+const RELIEFS = [
+  { id: 'raised',  label: 'Opstaande rand' },
+  { id: 'pressed', label: 'Ingeperst' },
+  { id: 'shadow',  label: 'Opgehoogd' },
+  { id: 'flat',    label: 'Vlak' },
+];
+
+const root = document.documentElement;
+const hero = document.getElementById('hero');
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const svgEl = (name, attrs) => {
+  const node = document.createElementNS(SVG_NS, name);
+  Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, v));
+  return node;
+};
+
+/* ------------------------------------------------------------------
+   DE STANGEN
+
+   Sinds v4 loopt de stang niet meer achter de poppetjes door maar houdt
+   hij bij elke romp op. Dat is de reden dat ze hier gerekend worden en
+   niet uitgeschreven staan: de segmenten volgen uit de plek van de
+   poppetjes, en één poppetje verschuiven zonder de twee segmenten
+   ernaast bij te stellen levert een stang die door een romp steekt of
+   een gat in de lucht. Tweeëntwintig rechthoeken met de hand bijhouden
+   is precies het soort werk dat een keer misgaat.
+
+   De rij is dus de bron, en de rest is aftrekken.
+   ------------------------------------------------------------------ */
+const ROD_ROWS = [
+  { y: 110, players: [390] },
+  { y: 252, players: [300, 480] },
+  { y: 680, players: [245, 390, 535] },
+  { y: 836, players: [185, 287.5, 390, 492.5, 595] },
+];
+
+/* De stang loopt van 100 tot 682 en de romp is 32 breed, dus hij houdt
+   16 eenheden voor het hart van een poppetje op en begint er 16 na. */
+const ROD_X0 = 100;
+const ROD_X1 = 682;
+const TORSO_HALF = 16;
+
+/* Eén segment: schaduw, balk, lichte strook, en drie streken. De y's en
+   de inzet van de streken zijn letterlijk die uit de referentie. */
+const rodSegment = (x, w) => {
+  const g = svgEl('g', {});
+  g.append(
+    svgEl('rect', { class: 'rod-shadow', x, y: -3.15, width: w, height: 7.1, rx: 1 }),
+    svgEl('rect', { class: 'rod-base', x, y: -2.45, width: w, height: 6, rx: 0.9 }),
+    svgEl('rect', { class: 'rod-hi-fill', x, y: -2.45, width: w, height: 2, rx: 0.9 }),
+    svgEl('line', { class: 'rod-hi-edge', x1: x + 0.4, y1: -1.75, x2: x + w - 0.4, y2: -1.75 }),
+    svgEl('line', { class: 'rod-mid-edge', x1: x + 0.2, y1: 0, x2: x + w - 0.2, y2: 0 }),
+    svgEl('line', { class: 'rod-lo-edge', x1: x + 0.5, y1: 3, x2: x + w - 0.5, y2: 3 }),
+  );
+  return g;
+};
+
+/* De gaten tussen de rompen, van links naar rechts. */
+const rodRow = ({ y, players }) => {
+  const row = svgEl('g', { transform: `translate(0 ${y})` });
+  let x = ROD_X0;
+  players.forEach((cx) => {
+    row.appendChild(rodSegment(x, cx - TORSO_HALF - x));
+    x = cx + TORSO_HALF;
+  });
+  row.appendChild(rodSegment(x, ROD_X1 - x));
+  players.forEach((cx) => {
+    row.appendChild(svgEl('use', { href: '#player', transform: `translate(${cx} 0)` }));
+  });
+  return row;
+};
+
+const defs = document.querySelector('defs');
+
+const rods = svgEl('g', { id: 'rods' });
+ROD_ROWS.forEach((row) => rods.appendChild(rodRow(row)));
+defs.appendChild(rods);
+
+/* Eén poppetje op twee stukjes stang, voor de vergrotingen — dezelfde
+   onderbreking, zodat het paneel laat zien wat het omslag doet. */
+const detail = svgEl('g', { id: 'detail' });
+detail.append(
+  rodSegment(-46, 30),
+  rodSegment(TORSO_HALF, 30),
+  svgEl('use', { href: '#player' }),
+);
+defs.appendChild(detail);
+
+/* Dezelfde rekensom die color-mix doet, zodat de tabel niet hoeft te
+   vertrouwen op wat de browser toevallig teruggeeft. */
+const mixWhite = (hex, p) => {
+  const n = parseInt(hex.slice(1), 16);
+  const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  return '#' + ch.map((v) => Math.round(v * p + 255 * (1 - p)).toString(16).padStart(2, '0')).join('');
+};
+
+/* ---- het omslag als bouwsteen, zodat de plank en de maten er ook
+        eentje kunnen zijn en niets uit elkaar loopt ---------------- */
+const coverHtml = (stain, name, sprite) => `
+  <div class="cover" data-stain="${stain}">
+    <div class="cover__layer cover__skin"></div>
+    <svg class="cover__rods" viewBox="0 0 780 1000" preserveAspectRatio="none" aria-hidden="true">
+      <use href="#${sprite || 'rods'}" />
+    </svg>
+    <div class="cover__print">
+      <div class="cover__kicker">Verzamelalbum van</div>
+      <div class="cover__name">${name}</div>
+      <div class="cover__rule"></div>
+    </div>
+    <div class="cover__layer cover__form"></div>
+    <div class="cover__layer cover__roll"></div>
+  </div>`;
+
+/* ---- banden ------------------------------------------------------- */
+const stains = document.getElementById('stains');
+stains.innerHTML = COVERS.map((c) => `
+  <button class="stain" data-stain="${c.id}" data-pick="${c.id}" title="${c.label}"
+          aria-label="${c.label}" aria-pressed="${c.id === 'navy'}"></button>`).join('');
+
+stains.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-pick]');
+  if (!btn) return;
+  hero.dataset.stain = btn.dataset.pick;
+  document.getElementById('figs').dataset.stain = btn.dataset.pick;
+  stains.querySelectorAll('.stain').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+});
+
+/* ---- reliëf ------------------------------------------------------- */
+const reliefs = document.getElementById('reliefs');
+reliefs.innerHTML = RELIEFS.map((r, i) => `
+  <button class="chip" data-relief="${r.id}" aria-pressed="${i === 0}">${r.label}</button>`).join('');
+
+reliefs.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-relief]');
+  if (!btn) return;
+  /* Op de <html>, want de vergrotingen verderop volgen dezelfde stand. */
+  root.dataset.relief = btn.dataset.relief;
+  reliefs.querySelectorAll('.chip').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+});
+root.dataset.relief = 'raised';
+
+/* ---- schuiven ----------------------------------------------------- */
+const bind = (id, out, apply) => {
+  const el = document.getElementById(id);
+  const render = () => { document.getElementById(out).textContent = apply(el.value); };
+  el.addEventListener('input', render);
+  render();
+};
+
+bind('edge', 'edge-out', (v) => {
+  root.style.setProperty('--edge', v);
+  return Number(v).toFixed(2) + '×';
+});
+
+bind('tint', 'tint-out', (v) => {
+  root.style.setProperty('--tint', v);
+  return Number(v).toFixed(2) + '×';
+});
+
+bind('relief', 'relief-out', (v) => {
+  root.style.setProperty('--relief', v + 'px');
+  return Number(v).toFixed(2) + 'px';
+});
+
+/* ---- aan/uit ------------------------------------------------------ */
+const toggle = (id, on, off) => {
+  const btn = document.getElementById(id);
+  btn.addEventListener('click', () => {
+    const next = btn.getAttribute('aria-pressed') !== 'true';
+    btn.setAttribute('aria-pressed', String(next));
+    (next ? on : off)();
+  });
+};
+
+toggle('t-ornament',
+  () => { delete root.dataset.ornament; },
+  () => { root.dataset.ornament = 'off'; });
+
+toggle('t-grain',
+  () => { document.querySelectorAll('.cover').forEach((c) => c.classList.remove('cover--nograin')); },
+  () => { document.querySelectorAll('.cover').forEach((c) => c.classList.add('cover--nograin')); });
+
+/* ---- vergrote figuren ---------------------------------------------
+   Dezelfde tekening, dezelfde classes; alleen andere lagen zichtbaar.
+   De viewBox is ruim genomen: het poppetje loopt van -41,5 (kruin) tot
+   63 (onderkant voet), en de stang steekt aan weerszijden uit.
+   ------------------------------------------------------------------ */
+const PANELS = [
+  { show: 'faces', title: 'Vlakken', text: 'Lichaam op 24%, met een schaduwvorm eronder en een hoogselvorm erop.' },
+  { show: 'edges', title: 'Randen', text: 'Dezelfde omtrek drie keer, een halve eenheid uit elkaar. Licht, leer, donker.' },
+  { show: 'details', title: 'Breuken', text: 'Kniebreuk, schouder, voetrand. Negen haarlijnen — en de goedkoopste laag van de vier.' },
+  { show: '', title: 'Samen', text: 'Pas hier is het een gietstuk in de huid in plaats van een vorm erop.' },
+];
+
+document.getElementById('figs').innerHTML = PANELS.map((p) => `
+  <div class="fig-cell">
+    <div class="fig-cell__plate">
+      <svg class="fig" data-show="${p.show}" viewBox="-56 -54 112 126" aria-hidden="true">
+        <use href="#detail" />
+      </svg>
+    </div>
+    <div class="fig-cell__cap"><b>${p.title}</b>${p.text}</div>
+  </div>`).join('');
+
+/* ---- de tabel ------------------------------------------------------ */
+document.querySelector('#palette tbody').innerHTML = COVERS.map((c) => {
+  const derived = mixWhite(c.hi, 0.82);
+  const same = derived.toLowerCase() === c.suggested.toLowerCase();
+  return `<tr>
+    <td>${c.label}</td>
+    <td class="hex"><span class="swatch" style="background:${c.hi}"></span>${c.hi}</td>
+    <td class="hex"><span class="swatch" style="background:${derived}"></span>${derived}</td>
+    <td class="hex"><span class="swatch" style="background:${c.suggested}"></span>${c.suggested}</td>
+    <td class="${same ? 'same' : ''}">${same ? 'gelijk' : 'afwijking'}</td>
+  </tr>`;
+}).join('');
+
+/* ---- de plank ------------------------------------------------------ */
+document.getElementById('shelf').innerHTML = COVERS.map((c) => `
+  <div class="shelf__item">
+    <div class="cover-scale" style="--z: 0.3">${coverHtml(c.id, 'Rik Maas')}</div>
+    <div class="shelf__label">${c.label}</div>
+  </div>`).join('');
+
+/* ---- het bewijsstuk voor §4 ----------------------------------------
+   Een tweede sprite, #rods-ns, met `vector-effect` op elke vorm.
+
+   Dat attribuut erft niet en het is geen custom property, dus het is het
+   ene ding dat níét over de <use>-grens komt: op de <use> zetten doet
+   niets. De uitweg is de klonen echt uitschrijven — elke <use> vervangen
+   door de inhoud waar hij naar wijst — en dat is meteen wat de app zou
+   moeten doen als ze de sprite niet in de wortel zet. Elf poppetjes ×
+   twintig vormen, per omslag, en dat is precies het argument om het niet
+   te doen.
+   -------------------------------------------------------------------- */
+const expandUses = (node) => {
+  let u;
+  while ((u = node.querySelector('use'))) {
+    const ref = document.querySelector(u.getAttribute('href'));
+    const g = document.createElementNS(SVG_NS, 'g');
+    const transform = u.getAttribute('transform');
+    if (transform) g.setAttribute('transform', transform);
+    Array.from(ref.children).forEach((child) => g.appendChild(child.cloneNode(true)));
+    u.replaceWith(g);
+  }
+  return node;
+};
+
+const nsSprite = expandUses(document.getElementById('rods').cloneNode(true));
+nsSprite.id = 'rods-ns';
+nsSprite.querySelectorAll('*').forEach((el) => el.setAttribute('vector-effect', 'non-scaling-stroke'));
+document.querySelector('defs').appendChild(nsSprite);
+
+/* ---- de maten ------------------------------------------------------
+   0,4 en 0,2 zijn --choice-scale uit albumchoice.css, breedpunt en
+   telefoon. 1,0 is de leestafel op zijn breedst.
+   -------------------------------------------------------------------- */
+const SIZES = [
+  { z: 1, label: '560px · leestafel' },
+  { z: 0.4, label: '224px · kiestafel' },
+  { z: 0.2, label: '112px · telefoon' },
+  { z: 0.2, label: '112px · non-scaling-stroke', sprite: 'rods-ns' },
+];
+
+document.getElementById('sizes').innerHTML = SIZES.map((s) => `
+  <div class="shelf__item">
+    <div class="cover-scale" style="--z: ${s.z}">${coverHtml('navy', 'Rik Maas', s.sprite)}</div>
+    <div class="shelf__label">${s.label}</div>
+  </div>`).join('');
+</script>

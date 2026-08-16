@@ -30,7 +30,7 @@ import {
 } from '../mock/cardMock';
 import { CoverId } from '../utils/albumLeather';
 import { ms, prefersReducedMotion } from '../utils/animationSpeed';
-import { packFoil } from '../utils/packFoil';
+import { packClass, packFoil } from '../utils/packFoil';
 import { PackGrab } from '../utils/packGrab';
 import { playSlot } from '../utils/sounds';
 import { CURRENT_PLAYER_KEY as PLAYER_KEY } from '../utils/currentPlayer';
@@ -364,6 +364,16 @@ const CollectionPage: React.FC = () => {
    * draw every card twice.
    */
   const openerCards = useRef<RevealedCard[]>([]);
+  /**
+   * How far the table is scrolled across, which belongs to the sitting and not to the packet.
+   *
+   * The opener is keyed on the packet, so reaching for the next one throws its row away and
+   * builds another — and the new one starts at its left edge, even though it is drawing the
+   * same cards in the same order. Here rather than in the opener for exactly that reason:
+   * this outlives the remount. The opener zeroes it itself when it mounts onto an empty
+   * table, so nothing here has to remember to clear it at the end of a sitting.
+   */
+  const tableScroll = useRef(0);
   /**
    * The new cards from the packet just closed, being put into the book one at a time.
    *
@@ -2076,6 +2086,7 @@ const CollectionPage: React.FC = () => {
                   table={table}
                   onPutAway={putAway}
                   onPutBack={closeOpener}
+                  tableScroll={tableScroll}
                   fastMode={fastMode}
                 />
                 {/*
@@ -2183,7 +2194,7 @@ const CollectionPage: React.FC = () => {
       */}
       {returning ? (
         <div
-          className="pack pack-flight"
+          className={`${packClass(returning.pack)} pack-flight`}
           ref={flightRef}
           style={
             {
@@ -2213,7 +2224,7 @@ const CollectionPage: React.FC = () => {
       {dealing?.map((pack) => (
         <div
           key={pack.id}
-          className="pack pack-flight"
+          className={`${packClass(pack)} pack-flight`}
           ref={(el) => setDealRef(pack.id, el)}
           style={packFoil(pack) as React.CSSProperties}
           aria-hidden="true"

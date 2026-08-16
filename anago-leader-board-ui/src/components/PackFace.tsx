@@ -1,8 +1,22 @@
 import React from 'react';
-import { Pack, isIconPack, packPrint } from '../mock/cardMock';
+import { Pack, packPrint } from '../mock/cardMock';
+import { isArtPack } from '../utils/packFoil';
 
 /**
  * What is printed on the front of a packet: the badge, and how many cards are in it.
+ *
+ * **On nearly every packet this renders nothing at all**, because the printing is in the
+ * photograph — see the `PACK_ART_*` tables in `utils/packFoil.ts`. Drawing over a render
+ * would put a second badge on a wrapper that already has one.
+ *
+ * What is left is the packet with no front: a gift of an odd size, or a floor nobody has
+ * drawn a wrapper for. It gets the badge and its count, which is the painted wrapper's
+ * own printing and the reason this component still exists.
+ *
+ * **The set-completion packet used to have a branch here** — a gold hexagon with a ball
+ * in it, drawn as an SVG in the numeral's slot. It is printed on its wrapper now, and an
+ * icoon packet always has that wrapper, so the branch could not be reached. It went with
+ * the painted icoon foil in `packFoil`; docs/trading-cards.md keeps the reasoning.
  *
  * Deliberately nothing else. It also carried "OPENEN" and the grant reason
  * ("testpakje", "gewonnen") for a while; neither is printing. A wrapper does not
@@ -25,45 +39,14 @@ interface PackFaceProps {
   pack: Pack;
 }
 
-/**
- * The set-completion packet's mark, in place of a count.
- *
- * A hexagon in gold outline with a gold ball in it, on the white board the rest of the
- * wrapper is. Drawn rather than printed for the reason nothing else on a packet is captioned:
- * the word `icoon` was in this slot first and read as a label stuck on the product — the same
- * objection that removed the `legende` pill from the card face.
- *
- * Pointy-top, and the geometry is a radius-42 hexagon on a 100-unit box: vertices every 60°
- * from straight up, so `0.866 × 42` gives the 36.4 either side of centre. Written out rather
- * than computed because it never changes and a reader can check it against the picture.
- *
- * `stroke` and `fill` come from the packet's own tokens, so the mark cannot drift from the
- * rule around the wrapper — both are the icoon card's gold. `vectorEffect` keeps the outline
- * one weight whatever size the packet is drawn at, which matters because it appears on the
- * shelf tile and on the full-size opener wrapper.
- */
-const IcoonMark: React.FC = () => (
-  <span className="pack__icoon" aria-hidden="true">
-    <svg viewBox="0 0 100 100" role="presentation">
-      <path
-        d="M50 8 L86.4 29 L86.4 71 L50 92 L13.6 71 L13.6 29 Z"
-        fill="var(--foil-hi, #fdfcf8)"
-        stroke="var(--ink, #b08e42)"
-        strokeWidth="6"
-        strokeLinejoin="round"
-      />
-      <circle cx="50" cy="50" r="14" fill="var(--ink, #b08e42)" />
-    </svg>
-  </span>
-);
-
-const PackFace: React.FC<PackFaceProps> = ({ pack }) => (
-  <>
-    {/* Decorative: it is the brand, and it says nothing a screen reader needs that
-        PackTile's aria-label does not already say. */}
-    <span className="pack__mark" aria-hidden="true" />
-    {isIconPack(pack) ? <IcoonMark /> : <span className="pack__size">{packPrint(pack)}</span>}
-  </>
-);
+const PackFace: React.FC<PackFaceProps> = ({ pack }) =>
+  isArtPack(pack) ? null : (
+    <>
+      {/* Decorative: it is the brand, and it says nothing a screen reader needs that
+          PackTile's aria-label does not already say. */}
+      <span className="pack__mark" aria-hidden="true" />
+      <span className="pack__size">{packPrint(pack)}</span>
+    </>
+  );
 
 export default PackFace;

@@ -1,0 +1,202 @@
+<meta charset="utf-8">
+<title>Card back — which property, and which fix?</title>
+<!--
+  Round two. Round one established that the softness is the render path and not the
+  artwork: removing the 3D context made it sharp (C, D), while removing the drop-shadow
+  did nothing (B), enlarging the mark did nothing (E), and the pack badge — sharp
+  everywhere else in the app — went soft the moment it was put in the same slot (F).
+  A bare <img> was sharp (G). So the flip's subtree is being rasterized below device
+  resolution and then scaled up.
+
+  But round one changed three properties at once. `.opener__flip` has
+  `transform-style: preserve-3d`, and `.opener__face` has both `transform: translateZ(1px)`
+  and `backface-visibility: hidden`. Any one of them can promote the subtree, and the
+  three are not equally easy to give up — the comment in packopen.css records that the
+  translateZ exists *because* backface-visibility is ignored on an element with no 3D
+  transform of its own, and that the 1px separates the two planes so they cannot z-fight.
+
+  Tiles A–D isolate the property. Tiles E–G try fixes that keep the flip exactly as
+  designed. Tile H is the fallback if none of them work.
+-->
+<style>
+  :root { color-scheme: dark; }
+
+  body {
+    margin: 0; padding: 28px;
+    background: #14161b; color: #c9d2de;
+    font: 13px/1.5 Tahoma, Verdana, sans-serif;
+  }
+  h1 { font-size: 15px; letter-spacing: .04em; text-transform: uppercase; margin: 0 0 4px; }
+  .lede { max-width: 70ch; color: #8d97a5; margin: 0 0 20px; }
+  .readout {
+    display: inline-block; padding: 12px 16px; margin-bottom: 26px;
+    border: 1px solid #2b313c; border-radius: 4px; background: #0d0f13;
+    font: 12px/1.5 Consolas, monospace; white-space: pre; color: #9fe8bf;
+  }
+  .grid { display: flex; flex-wrap: wrap; gap: 26px; }
+  figure { margin: 0; width: 240px; }
+  figcaption { margin-top: 10px; color: #8d97a5; }
+  figcaption b { color: #dbe3ee; display: block; font-size: 12px; }
+  figcaption i { color: #7f8b9b; font-style: normal; display: block; margin-top: 4px; }
+
+  /* The shipped card back, verbatim from card.css. */
+  .card {
+    position: relative; width: 240px; aspect-ratio: 5 / 7;
+    border-radius: 6px; overflow: hidden; container-type: inline-size;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+    background-color: #08090c;
+    background-image:
+      radial-gradient(ellipse 96% 74% at 50% 46%, rgba(0, 0, 0, 0) 30%, #000 88%),
+      linear-gradient(112deg,
+        rgba(255,255,255,.055) 0 17%, transparent 17% 39%,
+        rgba(255,255,255,.03) 39% 50%, transparent 50%),
+      radial-gradient(ellipse 84% 34% at 50% 46%, #384457 0%, rgba(0,0,0,0) 100%),
+      linear-gradient(165deg, #141a25 0%, #080a0e 62%, #10151e 100%);
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0;
+    border: 1px solid rgba(196,208,222,.16); border-radius: 6px;
+  }
+  .mark {
+    position: absolute; top: 47%; left: 50%; transform: translate(-50%, -50%);
+    width: 78%; aspect-ratio: 3 / 1;
+    background: center / contain no-repeat
+      url(../anago-leader-board-ui/src/assets/rik-dev-wordmark.png);
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,.65));
+  }
+
+  .riser { position: relative; width: 240px; }
+  .flip  { position: relative; }
+  .face  { }
+
+  /* --- A: everything, as shipped ------------------------------------ */
+  .v-shipped .flip { transform-style: preserve-3d; }
+  .v-shipped .face { transform: translateZ(1px); backface-visibility: hidden; }
+
+  /* --- B: preserve-3d alone ----------------------------------------- */
+  .v-p3d .flip { transform-style: preserve-3d; }
+
+  /* --- C: backface-visibility alone --------------------------------- */
+  .v-bfv .face { backface-visibility: hidden; }
+
+  /* --- D: translateZ alone (parent stays flat, so it is really 2D) --- */
+  .v-tz .face { transform: translateZ(1px); }
+
+  /* --- E: as shipped, plus a perspective far enough away to be
+           visually orthographic. 1px of depth under 4000px of
+           perspective is a 0.025% scale change — invisible — but it
+           gives the compositor a defined screen-space scale. -------- */
+  .v-persp { perspective: 4000px; }
+  .v-persp .flip { transform-style: preserve-3d; }
+  .v-persp .face { transform: translateZ(1px); backface-visibility: hidden; }
+
+  /* --- F: as shipped, plus will-change on the animated element ------ */
+  .v-wc .flip { transform-style: preserve-3d; will-change: transform; }
+  .v-wc .face { transform: translateZ(1px); backface-visibility: hidden; }
+
+  /* --- G: as shipped, but the face's 3D transform carries no depth.
+           rotateY(0deg) is still a 3D transform, so backface-visibility
+           is honoured, but there is no Z offset to rasterize around.
+           (If this is sharp, the fix is one token and the z-fight
+           guard needs re-solving some other way.) ------------------- */
+  .v-rot0 .flip { transform-style: preserve-3d; }
+  .v-rot0 .face { transform: rotateY(0deg); backface-visibility: hidden; }
+
+  /* --- H: the fallback — no 3D at rest, faces swapped by visibility.
+           This is what the card would look like waiting to be turned if
+           the 3D context were applied only while it is actually
+           turning. Known sharp; here to confirm it survives the swap. */
+  .v-rest .face--front { visibility: hidden; }
+</style>
+
+<h1>Card back — which property, and which fix?</h1>
+<p class="lede">
+  A–D isolate which property costs the resolution. E–G are fixes that keep the flip as
+  designed. H is the fallback. Screenshot the page <b>and paste the readout text</b> —
+  the device-pixel-ratio line is the other half of the answer.
+</p>
+
+<div class="readout" id="readout">measuring…</div>
+
+<div class="grid">
+  <figure>
+    <div class="riser v-shipped"><div class="flip"><div class="face">
+      <div class="card"><span class="mark"></span></div></div></div></div>
+    <figcaption><b>A — as shipped</b>preserve-3d + translateZ + backface-visibility.
+      <i>Expected soft. The control.</i></figcaption>
+  </figure>
+
+  <figure>
+    <div class="riser v-p3d"><div class="flip"><div class="face">
+      <div class="card"><span class="mark"></span></div></div></div></div>
+    <figcaption><b>B — preserve-3d only</b><i>Soft here ⇒ the 3D rendering context alone
+      does it, and no change to the faces can help.</i></figcaption>
+  </figure>
+
+  <figure>
+    <div class="riser v-bfv"><div class="flip"><div class="face">
+      <div class="card"><span class="mark"></span></div></div></div></div>
+    <figcaption><b>C — backface-visibility only</b><i>Soft here ⇒ the culling flag is the
+      cost, independently of the 3D context.</i></figcaption>
+  </figure>
+
+  <figure>
+    <div class="riser v-tz"><div class="flip"><div class="face">
+      <div class="card"><span class="mark"></span></div></div></div></div>
+    <figcaption><b>D — translateZ only</b><i>Soft here ⇒ any 3D transform promotes it,
+      even flattened by a non-preserve-3d parent.</i></figcaption>
+  </figure>
+
+  <figure>
+    <div class="riser v-persp"><div class="flip"><div class="face">
+      <div class="card"><span class="mark"></span></div></div></div></div>
+    <figcaption><b>E — + perspective: 4000px</b><i>Sharp here ⇒ the cheapest fix in the
+      repo: one line, and 1px of depth at 4000px is visually still orthographic.</i></figcaption>
+  </figure>
+
+  <figure>
+    <div class="riser v-wc"><div class="flip"><div class="face">
+      <div class="card"><span class="mark"></span></div></div></div></div>
+    <figcaption><b>F — + will-change: transform</b><i>Sharp here ⇒ also one line, though it
+      pins a layer for the whole time the opener is up.</i></figcaption>
+  </figure>
+
+  <figure>
+    <div class="riser v-rot0"><div class="flip"><div class="face">
+      <div class="card"><span class="mark"></span></div></div></div></div>
+    <figcaption><b>G — rotateY(0deg), no depth</b><i>Sharp here ⇒ the 1px Z offset is the
+      cost; culling still works, but the z-fight guard needs another answer.</i></figcaption>
+  </figure>
+
+  <figure>
+    <div class="riser v-rest"><div class="flip"><div class="face">
+      <div class="card"><span class="mark"></span></div></div></div>
+      <div class="face face--front"></div></div>
+    <figcaption><b>H — no 3D at rest</b><i>The fallback: apply the 3D context only while
+      the card is turning, and swap faces by visibility at rest.</i></figcaption>
+  </figure>
+</div>
+
+<script>
+  const mark = document.querySelector('.v-shipped .mark');
+  const card = document.querySelector('.v-shipped .card');
+  const img = new Image();
+  img.onload = () => {
+    const m = mark.getBoundingClientRect(), c = card.getBoundingClientRect();
+    const dpr = window.devicePixelRatio;
+    document.getElementById('readout').textContent = [
+      `devicePixelRatio   ${dpr}`,
+      `card               ${c.width.toFixed(1)} x ${c.height.toFixed(1)} css px`,
+      `mark box           ${m.width.toFixed(1)} x ${m.height.toFixed(1)} css px`
+        + `   (${(m.width / c.width * 100).toFixed(1)}% of card — should be 78.0%)`,
+      `mark in device px  ${(m.width * dpr).toFixed(0)} x ${(m.height * dpr).toFixed(0)}`,
+      `asset natural      ${img.naturalWidth} x ${img.naturalHeight}`,
+      `scale factor       ${(img.naturalWidth / (m.width * dpr)).toFixed(2)}x `
+        + (img.naturalWidth > m.width * dpr ? 'reduction' : 'ENLARGEMENT'),
+      ``,
+      `If the subtree is rastered at 1x, the mark is really being drawn from`,
+      `${m.width.toFixed(0)} px and stretched to ${(m.width * dpr).toFixed(0)} — a ${dpr}x upscale.`,
+    ].join('\n');
+  };
+  img.src = '../anago-leader-board-ui/src/assets/rik-dev-wordmark.png';
+</script>

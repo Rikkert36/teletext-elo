@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, avatarUrl, initialsFor, silhouetteUrl, splitName } from '../mock/cardMock';
-import { rikDevMark } from '../utils/brand';
+import { rikDevWordmark } from '../utils/brand';
 import '../styles/card.css';
 
 type CardSize = 'sm' | 'md' | 'lg';
@@ -301,19 +301,22 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
  * Face-down card, used while a pack is being revealed.
  *
  * Deliberately **the back of the wrapper it came out of** — the same near-black foil,
- * the same chrome, the same badge. See the `.card--back` block in card.css for why.
+ * the same chrome, the same mark. See the `.card--back` block in card.css for why.
  * It carries no player, no tier and no colour, because every card in the game has this
  * same back and it must give nothing away before the turn.
+ *
+ * The mark is the **wordmark**, not the badge (`rikDevWordmark`, not `rikDevMark`): a
+ * 3:1 band rather than a 5:4 crest. The two are laid out differently — see `brand.ts`.
  */
 export const CardBack: React.FC<{ size?: CardSize; className?: string }> = ({
   size = 'md',
   className = '',
 }) => (
   <div className={['card', 'card--back', sizeClass[size], className].filter(Boolean).join(' ')}>
-    {/* The badge and nothing else. Inline url, because it is webpack's hashed filename. */}
+    {/* The mark and nothing else. Inline url, because it is webpack's hashed filename. */}
     <span
       className="card--back__mark"
-      style={{ backgroundImage: `url(${rikDevMark})` }}
+      style={{ backgroundImage: `url(${rikDevWordmark})` }}
       aria-hidden="true"
     />
   </div>

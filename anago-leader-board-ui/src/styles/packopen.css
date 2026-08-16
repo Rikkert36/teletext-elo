@@ -525,9 +525,10 @@
    * inward as well as outward, so the part that lands inside the silhouette survives. A
    * zero-blur offset has no inside part to keep.
    *
-   * So a gold edge on this packet is drawn from the inside instead — `--pack-edge` for the
-   * straight sides, and `--seal-image` for the serrated ends, which are the crimp
-   * pseudo-elements and are painted within the mask.
+   * So an edge on a painted packet has to be drawn from the *inside*: the inset rule in
+   * the shared paint for the straight sides, and the crimp pseudo-elements for the
+   * serrated ends, both of which are painted within the mask. A printed packet sidesteps
+   * all of it — its edges are in the photograph — but this still governs the painted one.
    */
   filter: var(--pack-ring)
     drop-shadow(var(--contact-x) var(--contact-y) var(--contact-blur) var(--contact-ink))
@@ -649,11 +650,11 @@
    * highlight on a curved surface, so it wants to be light, not coloured; the hue
    * still carries on the foil, the glow and the numeral.
    *
-   * **The one exception is the set-completion packet**, where it goes gold — and the
-   * argument above is exactly why that works rather than contradicting it. There the line
-   * is not a highlight on dark foil, it is *the printed gold rule off the icoon card*, on
-   * a white board, which is a rim and is meant to read as one. `--pack-edge` is set by
-   * `packFoil` for that packet alone.
+   * The set-completion packet used to be the one exception, taking a gold `--pack-edge` —
+   * there the line was not a highlight on dark foil but the printed gold rule off the
+   * icoon card, on a white board, which is a rim and meant to read as one. That packet is
+   * printed now and its rule is in the photograph, so the token has no setter left and
+   * the value is written out again.
    *
    * **Under it, the lamp on one edge and the turn away on the other** — and this pair is
    * what actually lifts a packet off this table. The rule above is a *printed* line: 1px,
@@ -676,7 +677,7 @@
    * curving out of the light and the wood behind it is already black, so matching the
    * highlight's strength only draws a second line.
    */
-  box-shadow: inset 0 0 0 1px var(--pack-edge, rgba(255, 255, 255, 0.14)),
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14),
     inset calc(4px * var(--lit-dir)) 0 6px -4px var(--lit),
     inset calc(-4px * var(--lit-dir)) 0 6px -4px rgba(0, 0, 0, 0.42);
 }
@@ -697,8 +698,9 @@
  * silhouette is not available: `filter` is applied before `mask` on the same element, so
  * anything drawn outside the shape is masked straight back off. See `.pack`'s filter.
  *
- * Hence `--seal-image`: the chrome is the default and the set-completion packet swaps in the
- * same rolled-edge form struck in gold, so its ends match the rule down its sides.
+ * This was a `--seal-image` token, so the set-completion packet could swap the chrome for
+ * the same rolled-edge form struck in gold. That packet is printed now and its seals are
+ * in the photograph, which left a variable nothing set — so it is written out again.
  */
 .pack::before,
 .pack::after,
@@ -710,17 +712,14 @@
   right: 0;
   height: var(--crimp);
   pointer-events: none;
-  background-image: var(
-    --seal-image,
-    linear-gradient(
-      to bottom,
-      #e8edf2 0%,
-      #b3bcc6 22%,
-      #6f7982 46%,
-      #4b545c 52%,
-      #9aa4ae 74%,
-      #dfe6ec 100%
-    )
+  background-image: linear-gradient(
+    to bottom,
+    #e8edf2 0%,
+    #b3bcc6 22%,
+    #6f7982 46%,
+    #4b545c 52%,
+    #9aa4ae 74%,
+    #dfe6ec 100%
   );
 }
 
@@ -734,6 +733,67 @@
 .pack__half::after {
   bottom: 0;
   box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.55);
+}
+
+/**
+ * The printed packet: one photograph of a wrapper, in place of everything above.
+ *
+ * A one, a three and a five are artwork now — see `PACK_ART` in `utils/packFoil.ts` for
+ * which packets get it and which keep the paint. This rule's whole job is to take the
+ * painted wrapper back off, because every part of it is already in the render: the field
+ * and the bulge, the chrome seals, the printed rule down the sides, the badge and the
+ * numeral. Left on, they would sit *over* the photograph rather than under it.
+ *
+ * **The art is both the background and the mask, and that pairing is the point.** The
+ * asset is trimmed to the packet's own alpha bounds, so its alpha channel already is the
+ * serrated silhouette — which means the conic tooth mask above has to go, or a second set
+ * of teeth would be cut through the ones in the picture. Masking with the same image
+ * hands the shape back, and it is what keeps the travelling sheen honest: a background
+ * layer paints the whole box whatever the layer under it is doing, so an unmasked sheen
+ * would show as a pale diagonal in the empty notches between the teeth.
+ *
+ * **`100% 100%` is exact here, not a stretch to fit.** Each asset is already laid out on
+ * this box — 480 × 816, with the render placed inside it so that its coloured panel falls
+ * on the box's panel, 0.15 down and 1.40 tall. See `PACK_ART` in `utils/packFoil.ts`,
+ * which is where that has to be redone if a front is ever replaced. Drawing the image at
+ * anything but the full box therefore moves the panel off the card behind it.
+ *
+ * The renders' seals are finer than the painted 0.15, so each front stops a few percent
+ * short of the box at both ends and the packet is a little less tall than a painted one
+ * beside it. The panel — the part that is a card — is identical, which is the half that
+ * had to be.
+ *
+ * **No box-shadow, which is a departure worth stating.** The painted wrapper is lit by
+ * the room: a printed 1px rule, plus the lamp down one side and the turn away down the
+ * other (`--lit-dir`). A render carries its own lighting baked in — these have bright
+ * specular edges on both sides — so the room's edge light would be a second highlight on
+ * an edge that already has one. The cast shadow and the packet's own neon are unaffected:
+ * those are the `filter` on `.pack`, and they still run.
+ */
+.pack--art,
+.pack--art .pack__half {
+  background-color: transparent;
+  /* The sheen, then the front. Two layers where the paint has four, so the shared
+     `pack-sheen` keyframes still drive this: a `background-position` list longer than
+     the layer list is truncated, and the sheen is the first layer in both. */
+  background-image:
+    linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.18) 47%, transparent 54%),
+    var(--pack-art, none);
+  background-size: 250% 100%, 100% 100%;
+  background-position: -60% 0, 0 0;
+  background-repeat: no-repeat;
+  box-shadow: none;
+  -webkit-mask: var(--pack-art, none) 0 0 / 100% 100% no-repeat;
+  mask: var(--pack-art, none) 0 0 / 100% 100% no-repeat;
+}
+
+/* The seals are in the picture. `content: none` rather than `display: none`, so the
+   pseudo-element is never generated at all. */
+.pack--art::before,
+.pack--art::after,
+.pack--art .pack__half::before,
+.pack--art .pack__half::after {
+  content: none;
 }
 
 .pack:hover {
@@ -827,35 +887,12 @@
     0 2px 5px rgba(0, 0, 0, 0.85);
 }
 
-/**
- * The set-completion packet's mark: a gold hexagon with a gold ball in it.
- *
- * **In the numeral's slot, at the numeral's size**, because it is the same statement — what
- * is in the packet — and the shelf reads the two against each other. `inset: auto 0 20%`
- * and a width tied to `--pack-w` are lifted from `.pack__size` for that reason, so the
- * hexagon sits where a `3` would and is the same share of the front at every packet size.
- *
- * Drawn rather than printed. Nothing else on a wrapper spells out its contents, and the
- * word `icoon` was tried in this slot first — see `packPrint` for why it went.
- *
- * The shadow is shallow and warm-black: enough to seat the mark on the film, not enough to
- * lift it off as a sticker. The coloured packets' numerals get a halo of their own hue here;
- * this one deliberately does not, because a glow behind gold on white is a smudge.
+/*
+ * `.pack__icoon` was here: the set-completion packet's gold hexagon, drawn as an SVG in
+ * the numeral's slot. That packet is printed now and always has its wrapper, so the mark
+ * is in the photograph and nothing can render the element. It went with `IcoonMark` in
+ * PackFace and the icoon foil tokens in packFoil; docs/trading-cards.md keeps the why.
  */
-.pack__icoon {
-  position: absolute;
-  inset: auto 0 20%;
-  display: flex;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.pack__icoon svg {
-  width: calc(var(--pack-w) * 0.34);
-  height: auto;
-  display: block;
-  filter: drop-shadow(0 1px 2px rgba(40, 28, 6, 0.4));
-}
 
 /* ---------------------------------------------------------------- *
  * The unopened packets, waiting beside the album
@@ -1366,15 +1403,79 @@
   animation: opener-slide-in calc(180ms * var(--anim, 1)) ease-out;
 }
 
+/**
+ * **The 3D only exists while the card is turning, and that is a resolution fix.**
+ *
+ * Anything 3D in this subtree — `preserve-3d` here, or a `translateZ` on a face, or even
+ * a `rotateY(0deg)` — makes Chrome rasterize the whole card into a texture at roughly CSS
+ * resolution and scale that up to the device's pixels. On any HiDPI screen the card back
+ * is then visibly soft, and it is soft in the one state it is ever looked at: sitting
+ * still, face down, waiting to be clicked. It cost the wordmark its outlines and the
+ * badge before it looked no better.
+ *
+ * That was bisected rather than guessed (`docs/card-back-sharpness.html` and `-2.html`,
+ * one variable per tile). Two results are worth keeping:
+ *
+ * - **No property is innocent and no workaround helps.** `preserve-3d` alone did it;
+ *   `translateZ(1px)` alone did it, even under a flat parent; `rotateY(0deg)` did it with
+ *   no depth at all. Adding `perspective: 4000px` did not fix it, and neither did
+ *   `will-change: transform`. Only `backface-visibility: hidden` was free — and on its
+ *   own it is inert, which is the whole trap the block below describes.
+ * - **A bare `<img>` and a card outside the 3D context were both sharp**, which is what
+ *   ruled out the artwork. Two rounds of resampling the asset changed nothing.
+ *
+ * So the 3D machinery is switched on for the 320ms of the turn and switched off again.
+ * While it is on the card is soft, and nobody can see that, because it is rotating. At
+ * rest there is no 3D context, no promoted layer, and the card rasterizes at the device's
+ * own resolution.
+ *
+ * **`--turning` and `--up` must arrive in the same commit.** `transform` and `transition`
+ * are both declared under `--turning`, so the class landing is what starts the animation;
+ * if `--up` arrived first the card would snap to 180° with no transition, and if
+ * `--turning` arrived first it would animate from nothing. `PackOpener` batches the two
+ * `setState` calls for exactly this reason — see the note there, and the one at
+ * `playCard` about why batching in this file cannot be assumed.
+ *
+ * Taking `--turning` away again at the end is safe and needs no care: the transition is
+ * declared under it too, so it goes in the same frame as the transform it would have
+ * animated. The front face loses its own `rotateY(180deg)` in that same frame, so the two
+ * cancel exactly as they did while turning and nothing moves.
+ */
 .opener__flip {
   position: absolute;
   inset: 0;
+}
+
+.opener__flip--turning {
   transform-style: preserve-3d;
   transition: transform calc(320ms * var(--anim, 1)) cubic-bezier(0.4, 0.05, 0.25, 1);
 }
 
-.opener__flip--up {
+.opener__flip--turning.opener__flip--up {
   transform: rotateY(180deg);
+}
+
+/*
+ * At rest, which face shows is a fact rather than a consequence of geometry.
+ *
+ * Back-face culling is what chose between them while the 3D context was permanent, and
+ * with the context gone for most of the card's life something has to. `visibility` rather
+ * than `display`, so neither face is laid out afresh when the turn begins.
+ *
+ * **Only ever `hidden`, never `visible`, and that is not a style preference.** Visibility
+ * is inherited, and a descendant that declares `visible` overrides a hidden *ancestor* —
+ * so a `visible` here reaches up and defeats the inline `visibility: hidden` that
+ * `heroVisible` puts on `.opener__riser` during the hand-off. The symptom is the card
+ * refusing to leave the stage: it flies down to the revealed row and stays in the centre
+ * as well, one card in two places. Hence two mutually exclusive `hidden` rules picked out
+ * by `--up` rather than one `hidden` and one `visible` correcting it.
+ */
+.opener__flip:not(.opener__flip--turning):not(.opener__flip--up) .opener__face--front {
+  visibility: hidden;
+}
+
+.opener__flip:not(.opener__flip--turning).opener__flip--up .opener__face--back {
+  visibility: hidden;
 }
 
 /* The first card rises out of the torn wrapper. */
@@ -1394,12 +1495,14 @@
 }
 
 /**
- * **Both faces need a 3D transform of their own**, which is what the `translateZ` is for.
+ * **Both faces need a 3D transform of their own**, which is what the `translateZ` is for
+ * — but only while the card is turning. See the `--turning` block above for why the whole
+ * arrangement is temporary; this note is about why it has to look like this at all.
  *
  * `backface-visibility: hidden` is ignored on an element that is not itself
  * 3D-transformed, and the back face had no transform at all — so it was never culled and
  * showed straight through the front. It went unnoticed while the back was a dark brown
- * field: there was nothing on it bright enough to see through a card. Putting the badge
+ * field: there was nothing on it bright enough to see through a card. Putting the mark
  * on it made the leak obvious.
  *
  * This is the same trap `album.css` records for the book's leaves, and the same fix.
@@ -1408,16 +1511,22 @@
  * apart and never coplanar. There is no `perspective` anywhere in the opener — the flip
  * is deliberately orthographic — so this costs nothing visually and changes no
  * measurement the FLIP takes; it only gives the compositor an order to sort by.
+ *
+ * None of it is needed at rest, where exactly one face is visible and the other is
+ * `visibility: hidden`. There is nothing to cull and nothing to sort.
  */
 .opener__face {
   position: absolute;
   inset: 0;
-  transform: translateZ(1px);
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.opener__flip--turning .opener__face {
+  transform: translateZ(1px);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 /* Type needs no override — the card sizes its own text from its width. */
@@ -1425,7 +1534,7 @@
   --card-width: var(--pack-w);
 }
 
-.opener__face--front {
+.opener__flip--turning .opener__face--front {
   transform: rotateY(180deg) translateZ(1px);
 }
 
@@ -1486,14 +1595,22 @@
  * `translateZ(-1px)` keeps it off the faces' plane; without it the three are
  * coplanar in the preserve-3d context and z-fight. After 180deg it ends up in
  * front, which is harmless because it paints nothing inside the card's outline.
+ *
+ * Under `--turning` with the rest of the 3D, and for the same reason (see that block):
+ * a `translateZ` at rest would promote this layer to a texture too. Sorting is only
+ * needed where there is a 3D context to sort in — at rest the flip is flat, so this
+ * paints under both faces by document order, which is where it belongs anyway.
  */
 .opener__radiance {
   position: absolute;
   inset: 0;
   border-radius: 6px;
   pointer-events: none;
-  transform: translateZ(-1px);
   animation: opener-glow-grow var(--radiate-ms, 1200ms) linear var(--shimmer-ms, 700ms) forwards;
+}
+
+.opener__flip--turning .opener__radiance {
+  transform: translateZ(-1px);
 }
 
 .opener__radiance--held {

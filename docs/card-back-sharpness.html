@@ -1,0 +1,195 @@
+<meta charset="utf-8">
+<title>Card back — why is the mark soft?</title>
+<!--
+  A bisect, not a design page.
+
+  The wordmark on the card back reads soft in the opener. Two fixes aimed at the asset
+  have already failed to shift it: it was resampled from 2172px to 642px with Lanczos-3
+  (an 11x minification down to a 3.4x one), and at 1:1 the artwork measures crisper than
+  the pack badge, which is sharp on screen. So the softness is being introduced by the
+  render path, by the drop-shadow, or by the artwork simply having more contour detail
+  than 187px can hold — and those three have never been separated.
+
+  Each tile below changes exactly one thing against the shipped card back. Open this,
+  screenshot the whole page, and whichever tile snaps into focus names the cause.
+
+  The readout at the top matters as much as the tiles: it prints the mark's real drawn
+  size and the device pixels behind it, which settles whether the asset is being minified
+  at all on this screen and whether the 78% width is landing where the CSS says.
+-->
+<style>
+  :root { color-scheme: dark; }
+
+  body {
+    margin: 0;
+    padding: 28px;
+    background: #14161b;
+    color: #c9d2de;
+    font: 13px/1.5 Tahoma, Verdana, sans-serif;
+  }
+
+  h1 { font-size: 15px; letter-spacing: .04em; text-transform: uppercase; margin: 0 0 4px; }
+  .lede { max-width: 68ch; color: #8d97a5; margin: 0 0 20px; }
+
+  .readout {
+    display: inline-block;
+    padding: 12px 16px;
+    margin-bottom: 26px;
+    border: 1px solid #2b313c;
+    border-radius: 4px;
+    background: #0d0f13;
+    font-family: Consolas, monospace;
+    font-size: 12px;
+    white-space: pre;
+    color: #9fe8bf;
+  }
+
+  .grid { display: flex; flex-wrap: wrap; gap: 26px; }
+  figure { margin: 0; width: 240px; }
+  figcaption { margin-top: 10px; color: #8d97a5; }
+  figcaption b { color: #dbe3ee; display: block; font-size: 12px; }
+
+  /* ---------------------------------------------------------------- *
+   * The shipped card back, copied verbatim out of card.css so the tiles
+   * are the real thing and not an approximation of it.
+   * ---------------------------------------------------------------- */
+
+  .card {
+    position: relative;
+    width: 240px;              /* --pack-w at its clamp ceiling: the opener's size. */
+    aspect-ratio: 5 / 7;
+    border-radius: 6px;
+    overflow: hidden;
+    container-type: inline-size;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .5);
+    background-color: #08090c;
+    background-image:
+      radial-gradient(ellipse 96% 74% at 50% 46%, rgba(0, 0, 0, 0) 30%, #000 88%),
+      linear-gradient(112deg,
+        rgba(255, 255, 255, .055) 0 17%, transparent 17% 39%,
+        rgba(255, 255, 255, .03) 39% 50%, transparent 50%),
+      radial-gradient(ellipse 84% 34% at 50% 46%, #384457 0%, rgba(0, 0, 0, 0) 100%),
+      linear-gradient(165deg, #141a25 0%, #080a0e 62%, #10151e 100%);
+  }
+
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(196, 208, 222, .16);
+    border-radius: 6px;
+    pointer-events: none;
+  }
+
+  .mark {
+    position: absolute;
+    top: 47%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 78%;
+    aspect-ratio: 3 / 1;
+    background: center / contain no-repeat
+      url(../anago-leader-board-ui/src/assets/rik-dev-wordmark.png);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .65));
+  }
+
+  /* The opener's 3D context, also verbatim: this is what the card sits inside. */
+  .flip { position: relative; width: 240px; transform-style: preserve-3d; }
+  .face { transform: translateZ(1px); backface-visibility: hidden; }
+
+  /* ---------------------------------------------------------------- *
+   * The single-variable changes.
+   * ---------------------------------------------------------------- */
+
+  .no-shadow .mark { filter: none; }
+  .flat { transform-style: flat; }
+  .flat .face { transform: none; backface-visibility: visible; }
+  .bigger .mark { width: 92%; }
+  .badge .mark {
+    width: 84%;
+    aspect-ratio: 320 / 256;
+    background-image: url(../anago-leader-board-ui/src/assets/rik-dev-logo.png);
+  }
+  /* A plain img at the same drawn size — no card, no layer, no filter. The floor. */
+  .control { width: 240px; height: 336px; display: grid; place-items: center; background: #0b0d11; border-radius: 6px; }
+  .control img { width: 78%; }
+</style>
+
+<h1>Card back — bisecting the soft mark</h1>
+<p class="lede">
+  One variable per tile, all at the opener's real size (a 240px card). Screenshot the
+  whole page. If a tile is sharp and the shipped one is not, that tile names the cause.
+</p>
+
+<div class="readout" id="readout">measuring…</div>
+
+<div class="grid">
+  <figure>
+    <div class="flip"><div class="face"><div class="card"><span class="mark"></span></div></div></div>
+    <figcaption><b>A — as shipped</b>3D layer + drop-shadow. The reference.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="flip"><div class="face"><div class="card no-shadow"><span class="mark"></span></div></div></div>
+    <figcaption><b>B — no drop-shadow</b>A 2px blur around 5px strokes is a lot; it also
+      forces its own render surface.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="flip flat"><div class="face"><div class="card"><span class="mark"></span></div></div></div>
+    <figcaption><b>C — no 3D context</b>No <code>preserve-3d</code>, no
+      <code>translateZ</code>, no backface culling, so nothing is promoted to a
+      texture.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="flip flat"><div class="face"><div class="card no-shadow"><span class="mark"></span></div></div></div>
+    <figcaption><b>D — neither</b>If this is sharp and A is not, it is the render path,
+      not the artwork.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="flip"><div class="face"><div class="card bigger no-shadow"><span class="mark"></span></div></div></div>
+    <figcaption><b>E — 92% wide, no shadow</b>Tests whether the mark is simply too small
+      to carry its own contours.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="flip"><div class="face"><div class="card badge"><span class="mark"></span></div></div></div>
+    <figcaption><b>F — the badge instead</b>The known-sharp control. If this is soft too,
+      the layer is at fault and the wordmark is innocent.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="control">
+      <img src="../anago-leader-board-ui/src/assets/rik-dev-wordmark.png" alt="">
+    </div>
+    <figcaption><b>G — bare img</b>The asset with nothing done to it. The floor: no tile
+      above can beat this.</figcaption>
+  </figure>
+</div>
+
+<script>
+  // The numbers matter more than the pictures. If `device px` is at or above the
+  // asset's natural width there is no minification happening at all, and the asset
+  // was never the problem.
+  const mark = document.querySelector('.mark');
+  const card = document.querySelector('.card');
+  const img = new Image();
+  img.onload = () => {
+    const m = mark.getBoundingClientRect();
+    const c = card.getBoundingClientRect();
+    document.getElementById('readout').textContent = [
+      `devicePixelRatio   ${window.devicePixelRatio}`,
+      `card               ${c.width.toFixed(1)} x ${c.height.toFixed(1)} css px`,
+      `mark box           ${m.width.toFixed(1)} x ${m.height.toFixed(1)} css px`
+        + `   (${(m.width / c.width * 100).toFixed(1)}% of card — should be 78.0%)`,
+      `mark in device px  ${(m.width * devicePixelRatio).toFixed(0)}`
+        + ` x ${(m.height * devicePixelRatio).toFixed(0)}`,
+      `asset natural      ${img.naturalWidth} x ${img.naturalHeight}`,
+      `scale factor       ${(img.naturalWidth / (m.width * devicePixelRatio)).toFixed(2)}x`
+        + `  ${img.naturalWidth > m.width * devicePixelRatio ? 'reduction' : 'ENLARGEMENT'}`,
+    ].join('\n');
+  };
+  img.src = '../anago-leader-board-ui/src/assets/rik-dev-wordmark.png';
+</script>

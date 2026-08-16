@@ -1,0 +1,1219 @@
+<title>Blinddruk — de poppetjes in het leer</title>
+<style>
+/* ================================================================
+   Blind tooling: the rods and their men, pressed into the board.
+
+   Same room as docs/cover-ideas.html — a workshop bench under a warm
+   lamp, one dark world on purpose, every colour stated.
+
+   **The board is the one that exists.** The stain gradient and the
+   board roll are album.css verbatim. The photographed hide is NOT here:
+   that was a proposal on the other page and it was never applied, so
+   putting it under this ornament would be judging a stamp against a
+   cover we do not have.
+
+   The one new idea is the ornament layer. It is NOT a lighter shape
+   drawn on the leather: it is a tool pressed into it, and the reason
+   that distinction is worth four CSS layers is set out in the copy.
+   ================================================================ */
+
+:root {
+  --ground:     #14100b;
+  --ground-2:   #1d1710;
+  --ground-3:   #251d14;
+  --line:       #3b3022;
+  --text:       #e6dcc7;
+  --text-dim:   #a08e75;
+  --text-faint: #6f6150;
+  --brass:      #c9a24a;
+  --foil:       #e6c98a;
+  --gilt:       #a98b4c;
+
+  --display: Georgia, "Times New Roman", serif;
+  --body: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --mono: Consolas, "SF Mono", ui-monospace, Menlo, monospace;
+
+  --measure: 68ch;
+  --pad: clamp(20px, 4vw, 56px);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  background-image:
+    radial-gradient(120% 70% at 18% -10%, rgba(201, 162, 74, 0.07), transparent 60%),
+    radial-gradient(90% 60% at 90% 110%, rgba(0, 0, 0, 0.5), transparent 70%);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: var(--body);
+  font-size: 17px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--pad);
+  display: flex;
+  flex-direction: column;
+  gap: clamp(48px, 7vw, 88px);
+}
+
+.col { max-width: var(--measure); display: flex; flex-direction: column; gap: 18px; }
+
+p { margin: 0; }
+a { color: var(--brass); }
+strong { color: #f3ead6; font-weight: 700; }
+
+code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  color: var(--foil);
+  background: rgba(201, 162, 74, 0.08);
+  padding: 0.1em 0.36em;
+  border-radius: 2px;
+}
+
+/* ---------------------------------------------------------------- *
+ * Masthead
+ * ---------------------------------------------------------------- */
+
+header { display: flex; flex-direction: column; gap: 22px; }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+h1 {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(34px, 5.4vw, 58px);
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  margin: 0;
+  text-wrap: balance;
+  color: #f6eeda;
+}
+
+h1 em { color: var(--foil); }
+
+.standfirst {
+  max-width: 58ch;
+  font-size: clamp(18px, 2.1vw, 21px);
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.rule-brass {
+  height: 1px; border: 0; margin: 0;
+  background: linear-gradient(90deg, var(--gilt), rgba(169, 139, 76, 0) 70%);
+}
+
+section { display: flex; flex-direction: column; gap: 26px; }
+
+h2 {
+  font-family: var(--display);
+  font-weight: 400;
+  font-size: clamp(25px, 3.2vw, 34px);
+  line-height: 1.15;
+  margin: 0;
+  color: #f3ead6;
+  text-wrap: balance;
+}
+
+h3 { font-family: var(--display); font-weight: 400; font-size: 20px; margin: 0; color: #f3ead6; }
+
+.heads { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+
+.ladder {
+  display: inline-flex;
+  align-items: stretch;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.ladder span { padding: 5px 11px; display: flex; align-items: center; gap: 7px; }
+.ladder span + span { border-left: 1px solid var(--line); }
+.ladder b { font-weight: 400; color: var(--text-faint); }
+.ladder .v { color: var(--text-dim); }
+.ladder .v--gilt { color: var(--foil); }
+
+.verdict {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 5px 11px;
+  border-radius: 2px;
+  align-self: flex-start;
+}
+
+.verdict--do { color: #12100a; background: var(--brass); }
+.verdict--maybe { color: var(--text-dim); border: 1px solid var(--line); }
+
+/* ---------------------------------------------------------------- *
+ * The specimen bench
+ * ---------------------------------------------------------------- */
+
+.bench {
+  background: var(--ground-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  padding: clamp(20px, 3vw, 34px);
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  background-image: radial-gradient(80% 60% at 50% -10%, rgba(201, 162, 74, 0.06), transparent 70%);
+}
+
+.bench__books { display: flex; flex-wrap: wrap; gap: clamp(24px, 5vw, 64px); justify-content: center; }
+
+.book { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+
+.book__label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.book__label b { color: var(--text-dim); font-weight: 400; }
+
+.controls { display: flex; flex-direction: column; gap: 16px; }
+.controls__row { display: flex; flex-wrap: wrap; gap: 9px; align-items: center; }
+
+.controls__legend {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  width: 100%;
+}
+
+.controls__legend b { color: var(--foil); font-weight: 400; font-variant-numeric: tabular-nums; }
+
+.toggle {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--ground-3);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  padding: 7px 13px;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.toggle:hover { border-color: #574733; color: var(--text); }
+
+.toggle[aria-pressed="true"] {
+  background: rgba(201, 162, 74, 0.16);
+  border-color: var(--gilt);
+  color: var(--foil);
+}
+
+.toggle small { color: var(--text-faint); font-size: 10.5px; }
+
+.toggle:focus-visible, .stain:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+
+.stain {
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  box-shadow: 0 0 0 1px rgba(230, 201, 138, 0.15);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.stain:hover { transform: translateY(-2px); }
+.stain[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--foil); }
+
+.slider { width: min(320px, 100%); accent-color: var(--brass); cursor: pointer; }
+.slider:focus-visible { outline: 2px solid var(--brass); outline-offset: 4px; }
+
+/* ================================================================
+   THE COVER
+
+   The stain gradient and the board roll are src/styles/album.css
+   verbatim, at the real 560x718, scaled by `--z` on a wrapper.
+
+   One departure, and it is marked in the copy too: `.cover__form` —
+   the key light, the vignette and the inner bevel — is cover-ideas'
+   proposal and is also not in album.css. It is kept because without it
+   there is no lamp in the picture at all, and a blind stamp with no
+   lamp is nothing to look at. Say the word and it goes.
+   ================================================================ */
+
+.cover-scale { position: relative; }
+.cover-scale > .cover { transform: scale(var(--z)); transform-origin: top left; }
+
+.cover {
+  --page-w: 560px;
+  --page-h: 718px;
+  --board-roll: 8px;
+  --joint-w: 24px;
+
+  /* marineblauw — the stain the reference is bound in */
+  --leather-hi: #223049;
+  --leather-mid: #101828;
+  --leather-lo: #1b2740;
+
+  position: relative;
+  width: var(--page-w);
+  height: var(--page-h);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  border-radius: 0 3px 3px 0;
+  font-kerning: none;
+  color: var(--foil);
+  isolation: isolate;
+  background: linear-gradient(150deg, var(--leather-hi) 0%, var(--leather-mid) 55%, var(--leather-lo) 100%);
+  box-shadow: 0 42px 80px rgba(0, 0, 0, 0.7), 0 10px 22px rgba(0, 0, 0, 0.55);
+}
+
+.cover__roll {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 7;
+  background:
+    linear-gradient(to right,
+      rgba(255, 244, 219, 0) 4px, rgba(255, 244, 219, 0.065) 7.5px,
+      rgba(255, 244, 219, 0) 10.5px, rgba(255, 244, 219, 0) 16px,
+      rgba(255, 244, 219, 0.03) 19.5px, rgba(255, 244, 219, 0) var(--joint-w)),
+    linear-gradient(to right,
+      rgba(0, 0, 0, 0.72) 0, rgba(0, 0, 0, 0.42) 2.5px, rgba(0, 0, 0, 0.12) 5px,
+      rgba(0, 0, 0, 0.02) 7.5px, rgba(0, 0, 0, 0.16) 10.5px, rgba(0, 0, 0, 0.32) 13.5px,
+      rgba(0, 0, 0, 0.1) 18px, rgba(0, 0, 0, 0) 22px),
+    linear-gradient(to left,
+      rgba(0, 0, 0, 0.55) 0, rgba(0, 0, 0, 0.3) 2px,
+      rgba(0, 0, 0, 0.1) 4px, rgba(0, 0, 0, 0) var(--board-roll)),
+    linear-gradient(to top,
+      rgba(0, 0, 0, 0.62) 0, rgba(0, 0, 0, 0.34) 2px,
+      rgba(0, 0, 0, 0.12) 5px, rgba(0, 0, 0, 0) calc(var(--board-roll) + 2px)),
+    linear-gradient(to bottom,
+      rgba(255, 244, 219, 0.11) 0, rgba(255, 244, 219, 0.055) 1.5px, rgba(255, 244, 219, 0) 3.5px),
+    linear-gradient(to bottom,
+      rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.1) 4.5px, rgba(0, 0, 0, 0) 9px);
+}
+
+.cover__layer {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.cover__print {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.cover__kicker {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 13px;
+  font-style: italic;
+  letter-spacing: 1px;
+  opacity: 0.75;
+}
+
+.cover__name {
+  width: 76%;
+  font-family: "Segoe Script", "Brush Script MT", "Apple Chancery", Palatino, Georgia, serif;
+  font-style: italic;
+  font-size: 62px;
+  line-height: 1.1;
+  color: currentColor;
+}
+
+.cover__rule {
+  width: 60%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #a9853c 50%, transparent);
+}
+
+.cover__form {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 6;
+  background:
+    linear-gradient(to bottom, rgba(255, 246, 224, 0.05) 3px, rgba(255, 246, 224, 0) 22px),
+    linear-gradient(to left, rgba(0, 0, 0, 0.16) 3px, rgba(0, 0, 0, 0) 26px),
+    linear-gradient(to top, rgba(0, 0, 0, 0.18) 3px, rgba(0, 0, 0, 0) 28px),
+    radial-gradient(125% 108% at 50% 46%,
+      rgba(0, 0, 0, 0) 50%, rgba(0, 0, 0, 0.09) 74%, rgba(0, 0, 0, 0.3) 100%),
+    radial-gradient(130% 115% at 28% 16%,
+      rgba(255, 246, 224, 0.075), rgba(255, 246, 224, 0.022) 42%, rgba(255, 246, 224, 0) 72%);
+}
+
+/* ================================================================
+   THE TOOLING — four layers, and none of them is optional
+
+   z-order:  1 binding · 3 tooling · 5 printing
+             · 6 form (light, vignette, bevel) · 7 board roll
+
+   The tooling sits UNDER the light and the vignette on purpose: a lamp
+   falls on a blind stamp exactly as it falls on the gold, so a stamp
+   in the dark lower-right corner has to go quiet along with everything
+   else there.
+
+   The four layers, in paint order:
+
+     3a  face    the face of the stamp — a plane lifted toward the
+                 lamp, or a floor sunk away from it
+     3b  floor   the impression's floor, in shadow (deboss only)
+     3c  bevel   the walls, lit
+     3d  gilt    only when the ornament is foiled instead of blind
+
+   Splitting them is not tidiness. `face` and `gilt` blend normally,
+   `floor` multiplies and `bevel` soft-lights, and a single element
+   cannot carry four blend modes. Each is separately switchable below,
+   which is the only way to see what each one is actually worth.
+   ================================================================ */
+
+.cover__tool { z-index: 3; }
+
+/* 3a · the face.
+   Raised, this is a plane lifted a fraction closer to the lamp, so it
+   reads a shade lighter than the board around it. Pressed in, it is the
+   same plane sunk away from the lamp, painted in the stain's own mid
+   tone so it darkens without introducing a colour. Same layer, opposite
+   sign, which is the whole difference between the two blind variants.
+
+   On a real hide this layer would carry more than tone: a tool at 90 C
+   crushes the pores flat, and that alone reads as "pressed". The board
+   has no grain to crush, so here it is tone and nothing else — which is
+   the one thing this page cannot show honestly. See the open points. */
+.cover__tool--face { fill: var(--tool-face); opacity: var(--tool-face-a); }
+
+/* 3b · the floor, eroded so it does not fight the walls above it.
+   **Kept far weaker than it wants to be.** Blind tooling on a dark
+   stain is nearly all rim: a floor heavy enough to see on cognac turns
+   marineblauw into a hole cut through the board. */
+.cover__tool--floor { fill: #000; mix-blend-mode: multiply; opacity: 0.1; }
+
+/* 3c · the walls.
+   **soft-light, not overlay** — see the note in the copy. The filter
+   output is mid grey everywhere except at the edges, and mid grey is a
+   no-op under soft-light, so this layer is invisible except exactly
+   where the tool went in. */
+.cover__tool--bevel { fill: #000; mix-blend-mode: soft-light; opacity: 0.7; }
+
+/* 3d · foiled instead of blind. */
+.cover__tool--gilt { fill: url(#gilt-grad); opacity: 0.9; }
+
+.cover--deboss { --tool-face: var(--leather-mid);        --tool-face-a: 0.3; }
+.cover--emboss { --tool-face: rgba(255, 244, 219, 0.06); --tool-face-a: 1; }
+.cover--gilt   { --tool-face: var(--leather-mid);        --tool-face-a: 0.18; }
+
+/* Which layers a mode uses. */
+.cover__tool { display: none; }
+.cover--flat   .cover__tool--plain,
+.cover--deboss .cover__tool--face,
+.cover--deboss .cover__tool--floor,
+.cover--deboss .cover__tool--bevel,
+.cover--emboss .cover__tool--face,
+.cover--emboss .cover__tool--bevel,
+.cover--gilt   .cover__tool--face,
+.cover--gilt   .cover__tool--floor,
+.cover--gilt   .cover__tool--bevel,
+.cover--gilt   .cover__tool--gilt { display: block; }
+
+/* The naive version, kept so the difference can be seen: one flat
+   lighter shape, no lighting, no floor, no crush. This is what "draw
+   the men a bit lighter than the cover" gives you, and it is a sticker. */
+.cover__tool--plain { fill: rgba(255, 244, 219, 0.07); }
+
+/* Deboss lights the walls from the far side (azimuth 45); emboss from
+   the lamp's own side (225). A valley lit from up-left and a ridge lit
+   from down-right are the same picture, so the sign of the relief is
+   carried by the azimuth and `surfaceScale` stays positive — which is
+   the portable half of that identity. */
+.cover--emboss .cover__tool--bevel .t-in,
+.cover--deboss .cover__tool--bevel .t-out,
+.cover--gilt   .cover__tool--bevel .t-out { display: none; }
+
+/* Gold's shallower impression is set from the depth slider rather than
+   here — one owner for that number, and it is the one with the knob. */
+
+/* Solid figures, as in the reference. The outline variant is the
+   binder's other option: the same tool cut as a line rather than a
+   solid, which is how a fillet and a corner stamp are normally cut. */
+.t-rod { stroke: none; }
+.cover--line .t-men { fill: none; stroke: currentColor; stroke-width: 1.7; }
+.cover--line .cover__tool--face .t-men { stroke: var(--tool-face); }
+.cover--line .cover__tool--floor .t-men,
+.cover--line .cover__tool--bevel .t-men { stroke: #000; }
+.cover--line .cover__tool--plain .t-men { stroke: rgba(255, 244, 219, 0.07); }
+.cover--line .cover__tool--gilt  .t-men { stroke: url(#gilt-grad); }
+
+/* ---------------------------------------------------------------- *
+ * Small specimens
+ * ---------------------------------------------------------------- */
+
+.specimens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+  align-items: flex-start;
+  padding: 24px;
+  background: var(--ground-2);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+}
+
+.specimen { display: flex; flex-direction: column; gap: 10px; }
+
+.specimen__caption {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  max-width: 220px;
+}
+
+.specimen__caption b { color: var(--foil); font-weight: 400; }
+
+.crop { overflow: hidden; border-radius: 2px; border: 1px solid rgba(0, 0, 0, 0.5); }
+
+/* ---------------------------------------------------------------- *
+ * Notes, lists
+ * ---------------------------------------------------------------- */
+
+.notes {
+  max-width: var(--measure);
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 10px 20px;
+  font-size: 15.5px;
+  align-items: baseline;
+}
+
+.notes dt {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding-top: 2px;
+}
+
+.notes dd { margin: 0; color: var(--text-dim); }
+.notes dd b { color: var(--text); font-weight: 400; }
+
+.code {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0;
+  padding: 20px 22px;
+  background: #100c07;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #cbbb9c;
+  tab-size: 2;
+}
+
+.code code { background: none; padding: 0; color: inherit; font-size: inherit; }
+
+.aside {
+  max-width: var(--measure);
+  border-left: 2px solid var(--gilt);
+  padding: 4px 0 4px 20px;
+  color: var(--text-dim);
+  font-size: 16px;
+}
+
+footer {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+footer a { color: var(--text-dim); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+</style>
+
+<!-- ================================================================
+     One set of definitions for the whole page: the man, the two
+     lighting filters, the erosion that pulls the floor back from the
+     walls, and the leaf. Every cover on the page `use`s these, so the
+     depth slider moves one number and all of them follow.
+     ================================================================ -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+
+  <!-- The man, in his own coordinates: the rod runs through y=0, the
+       head tops out at -23 and the foot lands at 45. No fill or stroke
+       attribute anywhere in here — every layer below paints him in its
+       own ink by inheriting it through the `use`. -->
+  <g id="man">
+    <circle cx="0" cy="-17" r="6"/>
+    <rect x="-10.5" y="-9" width="21" height="21" rx="2.5"/>
+    <path d="M -8.5 13.6 Q -7.5 26 -5.6 36.4 L 5.6 36.4 Q 7.5 26 8.5 13.6 Z"/>
+    <rect x="-7" y="36" width="14" height="9" rx="1.5"/>
+  </g>
+
+  <!-- The walls of the impression.
+       `stdDeviation` is the radius the die's edge is rounded to; the
+       shape's own alpha, blurred, is the height map. `diffuseConstant`
+       is set to 0.5 / sin(elevation) so that a flat surface renders as
+       exactly mid grey and the layer disappears everywhere the tool did
+       not go. `color-interpolation-filters="sRGB"` is load-bearing:
+       the default is linearRGB, where 0.5 is no longer neutral and the
+       whole board picks up a wash. -->
+  <filter id="bevel-in" color-interpolation-filters="sRGB">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="1.4" result="bump"/>
+    <feDiffuseLighting in="bump" surfaceScale="7" diffuseConstant="0.7779"
+                       lighting-color="#ffffff">
+      <feDistantLight azimuth="45" elevation="40"/>
+    </feDiffuseLighting>
+  </filter>
+
+  <filter id="bevel-out" color-interpolation-filters="sRGB">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="1.4" result="bump"/>
+    <feDiffuseLighting in="bump" surfaceScale="7" diffuseConstant="0.7779"
+                       lighting-color="#ffffff">
+      <feDistantLight azimuth="225" elevation="40"/>
+    </feDiffuseLighting>
+  </filter>
+
+  <!-- The floor is pulled back from the walls and softened, so the
+       shadow inside the impression does not double the bevel's own dark
+       side. On the rod — 2.6 units tall — the erosion very nearly
+       removes it, which is correct: a line that thin has no floor. -->
+  <filter id="soften" color-interpolation-filters="sRGB">
+    <feMorphology operator="erode" radius="1"/>
+    <feGaussianBlur stdDeviation="0.9"/>
+  </filter>
+
+  <linearGradient id="gilt-grad" x1="0" y1="0" x2="0.4" y2="1">
+    <stop offset="0%"   stop-color="#f0d9a4"/>
+    <stop offset="38%"  stop-color="#c9a24a"/>
+    <stop offset="62%"  stop-color="#8d6c2c"/>
+    <stop offset="100%" stop-color="#d8b565"/>
+  </linearGradient>
+</defs></svg>
+
+<div class="wrap">
+
+<header>
+  <div class="eyebrow">teletext-elo · omslagvoorstel · 16 augustus 2026</div>
+  <h1>Geen lichtere vorm.<br><em>Een stempel.</em></h1>
+  <p class="standfirst">
+    Vier stangen met hun poppetjes over het omslag: één en twee boven de naam,
+    drie en vijf eronder. Ze zijn nauwelijks te zien en dat is precies de opdracht —
+    maar «nauwelijks te zien» is niet hetzelfde als «een beetje lichter». Deze
+    pagina gaat over dat verschil.
+  </p>
+  <hr class="rule-brass">
+  <p class="aside">
+    <strong>Een blinddruk is geen tekening, het is een vervorming van de huid.</strong>
+    Een lichtere vorm óp het leer leest als een sticker, hoe zwak je hem ook zet.
+    Een stempel is reliëf: het vlak ligt hoger of lager dan de rest van het bord, en
+    de wanden ertussen vangen licht aan de ene kant en schaduw aan de andere. Dat zijn
+    twee aparte dingen, en pas met allebei erbij lees je het als een stempel. De
+    schakelaars hieronder zetten ze los van elkaar aan en uit.
+  </p>
+  <p class="aside">
+    <strong>En jouw referentie is een reliëf, geen inslag.</strong> Dat is de moeite
+    waard om vast te leggen, want het is niet wat een binder normaal doet. De
+    poppetjes op jouw beeld staan een fractie <em>hoger</em> dan het bord — hun vlak
+    is een tikje lichter dan het leer eromheen — terwijl een blindstempel het leer
+    juist indrukt en daar donkerder van wordt. Beide staan hieronder, en het reliëf
+    staat voorop omdat dat is wat je liet zien.
+  </p>
+</header>
+
+<!-- =============================================================== -->
+<section>
+  <h2>Het ornament</h2>
+  <div class="heads">
+    <div class="ladder">
+      <span><b>Leer</b> <span class="v">blinddruk, vier stangen</span></span>
+      <span><b>Icoon</b> <span class="v v--gilt">nader te bepalen</span></span>
+    </div>
+    <span class="verdict verdict--do">Voorstel</span>
+  </div>
+
+  <div class="col">
+    <p>
+      De stangen staan waar ze op een tafel staan: <strong>1–2–3–5</strong>, van keeper
+      naar aanval, met de naam ertussen. De poppetjes zitten op <code>(i + ½) / n</code>
+      van de stanglengte, dus ze staan symmetrisch om het midden en de buitenste
+      houden hun eigen ruimte — dezelfde verdeling als op de tafel beneden.
+    </p>
+    <p>
+      Zet <em>Vlakke lijn</em> naast <em>Reliëf</em> en het verschil is meteen
+      duidelijk, ook al staat de sterkte op precies dezelfde waarde. Zet daarna de lagen
+      los uit: zonder de wanden blijft er een vlek over die net zo goed opdruk kan zijn,
+      en zonder het vlak zweeft er een omtrek met niets erin. Het is de combinatie die
+      het doet — geen van beide houdt het alleen.
+    </p>
+  </div>
+
+  <div class="bench">
+    <div class="bench__books" id="bench"></div>
+    <div class="controls">
+      <div class="controls__row" id="modes">
+        <span class="controls__legend">Behandeling</span>
+      </div>
+      <div class="controls__row" id="layouts">
+        <span class="controls__legend">Indeling</span>
+      </div>
+      <div class="controls__row" id="figures">
+        <span class="controls__legend">Stempel</span>
+      </div>
+      <div class="controls__row">
+        <span class="controls__legend">Diepte <b id="depth-out">0.50</b></span>
+        <input class="slider" id="depth" type="range" min="0" max="1.4" step="0.01" value="0.5"
+               aria-label="Diepte van de stempel">
+      </div>
+      <div class="controls__row">
+        <span class="controls__legend">Randafronding <b id="round-out">1.30</b></span>
+        <input class="slider" id="round" type="range" min="0.4" max="4" step="0.1" value="1.3"
+               aria-label="Afronding van de stempelrand">
+      </div>
+      <div class="controls__row" id="layers">
+        <span class="controls__legend">Lagen</span>
+        <button class="toggle" type="button" data-layer="face" aria-pressed="true">Vlak van de stempel</button>
+        <button class="toggle" type="button" data-layer="floor" aria-pressed="true">Bodem</button>
+        <button class="toggle" type="button" data-layer="bevel" aria-pressed="true">Wanden</button>
+      </div>
+      <div class="controls__row" id="stains">
+        <span class="controls__legend">Kleursel</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <p class="aside">
+      <strong>Soft-light, niet overlay — en dat is geen smaakkwestie.</strong>
+      <code>overlay</code> is de blendmodus die je voor reliëf pakt en lag dus voor de
+      hand. Maar overlay is op een donkere ondergrond hard scheef: op marineblauw (<code>#101828</code>,
+      luma&nbsp;23) tilt een wandwaarde van 0,7 het bord naar <b>116</b>, terwijl
+      dezelfde waarde onder <code>soft-light</code> op <b>43</b> uitkomt. De donkere
+      kant zakt ondertussen amper. Je krijgt met overlay dus geen reliëf maar een
+      oplichtende rand aan één kant — nog steeds een sticker, alleen een fellere.
+      Op cognac valt dat veel minder op; op marineblauw en antraciet sloopt het de
+      hele stempel.
+    </p>
+    <p class="aside">
+      <strong>De lamp staat linksboven, dus de kuil is rechtsonder verlicht.</strong>
+      Het omslag zegt het zelf al: het verloop van 150° in <code>album.css</code>, en
+      het sleutellicht op 28%&nbsp;16% van de vormlaag daarboven. Een kuil in dat licht
+      heeft een <em>donkere</em> rand aan de
+      lampkant en een lichte aan de overkant — omgekeerd aan wat je intuïtief tekent.
+      In de filter zit dat als <code>azimuth=45</code> met een positieve
+      <code>surfaceScale</code>: een dal belicht vanuit linksboven en een bult belicht
+      vanuit rechtsonder zijn hetzelfde beeld, en van die twee is het draaien van de
+      lamp de variant die overal hetzelfde rendert.
+    </p>
+  </div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+  <h2>De vier behandelingen, op ware grootte</h2>
+  <div class="col">
+    <p>
+      Uitsneden op 1:1 over de onderste twee stangen, want een stempel beoordelen op
+      30% is een stempel niet beoordelen. Alle vier op dezelfde diepte en hetzelfde
+      kleursel; alleen de behandeling verschilt.
+    </p>
+  </div>
+
+  <div class="specimens" data-specimen="modes"></div>
+
+  <div class="col">
+    <dl class="notes">
+      <dt>Vlakke lijn</dt>
+      <dd>Eén lichtere vorm, verder niets. <b>Leest als opdruk</b> — er is geen enkele rand die licht vangt, dus niets wat zegt dat het oppervlak zelf van vorm verandert.</dd>
+      <dt>Reliëf</dt>
+      <dd>Vlak en wanden, van achter geperst. <b>Dit is jouw referentie en dit is het voorstel.</b> Op een rustige plek in het beeld valt hij vrijwel weg en in strijklicht komt hij terug — precies wat een blinde stempel hoort te doen.</dd>
+      <dt>Ingeslagen</dt>
+      <dd>Dezelfde stempel andersom: de huid in plaats van eruit, met een bodem in de schaduw. Wat een binder normaal doet, en op een donker kleursel <b>meteen te zwaar</b> — de bodem staat hier op 0,10 en wil op cognac makkelijk het dubbele.</dd>
+      <dt>Goud</dt>
+      <dd>Wel mooi, en <b>het verkeerde antwoord voor dit boek</b>: de naam is het enige goud op het omslag, en acht gouden poppetjes maken hem tot bijzaak. Bewaar het voor de icoonband, als daar ooit iets moet gebeuren.</dd>
+    </dl>
+  </div>
+
+  <h3>En op de tien kleursels</h3>
+  <div class="col">
+    <p>
+      De diepte is met ogen gezet tegen marineblauw, want dat is het kleursel van de
+      referentie. <strong>Cognac en antraciet zijn de twee die het waarschijnlijk niet
+      op dezelfde waarde uithouden</strong> — cognac is veruit het lichtst en toont de
+      wanden dus het hardst, antraciet heeft de minste kleur om het verschil in te
+      verstoppen. Loop ze langs met de kleurselkiezer hierboven.
+    </p>
+  </div>
+
+  <div class="specimens" data-specimen="stains" style="overflow-x: auto"></div>
+</section>
+
+<!-- =============================================================== -->
+<section>
+  <h2>Zo staat het erin</h2>
+  <div class="col">
+    <p>
+      De vorm zit één keer in het document, in een verborgen <code>&lt;svg&gt;</code>
+      met de definities; elk omslag <code>use</code>t hem één keer per laag.
+      Niets ervan is gebakken: de stempel erft zijn inkt van de laag die hem tekent en
+      de kuil komt uit een filter, dus de tien kleursels blijven de tien kleursels.
+    </p>
+  </div>
+
+  <pre class="code"><code>/* de lagen, tussen het kleursel en het drukwerk in */
+.album__cover__tool { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+
+/* 3a · het vlak van de stempel. Reliëf: een vlak dat een fractie
+        dichter bij de lamp ligt. Ingeslagen: hetzelfde vlak eronder,
+        in de middentoon van het kleursel zelf. */
+.album__cover__tool--face { fill: var(--tool-face); opacity: var(--tool-face-a); }
+.album--emboss { --tool-face: rgba(255,244,219,.06); --tool-face-a: 1;  }
+.album--deboss { --tool-face: var(--leather-mid);    --tool-face-a: .3; }
+
+/* 3b · de bodem van de kuil, alleen bij ingeslagen. Geërodeerd t.o.v.
+        de wanden, en bewust zwak: op marineblauw wordt .2 al een gat */
+.album__cover__tool--floor { fill: #000; mix-blend-mode: multiply; opacity: .085; }
+
+/* 3c · de wanden. soft-light: overlay blaast op donker kleursel uit */
+.album__cover__tool--bevel { fill: #000; mix-blend-mode: soft-light; opacity: .5; }
+
+&lt;!-- de filter. sRGB is verplicht: in linearRGB is 0.5 niet neutraal
+     en krijgt het hele bord een waas. diffuseConstant = 0.5/sin(40°),
+     zodat een vlak oppervlak exact middengrijs oplevert — en een
+     middengrijs vlak is onder soft-light precies niets.
+     azimuth 225 = reliëf (lamp linksboven), 45 = ingeslagen. --&gt;
+&lt;filter id="bevel-out" color-interpolation-filters="sRGB"&gt;
+  &lt;feGaussianBlur in="SourceAlpha" stdDeviation="1.3" result="bump"/&gt;
+  &lt;feDiffuseLighting in="bump" surfaceScale="5.5" diffuseConstant="0.7779"
+                     lighting-color="#ffffff"&gt;
+    &lt;feDistantLight azimuth="225" elevation="40"/&gt;
+  &lt;/feDiffuseLighting&gt;
+&lt;/filter&gt;
+
+/* mix-blend-mode moet binnen het omslag blijven en niet door het blad
+   heen zakken. Dat is al geregeld: de will-change: transform op
+   .album__cover (tegen de haarlijn) maakt er een stacking context van,
+   en die doet hier hetzelfde als isolation: isolate. */</code></pre>
+
+  <div class="col">
+    <dl class="notes">
+      <dt>Kosten</dt>
+      <dd>Vier <code>&lt;svg&gt;</code>-lagen per omslag, geen enkel bestand erbij. De filter draait één keer per omslag bij het tekenen; er animeert niets, dus hij hoeft nooit opnieuw.</dd>
+      <dt>Let op</dt>
+      <dd>De id's van de filters zijn <b>documentbreed</b>. Op de kiestafel staan tien omslagen naast elkaar — die delen dezelfde definities, en dat is precies wat je wil, maar het betekent ook dat de diepte een pagina-instelling is en geen boek-instelling.</dd>
+      <dt>Open punt</dt>
+      <dd><code>surfaceScale</code> en <code>stdDeviation</code> staan in gebruikerseenheden van de <code>viewBox</code>, dus ze schalen mee met het omslag. Op de kiestafel (90&nbsp;px breed) is de stempel daarmee <b>onzichtbaar</b> — daar zou hij eigenlijk uit moeten, of naar één stang terug.</dd>
+      <dt>Het echte open punt</dt>
+      <dd><b>Een blinde stempel wil een nerf om in te drukken.</b> Het bord is nu een volmaakt glad verloop, dus er is niets om plat te drukken en het reliëf moet het alleen van toon hebben. Dat werkt — zie hierboven — maar het is de helft van wat een blinddruk op leer doet, en het is het enige wat deze pagina niet eerlijk kan laten zien. Als er ooit een huid op het omslag komt, is dit de laag die er het meest van opknapt.</dd>
+      <dt>En de vormlaag</dt>
+      <dd><code>.cover__form</code> — sleutellicht, vignet en binnenbevel — komt uit <code>docs/cover-ideas.html</code> en staat <b>net zomin in de codebase</b>. Hij is blijven staan omdat er anders geen lamp in het beeld zit en een blinde stempel zonder lamp niets is om naar te kijken. Moet hij ook weg, dan is het één regel.</dd>
+      <dt>Eén getal met ogen</dt>
+      <dd>De diepte staat op <b>0,50</b>, gezet tegen marineblauw. Zet hem op cognac en hij wil omlaag: dat is met afstand het lichtste kleursel en de wanden komen daar het hardst door. Antraciet is het andere uiterste.</dd>
+    </dl>
+  </div>
+</section>
+
+<footer>
+  <div>Voorstel · niets hiervan staat in de codebase</div>
+  <div>Kleursel en boordranden ongewijzigd uit anago-leader-board-ui/src/styles/album.css</div>
+  <div>Geen gefotografeerde huid — die is nooit toegepast</div>
+  <div>Stangen 1-2-3-5 · <a href="https://cool.culturalheritage.org/don/dt/dt0435.html">Etherington &amp; Roberts, Dictionary — blind tooling</a></div>
+</footer>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* The ten stains, from utils/albumLeather.ts. Order is the shelf. */
+  var COVERS = [
+    { id: 'tobacco',   label: 'tabak',       hi: '#5a412b', mid: '#301f0f', lo: '#372413' },
+    { id: 'tan',       label: 'cognac',      hi: '#8a6134', mid: '#5b3c1b', lo: '#754f27' },
+    { id: 'oxblood',   label: 'ossenbloed',  hi: '#6b2a22', mid: '#3c110b', lo: '#551f16' },
+    { id: 'claret',    label: 'bordeaux',    hi: '#5c2136', mid: '#300f1c', lo: '#4a1a2b' },
+    { id: 'aubergine', label: 'aubergine',   hi: '#4a3350', mid: '#271a2c', lo: '#3c2942' },
+    { id: 'olive',     label: 'olijf',       hi: '#565229', mid: '#2b2911', lo: '#46421f' },
+    { id: 'forest',    label: 'bosgroen',    hi: '#2f4a2c', mid: '#182c17', lo: '#274023' },
+    { id: 'petrol',    label: 'petrol',      hi: '#2a4a4c', mid: '#10282a', lo: '#21403f' },
+    { id: 'navy',      label: 'marineblauw', hi: '#223049', mid: '#101828', lo: '#1b2740' },
+    { id: 'charcoal',  label: 'antraciet',   hi: '#3a3a3c', mid: '#1c1c1e', lo: '#2e2e30' }
+  ];
+
+  var PAGE_W = 560;
+  var PAGE_H = 718;
+
+  /* The rod runs from x=64 to x=496 — the same 77% of the board the
+     reference uses, which leaves the ornament clear of the joint on the
+     left and of the fore-edge roll on the right. */
+  var ROD_X = 64;
+  var ROD_W = 432;
+
+  /* Rod rows. `n` is how many men are on the rod; the y values are the
+     reference's, measured off it and scaled to the board's own 718. */
+  var LAYOUTS = {
+    split: {
+      label: 'Referentie', note: '1-2 boven, 3-5 onder', scale: 1,
+      rods: [{ y: 77, n: 1 }, { y: 180, n: 2 }, { y: 476, n: 3 }, { y: 580, n: 5 }]
+    },
+    table: {
+      label: 'De hele tafel', note: 'acht stangen', scale: 0.78,
+      rods: [
+        { y: 52, n: 1 }, { y: 126, n: 2 }, { y: 200, n: 5 }, { y: 274, n: 3 },
+        { y: 444, n: 3 }, { y: 518, n: 5 }, { y: 592, n: 2 }, { y: 666, n: 1 }
+      ]
+    },
+    quiet: {
+      label: 'Alleen onder', note: '3 en 5', scale: 1,
+      rods: [{ y: 476, n: 3 }, { y: 580, n: 5 }]
+    },
+    keeper: {
+      label: 'Alleen de keeper', note: 'één stang', scale: 1,
+      rods: [{ y: 77, n: 1 }]
+    }
+  };
+
+  var MODES = [
+    { id: 'flat',   label: 'Vlakke lijn', note: 'de naïeve versie' },
+    { id: 'emboss', label: 'Reliëf',      note: 'jouw referentie' },
+    { id: 'deboss', label: 'Ingeslagen',  note: 'de klassieke' },
+    { id: 'gilt',   label: 'Goud',        note: '' },
+    { id: 'none',   label: 'Niets',       note: '' }
+  ];
+
+  var MODE_CLASSES = MODES.map(function (m) { return 'cover--' + m.id; });
+
+  /* ---- the ornament, as markup ----
+     One rod group per row: the rod itself, then the men on it. Both
+     inherit their ink from the layer that draws them, so this string is
+     painted three times over without a colour in it anywhere. */
+
+  function rods(layout) {
+    var out = '';
+    layout.rods.forEach(function (r) {
+      out += '<g transform="translate(0,' + r.y + ')">';
+      out += '<rect class="t-rod" x="' + ROD_X + '" y="-1.3" width="' + ROD_W + '" height="2.6" rx="1.3"/>';
+      out += '<g class="t-men">';
+      for (var i = 0; i < r.n; i++) {
+        var x = ROD_X + ((i + 0.5) / r.n) * ROD_W;
+        out += '<use href="#man" transform="translate(' + x.toFixed(1) + ',0) scale(' + layout.scale + ')"/>';
+      }
+      out += '</g></g>';
+    });
+    return out;
+  }
+
+  function toolLayer(cls, art, filter) {
+    return '<svg class="cover__layer cover__tool cover__tool--' + cls + '" ' +
+           'viewBox="0 0 ' + PAGE_W + ' ' + PAGE_H + '" aria-hidden="true">' +
+           (filter ? filter(art) : art) +
+           '</svg>';
+  }
+
+  function cover(name, z, layoutId) {
+    var layout = LAYOUTS[layoutId || 'split'];
+    var art = rods(layout);
+
+    var el = document.createElement('div');
+    el.className = 'cover-scale';
+    el.style.width = Math.round(PAGE_W * z) + 'px';
+    el.style.height = Math.round(PAGE_H * z) + 'px';
+
+    el.innerHTML =
+      '<div class="cover cover--emboss" style="--z:' + z + '">' +
+
+        toolLayer('plain', art) +
+        toolLayer('face', art) +
+        toolLayer('floor', art, function (a) { return '<g filter="url(#soften)">' + a + '</g>'; }) +
+        /* Both bevels are always in the DOM and CSS shows one; that way a
+           deboss and an emboss can stand side by side on the same page
+           without two copies of the filter. */
+        toolLayer('bevel', art, function (a) {
+          return '<g class="t-in" filter="url(#bevel-in)">' + a + '</g>' +
+                 '<g class="t-out" filter="url(#bevel-out)">' + a + '</g>';
+        }) +
+        toolLayer('gilt', art) +
+
+        '<div class="cover__print">' +
+          '<div class="cover__kicker">Verzamelalbum van</div>' +
+          '<div class="cover__name">' + name + '</div>' +
+          '<div class="cover__rule"></div>' +
+        '</div>' +
+        '<div class="cover__form"></div>' +
+        '<div class="cover__roll"></div>' +
+      '</div>';
+
+    return el;
+  }
+
+  function stain(root, s) {
+    root.style.setProperty('--leather-hi', s.hi);
+    root.style.setProperty('--leather-mid', s.mid);
+    root.style.setProperty('--leather-lo', s.lo);
+  }
+
+  function setMode(c, id) {
+    MODE_CLASSES.forEach(function (cls) { c.classList.remove(cls); });
+    c.classList.add('cover--' + id);
+  }
+
+  /* ---- the bench ---- */
+
+  var bench = document.getElementById('bench');
+  var benchCovers = [];
+  var state = { mode: 'emboss', layout: 'split', line: false, depth: 0.5, round: 1.3 };
+
+  function buildBench() {
+    bench.innerHTML = '';
+    benchCovers = [];
+
+    [{ name: 'Rik Maas', label: 'Blinddruk', sub: 'het gewone boek' }].forEach(function (spec) {
+      var book = document.createElement('div');
+      book.className = 'book';
+
+      var scaled = cover(spec.name, 0.72, state.layout);
+      var label = document.createElement('div');
+      label.className = 'book__label';
+      label.innerHTML = '<b>' + spec.label + '</b> · ' + spec.sub;
+
+      book.appendChild(scaled);
+      book.appendChild(label);
+      bench.appendChild(book);
+      benchCovers.push(scaled.firstChild);
+    });
+
+    benchCovers.forEach(function (c) {
+      setMode(c, state.mode);
+      c.classList.toggle('cover--line', state.line);
+      stain(c, currentStain);
+      applyLayers(c);
+    });
+
+    /* Fresh covers come back at the CSS defaults, so the two sliders
+       have to be re-applied or a layout change quietly resets them. */
+    applyDepth();
+    applyRound();
+  }
+
+  /* ---- pickers ---- */
+
+  function picker(hostId, items, isOn, onPick) {
+    var host = document.getElementById(hostId);
+    items.forEach(function (it) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'toggle';
+      b.setAttribute('aria-pressed', String(isOn(it)));
+      b.innerHTML = it.label + (it.note ? ' <small>(' + it.note + ')</small>' : '');
+      b.addEventListener('click', function () {
+        onPick(it);
+        Array.prototype.forEach.call(host.querySelectorAll('.toggle'), function (o) {
+          o.setAttribute('aria-pressed', String(o === b));
+        });
+      });
+      host.appendChild(b);
+    });
+  }
+
+  picker('modes', MODES, function (m) { return m.id === state.mode; }, function (m) {
+    state.mode = m.id;
+    benchCovers.forEach(function (c) { setMode(c, m.id); });
+  });
+
+  picker('layouts', Object.keys(LAYOUTS).map(function (k) {
+    return { id: k, label: LAYOUTS[k].label, note: LAYOUTS[k].note };
+  }), function (l) { return l.id === state.layout; }, function (l) {
+    state.layout = l.id;
+    buildBench();
+  });
+
+  picker('figures', [
+    { id: 'solid', label: 'Vol', note: 'zoals de referentie' },
+    { id: 'line',  label: 'Lijn', note: 'als een filet' }
+  ], function (f) { return (f.id === 'line') === state.line; }, function (f) {
+    state.line = f.id === 'line';
+    benchCovers.forEach(function (c) { c.classList.toggle('cover--line', state.line); });
+  });
+
+  /* ---- depth and edge radius ----
+     Depth moves two numbers at once, and on purpose: a deeper impression
+     has both steeper walls and a darker floor. Splitting them would give
+     two sliders that are wrong apart from each other. */
+
+  var depth = document.getElementById('depth');
+  var depthOut = document.getElementById('depth-out');
+  var round = document.getElementById('round');
+  var roundOut = document.getElementById('round-out');
+
+  function applyDepth() {
+    var v = Number(depth.value);
+    depthOut.textContent = v.toFixed(2);
+    /* A foiled ornament is barely pressed at all — the leaf is laid on a
+       shallow impression, not driven into one — so gold keeps its own
+       ratio to whatever the slider says rather than tracking it 1:1. */
+    function ratio(el) { return el.closest('.cover').classList.contains('cover--gilt') ? 0.55 : 1; }
+
+    document.querySelectorAll('.cover__tool--bevel').forEach(function (el) {
+      el.style.opacity = (v * ratio(el)).toFixed(3);
+    });
+    document.querySelectorAll('.cover__tool--floor').forEach(function (el) {
+      el.style.opacity = (v * 0.17 * ratio(el)).toFixed(3);
+    });
+    /* The walls also get steeper, not only stronger. */
+    document.querySelectorAll('#bevel-in feDiffuseLighting, #bevel-out feDiffuseLighting')
+      .forEach(function (fe) { fe.setAttribute('surfaceScale', (3 + v * 5).toFixed(2)); });
+  }
+
+  function applyRound() {
+    var v = Number(round.value);
+    roundOut.textContent = v.toFixed(2);
+    document.querySelectorAll('#bevel-in feGaussianBlur, #bevel-out feGaussianBlur')
+      .forEach(function (fe) { fe.setAttribute('stdDeviation', v.toFixed(2)); });
+  }
+
+  depth.addEventListener('input', applyDepth);
+  round.addEventListener('input', applyRound);
+
+  /* ---- layer toggles ---- */
+
+  var layerState = { face: true, floor: true, bevel: true };
+
+  function applyLayers(c) {
+    Object.keys(layerState).forEach(function (l) {
+      var el = c.querySelector('.cover__tool--' + l);
+      if (el) el.style.visibility = layerState[l] ? '' : 'hidden';
+    });
+  }
+
+  document.querySelectorAll('#layers .toggle').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var l = btn.dataset.layer;
+      layerState[l] = !layerState[l];
+      btn.setAttribute('aria-pressed', String(layerState[l]));
+      benchCovers.forEach(applyLayers);
+    });
+  });
+
+  /* ---- stain picker ---- */
+
+  var currentStain = COVERS[8];
+  var stains = document.getElementById('stains');
+
+  COVERS.forEach(function (s) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'stain';
+    b.title = s.label;
+    b.setAttribute('aria-label', s.label);
+    b.setAttribute('aria-pressed', String(s === currentStain));
+    b.style.background = 'linear-gradient(150deg,' + s.hi + ',' + s.mid + ' 55%,' + s.lo + ')';
+    b.addEventListener('click', function () {
+      currentStain = s;
+      benchCovers.forEach(function (c) { stain(c, s); });
+      Array.prototype.forEach.call(stains.querySelectorAll('.stain'), function (o) {
+        o.setAttribute('aria-pressed', String(o === b));
+      });
+    });
+    stains.appendChild(b);
+  });
+
+  /* ---- specimens ---- */
+
+  var SPECIMENS = {
+    /* Cropped over the bottom two rods, at 1:1. */
+    modes: [
+      { mode: 'flat',   crop: true, caption: 'Vlakke lijn · <b>leest als opdruk</b>' },
+      { mode: 'emboss', crop: true, caption: '<b>Reliëf</b> · jouw referentie' },
+      { mode: 'deboss', crop: true, caption: 'Ingeslagen · de klassieke' },
+      { mode: 'gilt',   crop: true, caption: 'Goud · vecht met de naam' }
+    ],
+    stains: [
+      { mode: 'emboss', stain: COVERS[8], scale: 0.46, caption: 'Marineblauw · <b>de referentie</b>' },
+      { mode: 'emboss', stain: COVERS[1], scale: 0.46, caption: 'Cognac · het lichtste kleursel' },
+      { mode: 'emboss', stain: COVERS[9], scale: 0.46, caption: 'Antraciet · de minste kleur' },
+      { mode: 'emboss', stain: COVERS[6], scale: 0.46, caption: 'Bosgroen' }
+    ]
+  };
+
+  Object.keys(SPECIMENS).forEach(function (key) {
+    var host = document.querySelector('.specimens[data-specimen="' + key + '"]');
+    if (!host) return;
+
+    SPECIMENS[key].forEach(function (spec) {
+      var wrap = document.createElement('div');
+      wrap.className = 'specimen';
+
+      var z = spec.crop ? 1 : (spec.scale || 0.3);
+      var scaled = cover('Rik Maas', z, 'split');
+      var c = scaled.firstChild;
+
+      setMode(c, spec.mode);
+      stain(c, spec.stain || COVERS[8]);
+
+      if (spec.crop) {
+        /* Both bottom rods, at 1:1 — one man of the three-rod and three
+           of the five, which is enough of each to judge the stamp. */
+        scaled.style.width = '300px';
+        scaled.style.height = '190px';
+        scaled.classList.add('crop');
+        c.style.transform = 'scale(1) translate(-118px, -448px)';
+      }
+
+      var cap = document.createElement('div');
+      cap.className = 'specimen__caption';
+      cap.innerHTML = spec.caption;
+
+      wrap.appendChild(scaled);
+      wrap.appendChild(cap);
+      host.appendChild(wrap);
+    });
+  });
+
+  buildBench();
+  applyDepth();
+  applyRound();
+})();
+</script>

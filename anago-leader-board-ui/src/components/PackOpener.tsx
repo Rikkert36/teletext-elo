@@ -18,7 +18,7 @@ import {
 } from '../mock/cardMock';
 import PlayerCard, { CardBack } from './PlayerCard';
 import PackFace from './PackFace';
-import { packFoil } from '../utils/packFoil';
+import { packClass, packFoil } from '../utils/packFoil';
 import { PackGrab, grabPack } from '../utils/packGrab';
 import {
   playFlip,
@@ -206,7 +206,12 @@ const COUNTED = [
  */
 const tallyText = (pack: number, total: number | null): string => {
   const line = `${COUNTED[pack] ?? pack} ${pack === 1 ? 'nieuwe kaart' : 'nieuwe kaarten'}`;
-  return total === null ? line : `${line} — ${COUNTED[total] ?? total} in totaal`;
+  if (total === null) return line;
+  // "geen in totaal" reads as a missing word rather than a count. The second clause is a
+  // bare figure with no noun after it, and there the numeral "nul" is the one that sounds
+  // like an amount.
+  const counted = total === 0 ? 'nul' : COUNTED[total] ?? total;
+  return `${line} — ${counted} in totaal`;
 };
 
 /* ------------------------------------------------------------------ *
@@ -630,6 +635,18 @@ interface PackOpenerProps {
    * is the thing being clicked past.
    */
   onPutBack: (from: PackGrab | null) => void;
+  /**
+   * Where the table is scrolled to, **owned by the sitting rather than by this packet**.
+   *
+   * The opener is keyed on the pack, so reaching for a second packet unmounts the whole of
+   * it and builds a fresh row — and a fresh scroll container starts at its left edge. The
+   * cards in it are the same cards, though, so what the reader saw was the row jumping back
+   * to its start for no reason they caused. A ref rather than a prop value because it is
+   * read at mount and written on every scroll frame; re-rendering the page for either would
+   * be absurd. Same shape as `from`, and for the same reason: it belongs to the page, and
+   * the opener only borrows it.
+   */
+  tableScroll: React.MutableRefObject<number>;
   fastMode: boolean;
 }
 
@@ -643,6 +660,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
   table,
   onPutAway,
   onPutBack,
+  tableScroll,
   fastMode,
 }) => {
   const [phase, setPhase] = useState<Phase>('sealed');
@@ -676,6 +694,20 @@ const PackOpener: React.FC<PackOpenerProps> = ({
   /** False during the hand-off gap, so the centre is briefly empty. */
   const [heroVisible, setHeroVisible] = useState(true);
   const [faceUp, setFaceUp] = useState(false);
+  /**
+   * True only for the 320ms the card is actually rotating.
+   *
+   * It exists to keep the 3D context off the card at rest. Anything 3D in that subtree
+   * makes Chrome rasterize the card at CSS resolution and scale it up, which on a HiDPI
+   * screen is a visibly soft card back — in the one state the back is ever looked at.
+   * `.opener__flip--turning` in packopen.css carries the full argument and the bisect it
+   * came from.
+   *
+   * **Set in the same commit as `faceUp`, never on its own.** The transform and its
+   * transition are both declared under the class, so the two have to land together or
+   * the card either snaps to 180° or animates from nothing.
+   */
+  const [turning, setTurning] = useState(false);
   /**
    * How many characters of the name have been written, and whether the portrait
    * has started dissolving in. Both only ever move for a *new* card — a duplicate
@@ -846,6 +878,28 @@ const PackOpener: React.FC<PackOpenerProps> = ({
      */
     row.classList.toggle('opener__revealed--scrolls', hand.offsetWidth > row.clientWidth);
   }, [table.length, landed]);
+
+  /*
+   * Pick the table's scroll back up where the last packet left it. See `tableScroll`.
+   *
+   * **At mount and never again**, which is the whole of it: from here on the row's scroll is
+   * whatever the reader and the reveal have made of it, and re-running this would fight both.
+   *
+   * **Below the measurement above and above the FLIP**, and both halves of that matter. The
+   * row is only a scroll container while it carries `--scrolls`, and a `scrollLeft` written
+   * to an element that is not one is silently clamped to zero — so the class has to be on
+   * first. And a reveal in progress must be free to overwrite this on the same commit, which
+   * it does from the effect below.
+   *
+   * **An empty table zeroes it rather than restoring it**, which is what keeps the ref from
+   * needing an owner who remembers to clear it. Nothing carried over means this is the first
+   * packet of a sitting, and whatever the last sitting left in there describes a row that no
+   * longer exists.
+   */
+  useLayoutEffect(() => {
+    if (rowRef.current) rowRef.current.scrollLeft = table.length ? tableScroll.current : 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useLayoutEffect(() => {
     const arriving = pendingFlip.current;
@@ -1105,6 +1159,22 @@ const PackOpener: React.FC<PackOpenerProps> = ({
      */
   }, [faceUp]);
 
+  /**
+   * Takes the 3D context off the card again once the turn is over.
+   *
+   * Its own timer rather than the shared `after` helper, for the reason the mote drain
+   * gives just above: scoped to the effect, so an unmount cancels it instead of letting
+   * it fire into the next card's timeline.
+   *
+   * `transitionend` would be the tighter signal, but it does not fire at all when the
+   * pacing multiplier collapses the transition to zero, and the class would then stick.
+   */
+  useEffect(() => {
+    if (!turning) return undefined;
+    const timer = window.setTimeout(() => setTurning(false), ms(FLIP_MS));
+    return () => window.clearTimeout(timer);
+  }, [turning]);
+
   /** Schedules `fn` after a base duration, scaled by the pacing multiplier. */
   const after = useCallback((base: number, fn: () => void) => {
     timers.current.push(window.setTimeout(fn, ms(base)));
@@ -1270,6 +1340,9 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       setCursor(index);
       setHeroVisible(true);
       setFaceUp(false);
+      // With the turn abandoned mid-flight, the class would otherwise outlive the card
+      // that was turning and leave the incoming one soft until its own turn cleared it.
+      setTurning(false);
       setFlagged(false);
       setPortraitIn(false);
       setFlashing(false);
@@ -1373,7 +1446,13 @@ const PackOpener: React.FC<PackOpenerProps> = ({
         }
 
         after(buildMs, () => {
-          setFaceUp(true);
+          // One commit — see `turning`. This runs from a timeout, and legacy
+          // `ReactDOM.render` does not batch those; the hazard `playCard` documents
+          // applies here for a different reason and with a worse symptom.
+          unstable_batchedUpdates(() => {
+            setFaceUp(true);
+            setTurning(true);
+          });
           // The glow deliberately survives the turn and the hold. Killing it here
           // meant all that build-up resolved into a card that looked exactly like
           // a common one the instant you could finally see who it was.
@@ -1404,7 +1483,11 @@ const PackOpener: React.FC<PackOpenerProps> = ({
     }
 
     after(standing ? 0 : FLIP_LEAD_MS, () => {
-      setFaceUp(true);
+      // One commit — see `turning`, and the note on the ceremony path above.
+      unstable_batchedUpdates(() => {
+        setFaceUp(true);
+        setTurning(true);
+      });
       /*
        * **The flip only. `playSlot()` used to double it on a new card, and it
        * read as a balloon popping.**
@@ -1793,7 +1876,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       {phase === 'sealed' ? (
         <div className="opener__stage">
           <div
-            className="pack"
+            className={packClass(pack)}
             ref={sealedRef}
             style={foil}
             /*
@@ -1822,7 +1905,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
           {/* Each half carries the whole face and its own `clip-path` cuts it,
               so the printing tears with the foil instead of blinking out the
               moment the wrapper is clicked. */}
-          <div className="pack pack--tearing" style={foil}>
+          <div className={`${packClass(pack)} pack--tearing`} style={foil}>
             <div className="pack__half pack__half--top">
               <PackFace pack={pack} />
             </div>
@@ -1953,6 +2036,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
                 className={[
                   'opener__flip',
                   faceUp ? 'opener__flip--up' : '',
+                  turning ? 'opener__flip--turning' : '',
                   flagged && current?.isNew ? 'opener__flip--new' : '',
                 ]
                   .filter(Boolean)
@@ -1976,7 +2060,9 @@ const PackOpener: React.FC<PackOpenerProps> = ({
                   />
                 ) : null}
 
-                <div className="opener__face">
+                {/* `--back` is not decoration: at rest the faces are chosen by class
+                    rather than by back-face culling, so both need naming. */}
+                <div className="opener__face opener__face--back">
                   <CardBack />
                 </div>
                 <div className="opener__face opener__face--front">
@@ -1988,8 +2074,9 @@ const PackOpener: React.FC<PackOpenerProps> = ({
                   */}
                   {/*
                     Absent for the whole of `waiting`, which costs nothing: the front
-                    face is turned away and back-face culled, so there is nothing to
-                    render there until the roll says what it is.
+                    face is `visibility: hidden` until the card turns — culled by the
+                    class at rest, by its backface during the turn — so there is
+                    nothing to render there until the roll says what it is.
                   */}
                   {current ? (
                     <PlayerCard
@@ -2095,6 +2182,14 @@ const PackOpener: React.FC<PackOpenerProps> = ({
       <div
         className="opener__revealed"
         ref={rowRef}
+        /*
+          Remembered for the packet after this one — see `tableScroll`. On the element's own
+          scroll rather than at the points that cause one, so it catches the reader's drag and
+          the reveal's `scrollLeft = scrollWidth` alike: a programmatic scroll fires this too.
+        */
+        onScroll={(e) => {
+          tableScroll.current = e.currentTarget.scrollLeft;
+        }}
         role={canFile ? 'button' : undefined}
         tabIndex={canFile ? 0 : undefined}
         aria-label={canFile ? 'Leg de kaarten in je album' : undefined}

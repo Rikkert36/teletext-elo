@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pack } from '../mock/cardMock';
-import { packFoil } from '../utils/packFoil';
+import { packClass, packFoil } from '../utils/packFoil';
 import { PackGrab, grabPack } from '../utils/packGrab';
 import PackFace from './PackFace';
 import PackNote from './PackNote';
@@ -119,7 +119,7 @@ const PackTile: React.FC<PackTileProps> = ({ pack, onOpen, elementRef, held }) =
     <>
       <button
         type="button"
-        className="pack pack--mini"
+        className={`${packClass(pack)} pack--mini`}
         style={vars}
         ref={(el) => {
           tileRef.current = el;
