@@ -3,6 +3,7 @@ import { COVERS, CoverId, albumLeather } from '../utils/albumLeather';
 import { ms, prefersReducedMotion } from '../utils/animationSpeed';
 import { playRebind } from '../utils/sounds';
 import WrittenName, { durationFor } from './WrittenName';
+import CoverOrnament from './CoverOrnament';
 import { writeName } from '../utils/hersheyScript';
 /*
  * The finished book's face is the album's own `.album__cover`, so those rules have to be
@@ -315,6 +316,12 @@ const AlbumChoice: React.FC<AlbumChoiceProps> = ({ stampName, onChoose, onDone }
         {picked ? (
           <div className="choice__stage" style={albumLeather(picked.id)}>
             <div className="album__cover">
+              {/*
+                The same ornament as the album's own cover, in the same place — this is the
+                face the book is handed over with, so anything missing here would appear out
+                of nowhere at the swap.
+              */}
+              <CoverOrnament />
               <div className="album__cover-kicker">Verzamelalbum van</div>
               {/*
                 The name going onto the cover.

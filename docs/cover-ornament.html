@@ -8,26 +8,29 @@
    schaduw rechtsonder, per vorm. Zo lijken de poppetjes uit de huid
    omhoog geduwd in plaats van erop gedrukt.
 
-   De tekening komt uit de referentie-SVG (v4) en is niet hertekend —
+   De tekening komt uit de referentie-SVG (v5) en is niet hertekend —
    zelfde maten, zelfde drie randstreken per vorm, zelfde toonwaarden.
-   Wat hier wél anders is:
+   De stang van v4 staat er nog naast, want die keuze staat open; §2 zet
+   de twee naast elkaar. Wat hier verder anders is:
 
      · de toonwaarden staan in CSS-variabelen (--edge, --tint) in plaats
        van in vaste getallen, zodat de schuiven hieronder werken;
      · `vector-effect: non-scaling-stroke` staat standaard UIT, want dat
-       is precies wat de kleine boekjes van de kiestafel sloopt — zie §4,
+       is precies wat de kleine boekjes van de kiestafel sloopt — zie §5,
        waar het naast elkaar staat;
      · `fill="none"` op de wortel is een `fill: none` op de <svg> geworden,
        zodat de randvormen niet volgelopen raken met currentColor;
-     · de tweeëntwintig stangsegmenten zijn niet uitgeschreven maar worden
-       gerekend uit de plek van de poppetjes — zie ROD_ROWS onderin.
+     · de vijftien stangsegmenten per variant zijn niet uitgeschreven maar
+       worden gerekend uit de plek van de poppetjes — zie ROD_ROWS onderin.
 
    De stang is sinds v4 een balk die BIJ ELKE ROMP OPHOUDT in plaats van
    erachter door te lopen, en dat is meer dan een detail: twee vormen van
    24% over elkaar geven 42%, dus een doorlopende stang tekende een lichte
    band dwars door elk poppetje. Nu raakt niets elkaar en klopt de dekking
-   overal. De prijs staat hieronder: de stang is niet langer één vorm die
-   je kunt hergebruiken.
+   overal. v5 maakt dat af door de koppen aan de binnenkant weg te laten,
+   zodat de onderbreking niet als een uiteinde leest maar als iets dat
+   erachter langs gaat. De prijs staat hieronder: de stang is niet langer
+   één vorm die je kunt hergebruiken.
 
    Dezelfde wereld als docs/cover-ideas.html: een werkbank onder een warme
    lamp, geen lichte modus. Het omslag zelf is uit dat bestand overgenomen
@@ -51,13 +54,14 @@
      --relief is de diepte in CSS-pixels, en geldt alleen voor de
               drop-shadow-variant (zie [data-relief="shadow"]).
 
-     0,80 en 0,10 is de gekozen stand, niet het midden van de schuif. De
+     0,70 en 0,20 is de gekozen stand en staat sinds vandaag zo in het
+     boek zelf (`--ornament-edge` / `--ornament-tint` in album.css). De
      leerkleur staat daarmee vrijwel uit — het lichaam van een poppetje is
-     0,24 × 0,10 ≈ 2,4% — en het hele ornament bestaat dus uit niets dan
+     0,24 × 0,20 ≈ 5% — en het hele ornament bestaat dus uit niets dan
      licht en schaduw op de huid. Dat is ook precies wat een blinde
      inslag is: er is geen tweede kleur, er is alleen reliëf. */
-  --edge: 0.8;
-  --tint: 0.1;
+  --edge: 0.7;
+  --tint: 0.2;
   --relief: 1.1px;
 
   /* De nerf: fractale ruis, geen foto. */
@@ -188,6 +192,11 @@ code {
   background-image: var(--grain);
   background-size: 220px 220px;
 }
+/* Standaard uit, want zo staat het boek er ook bij. De nerf is een tijdje op
+   het echte omslag geplakt (de recept staat in docs/cover-ideas.html) en is er
+   weer af gehaald: de poppetjes bestaan uit haarlijntjes op 12 tot 30% en een
+   porietextuur zit in dezelfde band, dus de inslag verdronk erin. De schakelaar
+   blijft staan om dat te kunnen zien. */
 .cover--nograin .cover__skin { display: none; }
 
 .cover__print {
@@ -255,7 +264,7 @@ code {
       rgba(0, 0, 0, 0) 2px, rgba(0, 0, 0, 0.1) 4.5px, rgba(0, 0, 0, 0) 9px);
 }
 
-/* De tonale detailkleur. Eén regel voor alle tien de banden — zie §3.
+/* De tonale detailkleur. Eén regel voor alle tien de banden — zie §4.
    Hier op [data-stain] en niet op .cover, zodat de vergrote figuren
    verderop dezelfde kleur uit dezelfde rekensom krijgen; in de app
    hoort hij gewoon op .album__cover, naast de andere tokens. */
@@ -582,6 +591,38 @@ code {
 }
 .fig-cell__cap b { display: block; color: var(--foil); font-weight: normal; letter-spacing: 0.08em; text-transform: uppercase; font-size: 10px; }
 
+/* ---- de tweekamp ---------------------------------------------------
+ * Twee omslagen naast elkaar, zo groot als er past. --z volgt uit de
+ * kleinste van twee eisen: twee omslagen plus de tussenruimte moeten in
+ * de breedte passen, en één omslag moet in de hoogte passen. Geen JS —
+ * min() rekent dit bij elke resize opnieuw, ook bij het draaien van een
+ * telefoon.
+ * ------------------------------------------------------------------- */
+.duel {
+  --z: max(0.3, min(calc((100vw - 150px) / 1120), calc((100vh - 170px) / 718)));
+  display: flex;
+  gap: 30px;
+  justify-content: center;
+  align-items: flex-start;
+  margin-top: 34px;
+}
+.duel__side { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.duel__label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #cbb79c;
+  text-align: center;
+}
+
+/* De vergroting eronder is een breder paneel dan dat van §3: hier moet
+   de stang aan weerszijden van de romp te zien zijn. */
+#duel-zoom .fig-cell { flex: 1 1 300px; }
+#duel-zoom .fig-cell__plate { height: 260px; }
+#duel-zoom .fig { width: 260px; height: 240px; }
+
+.verdict--ask { background: rgba(190, 150, 70, 0.16); color: #e8c88a; border: 1px solid rgba(210, 170, 90, 0.4); }
+
 /* ---- de plank ----------------------------------------------------- */
 
 .shelf {
@@ -646,7 +687,7 @@ pre .p { color: var(--foil); }
      Overgenomen uit de referentie-SVG (v4) zonder een coördinaat te
      veranderen. De classes staan in het stijlblad hierboven in plaats
      van in een <style> binnen de SVG, want dan kunnen de schuiven eraan
-     rekenen. Zie §5 voor wat dat in de app betekent.
+     rekenen. Zie §6 voor wat dat in de app betekent.
 
      Alleen het poppetje staat hier; de vier stangen worden onderin
      gerekend uit de plek van de poppetjes, want sinds v4 hangt hun
@@ -735,10 +776,12 @@ pre .p { color: var(--foil); }
   </p>
   <p class="aside">
     <strong>En de stang loopt niet meer achter de poppetjes door.</strong> Hij houdt bij elke
-    romp op en begint er aan de andere kant weer, zoals op een echte tafel waar de pop óm de
-    stang zit geklemd. Dat is niet alleen anatomie: twee doorschijnende vormen van 24% over
-    elkaar geven 42%, dus een doorlopende stang tekende een lichte band dwars door elk
-    poppetje heen — het enige plekje op het hele omslag waar de dekking niet klopte.
+    romp op en begint er aan de andere kant weer. Dat is niet alleen anatomie: twee
+    doorschijnende vormen van 24% over elkaar geven 42%, dus een doorlopende stang tekende een
+    lichte band dwars door elk poppetje heen — het enige plekje op het hele omslag waar de
+    dekking niet klopte. In v5 krijgen alleen de buitenste uiteinden een kop, waardoor die
+    onderbreking leest als een stang die achter de pop langs gaat en niet als twee losse
+    stukjes. <em>Stang</em> hiernaast wisselt tussen de twee; §2 zet ze naast elkaar.
   </p>
 </header>
 
@@ -766,11 +809,22 @@ pre .p { color: var(--foil); }
       samen aan één knop: een hoge rand op een bijna onzichtbare vorm is precies het
       subtiele effect, en een lage rand op een sterke vorm is de sticker.
     </p>
+    <p class="aside">
+      <strong>De stand die er nu op staat is 0,70 rand en 0,20 vorm, en dat is wat er in het
+      boek zit</strong> — <code>--ornament-edge</code> en <code>--ornament-tint</code> op
+      <code>.album__cover-rods</code> in <code>album.css</code>. Op 0,20 is het lichaam van een
+      poppetje 0,24 × 0,20 ≈ 5% dekking: de leerkleur is praktisch uit, en wat overblijft is
+      niets dan licht en schaduw op de huid. Dat is ook wat een blinde inslag ís: geen tweede
+      kleur, alleen reliëf. De rand staat onder één, want op vol is hij te scherp voor iets dat
+      op een meter afstand nauwelijks hoort op te vallen. Zet <em>Vorm</em> op 1,00 en je ziet
+      meteen waarom het die kant niet op moet: dan wordt het een lichtblauwe tekening óp
+      marineblauw leer in plaats van een indruk erin.
+    </p>
   </div>
 
   <div class="bench">
     <div class="cover-scale" style="--z: 0.78">
-      <div class="cover" data-stain="navy" id="hero">
+      <div class="cover cover--nograin" data-stain="navy" id="hero">
         <div class="cover__layer cover__skin"></div>
         <svg class="cover__rods" viewBox="0 0 780 1000" preserveAspectRatio="none" aria-hidden="true">
           <use href="#rods" />
@@ -795,13 +849,17 @@ pre .p { color: var(--foil); }
         <div class="chips" id="reliefs"></div>
       </div>
       <div class="controls__row">
-        <span class="controls__legend">Rand <b id="edge-out">1.00×</b></span>
-        <input class="slider" id="edge" type="range" min="0" max="2.5" step="0.05" value="1"
+        <span class="controls__legend">Stang</span>
+        <div class="chips" id="rodpick"></div>
+      </div>
+      <div class="controls__row">
+        <span class="controls__legend">Rand <b id="edge-out">0.70×</b></span>
+        <input class="slider" id="edge" type="range" min="0" max="2.5" step="0.05" value="0.7"
                aria-label="Sterkte van het wit en het zwart in de rand">
       </div>
       <div class="controls__row">
-        <span class="controls__legend">Vorm <b id="tint-out">1.00×</b></span>
-        <input class="slider" id="tint" type="range" min="0" max="2.5" step="0.05" value="1"
+        <span class="controls__legend">Vorm <b id="tint-out">0.20×</b></span>
+        <input class="slider" id="tint" type="range" min="0" max="2.5" step="0.05" value="0.2"
                aria-label="Sterkte van de leerkleur in de vorm">
       </div>
       <div class="controls__row">
@@ -813,11 +871,60 @@ pre .p { color: var(--foil); }
         <span class="controls__legend">Aan tafel</span>
         <div class="chips">
           <button class="chip" id="t-ornament" aria-pressed="true">Ornament</button>
-          <button class="chip" id="t-grain" aria-pressed="true">Nerf</button>
+          <button class="chip" id="t-grain" aria-pressed="false">Nerf</button>
         </div>
       </div>
     </div>
   </div>
+</section>
+
+<!-- =============================================================== -->
+<section class="duel-section">
+  <h2>De twee stangen, naast elkaar<span class="verdict verdict--ask">Te kiezen</span></h2>
+
+  <div class="col">
+    <p>
+      Hetzelfde omslag, dezelfde poppetjes, dezelfde stand van de schuiven. Het enige verschil
+      is de stang. Ze staan zo groot als het scherm toelaat, want op deze sterkte is dit een
+      verschil van een paar tienden van een pixel per rand en dat beoordeel je niet op een duim
+      papier. De vergrotingen eronder tonen dezelfde twee bij het punt waar het telt: waar de
+      stang het poppetje raakt.
+    </p>
+    <p>
+      <strong>v4 is een buis, v5 is een balk.</strong> v4 heeft afgeronde hoeken, ronde
+      uiteinden en drie randen — hoogsel, leer, schaduw — wat een rond staafje beschrijft. v5
+      heeft harde hoeken, rechte uiteinden en vier randen: hoogsel op de bovenkant, leer er net
+      onder, een lichte schaduw net boven de onderkant en zwart op de onderkant zelf. Dat
+      beschrijft een vlak met een afschuining eromheen. Hij is ook een derde hoger, acht
+      eenheden tegen zes.
+    </p>
+    <p>
+      Het argument voor v5 is dat hij van hetzelfde bij het poppetje hoort. Een romp is
+      <code>rx 1.8</code> op 32 breed — praktisch een rechthoek — met een harde rand eromheen,
+      en daar hing een rond buisje doorheen. Nu is het één gietwerk. Het argument tegen is dat
+      een echte tafelstang wél rond is; alleen is dat een argument over de tafel en niet over
+      de blinddruk, en een blinddruk is per definitie een vlakke vorm met een schuine kant.
+    </p>
+    <p>
+      Let ook op de <strong>uiteinden</strong>. v5 zet alleen aan de buitenkant van een rij een
+      kop; waar een segment bij een romp ophoudt blijft het open, en daardoor <em>verdwijnt</em>
+      de stang achter het poppetje in plaats van ertegenaan dood te lopen. v4 rondt elk
+      segmenteinde af, dus daar staan elf stangen van elk twee stukjes.
+    </p>
+  </div>
+
+  <div class="duel">
+    <div class="duel__side">
+      <div class="cover-scale" data-duel="v5"></div>
+      <div class="duel__label">v5 · balk, harde hoeken, open uiteinden</div>
+    </div>
+    <div class="duel__side">
+      <div class="cover-scale" data-duel="v4"></div>
+      <div class="duel__label">v4 · buis, afgeronde uiteinden</div>
+    </div>
+  </div>
+
+  <div class="figs" data-stain="navy" id="duel-zoom"></div>
 </section>
 
 <!-- =============================================================== -->
@@ -870,8 +977,8 @@ pre .p { color: var(--foil); }
       alle tien identiek — geen tint per band. Dat is dezelfde regel als voor het messing en het
       bladgoud in <code>albumLeather.ts</code>: één werkplaats, tien kleuren leer. Het licht in
       die werkplaats verandert niet mee met de huid. Alleen <code>currentColor</code> beweegt, en
-      dat zijn precies vier classes: <code>.shape-fill</code>, <code>.edge-mid</code>,
-      <code>.rod-base</code> en <code>.rod-mid-edge</code>.
+      dat zijn precies vijf classes: <code>.shape-fill</code>, <code>.edge-mid</code>,
+      <code>.rod-face</code>, <code>.rod-top-inner</code> en <code>.rod-left-inner</code>.
     </p>
   </div>
 
@@ -904,11 +1011,11 @@ pre .p { color: var(--foil); }
       en het vierde ermee.
     </p>
     <p>
-      De stang lijdt er minder onder dan in v2, en dat is een gratis meevaller van de balk: hij
-      is nu <em>meetkunde</em> — drie rechthoeken — en die schalen gewoon mee. Alleen de drie
-      streken op zijn randen zitten in de klem. Waar de stang eerst uit niets dan streken
-      bestond en op 0,2× een balk van drie pixels werd, blijft er nu een stang van de goede
-      dikte over met randen die te dik zijn.
+      De stang lijdt er minder onder dan in v2, en dat is een gratis meevaller van de balk: zijn
+      lijf is nu <em>meetkunde</em> — twee rechthoeken — en die schalen gewoon mee. Alleen de
+      randen eromheen zitten in de klem. Waar de stang eerst uit niets dan streken bestond en op
+      0,2× een balk van drie pixels werd, blijft er nu een stang van de goede dikte over met
+      randen die te dik zijn.
     </p>
     <p>
       Zonder het attribuut klopt de verhouding wel, maar dan is het volgende probleem de tekening
@@ -934,7 +1041,7 @@ pre .p { color: var(--foil); }
     </p>
     <p>
       <strong>De <code>&lt;style&gt;</code> uit de SVG mag niet mee.</strong> Die zet classes
-      als <code>.edge-hi</code> en <code>.rod-base</code> in de globale scope, en de app heeft
+      als <code>.edge-hi</code> en <code>.rod-face</code> in de globale scope, en de app heeft
       één stylesheet voor alles — dat is een naam als <code>.chip</code> claimen. Ze horen in
       <code>album.css</code>, genest onder <code>.album__cover-rods</code>. Dat is ook wat de
       schuiven op deze pagina mogelijk maakt: zolang de getallen in de SVG staan kan er niets
@@ -983,10 +1090,11 @@ pre .p { color: var(--foil); }
 
 <span class="c">/* De toonwaarden. Wit en zwart op alle tien de banden gelijk;
    alleen currentColor beweegt mee met het leer. */</span>
-.album__cover-rods .rod-base     { fill: currentColor; fill-opacity: .22; }
-.album__cover-rods .rod-hi-fill  { fill: #fff; fill-opacity: .055; }
-.album__cover-rods .rod-shadow   { fill: #000; fill-opacity: .08; }
-.album__cover-rods .rod-mid-edge { stroke: currentColor; stroke-opacity: .38; stroke-width: .95; }
+.album__cover-rods .rod-face      { fill: currentColor; fill-opacity: .23; }
+.album__cover-rods .rod-shadow    { fill: #000; fill-opacity: .09; }
+.album__cover-rods .rod-top       { stroke: #fff; stroke-opacity: .19; stroke-width: 1.05; }
+.album__cover-rods .rod-top-inner { stroke: currentColor; stroke-opacity: .48; stroke-width: .75; }
+.album__cover-rods .rod-bottom    { stroke: #000; stroke-opacity: .32; stroke-width: 1.1; }
 <span class="c">/* … en zo voor .shape-*, .edge-* en .detail-*; zie het stijlblad
    van deze pagina, dat is de bron. */</span>
 
@@ -995,7 +1103,7 @@ pre .p { color: var(--foil); }
    dus eraf, net als de rest van de kill list daar. */</span>
 .album--icons .album__cover-rods { display: none; }
 
-<span class="c">/* En eraf zodra het boekje te klein is: zie §4. */</span>
+<span class="c">/* En eraf zodra het boekje te klein is: zie §5. */</span>
 .choice__book .album__cover-rods { display: none; }</pre>
 
     <p class="aside">
@@ -1070,30 +1178,70 @@ const ROD_X0 = 100;
 const ROD_X1 = 682;
 const TORSO_HALF = 16;
 
-/* Eén segment: schaduw, balk, lichte strook, en drie streken. De y's en
-   de inzet van de streken zijn letterlijk die uit de referentie. */
-const rodSegment = (x, w) => {
+/* v5 — een rechte balk. Vier horizontale randen, en koppen alleen aan
+   de buitenuiteinden van de rij: waar een segment bij een romp ophoudt
+   blijft het open, zodat de stang achter het poppetje verdwijnt in
+   plaats van ertegenaan dood te lopen. Geen rx, geen ronde uiteinden. */
+const rodSegment5 = (x, w, caps) => {
+  const x2 = x + w;
   const g = svgEl('g', {});
   g.append(
-    svgEl('rect', { class: 'rod-shadow', x, y: -3.15, width: w, height: 7.1, rx: 1 }),
-    svgEl('rect', { class: 'rod-base', x, y: -2.45, width: w, height: 6, rx: 0.9 }),
-    svgEl('rect', { class: 'rod-hi-fill', x, y: -2.45, width: w, height: 2, rx: 0.9 }),
-    svgEl('line', { class: 'rod-hi-edge', x1: x + 0.4, y1: -1.75, x2: x + w - 0.4, y2: -1.75 }),
-    svgEl('line', { class: 'rod-mid-edge', x1: x + 0.2, y1: 0, x2: x + w - 0.2, y2: 0 }),
-    svgEl('line', { class: 'rod-lo-edge', x1: x + 0.5, y1: 3, x2: x + w - 0.5, y2: 3 }),
+    svgEl('rect', { class: 'rod-shadow', x, y: -3.2, width: w, height: 8 }),
+    svgEl('rect', { class: 'rod-face', x, y: -4, width: w, height: 8 }),
+    svgEl('line', { class: 'rod-top', x1: x, y1: -4, x2, y2: -4 }),
+    svgEl('line', { class: 'rod-top-inner', x1: x, y1: -2.75, x2, y2: -2.75 }),
+    svgEl('line', { class: 'rod-bottom-inner', x1: x, y1: 2.85, x2, y2: 2.85 }),
+    svgEl('line', { class: 'rod-bottom', x1: x, y1: 4, x2, y2: 4 }),
+  );
+  if (caps.left) {
+    g.append(
+      svgEl('line', { class: 'rod-left', x1: x, y1: -4, x2: x, y2: 4 }),
+      svgEl('line', { class: 'rod-left-inner', x1: x + 1.1, y1: -3.2, x2: x + 1.1, y2: 3.2 }),
+    );
+  }
+  if (caps.right) {
+    g.append(
+      svgEl('line', { class: 'rod-right-inner', x1: x2 - 1.1, y1: -3.2, x2: x2 - 1.1, y2: 3.2 }),
+      svgEl('line', { class: 'rod-right', x1: x2, y1: -4, x2, y2: 4 }),
+    );
+  }
+  return g;
+};
+
+/* v4 — een buis van zes eenheden met afgeronde uiteinden. */
+const rodSegment4 = (x, w) => {
+  const g = svgEl('g', {});
+  g.append(
+    svgEl('rect', { class: 'rodv4-shadow', x, y: -3.15, width: w, height: 7.1, rx: 1 }),
+    svgEl('rect', { class: 'rodv4-base', x, y: -2.45, width: w, height: 6, rx: 0.9 }),
+    svgEl('rect', { class: 'rodv4-hi-fill', x, y: -2.45, width: w, height: 2, rx: 0.9 }),
+    svgEl('line', { class: 'rodv4-hi-edge', x1: x + 0.4, y1: -1.75, x2: x + w - 0.4, y2: -1.75 }),
+    svgEl('line', { class: 'rodv4-mid-edge', x1: x + 0.2, y1: 0, x2: x + w - 0.2, y2: 0 }),
+    svgEl('line', { class: 'rodv4-lo-edge', x1: x + 0.5, y1: 3, x2: x + w - 0.5, y2: 3 }),
   );
   return g;
 };
 
-/* De gaten tussen de rompen, van links naar rechts. */
-const rodRow = ({ y, players }) => {
-  const row = svgEl('g', { transform: `translate(0 ${y})` });
+/* De gaten tussen de rompen, van links naar rechts. Beide stangen
+   worden getekend; --g-rod4 / --g-rod5 bepaalt welke je ziet. */
+const rodGaps = (players) => {
+  const gaps = [];
   let x = ROD_X0;
   players.forEach((cx) => {
-    row.appendChild(rodSegment(x, cx - TORSO_HALF - x));
+    gaps.push([x, cx - TORSO_HALF - x]);
     x = cx + TORSO_HALF;
   });
-  row.appendChild(rodSegment(x, ROD_X1 - x));
+  gaps.push([x, ROD_X1 - x]);
+  return gaps;
+};
+
+const rodRow = ({ y, players }) => {
+  const row = svgEl('g', { transform: `translate(0 ${y})` });
+  const gaps = rodGaps(players);
+  gaps.forEach(([x, w]) => row.appendChild(rodSegment4(x, w)));
+  gaps.forEach(([x, w], i) => {
+    row.appendChild(rodSegment5(x, w, { left: i === 0, right: i === gaps.length - 1 }));
+  });
   players.forEach((cx) => {
     row.appendChild(svgEl('use', { href: '#player', transform: `translate(${cx} 0)` }));
   });
@@ -1106,12 +1254,15 @@ const rods = svgEl('g', { id: 'rods' });
 ROD_ROWS.forEach((row) => rods.appendChild(rodRow(row)));
 defs.appendChild(rods);
 
-/* Eén poppetje op twee stukjes stang, voor de vergrotingen — dezelfde
-   onderbreking, zodat het paneel laat zien wat het omslag doet. */
+/* Eén poppetje op twee stukjes stang, voor de vergrotingen — met de
+   onderbreking en met de koppen aan de buitenkant, zodat het paneel
+   laat zien wat het omslag doet. */
 const detail = svgEl('g', { id: 'detail' });
 detail.append(
-  rodSegment(-46, 30),
-  rodSegment(TORSO_HALF, 30),
+  rodSegment4(-46, 30),
+  rodSegment4(TORSO_HALF, 30),
+  rodSegment5(-46, 30, { left: true, right: false }),
+  rodSegment5(TORSO_HALF, 30, { left: false, right: true }),
   svgEl('use', { href: '#player' }),
 );
 defs.appendChild(detail);
@@ -1126,11 +1277,12 @@ const mixWhite = (hex, p) => {
 
 /* ---- het omslag als bouwsteen, zodat de plank en de maten er ook
         eentje kunnen zijn en niets uit elkaar loopt ---------------- */
-const coverHtml = (stain, name, sprite) => `
-  <div class="cover" data-stain="${stain}">
+const coverHtml = (stain, name, opts = {}) => `
+  <div class="cover cover--nograin" data-stain="${stain}">
     <div class="cover__layer cover__skin"></div>
-    <svg class="cover__rods" viewBox="0 0 780 1000" preserveAspectRatio="none" aria-hidden="true">
-      <use href="#${sprite || 'rods'}" />
+    <svg class="cover__rods" viewBox="0 0 780 1000" preserveAspectRatio="none" aria-hidden="true"
+         style="${opts.rods || ''}">
+      <use href="#${opts.sprite || 'rods'}" />
     </svg>
     <div class="cover__print">
       <div class="cover__kicker">Verzamelalbum van</div>
@@ -1168,6 +1320,22 @@ reliefs.addEventListener('click', (e) => {
   reliefs.querySelectorAll('.chip').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
 });
 root.dataset.relief = 'raised';
+
+/* ---- stang -------------------------------------------------------- */
+const rodpick = document.getElementById('rodpick');
+rodpick.innerHTML = [
+  { id: 'v5', label: 'v5 · balk' },
+  { id: 'v4', label: 'v4 · buis' },
+].map((r, i) => `
+  <button class="chip" data-rod="${r.id}" aria-pressed="${i === 0}">${r.label}</button>`).join('');
+
+rodpick.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-rod]');
+  if (!btn) return;
+  root.dataset.rod = btn.dataset.rod;
+  rodpick.querySelectorAll('.chip').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+});
+root.dataset.rod = 'v5';
 
 /* ---- schuiven ----------------------------------------------------- */
 const bind = (id, out, apply) => {
@@ -1232,6 +1400,31 @@ document.getElementById('figs').innerHTML = PANELS.map((p) => `
     <div class="fig-cell__cap"><b>${p.title}</b>${p.text}</div>
   </div>`).join('');
 
+/* ---- de tweekamp ---------------------------------------------------
+   De twee omslagen zetten hun stangkeuze als inline-stijl op de <svg>,
+   want die wint van de [data-rod]-schakelaar van het grote omslag —
+   hier moeten ze naast elkaar staan, ongeacht wat daar aanstaat.
+   -------------------------------------------------------------------- */
+const RODS_ONLY = { v5: '--g-rod4: 0; --g-rod5: 1;', v4: '--g-rod4: 1; --g-rod5: 0;' };
+
+document.querySelectorAll('[data-duel]').forEach((slot) => {
+  slot.innerHTML = coverHtml('navy', 'Rik Maas', { rods: RODS_ONLY[slot.dataset.duel] });
+});
+
+/* Dezelfde twee, vergroot op de kruising met een romp. */
+document.getElementById('duel-zoom').innerHTML = [
+  { id: 'v5', title: 'v5 · balk', text: 'Harde hoeken, vier randen, en een uiteinde dat openblijft waar de romp begint.' },
+  { id: 'v4', title: 'v4 · buis', text: 'Afgeronde hoeken en ronde uiteinden: de stang loopt zichtbaar dood tegen de romp.' },
+].map((r) => `
+  <div class="fig-cell">
+    <div class="fig-cell__plate">
+      <svg class="fig" viewBox="-56 -48 112 112" style="${RODS_ONLY[r.id]}" aria-hidden="true">
+        <use href="#detail" />
+      </svg>
+    </div>
+    <div class="fig-cell__cap"><b>${r.title}</b>${r.text}</div>
+  </div>`).join('');
+
 /* ---- de tabel ------------------------------------------------------ */
 document.querySelector('#palette tbody').innerHTML = COVERS.map((c) => {
   const derived = mixWhite(c.hi, 0.82);
@@ -1252,7 +1445,7 @@ document.getElementById('shelf').innerHTML = COVERS.map((c) => `
     <div class="shelf__label">${c.label}</div>
   </div>`).join('');
 
-/* ---- het bewijsstuk voor §4 ----------------------------------------
+/* ---- het bewijsstuk voor §5 ----------------------------------------
    Een tweede sprite, #rods-ns, met `vector-effect` op elke vorm.
 
    Dat attribuut erft niet en het is geen custom property, dus het is het
@@ -1294,7 +1487,7 @@ const SIZES = [
 
 document.getElementById('sizes').innerHTML = SIZES.map((s) => `
   <div class="shelf__item">
-    <div class="cover-scale" style="--z: ${s.z}">${coverHtml('navy', 'Rik Maas', s.sprite)}</div>
+    <div class="cover-scale" style="--z: ${s.z}">${coverHtml('navy', 'Rik Maas', { sprite: s.sprite })}</div>
     <div class="shelf__label">${s.label}</div>
   </div>`).join('');
 </script>

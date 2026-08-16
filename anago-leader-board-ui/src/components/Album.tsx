@@ -3,6 +3,7 @@ import { unstable_batchedUpdates } from 'react-dom';
 import { Card, CardPlayer, splitName, toCard } from '../mock/cardMock';
 import PlayerCard, { ownedLabel } from './PlayerCard';
 import WrittenName from './WrittenName';
+import CoverOrnament from './CoverOrnament';
 import useIsMobile from '../hooks/useIsMobile';
 import { albumLeather } from '../utils/albumLeather';
 import { ms, prefersReducedMotion } from '../utils/animationSpeed';
@@ -667,6 +668,12 @@ const PageFace: React.FC<{
   if (page.kind === 'cover') {
     return (
       <div className="album__cover">
+        {/*
+          The ornament, before the icon binding on purpose: everything in here paints in
+          tree order, so the ivory boards go over it and the re-bind wipe carries the rods
+          off with the leather they were struck into. See `album.css`.
+        */}
+        <CoverOrnament />
         {/*
           The icon binding: ivory boards, with the chosen stain kept as the four corners.
 

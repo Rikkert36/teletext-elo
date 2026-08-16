@@ -94,6 +94,18 @@ export const COVERS: readonly Stain[] = [
 
 const BY_ID = new Map<string, Stain>(COVERS.map((stain) => [stain.id, stain]));
 
+/** A hex colour lightened toward white by `1 - keep`. Only `--detail` uses it. */
+const lighten = (hex: string, keep: number): string => {
+  const n = parseInt(hex.slice(1), 16);
+
+  return (
+    '#' +
+    [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+      .map((channel) => Math.round(channel * keep + 255 * (1 - keep)).toString(16).padStart(2, '0'))
+      .join('')
+  );
+};
+
 export const coverLabel = (cover: string | null | undefined): string =>
   (cover ? BY_ID.get(cover)?.label : undefined) ?? COVERS[0].label;
 
@@ -122,6 +134,29 @@ export const albumLeather = (cover: string | null | undefined): CSSProperties =>
     '--leather-hi': stain.hi,
     '--leather-mid': stain.mid,
     '--leather-lo': stain.lo,
+    /*
+     * The tone the blind ornament on the front board is struck in — the four rods and
+     * their figures, see `CoverOrnament.tsx`. Barely used at full strength: the drawing
+     * runs it at a fifth (`--ornament-tint` in album.css) and what you see is mostly the
+     * white and black of the relief. But it is what keeps the impression *in* the stain
+     * rather than on top of it.
+     *
+     * **Derived, and not a table of ten.** A per-stain palette was proposed alongside the
+     * drawing, and every one of its ten values turned out to be `hi` mixed with 18% white
+     * — exactly, on all thirty channels. So it is one sum rather than ten decisions, and a
+     * stain that gets retuned takes its ornament with it instead of drifting away from a
+     * frozen copy of itself.
+     *
+     * `hi` rather than `mid` is the right end to derive from and not a coin toss: `hi` is
+     * the corner the lamp falls on, and a raised form catches that same light.
+     *
+     * **Computed here rather than as `color-mix()` in CSS**, which is where it started.
+     * A `var()` that resolves to a function the browser does not know is invalid at
+     * computed-value time, and an invalid `color` does not fall back to the declaration
+     * before it — it inherits. The inherited colour on this cover is `--foil`, so on any
+     * browser without `color-mix` the ornament would have come out in gold leaf.
+     */
+    '--detail': lighten(stain.hi, 0.82),
     /*
      * Brass, on every stain.
      *

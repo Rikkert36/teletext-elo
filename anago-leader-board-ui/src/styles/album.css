@@ -2913,14 +2913,46 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: linear-gradient(
-    150deg,
-    var(--leather-hi, #5a4526) 0%,
-    var(--leather-mid, #35270f) 55%,
-    var(--leather-lo, #4a3820) 100%
-  );
+  /* ----------------------------------------------------------------
+   * The dither, and it is not a texture
+   *
+   * Read the note below this one first: the hairline that appears down the cover after
+   * a hover is a **dither seam**, and this layer is the other half of the cure.
+   *
+   * The ramp is the problem. Over a gradient line of roughly 900px the green channel
+   * moves about thirty 8-bit steps — one step every 17px, and every 22 to 24 for red and
+   * blue. No 8-bit ramp that shallow can be smooth, so the browser scatters its own noise
+   * across each plateau to break the banding. That noise is generated per damage
+   * rectangle, so a partial repaint lays down a pattern that no longer interlocks with the
+   * pixels beside it, and the join shows as a one-level line at the rect's edge.
+   *
+   * A plateau that is *already* noisy has no join to show. So this puts a fixed ±1 to 3
+   * levels over the whole board, which is below the threshold of anything reading as a
+   * surface and is enough to swallow the seam.
+   *
+   * **This is a dither, not the hide.** A photographed grain was fitted here and taken off
+   * again — see the note further down — and it happened to be doing this job as a side
+   * effect at 0.62 opacity, which is why the seam only came back when it went. The
+   * difference that matters is scale: the ornament is drawn in hairlines at 12-30% alpha,
+   * and a pore texture sits in the same band and drowns it. This does not; at these
+   * levels there is nothing here to compete with.
+   *
+   * **Strength lives in the colour matrix, not in an opacity**, because CSS has no
+   * per-layer background opacity — the same reason `--grain-figure` in game.css carries
+   * its own. The matrix maps the noise into a narrow band centred on mid grey, which
+   * `overlay` leaves untouched, so only the deviation from grey acts and it acts
+   * symmetrically. **The two numbers are one dial and must move together**: the
+   * coefficients are `s / 3` and the offset is `(1 - s) / 2`, here s = 0.10. Raise s to
+   * strengthen. Off-centre and this stops being dither and starts tinting the leather.
+   *
+   * Stretched over the board rather than tiled, like the wood: turbulence has no seam
+   * when there is only one instance of it. `baseFrequency: 0.9` puts a feature at about
+   * 1.1px, which is per-pixel on a 1x screen and a 2x2 block on a retina one — both break
+   * a plateau.
+   * ---------------------------------------------------------------- */
+  --cover-dither: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='560' height='718'%3E%3Cfilter id='d' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' seed='3'/%3E%3CfeColorMatrix type='matrix' values='.0333 .0333 .0333 0 .45 .0333 .0333 .0333 0 .45 .0333 .0333 .0333 0 .45 0 0 0 0 1'/%3E%3C/filter%3E%3Crect width='560' height='718' filter='url(%23d)'/%3E%3C/svg%3E");
   /*
-   * **Its own raster layer, and this is the cure for the hairline down the cover.**
+   * **Its own raster layer, and this was half the cure for the hairline down the cover.**
    *
    * A faint vertical line kept appearing on the closed book — after it had been opened and
    * shut and then hovered, never reliably, never twice in the same place. It was chased as
@@ -2940,6 +2972,13 @@
    * rasterised whole and re-used rather than being repainted in pieces along with its
    * neighbours. Two of these exist at a time and both are small; the memory is not a
    * consideration.
+   *
+   * **It reduces how often the seam happens and cannot stop it**, which is why the dither
+   * above exists as well. An invalidation *inside* the layer still damages a sub-rect and
+   * that rect alone is re-rastered — a promoted layer only keeps the cover from being
+   * repainted piecemeal along with everything around it. The line was reported again after
+   * the photographed hide came off, which is the same fact from the other side: the hide
+   * had been dithering the ramp by accident.
    *
    * **Safe here specifically, and check this before copying it elsewhere.** It makes an
    * element a containing block and a stacking context, which on this one changes nothing:
@@ -2980,6 +3019,74 @@
    * which is exactly why the shift was small enough to live with for a while.
    */
   font-kerning: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * The leather itself, on a layer of its own that nothing ever invalidates
+ *
+ * **This is the actual cure for the seam, and the two attempts before it are worth
+ * knowing about so nobody re-tries them.**
+ *
+ * The symptom: a hairline down the cover, sometimes a second one meeting it at a corner
+ * in a lower quadrant. Vertical or horizontal, full run of the board, never twice in the
+ * same place, and it arrives when the book is opened — a hover can add another. It is not
+ * any element's edge; it is the boundary of a **damage rectangle**. When part of the cover
+ * is invalidated, that rectangle alone is re-rasterised, and a 150deg ramp this shallow —
+ * about one 8-bit step every 17px on the green channel — does not come back identical, so
+ * the re-painted region meets the untouched one along a straight line.
+ *
+ *   1. `will-change: transform` on the cover (see the note above it). It stops the cover
+ *      being repainted piecemeal *along with its neighbours*, which made the seam rarer.
+ *      It cannot stop it: an invalidation *inside* the layer still damages a sub-rect.
+ *   2. A dither — fine noise blended into the ramp, below — on the theory that the step
+ *      was one 8-bit level and noise of the same size would swallow it. It did not, and
+ *      that is informative rather than wasted: the step is **bigger** than the ±1 to 3
+ *      levels the dither adds, so the two regions are genuinely rasterised differently
+ *      and no amount of masking is going to be honest about it.
+ *
+ * So the ramp is moved off the element that gets invalidated and onto one that cannot be.
+ * `::before` carries the leather and holds nothing else — no text, no ornament, no
+ * binding, nothing that transitions — and `will-change: transform` gives it its own
+ * raster. Nothing inside it ever changes, so it is rasterised once and re-used, and the
+ * printing above it can be damaged and repainted as often as it likes: those repaints
+ * land on a *transparent* background, where an eight-level mismatch would have nothing
+ * to be a mismatch against.
+ *
+ * The dither stays. It is now belt and braces rather than the cure, it costs one
+ * background layer, and it is the thing that keeps ordinary banding off a ramp this
+ * shallow even when nothing is being repainted at all.
+ *
+ * **Why `::before` and not another `<div>`:** the cover face is rendered from two places
+ * (`Album` and `AlbumChoice`) and they have to agree exactly, so a layer that exists only
+ * in CSS cannot be forgotten in one of them. The note on `::after` further down records
+ * that `::before` was being kept free; this is what it was being kept for.
+ *
+ * **Order.** `::before` paints as the first child, so it is under the ornament, under the
+ * icon binding and under the printing, and `::after` still goes over the lot. The cover's
+ * own `background` is now nothing at all — do not put one back, or it will paint into the
+ * invalidated layer and the seam comes with it.
+ * ---------------------------------------------------------------- */
+.album__cover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image:
+    var(--cover-dither),
+    linear-gradient(
+      150deg,
+      var(--leather-hi, #5a4526) 0%,
+      var(--leather-mid, #35270f) 55%,
+      var(--leather-lo, #4a3820) 100%
+    );
+  background-size: 100% 100%, auto;
+  background-repeat: no-repeat, no-repeat;
+  background-blend-mode: overlay, normal;
+  /* Its own raster, and the whole point of the rule. Same reasoning as the cover's own
+     promotion, one level down and for keeps: this layer has no content that can change,
+     so it is painted once for the life of the book. */
+  will-change: transform;
 }
 
 /* ---------------------------------------------------------------- *
@@ -3113,6 +3220,185 @@
       rgba(0, 0, 0, 0.1) 4.5px,
       rgba(0, 0, 0, 0) 9px
     );
+}
+
+/* ---------------------------------------------------------------- *
+ * **The hide was fitted here and taken off again, and it is worth saying why.**
+ *
+ * docs/cover-ideas.html works out a photographed grain in some detail — `leather-grain.jpg`,
+ * a grey relief-only plate at exactly twice the board, painted twice out of one file
+ * (fine at 1:1 for the pores, broad at 240% for the swell) and composited with `overlay`.
+ * It is a good piece of work and the asset is still in `src/assets`.
+ *
+ * On the real cover it fights the ornament. The rods and their figures are built out of
+ * hairlines a fraction of a pixel wide at 12-30% alpha, and a pore texture at that scale
+ * is noise in the same band as the relief — the impression stops reading as something
+ * pressed into a smooth hide and starts reading as something lost in a rough one. The
+ * cover is now what it was before: one 150deg ramp, and the only marks on it are the ones
+ * that mean something.
+ *
+ * If it ever comes back it belongs *under* the ornament and much quieter than 0.62/0.34.
+ * ---------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------- *
+ * The blind ornament — four rods, 1-2-3-5
+ *
+ * The geometry and the reasoning are in `CoverOrnament.tsx` and, at length, in
+ * docs/cover-ornament.html. What lives here is the ink, and there is almost none of it.
+ *
+ * **Two dials, and they are not one dial.** `--ornament-edge` scales every white and
+ * every black — how high the form stands. `--ornament-tint` scales the leather's own
+ * tone — how visible the form is at all. At 0.7 and 0.2 a figure's body is
+ * 0.24 x 0.2 ≈ 5% and the rest is light and shadow: that is a blind stamp, which has no
+ * second colour by definition. Turning the tint up is the one change that takes the
+ * whole thing from an impression in the hide to a pale blue picture on top of it, so if
+ * this ever looks wrong, that is the number to suspect.
+ *
+ * **White and black are identical on all ten stains**, and only `currentColor` moves.
+ * Same rule as the brass and the gold in `albumLeather.ts`: one workshop, ten leathers,
+ * and the lamp in that workshop does not change with the skin. The five classes that
+ * carry the stain are `.rod-face`, `.rod-top-inner`, `.rod-left-inner`, `.shape-fill`
+ * and `.edge-mid`.
+ *
+ * **The black is stronger than the white at every level** — 30 against 18 on the outline,
+ * 32 against 19 on the rod, 19 against 9 on the seams. Leather is matt: it swallows light
+ * and gives back shadow. Equal light and dark is what every emboss filter does by default
+ * and it reads as plastic.
+ *
+ * **`fill: none` on the svg is load-bearing.** The `.edge-*` shapes are outlines of the
+ * same rects and paths as the fills; inheriting a fill turns each figure into a block.
+ *
+ * **Placement: after the hide, before `.album__cover-icons`.** Everything in here stacks
+ * in tree order — `.album__face` sets no `preserve-3d`, so `z-index` buys nothing (see
+ * the note on `.album__cover-icons`). Sitting before the icon binding means the ivory
+ * boards paint over the rods, so the re-bind wipe carries them off with the leather
+ * instead of leaving them lying across the new boards, and no kill-list rule is needed.
+ * `.album__cover::after` still goes over the top of all of it, which is right: the roll
+ * at the board's edge is a real edge, and this is an impression in the flat inside it.
+ * ---------------------------------------------------------------- */
+.album__cover-rods {
+  --ornament-edge: 0.7;
+  --ornament-tint: 0.2;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  color: var(--detail, #465268);
+  fill: none;
+  stroke: none;
+}
+
+/* The rod: a shadow offset downward only, the bar, and four edges — highlight on top,
+   leather just under it, a soft dark just above the bottom, black on the bottom. No
+   rounded corners and no round caps; see CoverOrnament.tsx. */
+.album__cover-rods .rod-shadow {
+  fill: #000;
+  fill-opacity: calc(0.09 * var(--ornament-edge));
+}
+.album__cover-rods .rod-face {
+  fill: currentColor;
+  fill-opacity: calc(0.23 * var(--ornament-tint));
+}
+.album__cover-rods .rod-top {
+  stroke: #fff;
+  stroke-opacity: calc(0.19 * var(--ornament-edge));
+  stroke-width: 1.05;
+}
+.album__cover-rods .rod-top-inner {
+  stroke: currentColor;
+  stroke-opacity: calc(0.48 * var(--ornament-tint));
+  stroke-width: 0.75;
+}
+.album__cover-rods .rod-bottom-inner {
+  stroke: #000;
+  stroke-opacity: calc(0.16 * var(--ornament-edge));
+  stroke-width: 0.8;
+}
+.album__cover-rods .rod-bottom {
+  stroke: #000;
+  stroke-opacity: calc(0.32 * var(--ornament-edge));
+  stroke-width: 1.1;
+}
+.album__cover-rods .rod-left {
+  stroke: #fff;
+  stroke-opacity: calc(0.16 * var(--ornament-edge));
+  stroke-width: 1;
+}
+.album__cover-rods .rod-left-inner {
+  stroke: currentColor;
+  stroke-opacity: calc(0.42 * var(--ornament-tint));
+  stroke-width: 0.75;
+}
+.album__cover-rods .rod-right-inner {
+  stroke: #000;
+  stroke-opacity: calc(0.14 * var(--ornament-edge));
+  stroke-width: 0.75;
+}
+.album__cover-rods .rod-right {
+  stroke: #000;
+  stroke-opacity: calc(0.28 * var(--ornament-edge));
+  stroke-width: 1;
+}
+
+/* The planes of a figure: the body, with a shadow form under it and a highlight form
+   over it, each a fraction offset. */
+.album__cover-rods .shape-fill {
+  fill: currentColor;
+  fill-opacity: calc(0.24 * var(--ornament-tint));
+}
+.album__cover-rods .shape-hiFill {
+  fill: #fff;
+  fill-opacity: calc(0.05 * var(--ornament-edge));
+}
+.album__cover-rods .shape-loFill {
+  fill: #000;
+  fill-opacity: calc(0.09 * var(--ornament-edge));
+}
+
+/* The raised edge: the same outline three times, half a unit apart. This is what makes
+   a silhouette into a relief. */
+.album__cover-rods .edge-hi {
+  stroke: #fff;
+  stroke-opacity: calc(0.18 * var(--ornament-edge));
+  stroke-width: 1.05;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.album__cover-rods .edge-mid {
+  stroke: currentColor;
+  stroke-opacity: calc(0.42 * var(--ornament-tint));
+  stroke-width: 0.95;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.album__cover-rods .edge-lo {
+  stroke: #000;
+  stroke-opacity: calc(0.3 * var(--ornament-edge));
+  stroke-width: 1.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The seams in the casting: knee, shoulder, top of the foot. The cheapest layer of the
+   four and the one that stops the figures reading as silhouettes. */
+.album__cover-rods .detail-hi {
+  stroke: #fff;
+  stroke-opacity: calc(0.09 * var(--ornament-edge));
+  stroke-width: 0.8;
+  stroke-linecap: round;
+}
+.album__cover-rods .detail-mid {
+  stroke: currentColor;
+  stroke-opacity: calc(0.26 * var(--ornament-tint));
+  stroke-width: 0.72;
+  stroke-linecap: round;
+}
+.album__cover-rods .detail-lo {
+  stroke: #000;
+  stroke-opacity: calc(0.19 * var(--ornament-edge));
+  stroke-width: 0.84;
+  stroke-linecap: round;
 }
 
 /* "Verzamelalbum van", above the owner's name. Deliberately the smaller of the
@@ -3544,11 +3830,46 @@
  * Positioned purely to join the same painting layer as `.album__cover-icons` — without
  * it these are in-flow content, the absolutely-positioned binding paints over the whole
  * lot, and the wipe erases the owner's name off their own cover on its way across.
- */
+ *
+ * ---------------------------------------------------------------- *
+ * And it sits a little above the middle of the board
+ *
+ * The cover centres its three printed things with `justify-content`, which puts the
+ * block's *box* on the centre line. That is not where it wants to be. There are two rods
+ * above it and two below, and the lower pair carries eight figures against the upper
+ * pair's three — so the bottom half of the board is visually much heavier, and a block
+ * centred by arithmetic reads as sitting low. Bindings are blocked above centre for the
+ * same reason.
+ *
+ * **Two dials, and both are `top` on already-relative elements rather than margins.** A
+ * margin would move the block *and* re-centre what is left of it, so the two numbers
+ * would fight; `top` shifts paint without touching layout, so each does exactly one
+ * thing. No `transform` either — that would make three stacking contexts and hand the
+ * kicker's 13px italic to the compositor for no reason.
+ *
+ *   --print-lift   the whole block, kicker to rule
+ *   --rule-lift    the rule alone, on top of the lift above
+ *
+ * The rule needs the second one because the name is a drawing whose box is its ink plus
+ * 18% of a cap height all round (see `WrittenType`), so the gap under it is that pad plus
+ * the flex gap, and it looks slack where the gap above the name does not. The pad is
+ * about 13px on a 718px board, so the rule must not come up more than that on top of the
+ * 12px gap or it starts crossing the swash on a name that has one.
+ *
+ * Both are fractions of `--page-h` rather than pixels: everything else on this cover is
+ * proportional, and a fixed lift would drift as the board resizes.
+ * ---------------------------------------------------------------- */
 .album__cover-kicker,
 .album__cover-title,
 .album__cover-rule {
+  --print-lift: calc(var(--page-h) * 0.02);
+  --rule-lift: calc(var(--page-h) * 0.02);
   position: relative;
+  top: calc(-1 * var(--print-lift));
+}
+
+.album__cover-rule {
+  top: calc(-1 * (var(--print-lift) + var(--rule-lift)));
 }
 
 /*
