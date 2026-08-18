@@ -23,6 +23,7 @@ namespace UnitTests
         [TestCase(800, 70)]
         [TestCase(1000, 80)]
         [TestCase(1851, 90)]
+        [TestCase(2600, 99)]
         [TestCase(3000, 99)]
         public void AnchorsAreHitExactly(int visibleRating, int expectedOverall)
         {
@@ -44,9 +45,9 @@ namespace UnitTests
         /// </summary>
         [TestCase(1851, 90)] // Petar
         [TestCase(1578, 88)] // Ton
-        [TestCase(1551, 87)] // Mark
+        [TestCase(1551, 88)] // Mark
         [TestCase(1463, 87)] // Rik
-        [TestCase(1362, 85)] // Luuk
+        [TestCase(1362, 86)] // Luuk
         [TestCase(1327, 85)] // Casper
         [TestCase(1201, 83)] // Gijs
         [TestCase(1179, 83)] // Anneloes
@@ -78,6 +79,31 @@ namespace UnitTests
         public void RealPlayersLandWhereTheDocumentedOddsSayTheyDo(int visibleRating, int expectedOverall)
         {
             Assert.That(_calculator.OverallFor(visibleRating), Is.EqualTo(expectedOverall));
+        }
+
+        /// <summary>
+        /// The two ratings the current anchors were tuned against, pinned as a pair.
+        ///
+        /// They are one test rather than two because they are one trade-off. Everything added to
+        /// the 1000-1851 stretch to lift the board accumulates onto the top active, and he prints
+        /// 90 only while his raw value stays under 90.50 - he is at 89.80. So the record holder
+        /// reaching 92 and the top active staying 90 is not two facts about two players; it is
+        /// the single constraint that picked these anchors, and a re-tune that breaks either half
+        /// has broken the tuning.
+        ///
+        /// Deliberately the live ratings rather than the anchor values, because the whole point
+        /// is where real people land between anchors.
+        /// </summary>
+        [Test]
+        public void TheRecordHolderPrints92AndTheTopActiveStays90()
+        {
+            Assert.Multiple(() =>
+            {
+                Assert.That(_calculator.OverallFor(1954), Is.EqualTo(92),
+                    "Roel Loonen's all-time high, the highest rating ever recorded");
+                Assert.That(_calculator.OverallFor(1816), Is.EqualTo(90),
+                    "Petar's current rating - the ceiling on sharpening anything below 1851");
+            });
         }
 
         /// <summary>

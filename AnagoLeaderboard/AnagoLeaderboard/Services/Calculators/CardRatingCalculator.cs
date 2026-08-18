@@ -30,8 +30,26 @@ public class CardRatingCalculator
     /// 1000->1851 is 851 rating for the same 10, a 4x slope change steeper than any log or
     /// logistic will bend, so the scale is deliberately piecewise rather than fitted.
     ///
-    /// Everything up to 1851 is fixed and must stay so: it is the highest rating ever
-    /// recorded, it is pinned to exactly 90, and every player sits at or below it.
+    /// <strong>1000 -> 80 is the fixed point, not 1851.</strong> It is the hinge
+    /// <see cref="TicketsFor"/> pivots on, and everything at or below it is untouched by any
+    /// tuning done so far - which is what makes a re-tune auditable: no card under rating 1000
+    /// can move, so only the top of the board has to be re-checked.
+    ///
+    /// 1851 -> 90 is kept, but only as a shape control. Its old justification - "the highest
+    /// rating ever recorded, every player sits at or below it" - was wrong twice over: 1851 was
+    /// Petar's rating in one snapshot rather than anyone's peak, and now that the replay tracks
+    /// peaks the real all-time high is 1954 (Roel Loonen). Since an icoon is rated on their peak,
+    /// the region above 1851 is live, not headroom.
+    ///
+    /// The top three anchors used to sit at 2200/2600/3000, which drew that live region at ~116
+    /// rating per point and printed the record holder as a 91. They are at 2000/2300/2600 now.
+    /// Nothing at or below 1851 sees that change, so it moves exactly one card.
+    ///
+    /// 1300 -> 85 and 1550 -> 88 replace 1250 -> 84 and 1500 -> 87. Note the form: the anchor
+    /// *ratings* moved rather than the overalls, which spends less of the 1000-1816 budget than
+    /// raising the overalls in place would (60 rating per point in the lower band against 50, and
+    /// 151 against 176 in the upper) and so keeps the curve closer to evenly graded. The budget is
+    /// real and it is small - see <see cref="OverallFor"/>.
     /// </summary>
     private static readonly ScaleAnchor[] DefaultScaleAnchors =
     {
@@ -41,12 +59,12 @@ public class CardRatingCalculator
         new(600, 61.5),
         new(800, 70),
         new(1000, 80),
-        new(1250, 84),
-        new(1500, 87),
+        new(1300, 85),
+        new(1550, 88),
         new(1851, 90),
-        new(2200, 93),
-        new(2600, 96),
-        new(3000, 99)
+        new(2000, 93),
+        new(2300, 96),
+        new(2600, 99)
     };
 
     /// <summary>Unreachable in practice; the top anchor is already beyond any real rating.</summary>
@@ -127,6 +145,21 @@ public class CardRatingCalculator
     ///
     /// For an icoon this is fed their all-time-high visible rating rather than their
     /// current one, which is the whole difference between an icoon and an ordinary card.
+    ///
+    /// <para>
+    /// <strong>Before moving an anchor between 1000 and 1851, work out the budget first.</strong>
+    /// The board's top active is the binding constraint on that whole stretch, because whatever
+    /// you add below him accumulates onto him: he currently interpolates to 89.80 raw and prints
+    /// 90 while that stays under 90.50, which leaves under a point of slack to spread over 800
+    /// rating. Overspend it and the top card silently becomes a 91 - a change nobody asked for,
+    /// arriving as a side effect of sharpening the middle. The current anchors spend 0.10 of it.
+    /// </para>
+    /// <para>
+    /// Rounding also makes the effect striped rather than uniform. A change to one anchor shifts
+    /// raw values on a ramp, so it only shows up where the ramp drags a value across a .5
+    /// boundary - two players 40 rating apart can easily land one on each side of that. Never
+    /// reason about who moves; run the roster through it.
+    /// </para>
     /// </summary>
     public int OverallFor(int visibleRating)
     {

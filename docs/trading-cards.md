@@ -1,6 +1,21 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-16)
+## Where this stands (last updated 2026-08-18)
+
+**The rating scale has been re-ijked, and the fixed point is `1000 → 80` — not 1851.**
+Five anchors moved: the top three from `2200/2600/3000` to `2000/2300/2600`, and
+`1250 → 84` / `1500 → 87` to `1300 → 85` / `1550 → 88`. Eight of fifty-seven cards gain a
+point; nothing under rating 1156 moves at all. Read "The rating scale" before touching
+`Cards:ScaleAnchors` — it now records the **budget**, which is the thing that decides
+every question in this range and is far tighter than it looks: the top active sits at
+89.80 raw against a 90.50 ceiling, so the whole 1000→1816 stretch has under one overall
+point of slack, and the current anchors spend 0.10 of it. Overspend and the top card
+becomes a 91 as a side effect of sharpening the middle. Four other routes to the same
+outcome were built and dropped, including two that move the record holder the wrong way;
+they are written up so they are not re-walked. Note also the **form** of the mid-band
+edit — the anchor *ratings* moved rather than the overalls being raised in place, which
+is what keeps the curve evenly graded. `appsettings.json` wins over the C# defaults at
+runtime, so both have to change together.
 
 **The one, the three and the five are printed artwork now**, not painted CSS — see "The
 one, the three and the five are printed, not painted" under Pack opening, which is the
@@ -622,7 +637,7 @@ the pages are real — and the gate is the knob.
 
 ## The rating scale (FIFA-style 40–99)
 
-Anchors: `1851 → 90`, `1000 → 80`, `800 → 70`, floor `40`.
+Anchors: `1000 → 80`, `800 → 70`, floor `40`, cap `99`.
 
 A smooth curve cannot fit these. Fitting `A + B·ln(r + C)` solves to `C = −738`,
 which diverges below 738 rating; a 99-capped logistic hits the upper anchors but
@@ -639,61 +654,130 @@ bend. So: **piecewise-linear interpolation** through an anchor table.
 | 600 | 61.5 |
 | 800 | 70 |
 | 1000 | 80 |
-| 1250 | 84 |
-| 1500 | 87 |
+| 1300 | 85 |
+| 1550 | 88 |
 | 1851 | 90 |
-| 2200 | 93 |
-| 2600 | 96 |
-| 3000 | 99 |
+| 2000 | 93 |
+| 2300 | 96 |
+| 2600 | 99 |
 | above | clamp 99 |
 
 Slope rises monotonically to a peak of `.05` in the 800–1000 band then falls
 monotonically — an S-curve inflecting exactly where the anchors demand. 99 is
 unreachable in practice.
 
-### Why 99 lands at 3000 and not 4000
+**`1000 → 80` is the fixed point, not `1851 → 90`.** It is the hinge `TicketsFor`
+pivots on, and every re-tune so far has left it and everything below it exactly
+alone — which is what makes a re-tune auditable. No card under rating 1000 can move,
+so only the top of the board has to be re-checked, and the twenty-seven players
+below it never enter the argument.
 
-Everything up to **1851 is fixed** and must stay so. It is pinned to exactly 90,
-every active player sits at or below it, and since overall also feeds the ticket
-weighting, moving any anchor in that range silently re-balances rarity.
-
-It was originally justified as "the highest rating ever recorded", which was
-wrong: 1851 was Petar's rating in the snapshot this was written against — his
-*current* rating, not anyone's peak. Now that the replay tracks peaks, the real
-all-time high is **1954** (Roel Loonen), with Petar at 1953 and Ton at 1931. This
-changes nothing structural, because all three land inside the 1851→2200 segment
-that was already there as headroom, and Roel comes out at overall 91. But it does
-mean the region above 1851 is **not** hypothetical the way the paragraphs below
-assume: icons are rated on peaks, and the best icoon is above every active
-player on the board.
+### The top three anchors, and why the record holder was a 91
 
 The table originally ran on to `4000 → 98`, which reserved 9 of the 59 available
-points — **15% of the scale** — for ratings nobody has been near. That headroom is
-what made the top steep: a point cost 146 rating at 1851 and 400 by the end.
+points — **15% of the scale** — for ratings nobody has been near. That was pulled in
+to `2200/2600/3000` on the argument that the region was hypothetical headroom and
+should be spent on ratings that are at least imaginable.
 
-Spending the same span on ratings that are at least imaginable gives three even
-steps of +3. The first continues the slope below it almost exactly — 117 → 116
-rating per point, a **0.99× kink** — so 1500 through 3000 is now effectively one
-straight line:
+**The premise was wrong, and it took two corrections to see it.** `1851 → 90` was
+justified as "the highest rating ever recorded, every player sits at or below it."
+1851 was in fact Petar's rating in one snapshot — his *current* rating, not anyone's
+peak. Then the replay started tracking peaks, and the real all-time high turned out
+to be **1954 (Roel Loonen)**. Since an icoon is rated on their peak, the region above
+1851 is **live**: the best icoon stands above every active player on the board, and
+he is not alone up there for long — Petar's own peak is 1953.
 
-| overall | old cutoff | new | width old | width new |
-|---:|---:|---:|---:|---:|
-| 90 | 1792 | 1792 | 146 | **117** |
-| 92 | 2113 | 2025 | 187 | 116 |
-| 94 | 2500 | 2267 | 250 | 133 |
-| 96 | 3050 | 2533 | 350 | 133 |
-| 98 | 3800 | 2800 | 200 | 133 |
-| 99 | 4000 | **3000** | — | — |
+Drawn at ~116 rating per point, that live region printed the record holder as a
+**91**, one point above the top active despite a 138-rating gap. The top three are at
+`2000/2300/2600` now, which draws it at ~50 and prints him **92**.
 
-**No player's overall changed** — 0 of 38 actives and 0 of the icoon
-placeholders — so the odds table, the completion estimates and `DHigh` all stand
-untouched. That is the whole reason this change was safe to make on its own.
+**Nothing at or below 1851 sees that change, so it moves exactly one card.** That
+property is the reason to reach for these three anchors first whenever the complaint
+is about the very top: it is the only edit on the table that provably cannot disturb
+anybody else. Two alternatives were built and dropped for being less clean at the same
+outcome — pinning a bare `1954 → 92` anchor (which fits an anchor to one player, and
+leaves the vestigial `1851 → 90` behind it), and steepening `2200 → 96` (a magic number
+with no story).
 
-Still open, and independent of this: the worst kink on the scale remains **3.13×
-at rating 1000**, where the slope snaps from 20 to 62.5 rating per point. Monotone
-cubic (PCHIP) interpolation over the same anchors would smooth it to 1.50× while
-passing through every anchor exactly; it moves four of forty cards by +1 and
-crosses no tier or ceremony boundary.
+### The budget: what the top active costs you
+
+**Before moving any anchor between 1000 and 1851, work out the budget first.** This is
+the constraint that decides every question in this range, and it is much tighter than
+it looks.
+
+Whatever you add below the top active accumulates onto him. Petar at 1816 interpolates
+to **89.80 raw** and prints 90 only while that stays under **90.50**. So the entire
+1000→1816 stretch has **under one overall point of slack** to spread over 800 rating.
+The current anchors spend 0.10 of it. Overspend and the top card silently becomes a 91
+— a change nobody asked for, arriving as a side effect of sharpening the middle.
+
+Rounding also makes the effect **striped, not uniform**. A moved anchor shifts raw
+values on a ramp, so it only surfaces where the ramp drags a value across a `.5`
+boundary; two players 40 rating apart routinely land one on each side. Never reason
+about who moves — run the roster through it. `TheRecordHolderPrints92AndTheTopActiveStays90`
+pins both halves of the trade-off as one test, because they are one trade-off.
+
+### Why `1300 → 85` rather than `1250 → 85`
+
+`1250 → 84` and `1500 → 87` became **`1300 → 85` and `1550 → 88`**. Note the form: the
+anchor *ratings* moved, the overalls did not get raised in place. The obvious version
+of this edit — leave the ratings and write 85 and 88 — was built, costed and dropped.
+
+Moving the ratings spends less of the budget and grades the curve more evenly:
+
+| segment | before | overalls raised in place | **ratings moved** |
+|---|---:|---:|---:|
+| 1000 → next | 62 | 50 | **60** |
+| middle | 83 | 83 | **83** |
+| → 1851 | 117 | 176 | **151** |
+| cards moved | — | 16 | **8** |
+| Petar's room to drop to 89 | −23 | −52 | **−40** |
+
+(rating per overall point; lower is looser)
+
+Raising in place swings the curve 50 → 83 → 176, a 3.5× spread that hollows out the
+1500–1851 stretch to pay for the bottom. Moving the ratings swings 60 → 83 → 151, a
+2.5× spread. **It buys two-thirds of the effect with a fraction of the deformation.**
+What it gives up is Mark (1604) and Ton (1593), who stay 88 — and so does Rik (1556),
+so all three now print the same number where Rik used to be a point below. That was
+the accepted cost.
+
+Cards that moved: Roel 91→92, Rik 87→88, Lieke Daniels 86→87, Bart / Luc / Luuk 85→86,
+Rakesh 84→85, Ridho 82→83. Eight of fifty-seven; nothing below rating 1156.
+
+### The 90 band slides — it does not widen
+
+The 90 band is ~113 rating wide and moves as a unit with the 90 anchor. Petar stands
+still at 1816, so **moving the anchor slides the band under him**: room to drop and room
+to rise trade one-for-one. Under the old table he sat 23 above the floor and 94 below
+the ceiling — jammed against the 89 cliff, which is exactly why he read as "only just a
+90". He is at −40 / +60 now, and that came free with the 1550 anchor rather than from
+touching 1851.
+
+Two dead ends worth not re-walking:
+
+- **Lowering the 90 anchor cannot lift the record holder.** He sits *above* it, and
+  dragging it left stretches the segment he is in, flattening it. The gain rate goes as
+  `(next anchor − rating)`, so the top active — further from the anchor above — climbs
+  **1.56× faster** and crosses into 91 before the record holder ever reaches 92.
+- **Sliding the 90 anchor on top of the new mid anchors is a no-op.** Anywhere from 1771
+  to 1872 every one of the 57 cards prints identically; the roster is empty between 1604
+  and 1816, so there is nobody for the slide to catch. All it changes is Petar's balance
+  within the band.
+
+### Rarity did not meaningfully move, and that is the point
+
+Eight cards gaining a point costs each of them a factor `2^(−1/DHigh)` = 0.76 in
+tickets, but they were already a rounding error in the pool total: `P(85+ in one card)`
+goes 3.10% → 2.98%, and the record holder 1 in 1,132 → 1 in 1,493. **The anchor table is
+not the rarity knob.** If the top of the album should feel scarcer, that is `DHigh`
+(2.5 → 2.25 or 2.0), which changes no printed number at all — see the ticket weighting
+below.
+
+Still open, and independent of all of this: the worst kink on the scale remains **3.13×
+at rating 1000**, where the slope snaps from 20 to 60 rating per point. Monotone cubic
+(PCHIP) interpolation over the same anchors would smooth it while passing through every
+anchor exactly.
 
 Icons use the same scale applied to their **all-time-high** `visibleRating`.
 `GetLeaderBoard` already replays every game in chronological order, so tracking
@@ -782,8 +866,8 @@ the overall, it narrows the candidates without touching the weighting inside the
 nothing that comes out of a game can carry one. See the gift notes at the top.
 
 A single global halving rate fails too, because the rating scale deliberately
-compresses the top: Petar (1851) and Mathijs (1035) are 9 overall points apart
-despite an 816-rating gap, so a constant rate would put them a mere 2.2× apart
+compresses the top: Petar (1816) and Mathijs (1035) are 9 overall points apart
+despite a 781-rating gap, so a constant rate would put them a mere 2.2× apart
 in rarity while Daria and Ida (374 rating apart) would be 3.4× apart — backwards
 relative to real skill.
 
@@ -838,6 +922,14 @@ collecting the best player is easiest for whoever beats the best player. Do not
 tune it as an economy lever.
 
 ### Per-player odds at DHigh = 2.5
+
+> **Snapshot, not current.** This table is the 38-active roster at the ratings and
+> anchors of the day it was computed — before peaks were tracked (so no icons in the
+> pool at all) and before the anchors moved to `1300/1550/1851/2000/2300/2600`. Both
+> the ratings and the overalls in it are stale; the pool is 57 subjects now. It is kept
+> because the *shape* of the argument below it — a deliberately wide scarcity spread
+> with a tight bottom two-thirds — is what was being decided, and that still holds.
+> Read the live numbers off `GET /api/cards/pool`.
 
 Mix assumption for the last column: 42.5% × 1-card, 35% × 3-card, 22.5% × 5-card,
 from P(win) = 0.5 and P(bonus) ≈ 0.30.
@@ -1321,7 +1413,8 @@ its own. It calls the same service, so the two cannot disagree.
 TypeScript.
 
 The anchor table is a **balance** knob rather than a presentation one — it also
-feeds `ticketsFor`, and moving any anchor below 1851 silently re-balances rarity.
+feeds `ticketsFor`, so moving any anchor silently re-balances rarity, and moving one
+between 1000 and 1851 spends against the top active's budget besides.
 Once the draw runs server-side, a browser with its own copy of the scale could
 print an overall inconsistent with the odds the card was actually drawn at, and
 nothing would ever surface it. Retuning `appsettings.json` now also needs no

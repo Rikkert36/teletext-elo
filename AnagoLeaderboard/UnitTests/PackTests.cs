@@ -457,7 +457,7 @@ namespace UnitTests
         [Test]
         public void AFloorNarrowsTheDrawToWhoClearsIt()
         {
-            // 1851 -> 90 and 1362 -> 85 clear an 85 floor; the other three do not.
+            // 1851 -> 90 and 1362 -> 86 clear an 85 floor; the other three do not.
             var pool = PoolOf(("top", 1851), ("rare", 1362), ("gold", 1035), ("silver", 919), ("bronze", 342));
             var random = new Random(20260811);
 

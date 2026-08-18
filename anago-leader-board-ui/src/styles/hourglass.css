@@ -18,11 +18,13 @@
  * Four rules this file follows:
  *
  * 1. **Nothing shows for the first `--wait-in`.** Every animation here, including the
- *    fade in, is delayed by it with `both` fill — so a request that lands inside 420ms
+ *    fade in, is delayed by it with `both` fill — so a request that lands inside it
  *    paints an empty stage and the hourglass is never seen. That is the original
  *    decision kept rather than reversed: it only appears once waiting is a real thing
  *    that is happening to you. The delay is on the children as well as the root, so the
- *    sand starts full at the moment you first see it rather than a fifth drained.
+ *    sand starts full at the moment you first see it rather than a fifth drained. What
+ *    *has* been reversed is the size of it — see `--wait-in`, which was set high enough
+ *    that the object never finished arriving before the book took its place.
  * 2. **Durations do NOT read `var(--anim)`**, which every other animation on this page
  *    does. `--anim` paces the *reveal* — it is a dramatic control, exposed on
  *    `cardDebug` for tuning the ceremony — and a waiting cadence is not a beat in that
@@ -56,8 +58,22 @@
   --turn: 500ms;
   --cycle: 5000ms;
 
-  /* How long the table stays empty before an object is put on it. */
-  --wait-in: 420ms;
+  /*
+   * How long the table stays empty before an object is put on it.
+   *
+   * **It has to leave room for the fade as well as itself**, and 420 did not. A return
+   * visit to this page is two sequential round trips — the player list, then the
+   * collection — and against the dev server that is ~360ms + ~250ms. The hourglass
+   * arrived at 420ms and was still a third of the way through its 320ms fade when the
+   * book replaced it at ~610ms, so the whole of the one wait that is reliably long
+   * enough to need it read as a blank table followed by a book popping in. An object
+   * that is only ever seen at 60% opacity is not on the table.
+   *
+   * So the gate is what it always was — nothing for a request that lands promptly — set
+   * where `--wait-in` plus the fade still clears comfortably inside a real wait. Anything
+   * answering inside 160ms paints an empty stage exactly as before.
+   */
+  --wait-in: 160ms;
 
   --glass-w: 54px;
   --glass-h: 82px;
@@ -79,8 +95,15 @@
   justify-content: center;
   gap: 20px;
 
-  /* Rule 1. `both`, so the backwards fill holds it invisible through the delay. */
-  animation: hourglass-arrive 320ms ease var(--wait-in) both;
+  /*
+   * Rule 1. `both`, so the backwards fill holds it invisible through the delay.
+   *
+   * Shorter than the 320ms it was, for the reason `--wait-in` gives: the gate and the
+   * fade are one number as far as the reader is concerned, and it is the sum that has to
+   * fit inside a wait. Fully on the table by ~360ms, which a return visit clears twice
+   * over.
+   */
+  animation: hourglass-arrive 200ms ease var(--wait-in) both;
 }
 
 /* Holds the shadow on the wood while the glass above it turns. */
