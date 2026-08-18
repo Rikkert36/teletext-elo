@@ -44,18 +44,16 @@ public class CardPoolService
 
         var eligible = players.Where(player => player.NumberOfGames >= minGames).ToList();
 
+        // Both sides go through SubjectFor rather than choosing a rating here, so which number
+        // an icoon is rated on is decided in exactly one place - see there.
         var actives = eligible
             .Where(player => player.Active)
-            .Select(player => ToSubject(player, player.VisibleRating, isIcon: false))
+            .Select(SubjectFor)
             .ToList();
 
-        // Rated on the all-time high, which is the whole point of an icoon: it says who
-        // someone was, not what their form decayed to before they stopped playing. It also
-        // spreads them across the tiers - somebody who managed ten games and peaked at 780
-        // is an icoon in silver, and a gold card would lie about them.
         var icons = eligible
             .Where(player => !player.Active)
-            .Select(player => ToSubject(player, player.PeakVisibleRating, isIcon: true))
+            .Select(SubjectFor)
             .ToList();
 
         return new CardPool(minGames, Ordered(actives), Ordered(icons));
@@ -79,6 +77,26 @@ public class CardPoolService
     public static bool ActiveSetComplete(CardPool pool, IReadOnlyDictionary<string, int> counts) =>
         pool.Actives.Count > 0
         && pool.Actives.All(active => counts.GetValueOrDefault(active.Id) > 0);
+
+    /// <summary>
+    /// The card a player has, whether or not a packet can currently contain them.
+    ///
+    /// The split is the one that defines the pool: an active is rated on their current rating,
+    /// an icoon on their all-time high - which is the whole point of an icoon, since it says who
+    /// someone was rather than what their form decayed to before they stopped playing. It also
+    /// spreads them across the tiers: somebody who managed ten games and peaked at 780 is an
+    /// icoon in silver, and a gold card would lie about them.
+    ///
+    /// Public, and separate from <see cref="GetPool"/>, for the one caller that has to render a
+    /// subject the pool does not contain - <see cref="CardStatisticsService"/>, for cards already
+    /// minted of somebody who has since fallen back under the games gate. It deliberately does
+    /// not check the gate itself: what it answers is "what does this player's card look like",
+    /// and whether they are collectable is GetPool's question.
+    /// </summary>
+    public CardSubject SubjectFor(DynamicRatingPlayer player) =>
+        player.Active
+            ? ToSubject(player, player.VisibleRating, isIcon: false)
+            : ToSubject(player, player.PeakVisibleRating, isIcon: true);
 
     private CardSubject ToSubject(DynamicRatingPlayer player, int visibleRating, bool isIcon) =>
         new(

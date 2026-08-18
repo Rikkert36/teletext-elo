@@ -9,10 +9,14 @@ namespace AnagoLeaderboard.Controllers
     public class CardController : ControllerBase
     {
         private readonly CardPoolService _cardPoolService;
+        private readonly CardStatisticsService _cardStatisticsService;
 
-        public CardController(CardPoolService cardPoolService)
+        public CardController(
+            CardPoolService cardPoolService,
+            CardStatisticsService cardStatisticsService)
         {
             _cardPoolService = cardPoolService;
+            _cardStatisticsService = cardStatisticsService;
         }
 
         /// <summary>
@@ -27,6 +31,23 @@ namespace AnagoLeaderboard.Controllers
         public async Task<CardPool> GetCardPool()
         {
             return await _cardPoolService.GetPool();
+        }
+
+        /// <summary>
+        /// How often each card has come out of a packet, over every collector there is.
+        ///
+        /// Ungated, like the pool above it. Everything in it is an aggregate over figures that
+        /// are already public - who is collectable, and what they are rated - and no row says
+        /// which cards any particular collector holds, so there is nothing here to put behind
+        /// the caretaker's key.
+        ///
+        /// Costs one leaderboard replay and two grouped queries, like every other GET on this
+        /// API. Nothing is written.
+        /// </summary>
+        [HttpGet("cards/statistics")]
+        public async Task<CardStatistics> GetCardStatistics()
+        {
+            return await _cardStatisticsService.GetStatistics();
         }
     }
 }

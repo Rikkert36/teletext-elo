@@ -1338,6 +1338,41 @@ Done:
 - **`Services/CardPoolService.cs`** — actives and icons. Knows nothing about
   collections or packs; it is the set, not anyone's state over it, which is what
   lets `CollectionService` call straight into it rather than build its own list.
+  - `SubjectFor` is the one public seam past `GetPool`, and both halves of `GetPool`
+    now go through it, so **which rating a card is printed on is decided in exactly
+    one place** — an active on their current, an icoon on their all-time high. It was
+    added for `CardStatisticsService`, which has to render a subject the pool no
+    longer contains, and it deliberately does not check the games gate: what a
+    player's card looks like and whether a packet can contain them are two questions.
+- **`Services/CardStatisticsService.cs`** — how often each card has actually been
+  packed, behind `GET api/cards/statistics`. Its own service because both of its
+  neighbours have a stated boundary it would otherwise cross: the pool service knows
+  nothing about anyone's state over the set, and `PackService` is deliberately handed
+  its roster rather than replaying for one, so giving it a `LeaderBoardService` to
+  build this would undo the reason it has none. One replay, handed to `GetPool`, plus
+  two grouped queries; nothing is written.
+  - Every pool member is listed, including at zero — an overview whose rarest cards
+    are the ones missing from it would be answering a different question.
+  - **Subjects who have left the pool are listed and flagged, not dropped.** A game
+    being deleted can put a collectable player back under the games gate while the
+    cards minted of them stay in other people's books; dropping those rows would
+    leave the tallies not adding up to `TotalCards`. A subject absent from the
+    *replay* is impossible rather than skipped — being drawn takes games, and
+    deleting a player cascades their cards away.
+  - `MintedAsIcon` is **the only reader of `CardInstance.IsIcon` anywhere**, and it is
+    the question that column exists for: what came out of the packet. The `Subject` on
+    the same row is live, so a card can be an icoon today and have been minted as an
+    active, and the two figures disagreeing is the design working.
+  - **No expected-share column, and that is a decision rather than an omission.** A
+    card's expected share is not a property of the card: it depends on the pool as it
+    stood at each draw, on who was doubled in that pack, on any gift floor, on whether
+    that collector had the icons unlocked, and on the draw being without replacement.
+    One "expected %" would have to ignore all five, and the thing it would be used for
+    is re-tuning the rating scale — a number that looks authoritative and is quietly
+    wrong is worse there than no number at all. Compare it against
+    "Per-player odds at DHigh = 2.5" by eye instead.
+  - Ungated, like `cards/pool`. Every figure in it is an aggregate over what is already
+    public, and no row says which cards a named collector holds.
 
 - **`Services/PackService.cs`** — deriving, sizing, rolling, claiming, the daily
   freebie, and giving. `Derive`, `PackForGame`, `DailyPack`, `GiftPack` and `Roll` are all

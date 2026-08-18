@@ -31,6 +31,7 @@ builder.Services.AddScoped<ChampionService>();
 builder.Services.AddScoped<CardPoolService>();
 builder.Services.AddScoped<CollectionService>();
 builder.Services.AddScoped<PackService>();
+builder.Services.AddScoped<CardStatisticsService>();
 
 // No state, just paths and a process invocation, so singletons.
 builder.Services.AddSingleton<AvatarStorage>();
