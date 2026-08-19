@@ -40,12 +40,27 @@ public class AvatarStorage
     public string? SilhouettePath(string id) =>
         SafeId.IsMatch(id) ? Path.Combine(SilhouetteDirectory, id + ".png") : null;
 
-    public byte[] ReadAvatarOrFallback(string id)
+    /// <summary>
+    /// The file a request for this id resolves to — the player's own photo, or the shared
+    /// fallback when there is none — together with the metadata a conditional GET needs.
+    ///
+    /// Hands out a path rather than the bytes so a response can stream straight off disk.
+    /// These are original camera uploads and the largest run to double-digit megabytes,
+    /// which is well past the threshold where buffering one into a byte[] per request
+    /// lands on the large object heap.
+    /// </summary>
+    public (string Path, DateTime LastModified, long Length) ResolveAvatar(string id)
     {
         var path = AvatarPath(id);
-        if (path == null || !File.Exists(path)) path = FallbackAvatarPath;
-        return File.ReadAllBytes(path);
+        var file = path == null ? null : new FileInfo(path);
+        if (file == null || !file.Exists) file = new FileInfo(FallbackAvatarPath);
+
+        return (file.FullName, file.LastWriteTimeUtc, file.Length);
     }
+
+    /// For callers that need the bytes in hand. Prefer <see cref="ResolveAvatar"/> when
+    /// the bytes are on their way to a response body.
+    public byte[] ReadAvatarOrFallback(string id) => File.ReadAllBytes(ResolveAvatar(id).Path);
 
     public void EnsureDirectories()
     {

@@ -126,9 +126,11 @@ namespace AnagoLeaderboard.Services
             await _dbContext.Clear();
         }
 
-        internal byte[] GetAvatar(string id)
+        /// The avatar as a path plus the metadata a conditional GET needs, rather than as
+        /// bytes — see <see cref="AvatarStorage.ResolveAvatar"/> for why.
+        internal (string Path, DateTime LastModified, long Length) GetAvatarFile(string id)
         {
-            return _storage.ReadAvatarOrFallback(id);
+            return _storage.ResolveAvatar(id);
         }
 
         /// <summary>

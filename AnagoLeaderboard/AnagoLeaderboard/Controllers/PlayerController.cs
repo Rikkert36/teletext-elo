@@ -79,12 +79,36 @@ namespace AnagoLeaderboard.Controllers
         }
 
 
+        /// <summary>
+        /// The player's photo, or the shared fallback when there is none.
+        ///
+        /// Cached hard and, just as importantly, validatable. The pool is around 180 MB of
+        /// original camera uploads — the largest single file is 17 MB, to be painted at
+        /// 150 px in the album and at most 380 px in the viewer. The max-age keeps a warm
+        /// client from asking at all; the ETag means a client that does ask pays a 304
+        /// instead of the body.
+        ///
+        /// Both halves earn their keep over the VPN. The origin negotiates h2, so every
+        /// stream shares one connection and one congested tunnel, and a small api call
+        /// issued alongside tens of megabytes of photos waits on the window they are
+        /// filling — opening the album while portraits are in flight is the case that
+        /// hurts.
+        ///
+        /// An hour of staleness is the price: a replaced photo takes that long to appear,
+        /// or one hard refresh. Same bargain the silhouette makes below, on the same asset.
+        /// </summary>
         [HttpGet("player/{id}/avatar")]
+        [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
         public IActionResult GetAvatar(string id)
         {
-            var fileBytes = _playerService.GetAvatar(id);
-            return File(fileBytes, "image/jpeg");
+            var (path, lastModified, length) = _playerService.GetAvatarFile(id);
 
+            // An upload always rewrites the file, so write time plus length identifies a
+            // version well enough. PhysicalFile handles the 304 by itself when the browser
+            // sends If-None-Match, and streams the file off disk instead of buffering it.
+            var etag = new EntityTagHeaderValue($"\"{lastModified.Ticks:x}-{length:x}\"");
+
+            return PhysicalFile(path, "image/jpeg", lastModified, etag);
         }
 
         /// <summary>
