@@ -26,6 +26,10 @@
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
+    <!-- The live card pool, as GET /api/cards/pool returns it. Read by PackOddsTests. -->
+    <None Include="Data\pool-snapshot.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\AnagoLeaderboard\AnagoLeaderboard.csproj" />
   </ItemGroup>
 </Project>

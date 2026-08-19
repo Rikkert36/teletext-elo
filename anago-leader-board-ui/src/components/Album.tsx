@@ -1,7 +1,7 @@
 import React, { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import { Card, CardPlayer, splitName, toCard } from '../mock/cardMock';
-import PlayerCard, { ownedLabel } from './PlayerCard';
+import PlayerCard, { otherKindLabel, ownedLabel } from './PlayerCard';
 import WrittenName from './WrittenName';
 import CoverOrnament from './CoverOrnament';
 import useIsMobile from '../hooks/useIsMobile';
@@ -308,17 +308,40 @@ const writeLeaf = (leaf: number, owner?: string): void => {
   }
 };
 
+/**
+ * How many copies of one subject the collector holds, by the kind of card each was drawn as.
+ *
+ * A slot takes cards of its own kind, so which of these two a slot reads is decided by the
+ * live `isIcon` on the player in it, not by the section it sits in — actives and icoons are
+ * interleaved by rating into one section, so the section cannot say.
+ */
+export interface OwnedCounts {
+  asPlayer: number;
+  asIcon: number;
+}
+
 export interface AlbumSection {
   title: string;
   /** Everything collectable in this section, in display order. */
   players: CardPlayer[];
-  /** How many of each you hold. Absent or 0 renders a silhouette. */
-  counts: Map<string, number>;
+  /** How many of each you hold, per kind. Absent, or 0 of this slot's kind, renders a silhouette. */
+  counts: Map<string, OwnedCounts>;
 }
 
 interface Slot {
   card: Card;
+  /** Copies of this slot's own kind — what fills it, and what the card prints. */
   count: number;
+  /**
+   * Copies of the *other* kind, which fill nothing here.
+   *
+   * Almost always 0. It is other than 0 for exactly one thing, and that thing is the whole
+   * reason this field exists: a subject who has changed side since you packed them. You
+   * collected them as an active player and they have retired, so their icoon slot is empty
+   * and `other` is the pile of player cards you hold — which the checklist prints in
+   * brackets, because an empty slot for a card you know you had reads as a fault otherwise.
+   */
+  other: number;
 }
 
 /* ------------------------------------------------------------------ *
@@ -345,6 +368,10 @@ interface ChecklistEntry {
   name: string;
   number: number;
   count: number;
+  /** The other kind's count — see `Slot.other`. Printed in brackets when `count` is 0. */
+  other: number;
+  /** Whether this row's slot is an icoon slot, for phrasing the hover. */
+  isIcon: boolean;
 }
 
 /** A slot plus which page it is printed on, for anything navigating the book. */
@@ -486,10 +513,19 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
 
     for (let i = 0; i < section.players.length; i += SLOTS_PER_PAGE) {
       const chunk = section.players.slice(i, i + SLOTS_PER_PAGE);
-      const slots = chunk.map((player) => ({
-        card: toCard(player),
-        count: section.counts.get(player.id) ?? 0,
-      }));
+      /*
+       * Which of the two counts fills this slot comes off the player's live `isIcon`, so a
+       * subject changing side moves their slot and changes which pile counts towards it in
+       * one step — there is no third state to keep in sync.
+       */
+      const slots = chunk.map((player) => {
+        const held = section.counts.get(player.id);
+        return {
+          card: toCard(player),
+          count: (player.isIcon ? held?.asIcon : held?.asPlayer) ?? 0,
+          other: (player.isIcon ? held?.asPlayer : held?.asIcon) ?? 0,
+        };
+      });
 
       slots.forEach((slot) => {
         entries.push({
@@ -510,6 +546,8 @@ const buildPages = (sections: AlbumSection[], owner?: string): AlbumPage[] => {
           /* Counted over slots, so a padding page cannot shift a number. */
           number: entries.length + 1,
           count: slot.count,
+          other: slot.other,
+          isIcon: slot.card.player.isIcon,
         });
       });
 
@@ -840,6 +878,18 @@ const PageFace: React.FC<{
           {rows.map((entry) => {
             const has = entry.count > 0;
             const { tick, tilt } = handMark(entry.playerId);
+            /*
+              The pile behind an empty slot: cards of this subject as the other
+              kind, which fill nothing here. See `Slot.other`.
+
+              It shows as a bracketed figure while the slot is empty, and then
+              stops showing — a filled row already carries its own count, and a
+              permanent second number on fifty-odd lines in a 1em column is
+              clutter in the narrowest place in the book. It does not stop being
+              true though, so past that point it lives on the row's hover, which
+              is also where a filled row's version of it can be read.
+            */
+            const former = entry.other > 0;
             return (
               <li key={entry.playerId} className="album__entry">
                 {/*
@@ -850,7 +900,12 @@ const PageFace: React.FC<{
                   than as print, which is the argument that keeps the rest of the
                   album bare. Looking a card up is what turning pages is for.
                 */}
-                <div className="album__entry-row">
+                <div
+                  className="album__entry-row"
+                  title={
+                    former ? otherKindLabel(entry.other, entry.isIcon) : undefined
+                  }
+                >
                   <span className="album__entry-nr">{entry.number}</span>
                   <span className="album__entry-name">{entry.name}</span>
                   {/* Leader dots, as a printed list has between name and mark. */}
@@ -873,9 +928,21 @@ const PageFace: React.FC<{
                     a book you were keeping — and the reason a checklist is also a
                     swap list. Only past one: "1" written next to a tick would be
                     saying the same thing twice.
+
+                    The same column carries the bracketed figure when the slot is
+                    empty and the other kind is not, since the two can never want
+                    it at once: `count` is 0 in that case, so there is no doubles
+                    numeral to displace. Bracketed and not a bare number because
+                    it is a note about cards that are not in this slot, and it
+                    needs its own width — the numeral column is 1em.
                   */}
-                  <span className="album__entry-dupe">
+                  <span
+                    className={`album__entry-dupe${
+                      !has && former ? ' album__entry-dupe--former' : ''
+                    }`}
+                  >
                     {entry.count > 1 ? entry.count : ''}
+                    {!has && former ? `(${entry.other}×)` : ''}
                   </span>
                   {/*
                     The mark is a drawn tick and the doubles figure is a bare
@@ -886,6 +953,12 @@ const PageFace: React.FC<{
                   */}
                   <span className="album__entry-state">
                     {ownedLabel(entry.count)}
+                    {/*
+                      And the bracket spelled out, since brackets are not read and
+                      a hover cannot be reached without a pointer. Same helper as
+                      the title above it, so the two cannot phrase it differently.
+                    */}
+                    {former ? `, ${otherKindLabel(entry.other, entry.isIcon)}` : ''}
                   </span>
                 </div>
               </li>
@@ -993,7 +1066,22 @@ const PageFace: React.FC<{
                */
               data-slot-shown={visible ? '1' : undefined}
               onClick={() => onCardOpen?.(slot.card.player.id)}
-              aria-label={`${slot.card.player.name} — ${ownedLabel(slot.count)}`}
+              /*
+               * The slot itself stays bare — no bracket painted on the silhouette. The
+               * checklist is where a collector goes to see what is missing and why, and a
+               * figure floating on an empty mount would read as part of the printing. The
+               * fact is still reachable here, on the hover and in the label.
+               */
+              title={
+                slot.other > 0
+                  ? otherKindLabel(slot.other, slot.card.player.isIcon)
+                  : undefined
+              }
+              aria-label={`${slot.card.player.name} — ${ownedLabel(slot.count)}${
+                slot.other > 0
+                  ? `, ${otherKindLabel(slot.other, slot.card.player.isIcon)}`
+                  : ''
+              }`}
             >
               <PlayerCard
                 card={slot.card}

@@ -73,10 +73,17 @@ public class CardPoolService
     /// Lives here, next to the code that decides who is an active and who is an icoon,
     /// rather than inside the claim that used to apply it. Its old home is what made the
     /// unlock a side effect of opening a pack.
+    ///
+    /// <strong>Player cards only, not any card of an active.</strong> The two came apart when
+    /// slots started being filled per kind: an icoon who returns to play brings an active slot
+    /// back with them, and the icoon copies you hold do not fill it - the same rule, run in the
+    /// other direction, that empties an icoon slot when somebody retires. See
+    /// <see cref="MintTally"/>. Reading the flat total here would make a comeback complete a set
+    /// off cards drawn from the icon pool.
     /// </summary>
-    public static bool ActiveSetComplete(CardPool pool, IReadOnlyDictionary<string, int> counts) =>
+    public static bool ActiveSetComplete(CardPool pool, IReadOnlyDictionary<string, MintTally> counts) =>
         pool.Actives.Count > 0
-        && pool.Actives.All(active => counts.GetValueOrDefault(active.Id) > 0);
+        && pool.Actives.All(active => counts.GetValueOrDefault(active.Id)?.AsPlayer > 0);
 
     /// <summary>
     /// The card a player has, whether or not a packet can currently contain them.

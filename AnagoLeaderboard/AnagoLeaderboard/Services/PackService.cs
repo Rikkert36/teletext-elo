@@ -11,9 +11,9 @@ namespace AnagoLeaderboard.Services;
 /// available is computed on read:
 ///
 /// <code>
-/// available(player, today) = games today the player took part in  minus  PackClaim rows
-///                          + the daily freebie                    minus  a daily claim
-///                          + gift rows not yet expired            minus  a claim for each
+/// available(player, now) = games in the last 24h the player took part in  minus  PackClaim rows
+///                        + today's daily freebie                          minus  a daily claim
+///                        + gift rows not yet expired                      minus  a claim for each
 /// </code>
 ///
 /// A <see cref="PackGift"/> is the one exception, and it is the exception that shows the rule:
@@ -25,8 +25,10 @@ namespace AnagoLeaderboard.Services;
 /// writing. <c>CreateGame</c> has no hook, so "cards must never break game submission" stops
 /// being a rule and becomes a fact. Editing a game's score re-sizes its unclaimed packs and
 /// leaves its claimed ones alone, both for free. Deleting a game takes its unclaimed packs with
-/// it with no cascade rule at all - they simply stop being derived. And hard same-day expiry
-/// needs no job and no read filter, because "today's games" *is* the window.
+/// it with no cascade rule at all - they simply stop being derived. And expiry needs no job and
+/// no sweep, because the window *is* the query - which is also why moving game packs off
+/// same-day and onto twenty-four rolling hours cost two predicates and no schema at all. See
+/// <see cref="GamePackLifetime"/>.
 ///
 /// The way to break all of that again is to reintroduce a write into <c>CreateGame</c>. Don't.
 /// </summary>
@@ -61,13 +63,38 @@ public class PackService
     private const string IconsPackId = IconsPrefix + "once";
 
     /// <summary>
-    /// Beating the expected margin by this much earns the +2, and doubles both opponents'
-    /// tickets.
+    /// How far past the expected margin a player who *won* has to finish to earn the +2 on top of
+    /// the win. Also the bar the opponent-ticket doubling uses, for everyone.
+    ///
+    /// Three rather than one because winning and beating the expectation are very nearly the same
+    /// event - Elo pays the over-performer, and in an even game the winner *is* the over-performer
+    /// - so a bonus that fired on any positive residual would pay the top packet twice for one
+    /// fact. At three, the win measures direction and this measures magnitude, and those are
+    /// independent. It is also what separates an upset from a coin-flip that went your way:
+    /// expected -3 and you win by one is a five, expected -1 and you win by one is a three.
     ///
     /// Expressed in margins rather than scores so it is symmetric: expected -6 and actual -3
     /// earns it too, which rewards a good loss.
     /// </summary>
     private const int MarginBonusThreshold = 3;
+
+    /// <summary>
+    /// The same bar for a player who *lost*: any improvement on the expected margin at all.
+    ///
+    /// A loss hardly ever cleared three, so the loser's packet was a flat single in nearly every
+    /// game - half of all packets, and the dull outcome. The underdog who was written off and lost
+    /// 7 - 10 has done the thing this bonus is for, so they collect it. Elo keeps it honest: the
+    /// expectation is derived from the ratings on the row, so a player who keeps over-performing
+    /// faces a higher bar next time.
+    ///
+    /// Both margins are integers, so a game that lands exactly on the prediction is not an
+    /// improvement on it and pays a single.
+    ///
+    /// This caps a loss at three. Five requires a win - deliberately, even though a heavy underdog
+    /// losing by three fewer than predicted has arguably earned it: a docket reading
+    /// "Verloren ... 7 - 10" next to five cards is not a thing to have to explain at the table.
+    /// </summary>
+    private const int LosingMarginBonusThreshold = 1;
 
     /// <summary>
     /// The largest packet a present may be.
@@ -77,6 +104,28 @@ public class PackService
     /// entire pool in one packet. Twice the biggest earned pack is more than anything has needed.
     /// </summary>
     private const int MaxGiftSize = 10;
+
+    /// <summary>
+    /// How long a game pack stands open, measured from the game itself.
+    ///
+    /// This replaced hard same-day expiry, and only for game packs. The case same-day got wrong
+    /// is the one it admitted to: a game at five o'clock died at midnight, so the pack you earned
+    /// on the way out of the office was gone before you were back in it. Twenty-four hours from
+    /// the game means an evening game is still there the next morning, which is when it was
+    /// always going to be opened.
+    ///
+    /// **The daily freebie deliberately did not follow.** It stays keyed on the calendar date -
+    /// see <see cref="DailyPack"/> - because a rolling window would make it ratchet: claim at
+    /// nine and the next is due at nine, claim that one at eleven and the next is due at eleven,
+    /// and it walks forward until it falls outside office hours and costs somebody a day for
+    /// having been early. A reward for turning up must not punish turning up promptly. Presents
+    /// never expired and still do not.
+    ///
+    /// Measured from <see cref="Game.CreatedAt"/> rather than from the top of the previous day,
+    /// so every pack gets the same lifetime and two games in one evening expire an hour apart -
+    /// invisible in practice, and the rule is one sentence rather than two.
+    /// </summary>
+    private static readonly TimeSpan GamePackLifetime = TimeSpan.FromHours(24);
 
     private readonly DatabaseContext _dbContext;
     private readonly CardRatingCalculator _cardRatingCalculator;
@@ -114,10 +163,10 @@ public class PackService
         string playerId,
         IReadOnlyList<Game> allGames,
         CardPool? pool = null,
-        IReadOnlyDictionary<string, int>? counts = null)
+        IReadOnlyDictionary<string, MintTally>? counts = null)
     {
         var now = DateTime.Now;
-        var (claims, gifts) = await ReadDerivationInputs(playerId, now.Date);
+        var (claims, gifts) = await ReadDerivationInputs(playerId, now);
 
         return Derive(playerId, allGames, claims, now, gifts, pool, counts);
     }
@@ -131,16 +180,27 @@ public class PackService
     /// </summary>
     private async Task<(List<PackClaim> Claims, List<PackGift> Gifts)> ReadDerivationInputs(
         string playerId,
-        DateTime today)
+        DateTime now)
     {
-        // Today's claims, plus every gift claim this player has ever made, plus their set-completion
-        // claim if they have one. A present stands open for days and the icoon packet stands open
-        // forever, so a claim of either kind from months ago is still the thing that stops it coming
-        // back - narrowing those to today would hand the same packet over every morning.
+        // The claims the window can still reach, plus every gift claim this player has ever made,
+        // plus their set-completion claim if they have one. A present stands open for days and the
+        // icoon packet stands open forever, so a claim of either kind from months ago is still the
+        // thing that stops it coming back - narrowing those to the window would hand the same
+        // packet over every morning.
+        //
+        // **This filter has to be at least as wide as the pack window, or an opened pack comes
+        // back.** A pack is offered when no claim for it is in this list, so a claim the read
+        // misses reads as "never opened". It is provably wide enough: a claim cannot predate the
+        // thing it claims, so any claim for a game inside the window was made on or after that
+        // game's date, which is on or after the window's first date. Generous by up to a day,
+        // which costs a handful of rows and keeps the predicate on the stored date rather than on
+        // an expression the index cannot use.
+        var earliestRelevantDate = (now - GamePackLifetime).Date;
+
         var claims = await _dbContext.PackClaims
             .Where(claim => claim.PlayerId == playerId)
             .Where(claim =>
-                claim.ClaimDate == today
+                claim.ClaimDate >= earliestRelevantDate
                 || claim.Source == PackSource.Gift
                 || claim.Source == PackSource.Icons)
             .ToListAsync();
@@ -161,9 +221,18 @@ public class PackService
     /// tests drive.
     /// </summary>
     /// <param name="now">
-    /// The moment being asked about, and both halves of it are used: the date is the window game
-    /// packs and the daily live in, and the time is what a gift's <c>ExpiresAt</c> is measured
-    /// against. Passing a bare date therefore still works and simply reads expiry to the day.
+    /// The moment being asked about, and both halves of it are used: the date decides which
+    /// daily freebie is on offer, and the time is what the game window and a gift's
+    /// <c>ExpiresAt</c> are measured against. Passing a bare date therefore still works and
+    /// reads as midnight, which is the start of that day's freebie and the end of the game
+    /// window reaching back into the day before.
+    /// </param>
+    /// <param name="claims">
+    /// This player's claims. Game, gift and icoon claims must arrive <em>complete</em> - the
+    /// derivation subtracts them all regardless of date, because an opened pack must never be
+    /// offered again and the day it was opened on says nothing about that. Only the daily
+    /// freebie reads <see cref="PackClaim.ClaimDate"/>, so only daily claims may be narrowed,
+    /// and only to today.
     /// </param>
     /// <param name="gifts">
     /// Candidate presents - the one thing here that is a row rather than a computation. Whether
@@ -189,17 +258,18 @@ public class PackService
         DateTime now,
         IReadOnlyList<PackGift>? gifts = null,
         CardPool? pool = null,
-        IReadOnlyDictionary<string, int>? counts = null)
+        IReadOnlyDictionary<string, MintTally>? counts = null)
     {
         var today = now.Date;
+        var windowStart = now - GamePackLifetime;
 
-        // Narrowed to the day here rather than trusted to arrive narrowed. The window is the
-        // whole of the expiry rule, so it belongs with the rule, not with whoever happened to run
-        // the query. Gift claims are exempt on purpose - a present outlives the day it was
-        // opened on, so they are read from `claims` in full below.
-        var claimsToday = claims.Where(claim => claim.ClaimDate == today).ToList();
-
-        var claimedGameIds = claimsToday
+        // **Every game claim counts, whatever day it was made on.** No date narrowing here on
+        // purpose: a claim is the record that a pack was opened, and an opened pack must never
+        // come back, so nothing about *when* it was opened may be allowed to hide it. Narrowing
+        // this to the day was safe only while a pack could not outlive the day it was earned on;
+        // under a rolling window it would re-offer this morning a pack that was opened last
+        // night, and the shelf would carry a packet whose claim then 409s on the unique index.
+        var claimedGameIds = claims
             .Where(claim => claim.Source == PackSource.Game)
             .Select(claim => claim.GameId)
             .ToHashSet();
@@ -237,8 +307,10 @@ public class PackService
             .OrderByDescending(gift => gift.CreatedAt)
             .Select(GiftPack));
 
+        // Strictly newer than the window's edge, so "less than twenty-four hours old" is the whole
+        // of it and a game exactly a day old is out rather than balanced on the boundary.
         packs.AddRange(allGames
-            .Where(game => game.CreatedAt.Date == today)
+            .Where(game => game.CreatedAt > windowStart)
             .Where(game => game.GetPlayerIds().Contains(playerId))
             .Where(game => !claimedGameIds.Contains(game.Id))
             .OrderByDescending(game => game.CreatedAt)
@@ -246,7 +318,10 @@ public class PackService
 
         // Last, under the game packs. It is the smallest and the one that is always there, so
         // it is the bottom of the pile rather than the top of it.
-        if (!claimsToday.Any(claim => claim.Source == PackSource.Daily))
+        //
+        // Keyed on the calendar date, and the one source still keyed on a date at all. See
+        // `GamePackLifetime` for why this did not follow the game packs onto a rolling window.
+        if (!claims.Any(claim => claim.Source == PackSource.Daily && claim.ClaimDate == today))
         {
             packs.Add(DailyPack(today));
         }
@@ -255,8 +330,9 @@ public class PackService
     }
 
     /// <summary>
-    /// One player's pack for one game: 1 for playing, +2 for winning, +2 for beating the
-    /// expected margin by three or more. So 1, 3 or 5.
+    /// One player's pack for one game: 1 for playing, +2 for winning, and +2 for beating the
+    /// expected margin - by three or more if you won, by anything at all if you lost. So 1, 3 or
+    /// 5, and a loss caps at 3.
     ///
     /// A pure function of the game row. <see cref="GameWithAnalytics"/> computes both margins
     /// from the four old ratings frozen on the row, so this needs no leaderboard replay of its
@@ -278,7 +354,13 @@ public class PackService
         }
 
         var won = game.IsWonBy(playerId);
-        var beatExpectation = actualMargin - expectedMargin >= MarginBonusThreshold;
+        var residual = actualMargin - expectedMargin;
+
+        // The second +2 is gated harder for a winner than for a loser, because for a winner it is
+        // very nearly the same claim as the first one. A loser needs only to have done better than
+        // the ratings said; a winner needs to have done so emphatically. See the two thresholds.
+        var beatExpectation =
+            residual >= (won ? MarginBonusThreshold : LosingMarginBonusThreshold);
 
         var team = game.GetTeam(playerId);
         var opponents = game.GetOtherTeam(playerId);
@@ -288,7 +370,12 @@ public class PackService
         // even when both are true - a dominant win already pays five cards, and compounding to
         // 4x would let blowouts dominate collections. This is flavour, not an economy lever:
         // doubling 2 of 38 players shifts about 6% of the ticket mass.
-        var doubled = won || beatExpectation
+        //
+        // It keeps the winner's bar at both ends rather than following `beatExpectation` down to
+        // the loser's, which is a choice not to disturb something the rule change did not have to
+        // disturb: `PackOddsTests.PackSizeMix` measures it at 53.1% of packs, against 59.1% on the
+        // loser's bar. Neither number is a lever - this is flavour - so it stays where it was.
+        var doubled = won || residual >= MarginBonusThreshold
             ? new List<string> { opponents.FirstPlayer.PlayerId, opponents.SecondPlayer.PlayerId }
             : new List<string>();
 
@@ -382,7 +469,7 @@ public class PackService
     /// Rolled here rather than when the pack was earned. A pack belongs to a player, so this
     /// credits that player whoever clicked it - the cards cannot be stolen either way - which
     /// means rolling late costs nothing in safety and avoids minting rows for packs that expire
-    /// unopened. Within a same-day window ratings cannot drift meaningfully in between.
+    /// unopened. Within a day-long window ratings cannot drift meaningfully in between.
     ///
     /// Answers only about the pack. Whether the player exists, has an album and is over the
     /// games gate is settled by <see cref="CollectionService.ClaimPack"/> before this is
@@ -402,7 +489,7 @@ public class PackService
     {
         var now = DateTime.Now;
         var today = now.Date;
-        var (claims, gifts) = await ReadDerivationInputs(playerId, today);
+        var (claims, gifts) = await ReadDerivationInputs(playerId, now);
 
         /*
          * Read before the derivation rather than after, because the set-completion packet's whole
@@ -474,8 +561,14 @@ public class PackService
         {
             // Read before incrementing. This is the only point at which "did this fill an empty
             // slot" can still be answered.
-            var before = counts.GetValueOrDefault(subject.Id);
-            counts[subject.Id] = before + 1;
+            //
+            // Per kind, off the subject's live flag, and that is what makes the icoon of somebody
+            // you already collected as a player land as NEW rather than as a duplicate: their
+            // icoon slot was empty however deep the pile of player cards behind it. Filling an
+            // empty slot is the whole of what `isNew` says. See MintTally.
+            var tally = counts.GetValueOrDefault(subject.Id) ?? MintTally.None;
+            var before = tally.OfKind(subject.IsIcon);
+            counts[subject.Id] = tally.Plus(subject.IsIcon);
 
             _dbContext.CardInstances.Add(
                 CardInstance.Mint(playerId, subject.Id, claim.Id, gameId, subject.IsIcon));
@@ -617,13 +710,27 @@ public class PackService
     private static string GiftReason(string? reason) =>
         string.IsNullOrWhiteSpace(reason) ? "Cadeaupakje" : reason.Trim();
 
-    /// <summary>How many of each subject this player holds.</summary>
-    public async Task<Dictionary<string, int>> CountsBySubject(string playerId) =>
+    /// <summary>
+    /// How many of each subject this player holds, split by the kind of card each copy was drawn
+    /// as. <see cref="MintTally"/> carries why it is a split rather than one figure.
+    ///
+    /// Together with the statistics tally this is the only place
+    /// <see cref="CardInstance.IsIcon"/> is read, and both read it for what it is: the record of
+    /// what came out of the packet. Neither decides what a card looks like.
+    /// </summary>
+    public async Task<Dictionary<string, MintTally>> CountsBySubject(string playerId) =>
         await _dbContext.CardInstances
             .Where(card => card.PlayerId == playerId)
             .GroupBy(card => card.SubjectPlayerId)
-            .Select(group => new { SubjectPlayerId = group.Key, Count = group.Count() })
-            .ToDictionaryAsync(row => row.SubjectPlayerId, row => row.Count);
+            .Select(group => new
+            {
+                SubjectPlayerId = group.Key,
+                AsPlayer = group.Count(card => !card.IsIcon),
+                AsIcon = group.Count(card => card.IsIcon)
+            })
+            .ToDictionaryAsync(
+                row => row.SubjectPlayerId,
+                row => new MintTally(row.AsPlayer, row.AsIcon));
 
     /// <summary>
     /// The draw: a weighted raffle without replacement.

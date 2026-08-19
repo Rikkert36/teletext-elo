@@ -7,7 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
-import Album, { AlbumSection, albumSlotOrder } from '../components/Album';
+import Album, { AlbumSection, OwnedCounts, albumSlotOrder } from '../components/Album';
 import AlbumChoice from '../components/AlbumChoice';
 import CardViewer from '../components/CardViewer';
 import GameShell from '../components/GameShell';
@@ -1038,9 +1038,16 @@ const CollectionPage: React.FC = () => {
   };
 
 
+  /*
+   * Both counts per subject, because a slot is filled by a card of its own kind — the
+   * album picks the one matching the slot it is drawing and brackets the other. See
+   * `OwnedCardCount`, and `MintTally` on the server for the rule itself.
+   */
   const counts = useMemo(() => {
-    const map = new Map<string, number>();
-    collection?.owned.forEach((owned) => map.set(owned.playerId, owned.count));
+    const map = new Map<string, OwnedCounts>();
+    collection?.owned.forEach((owned) =>
+      map.set(owned.playerId, { asPlayer: owned.asPlayer, asIcon: owned.asIcon }),
+    );
     return map;
   }, [collection]);
 

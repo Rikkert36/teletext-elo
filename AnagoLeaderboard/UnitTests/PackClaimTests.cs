@@ -142,13 +142,13 @@ namespace UnitTests
             // The state travels with the cards, so the page needs no follow-up read: the card is
             // already in it and the packet is already off the shelf. This is the property that
             // saves the second leaderboard replay.
-            Assert.That(result.State!.Owned.Sum(owned => owned.Count), Is.EqualTo(1));
+            Assert.That(result.State!.Owned.Sum(owned => owned.AsPlayer + owned.AsIcon), Is.EqualTo(1));
             Assert.That(result.State.Owned.Single().PlayerId, Is.EqualTo(result.Cards[0].Player.Id));
             Assert.That(result.State.Packs.Any(pack => pack.Id == daily.Id), Is.False);
 
             // Filed, not just reported: a fresh read agrees with what came back.
             var after = await _collectionService.GetCollection(me.Id);
-            Assert.That(after!.Owned.Sum(owned => owned.Count), Is.EqualTo(1));
+            Assert.That(after!.Owned.Sum(owned => owned.AsPlayer + owned.AsIcon), Is.EqualTo(1));
             Assert.That(after.Owned.Single().PlayerId, Is.EqualTo(result.Cards[0].Player.Id));
             Assert.That(after.Packs.Any(pack => pack.Id == daily.Id), Is.False);
         }
@@ -424,16 +424,24 @@ namespace UnitTests
         }
 
         /// <summary>
-        /// A card you hold turns into an icoon when its subject goes out of service.
+        /// A subject going out of service leaves their icoon slot <em>empty</em>, with the player
+        /// cards you hold of them counted beside it rather than filling it.
         ///
-        /// Nothing pinned this before, and it is the rule two others are easy to mistake for.
-        /// <see cref="CardInstance.IsIcon"/> is frozen at mint and stays false — that column is
-        /// history — while the *pool* moves the subject across, and the album draws its slots and
-        /// its colourway from the pool. So the card in the book becomes an icoon, the collector
-        /// keeps it either way, and while the icons are locked it simply has no slot to sit in.
+        /// This is the rule two others are easy to mistake for, and it is the one place where the
+        /// two halves of the design are both visible at once. The *pool* moves the subject across
+        /// and the album draws slots and colourway from it, so what the card looks like follows
+        /// the subject and always will. But <see cref="CardInstance.IsIcon"/> is frozen at mint
+        /// and stays false, and it is what decides which slot a copy fills — so the icoon has to
+        /// be packed. The player cards are not lost and not counted as icoons: they stay on
+        /// <c>AsPlayer</c>, which is what the checklist prints in brackets against the unticked
+        /// row.
+        ///
+        /// It used to assert the reverse — that the held card came back already collected on
+        /// unlock. That handed over part of the icons set as a reward for cards earned towards
+        /// the active one. See <c>MintTally</c>.
         /// </summary>
         [Test]
-        public async Task AHeldCardBecomesAnIconWhenItsSubjectGoesOutOfService()
+        public async Task AnIconSlotStartsEmptyWhenItsSubjectGoesOutOfService()
         {
             var me = await ARosterWhereOnlyOnePlayerIsCollectable();
             await _collectionService.CreateCollection(me.Id, "navy");
@@ -455,9 +463,12 @@ namespace UnitTests
 
             var after = (await _collectionService.GetCollection(me.Id))!;
 
-            // Gone from the active pool, and the card is still theirs and still counted.
+            // Gone from the active pool, and the card is still theirs and still counted - as the
+            // player card it was drawn as.
             Assert.That(after.Pool, Is.Empty);
             Assert.That(after.Owned.Single().PlayerId, Is.EqualTo(me.Id));
+            Assert.That(after.Owned.Single().AsPlayer, Is.GreaterThan(0));
+            Assert.That(after.Owned.Single().AsIcon, Is.Zero);
 
             // Invisible while locked: no slot on either list, so the book has nowhere to print it.
             Assert.That(after.Album!.IconsUnlocked, Is.False);
@@ -468,13 +479,101 @@ namespace UnitTests
                 (await _dbContext.CardInstances.FirstAsync(c => c.SubjectPlayerId == me.Id)).IsIcon,
                 Is.False);
 
-            // Unlock, and it is there, already collected, wearing the icoon colourway.
+            // Unlock, and the slot is there wearing the icoon colourway - and empty. The player
+            // cards behind it are what the bracket on the checklist row is counting.
             await _collectionService.SetIconsUnlocked(me.Id, true, force: true);
             var unlocked = (await _collectionService.GetCollection(me.Id))!;
 
             Assert.That(unlocked.Icons.Single().Id, Is.EqualTo(me.Id));
             Assert.That(unlocked.Icons.Single().IsIcon, Is.True);
-            Assert.That(unlocked.Owned.Single().Count, Is.GreaterThan(0));
+            Assert.That(unlocked.Owned.Single().AsIcon, Is.Zero, "the icoon still has to be packed");
+            Assert.That(unlocked.Owned.Single().AsPlayer, Is.GreaterThan(0), "and these are the bracket");
+        }
+
+        /// <summary>
+        /// The other half of the same rule: packing that icoon is a NEW card, however many player
+        /// cards of the same subject are already in the book.
+        ///
+        /// This is the payoff, and it is worth pinning because it is the assertion that would
+        /// silently invert if anything went back to a flat count. Under the old rule the reveal
+        /// called this a duplicate and skipped the new-card beat, which is the moment the whole
+        /// icons set exists to produce.
+        /// </summary>
+        [Test]
+        public async Task PackingTheIconOfAPlayerYouAlreadyHoldIsNew()
+        {
+            var me = await ARosterWhereOnlyOnePlayerIsCollectable();
+            await _collectionService.CreateCollection(me.Id, "navy");
+
+            // A player card first, on a roster whose pool is one deep, so the draw is certain.
+            var first = await ClaimTheDaily(me.Id);
+            Assert.That(first.Cards!.Single().IsNew, Is.True);
+
+            var subject = await _dbContext.Players.SingleAsync(p => p.Id == me.Id);
+            subject.Active = false;
+            await _dbContext.SaveChangesAsync();
+            await _collectionService.SetIconsUnlocked(me.Id, true, force: true);
+
+            // Backdated rather than deleted, so today's freebie comes back while the player card
+            // stays - CardInstance cascades from PackClaim, and deleting the row here would empty
+            // the very pile this test is about.
+            await _dbContext.PackClaims.ExecuteUpdateAsync(
+                claims => claims.SetProperty(claim => claim.ClaimDate, DateTime.Now.Date.AddDays(-1)));
+            _dbContext.ChangeTracker.Clear();
+
+            var second = await ClaimTheDaily(me.Id);
+            var icon = second.Cards!.Single();
+
+            Assert.That(icon.Player.IsIcon, Is.True);
+            Assert.That(icon.IsNew, Is.True, "it filled the icoon slot");
+            Assert.That(icon.Copies, Is.EqualTo(1), "counted per kind, not over the whole pile");
+
+            var owned = second.State!.Owned.Single();
+            Assert.That(owned.AsIcon, Is.EqualTo(1));
+            Assert.That(owned.AsPlayer, Is.EqualTo(1));
+        }
+
+        /// <summary>
+        /// Completing the active set takes a <em>player</em> card, so an icoon who comes back
+        /// cannot be ticked off with the icoon copies you already hold.
+        ///
+        /// The reverse direction of the same rule, and the reason
+        /// <see cref="CardPoolService.ActiveSetComplete"/> reads one half of the tally rather than
+        /// the total. Left flat, a comeback would complete a set off cards drawn from the icon
+        /// pool - and on this roster it would hand over the icons packet for nothing.
+        /// </summary>
+        [Test]
+        public async Task AComebackIsNotTickedOffByTheIconYouHold()
+        {
+            var me = await ARosterWhereOnlyOnePlayerIsCollectable();
+            await _collectionService.CreateCollection(me.Id, "navy");
+
+            // Retire them, unlock the icons, and pack the icoon: the whole pool is that one card.
+            var subject = await _dbContext.Players.SingleAsync(p => p.Id == me.Id);
+            subject.Active = false;
+            await _dbContext.SaveChangesAsync();
+            await _collectionService.SetIconsUnlocked(me.Id, true, force: true);
+
+            var claimed = await ClaimTheDaily(me.Id);
+            Assert.That(claimed.Cards!.Single().Player.IsIcon, Is.True);
+
+            // Back in service. Their active slot returns, and the icoon in the book does not fill
+            // it, so the set is not complete and the completion packet is not offered.
+            subject.Active = true;
+            await _dbContext.SaveChangesAsync();
+
+            var leaderBoard = new LeaderBoardService(_gameService, _dbContext);
+            var (players, allGames) = await leaderBoard.GetLeaderBoard();
+            var pool = new CardPoolService(leaderBoard, new CardRatingCalculator()).GetPool(players);
+            var counts = await _packService.CountsBySubject(me.Id);
+
+            Assert.That(pool.Actives.Single().Id, Is.EqualTo(me.Id));
+            Assert.That(counts[me.Id].AsIcon, Is.EqualTo(1));
+            Assert.That(counts[me.Id].AsPlayer, Is.Zero);
+            Assert.That(CardPoolService.ActiveSetComplete(pool, counts), Is.False);
+
+            var packs = await _packService.GetAvailable(me.Id, allGames, pool, counts);
+            Assert.That(packs.Any(pack => pack.Id == "icons"), Is.False);
         }
 
         [Test]
@@ -617,7 +716,7 @@ namespace UnitTests
 
             Assert.That(result.Outcome, Is.EqualTo(ClaimOutcome.Claimed));
             Assert.That(result.Cards!.Count, Is.EqualTo(3));
-            Assert.That(result.State!.Owned.Sum(owned => owned.Count), Is.EqualTo(3));
+            Assert.That(result.State!.Owned.Sum(owned => owned.AsPlayer + owned.AsIcon), Is.EqualTo(3));
             Assert.That(result.State.Packs.Any(pack => pack.Id == packet.Id), Is.False);
 
             var after = await _collectionService.GetCollection(me.Id);

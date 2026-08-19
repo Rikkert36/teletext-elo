@@ -90,6 +90,20 @@ export const ownedLabel = (count: number): string =>
   count === 0 ? 'nog niet in bezit' : `${count}× in bezit`;
 
 /**
+ * The pile that does *not* fill this slot, in words: the copies you hold of the subject as
+ * the other kind of card.
+ *
+ * A slot takes cards of its own kind, so somebody who has retired since you collected them
+ * has an empty icoon slot with player cards behind it — the checklist prints that figure in
+ * brackets, and this is the same fact spelled out for the hover and for a screen reader,
+ * which get no brackets to read.
+ *
+ * @param isIconSlot which slot is being described, so the label names the *other* kind.
+ */
+export const otherKindLabel = (count: number, isIconSlot: boolean): string =>
+  `${count}× als ${isIconSlot ? 'speler' : 'icoon'}`;
+
+/**
  * Portrait with a graceful fallback. Avatars live as loose files on the server
  * and the write path is known to disagree with the read path, so a missing
  * image is an expected state rather than an error.

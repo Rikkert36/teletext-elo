@@ -328,7 +328,7 @@ public class CollectionService
         var counts = await _packService.CountsBySubject(playerId);
 
         var owned = counts
-            .Select(count => new OwnedCard(count.Key, count.Value))
+            .Select(count => new OwnedCard(count.Key, count.Value.AsPlayer, count.Value.AsIcon))
             .ToList();
 
         // No book, no packets. They would have nowhere to be filed - the claim endpoint refuses

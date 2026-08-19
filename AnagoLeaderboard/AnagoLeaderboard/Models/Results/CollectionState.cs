@@ -80,8 +80,17 @@ public sealed record AlbumBinding(
     DateTime CreatedAt,
     bool IconsUnlocked);
 
-/// <summary>How many copies of one player's card the collector holds.</summary>
-public sealed record OwnedCard(string PlayerId, int Count);
+/// <summary>
+/// How many copies of one subject the collector holds, split by the kind of card each copy came
+/// out of the packet as - see <see cref="MintTally"/>, which this is the wire shape of.
+///
+/// Both numbers ship for every subject the collector holds anything of, and the page picks by
+/// the slot it is filling: a slot takes the count of its own kind, and prints the other in
+/// brackets against an unticked checklist row. That bracketed figure is the only thing standing
+/// between "you have to pack this icoon" and a card you know you had disappearing without a
+/// word, so it is not an extra: it is the reason the rule is legible at all.
+/// </summary>
+public sealed record OwnedCard(string PlayerId, int AsPlayer, int AsIcon);
 
 /// <summary>
 /// A pack waiting to be opened.

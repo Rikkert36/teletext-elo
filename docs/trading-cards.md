@@ -1,6 +1,43 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-18)
+## Where this stands (last updated 2026-08-19)
+
+**Game packs stand open for 24 rolling hours, and the daily freebie does not.** Read
+"Twenty-four hours, and only for game packs" before touching the window in
+`PackService.Derive`. Same-day expiry killed the pack you earned on the way out of the
+office; a rolling window fixes exactly that, and would break the freebie, which ratchets
+forward through the week under one. The load-bearing consequence is on the *claim* side
+rather than the pack side: `Derive` now subtracts **every** game claim regardless of
+date, because a pack that outlives its day can be opened on one day and still be inside
+the window on the next, and a claim narrowed to today would let an opened pack back onto
+the shelf. Only the daily reads `ClaimDate`. Narrowing game claims by date again is the
+one-line way to undo this, and two tests pin it.
+
+**The margin bonus has two bars now: ≥3 if you won, ≥1 if you lost.** Read "The two
+bars" before touching `PackService.PackForGame` — the asymmetry is the decision, not a
+tuning artefact, and it looks exactly like something to tidy into one threshold. In
+short: a loss under one shared bar of ≥3 hardly ever cleared it, so 46.9% of all
+packets were a flat single; and a winner's bar at ≥1 would pay the top packet twice
+for one fact, because Elo pays the over-performer and in a level game the winner *is*
+the over-performer. A loss caps at 3. The cost is measured rather than assumed —
+`PackOddsTests.PackSizeMix`, +4.7% on the average packet, no `DHigh` change.
+
+**A slot is filled by a card of its own kind, and an icoon has to be packed as an
+icoon.** Read "A slot is filled by a card of its own kind" under The icon pool before
+touching anything that counts a collection. It is one sentence to state and easy to undo by
+accident, because it looks like two counts that want to be one: appearance is still live —
+a retired subject's card wears the icoon colourway wherever it is drawn — while
+`CardInstance.IsIcon` decides which slot a copy fills. Collapse them either way and
+something breaks quietly. The load-bearing detail is the **bracket**: `(2×)` against the
+unticked checklist row is the only thing between this rule and a card you know you had
+disappearing without a word, which is why the same idea was rejected the first time it came
+up. No migration was needed; the column was always right.
+
+**There is a `GET api/cards/statistics`** — how often each card has actually been packed,
+across every collector. Ungated, aggregate, nothing written. It deliberately carries no
+expected-share column: that figure depends on the pool at each draw, the doubled players in
+that pack, any gift floor, whether that collector had icons unlocked, and the draw being
+without replacement, and the thing it would be used for is re-tuning the rating scale.
 
 **The rating scale has been re-ijked, and the fixed point is `1000 → 80` — not 1851.**
 Five anchors moved: the top three from `2200/2600/3000` to `2000/2300/2600`, and
@@ -283,9 +320,11 @@ nothing else. See "The tear does not wait for the roll".
 
 Four things worth knowing about how it landed:
 
-- **`Derive` narrows to the day itself** rather than trusting its caller to have
-  queried only today's claims. The window is the whole of the expiry rule, so it
-  belongs with the rule. A test caught this.
+- **`Derive` applies the window itself** rather than trusting its caller to have
+  queried only what is still live. The window is the whole of the expiry rule, so it
+  belongs with the rule. A test caught this. (It narrowed *claims* to the day too,
+  which the rolling window later had to undo — see "Twenty-four hours, and only for
+  game packs".)
 - **`GameWithAnalytics` must be fed replayed games.** `PlayerPerformance.OldRating`
   is assigned inside `GetUpdates` during the leaderboard replay, *not* read off the
   row — so a game fetched straight from the table reports every old rating as 0 and
@@ -550,13 +589,13 @@ sized by how well they did, and collections build toward a icons unlock.
 | Album cover | Five leather stains — bordeaux, cognac, bosgroen, marineblauw, antraciet — brass edge and gold foil on all five. **Chosen once**, with no preview. |
 | Access gate | Collection page unlocks once that player has **≥5 games** — symmetric with the card pool. **Signing in is never refused**; an under-gate name lands on a shut, padlocked album that says how many games are left. |
 | Pack recipients | **All four participants** of a game. |
-| Pack size | 1 for playing, **+2** for winning, **+2** for beating expected margin by ≥3. So 1, 3 or 5. |
-| Opponent bonus | Winning *or* beating expected margin by ≥3 doubles both opponents' tickets in that pack. Flat 2×, does not stack to 4×. Flavour, not balance. |
+| Pack size | 1 for playing, **+2** for winning, **+2** for beating the expected margin — **by ≥3 if you won, by anything at all if you lost**. So 1, 3 or 5, and **a loss caps at 3**. Settled 2026-08-19; the loser's bar was ≥3 too until then. See "The two bars". |
+| Opponent bonus | Winning *or* beating expected margin by ≥3 doubles both opponents' tickets in that pack. Flat 2×, does not stack to 4×. Flavour, not balance. **Keeps the winner's ≥3 bar at both ends** — it did not follow the loser's bonus down. |
 | Within a pack | Each player at most once — draw **without replacement**. |
 | Free pack | One 1-card pack per player per day. |
 | Gifts | A pack handed out rather than earned, and the **only** grant-shaped thing in the design. To named players, or to everybody — which is expanded into one addressed row each when the gift is given. Either *n* ordinary cards **or** one card at a floor on the overall, never both. |
 | Gift expiry | **None.** A present stands open until it is opened. |
-| Pack expiry | **Hard.** Unrevealed at end of day = gone. Gifts and the set-completion packet excepted. |
+| Pack expiry | **24 rolling hours from the game**, for game packs. The daily freebie stays keyed on the **calendar date**; gifts and the set-completion packet never expire. Settled 2026-08-19; it was hard same-day for everything until then. See "Twenty-four hours, and only for game packs". |
 | Contents rolled | At reveal time. |
 | Duplicates | **Not** shown on the card at all — but in the tooltip and the card viewer, which are off-face surfaces. New cards are marked instead, with a glow at reveal. No conversion economy. |
 | Card rating | **Live**, computed on read from `visibleRating`. No stat columns on the card. |
@@ -601,6 +640,49 @@ spread across every tier: 4 goud zeldzaam, 7 goud, 7 zilver, 2 brons. That sprea
 is the thing to keep — it is the whole argument for the icoon carrying its tier's
 metal rather than being uniformly gold, and it is now demonstrated rather than
 asserted.
+
+### A slot is filled by a card of its own kind
+
+**An icoon has to be packed as an icoon.** Retiring somebody whose card you hold does
+not hand you their icoon: their active slot goes with them, their icoon slot arrives
+empty when the icons unlock, and the player cards you hold are counted **in brackets**
+against the unticked checklist row — `(2×)`, in the column the doubles numeral uses.
+Symmetric: an icoon who starts playing again brings an active slot back that their icoon
+copies do not fill, and `ActiveSetComplete` reads player cards only for exactly that
+reason.
+
+The counts are **not sliced by era.** `AsPlayer` is every player card of that subject
+there has ever been, whether packed before the retirement or after the comeback. The
+alternative is a card that stops counting on account of the day it was drawn, which is a
+worse rule than either of the ones this replaced.
+
+This is **not a retreat from live cards**, and the distinction is the thing to hold on
+to: appearance follows the subject, what you have collected follows what you drew. A
+retired subject's card still *wears* the icoon colourway everywhere it is drawn — that
+rule is untouched — it simply no longer fills the icoon slot. Collapse the two in either
+direction and something breaks quietly: read `CardInstance.IsIcon` to draw a card and
+faces freeze at mint; read the live flag to fill a slot and the icons set arrives
+part-filled on the day it unlocks, as a reward for cards earned towards the active set.
+
+Three things came out of it, and the first is the reason it is worth having:
+
+- **The icoon of somebody you already collected is NEW.** Under the flat count the reveal
+  called it a duplicate and skipped the new-card beat — the moment the icons set exists to
+  produce. `IsNew` and `Copies` are both per kind now, so it lands as new and reports one
+  copy.
+- **The bracket is load-bearing, not decoration.** It is the only thing standing between
+  this rule and a card you know you had vanishing without a word, which is why the
+  earlier version of this idea was rejected. It shows while the slot is empty and then
+  gives way to the row's own count, surviving on the row's hover and in its
+  `aria-label` — a permanent second figure in a 1em column is clutter in the narrowest
+  place in the book.
+- **No migration.** `IsIcon` was created with the table and has been written from the
+  live pool since the first mint, so every historical row was already right. It was a
+  read-side change and nothing else.
+
+Where it lives: `MintTally` (the rule and the reasoning), `PackService.CountsBySubject`
+(the one query that reads the column, with the statistics tally), `ActiveSetComplete`,
+`OwnedCard` on the wire, and `Slot.other` / `otherKindLabel` in the browser.
 
 ### One sequence, not an annexe
 
@@ -899,6 +981,50 @@ leaderboard. If Petar goes inactive he moves to the icon pool and the
 remaining active set becomes dramatically easier. This number drifts with the
 roster; `DHigh` is the correction. Accepted knowingly.
 
+### The two bars
+
+The margin bonus is gated at **≥3 for a winner and ≥1 for a loser**, and the
+asymmetry is the point rather than an accident of tuning.
+
+**Why a loser needs only to have done better than the ratings said.** Under one
+shared bar of ≥3, a loss almost never cleared it — measured over 3,192 real games,
+**46.9%** of all packets were a flat single, which is the dull outcome and half the
+table's experience of the feature. The underdog who was written off and lost 7–10
+has done the thing this bonus is for. Elo keeps it honest by construction: the
+expectation is derived from the ratings on the row, so a player who keeps
+over-performing faces a higher bar next time. Nobody can farm it.
+
+**Why a winner still needs ≥3.** Because winning and beating the expectation are
+very nearly the same claim. Elo pays the *over-performer*, and the winner gains
+points only because winning usually *is* over-performing — in a level game the two
+coincide almost exactly. A winner's bonus at ≥1 would therefore pay the top packet
+twice for one fact: win 10–6 when the model said 10–7 and you would collect +2 for
+winning and +2 for a residual of +1, which is one sentence read twice. At ≥3 the
+win measures **direction** and the bonus measures **magnitude**, and those are
+independent.
+
+It also draws the line the five is *for*. Expected −3 and you win by one → five, an
+upset. Expected −1 and you win by one → three, a coin-flip that went your way. A
+shared bar of ≥1 would have paid both the same, which is the argument against the
+symmetric version of this rule and the reason it was rejected.
+
+**Why a loss caps at three.** A heavy underdog who loses by three fewer goals than
+predicted has arguably earned the five on the same logic, and dropping the cap
+would make the rule a single expression with no branch on the result. It is capped
+anyway: a docket reading *Verloren … 7 - 10* next to five cards is not a thing to
+have to explain at the table. Five requires a win.
+
+**A quiet consequence worth knowing.** The loser's bonus needs the reader to be at
+least a mild underdog — a level game's expected margin is ±1, so the side expected
+to lose by one would have to *win* to beat it. The bonus therefore cannot fire in an
+even game at all, which is most games in this office, and is why it costs so much
+less than it looks like it should (see "Volume and pacing").
+
+Both bars are monotone in your own goal difference at any fixed expectation, so a
+better result never pays less and there is never a reason to throw a game.
+`PackTests.SizeIsMonotonicInYourOwnGoalDifference` walks every scoreline from both
+seats at four rating gaps and pins that.
+
 ### One of each per pack
 
 Each player can appear at most once in a pack, so a pack is a draw **without
@@ -921,6 +1047,15 @@ easily if you beat them* — which happens to be true, and happens to mean that
 collecting the best player is easiest for whoever beats the best player. Do not
 tune it as an economy lever.
 
+**It kept the winner's ≥3 bar at both ends when the loser's bonus dropped to ≥1.**
+It is the same `won || residual >= 3` it always was, and now deliberately no longer
+the same condition as the +2. That is a choice not to disturb something the sizing
+change did not have to disturb, not a claim that the wider version would have been
+harmful: measured over 3,192 games it fires on **53.1%** of packets, against
+**59.1%** on the loser's bar. Six points on a thing that is explicitly not a lever.
+Note what that 53.1% says on its own — the doubling was never rare, because `won`
+alone is half of all packets. The legend is about *why* it fired, not how often.
+
 ### Per-player odds at DHigh = 2.5
 
 > **Snapshot, not current.** This table is the 38-active roster at the ratings and
@@ -929,10 +1064,33 @@ tune it as an economy lever.
 > the ratings and the overalls in it are stale; the pool is 57 subjects now. It is kept
 > because the *shape* of the argument below it — a deliberately wide scarcity spread
 > with a tight bottom two-thirds — is what was being decided, and that still holds.
-> Read the live numbers off `GET /api/cards/pool`.
+>
+> **For the live numbers, run `UnitTests/PackOddsTests.PackOdds`** — a million
+> packs of each size (1, 3 and 5) through `PackService.Roll` against a checked-in
+> snapshot of `GET /api/cards/pool`, printed as a table and checked against an exact
+> enumeration of the same draw. It is `[Explicit]`, and has to be filtered **by name** — a
+> `TestCategory` filter does not override `[Explicit]`, it silently skips:
+>
+> ```
+> dotnet test AnagoLeaderboard\UnitTests\UnitTests.csproj ^
+>     --filter "FullyQualifiedName~PackOddsTests.PackOdds" ^
+>     -l "console;verbosity=detailed"
+> ```
+>
+> It is also the answer to the question this table keeps being misread as answering.
+> **The per-card share and the per-pack inclusion probability are different numbers**,
+> and for a five the second is about 5.4× the first (1.9× for a three) — five draws,
+> plus the without-replacement lift. On the roster of 2026-08-18 (36 actives, 21
+> icons) the top card is rating 1808 → 90, a **0.178%** per-card share with the icons
+> locked, and a **0.956% chance of being in any given five** — one in 105. Unlock the
+> icons and the same card's per-card share falls to **0.117%**, because 21 more
+> subjects dilute the ticket mass without changing anybody's own tickets.
 
 Mix assumption for the last column: 42.5% × 1-card, 35% × 3-card, 22.5% × 5-card,
-from P(win) = 0.5 and P(bonus) ≈ 0.30.
+from P(win) = 0.5 and P(bonus) ≈ 0.30. Assumed, and stale twice over — it predates
+the two bars, and the measured mix is now 40.9 / 34.9 / 24.1 (see "Volume and
+pacing"). It happens to land within a point of the truth, which is luck rather than
+method; the column it feeds is a stale snapshot anyway.
 
 Bracketed values are what the same player was under the old ≥10 gate, kept so the
 cost of the drop stays legible.
@@ -983,12 +1141,38 @@ are high, so the curve makes them rare automatically.
 
 ## Volume and pacing
 
-**Average pack size ≈ 2.6 cards**, from `1 + 2×P(win) + 2×P(bonus)` with
-P(win) = 0.5 and P(beating expected margin by ≥3) ≈ 0.30. That 0.30 is grounded
-in the existing data: a mid-table player wins 10-6 and loses 6-10 on average, so
-a typical winning margin is ~4 against an expected margin of ~1 in an even
-matchup. Roughly half of wins clear the bar; losses clear it only for heavy
-underdogs who keep it close.
+**Average pack size = 2.66 cards** — measured, not derived, by
+`UnitTests/PackOddsTests.PackSizeMix`, which walks every seat of every game in a copy
+of the production database and sizes it through `PackService.PackForGame`. It is
+`[Explicit]` and has to be filtered by name, the same way `PackOdds` does:
+
+```
+dotnet test AnagoLeaderboard\UnitTests\UnitTests.csproj ^
+    --filter "FullyQualifiedName~PackOddsTests.PackSizeMix" ^
+    -l "console;verbosity=detailed"
+```
+
+On 3,192 games / 12,768 packets to 2026-08-15, with the retired single-bar rule beside
+it so the cost of "The two bars" stays legible:
+
+| | 1 card | 3 cards | 5 cards | mean |
+|---|---:|---:|---:|---:|
+| Two bars (live) | 40.9% | 34.9% | 24.1% | **2.66** |
+| One bar of ≥3 (retired) | 46.9% | 28.9% | 24.1% | 2.54 |
+
+**The loser's bonus cost +4.7%, and that is the surprising part.** It was expected to
+run to about +8%. It does not, because of the consequence noted under "The two bars":
+the bonus cannot fire in a level game at all, and most games here are near-level. So
+it moves exactly **6.0 points** of packets from a single to a three and touches
+nothing else — the 5-card share is identical to three decimal places, by construction,
+since a loss caps at three. Restricted to the last 12 months the answer is the same
+shape: 39.7 / 36.8 / 23.5, mean 2.68, +5.0%.
+
+That is small enough that **`DHigh` was not re-tuned.** A 4.7% larger average packet
+pulls the completion figures below in by roughly the same fraction — a median nearer
+~3.3 months than ~3.5 — which is inside the noise on a distribution whose two ends are
+already more than 2× apart. Revisit it only if the roster shifts enough to make level
+games rare, which would let the loser's bonus fire far more often than it does now.
 
 Per person, at **3 games/day, 5 days/week** (roughly the heaviest current rate —
 1746 games over ~2.5 years):
@@ -1097,8 +1281,9 @@ in writing:
 - **Deleting a game takes its unclaimed packs with it** with no cascade rule at
   all; they simply stop being derived. Only `CardInstance.GameId` still needs the
   cascade, for the claimed half.
-- **No expiry job and no read filter.** "Today's games" *is* the window — which
-  also turns hard same-day expiry from a settled decision into a one-line knob.
+- **No expiry job and no sweep.** The games query *is* the window — which also turns
+  the expiry rule from a settled decision into a knob. It was cashed in on 2026-08-19
+  when game packs moved to 24 rolling hours: two predicates, no schema.
 - **No lazy materialisation for the daily freebie.** It is "does a claim row exist
   for me for today?", which is a read.
 
@@ -1128,23 +1313,68 @@ Two consequences, one of them a real cost:
 A pack belongs to a player, so the claim endpoint credits that player regardless
 of who clicked it — the cards cannot be stolen either way. Rolling at claim
 therefore costs nothing in safety and avoids writing card rows for packs that
-expire unopened. With a same-day window, ratings cannot drift meaningfully
+expire unopened. Within a day-long window, ratings cannot drift meaningfully
 between the game and the claim.
 
-### Hard daily expiry
+### Twenty-four hours, and only for game packs
 
-Unclaimed at end of day = gone. Absence from the office means you were not
-playing and so earned no game packs anyway, and the free daily pack is a reward
-for visiting, so there is nothing to lose by not visiting. The one real case is
-an end-of-day game, which is the player's own call — and the app is now mobile
-friendly, so opening on a phone is quick.
+This was hard same-day expiry — unclaimed at end of day = gone — for everything
+but gifts. **Game packs moved to a rolling 24 hours from `Game.CreatedAt` on
+2026-08-19. The daily freebie deliberately did not follow.** They read as one rule
+and are two, and the reasoning splits cleanly:
 
-"Day" = server-local date, consistent with `DateTime.Now` used throughout.
+- **The game pack.** Same-day named its own weak case in this document: an
+  end-of-day game, "which is the player's own call". It is not much of a call. You
+  play at five, you leave, and the pack you just earned dies at midnight while
+  nobody is in the building. Twenty-four hours from the game means the evening
+  game is still there the next morning, which is when it was always going to be
+  opened. Everything same-day was *right* about survives — absence from the office
+  still earns you nothing, because you were not playing.
+- **The daily freebie.** A rolling window here would make it **ratchet**: claim at
+  nine and the next is due at nine, claim that one at eleven and the next at
+  eleven, and it walks forward through the week until it lands outside office
+  hours and costs somebody a day for having been early. That is the standard
+  daily-timer complaint, and it is the wrong incentive for a pack whose entire
+  purpose is rewarding turning up. It also keeps the freebie cheap: the synthetic
+  id `daily:{yyyy-MM-dd}` has a natural key, and the filtered unique index on
+  `(PlayerId, ClaimDate)` makes the claim idempotent by construction. A rolling
+  window has neither — it would need a last-claim timestamp comparison instead.
+- **Presents** never expire and were never in this argument.
 
-Under derivation this needs no enforcing: the window is the query. Widening it to
-three days, or to forever, is one date filter — so the decision stays settled but
-stops being expensive to revisit. Gifts are the deliberate exception and carry
-their own `ExpiresAt`, because a present that vanishes overnight is a mean present.
+"Day", where a day is still used, = server-local date, consistent with
+`DateTime.Now` throughout.
+
+Measured from the game rather than from the top of the previous day, so every pack
+gets the same lifetime and two games in one evening expire an hour apart. Invisible
+in practice, and the rule is one sentence rather than two.
+
+Under derivation this still needs no enforcing: the window is the query, which is
+why the change cost two predicates and no schema at all. Widening it further, or to
+forever, remains one filter.
+
+**The trap the rolling window opens.** A pack that outlives the day it was earned on
+can also be *opened* on one day and still be inside the window on the next — and
+`Derive` used to subtract only *today's* claims, which was safe precisely because a
+pack could not outlive its day. Left alone, last night's opened pack would be back on
+the shelf this morning, and clicking it would 409 against the unique index rather than
+open. So the claim side had to widen with the pack side, and it widened further than
+strictly necessary:
+
+- **`Derive` subtracts every game claim it is given, regardless of date.** Not
+  "claims inside the window" — *all* of them. A claim is the record that a pack was
+  opened, and nothing about when it was opened may be allowed to hide it. The date
+  narrowing survives for the daily freebie alone, which is the only source that reads
+  `ClaimDate` at all. Two tests pin this: one for the overnight case, one asserting a
+  claimed pack stays gone at every hour of its window.
+- **The read is filtered by `ClaimDate >= (now − 24h).Date`**, and it is provably wide
+  enough rather than wide by guess: a claim cannot predate the thing it claims, so any
+  claim for a game inside the window was made on or after that game's date, which is on
+  or after the window's first date. Generous by up to a day, which costs a handful of
+  rows and keeps the predicate on the stored date rather than on an expression no index
+  can use.
+- **The unique index was already right.** `(PlayerId, Source, GameId)` carries no date,
+  so the database-level double-claim guard needed nothing — it is `ClaimDate` that had
+  been doing date-shaped work it was never keyed on.
 
 ### Impersonation: type-ahead, not a dropdown
 
@@ -1233,16 +1463,20 @@ new tables should use real FKs.
   - Deleting a game therefore reaches its cards **two ways** — directly, and through
     the claim — which SQLite is happy to have. The direct one is kept because it is
     the one that states the rule.
-  - `IsIcon` is frozen at mint time, and it is **history only — nothing reads it to
-    decide what a card looks like.** This bullet used to reason that freezing it stopped
-    somebody going inactive from "retroactively handing you an icoon", which reads as
-    though the column governs the face. It does not, and the opposite is true: cards are
-    live, so **a card you already hold turns into an icoon the moment its subject goes out
-    of service**, because the album draws its slots and its colourway from the current
-    pool. That is the same rule as a zilver card becoming goud when someone's form
-    improves. What this column answers is "what came out of the packet", which is a
-    question about history rather than about presentation — wiring it into rendering would
-    freeze a card's face at mint and quietly contradict the live-card rule.
+  - `IsIcon` is frozen at mint time. **Nothing reads it to decide what a card looks
+    like — and it is what decides which slot a copy fills.** Those are two different
+    questions and the answers pull opposite ways, which is the single most re-litigated
+    thing in this document. See "A slot is filled by a card of its own kind" below, which
+    is the section to read before touching anything that counts a collection.
+    - Appearance is **live**: the album draws its slots and its colourway from the current
+      pool, so a card in your book wears the icoon colourway the moment its subject goes
+      out of service, the same way a zilver card becomes goud when someone's form
+      improves. Wiring this column into rendering would freeze a card's face at mint.
+    - What you have **collected** follows the column: a slot takes cards of its own kind,
+      so the icoon slot of somebody you collected as an active player starts empty and has
+      to be packed. Reading the live flag to fill a slot instead would hand over part of
+      the icons set on the day it unlocked, as a reward for cards earned towards the
+      active one.
 - **`PlayerCollection`** — **built**, and the only table so far. `PlayerId` (PK
   *and* FK to `Players`, cascade), `Cover`, `CreatedAt`, `IconsUnlockedAt`
   (nullable — a permanent latch, so new joiners and players crossing 5 games don't
@@ -1275,7 +1509,7 @@ new tables should use real FKs.
     and re-points their claims first, so no cards are lost — see `AddressEveryGift`, which
     was hand-written because EF's scaffold would have defaulted the column to `""`.
   - **`ExpiresAt` is null: presents do not expire.** They stood open for seven days, as the
-    deliberate exception to hard same-day expiry — a present that vanishes overnight is a
+    deliberate exception to what was then hard same-day expiry — a present that vanishes overnight is a
     mean present, and unlike a game pack there is no "you were not here, so you earned
     nothing" to fall back on. The deadline only ever existed to stop an *unaddressed* gift
     reaching next year's joiners, and expanding "everybody" removes that reason at the root.
@@ -3945,7 +4179,7 @@ Three things fell out of it, all of them in the component:
   wrong, but invisibly so. Something has visibly begun now, so it has to visibly end: the
   page puts the packet away and **refetches**, because every refusal this endpoint issues
   means the shelf is out of date (409 for a packet opened in another tab, 404 for one that
-  expired at midnight or whose game has been deleted). The refetch is both the explanation
+  has run out its window or whose game has been deleted). The refetch is both the explanation
   and the fix.
 
 Deliberately *not* added: an idle float or breathe on the waiting card back. It would have
@@ -6187,6 +6421,29 @@ presentation layer.
    masquerading as successive sampling. A pool smaller than the pack is also covered,
    because it is the one input that could loop forever.
 
+5b. **The odds themselves**, in `UnitTests/PackOddsTests.cs`, `[Explicit]` and
+    `[Category("odds")]` so an ordinary `dotnet test` never pays for it. A million packs
+    of each size — 1, 3 and 5, on the real roster, icons locked, no opponent bonus —
+    against an **exact** enumeration of the same successive-sampling draw, which is the
+    part that makes it a proof rather than a printout: there is no closed form for k > 1,
+    so the enumeration walks every ordered draw prefix and accumulates, 36·35·34·33·32 of
+    them at size 5. Every subject at every size is asserted within five sigma, and the
+    seeds are fixed per shard, so it is deterministic rather than flaky — it either
+    passes forever or the draw changed.
+    - It is the replacement for the deleted "kansen" button, which did the same thing in
+      the browser at a few thousand packs and against the stale table above.
+    - The roster is `UnitTests/Data/pool-snapshot.json`, refreshed with a curl against a
+      running API, or by `PrintThePoolFromADatabase` in the same fixture with no API to
+      hand — that one **copies the database and reads the copy**. Prefer the curl: the
+      local `C:\tafelvoetbal-data\` copy drifts behind the server within days, and it
+      produced a roster two subjects and several ratings stale the first time this ran.
+    - The overalls in the snapshot are recomputed through `CardRatingCalculator` on load.
+      A stale snapshot can then be wrong about who is on the roster, which is visible in
+      the printed table, but never about the scale, which would not be.
+    - The band lines ("contains an 85 or better") are read off the best card in
+      each simulated pack, not summed off the column. Summing double-counts every pack
+      holding two of the band, which at the 80+ line is the difference between 62% and 80%.
+
 5a. **The claim slice**, in `UnitTests/PackClaimTests.cs`, against real SQLite over a
     held-open in-memory connection — the in-memory provider enforces neither the unique
     indexes nor the cascades, and here those *are* the implementation. Covered: the
@@ -6206,12 +6463,21 @@ presentation layer.
       `force` bypass skipping the check; no album and no player; and emptying the album
       taking the unlock with it — which cannot be asserted on the wire, because the flag
       lives on `Album` and there is no album left to carry it. That *is* the guarantee.
-    - **`AHeldCardBecomesAnIconWhenItsSubjectGoesOutOfService`** pins the rule nothing
-      pinned before, and the one two others are easy to mistake for: flip `Active` on a
-      subject whose card you hold, and it leaves `Pool`, stays in `Owned`, is absent from
-      `Icons` while locked — so it has no slot and quietly leaves the book — and comes back
-      as an icoon, already collected, on unlock. `CardInstance.IsIcon` stays false
-      throughout, because it is history.
+    - **Three tests pin "a slot is filled by a card of its own kind"** — the rule two
+      others are easy to mistake for, and the one most likely to be undone by somebody
+      tidying two counts back into one.
+      - **`AnIconSlotStartsEmptyWhenItsSubjectGoesOutOfService`**: flip `Active` on a
+        subject whose card you hold, and they leave `Pool`, stay in `Owned` as `AsPlayer`,
+        are absent from `Icons` while locked — so the card has no slot and quietly leaves
+        the book — and on unlock the icoon slot appears **empty**, `AsIcon` still 0, with
+        `AsPlayer` holding what the bracket counts. `CardInstance.IsIcon` stays false
+        throughout. This asserted the reverse until the bracket made the empty slot
+        legible; the note on the test says so, so the old shape is not walked back into.
+      - **`PackingTheIconOfAPlayerYouAlreadyHoldIsNew`**: the payoff, and the assertion
+        that silently inverts if anything goes back to a flat count.
+      - **`AComebackIsNotTickedOffByTheIconYouHold`**: the same rule in the other
+        direction — reactivate a subject you hold only as an icoon and the active set is
+        incomplete, so the completion packet is not offered.
 6. `dotnet run` the API, `npm start` the UI (proxy via `public/config.js`).
 7. Submit a game → all four participants each have a pack of the right size →
    reveal → cards persist across a hard reload.
@@ -6259,9 +6525,18 @@ presentation layer.
     that no row has a null recipient, and that somebody added afterwards is not offered one.
     Then confirm no present expires — a gift from last week is still on the shelf.
 15b. Set a subject whose card you hold to inactive with the icons locked: the card leaves
-    the book, `{totalCards} kaarten` is unchanged, and unlocking brings it back as an
-    icoon, already collected. Then repeat with the icons *already* unlocked and confirm it
-    turns into an icoon in place, immediately, with no ceremony.
+    the book and `{totalCards} kaarten` is unchanged. Unlocking brings the slot back
+    wearing the icoon colourway and **empty**, with `(2×)` against the unticked checklist
+    row and `2× als speler` on its hover. Then pack that icoon and confirm it reveals as
+    **nieuw** rather than as a duplicate, the bracket gives way to the row's own count, and
+    the hover still carries the player cards. Repeat with the icons *already* unlocked: the
+    card leaves the active pages and the empty icoon slot appears in the same fetch.
+15d. The rolling window, which needs a backdated game row rather than a wait. Set a game's
+    `CreatedAt` to 20 hours ago and confirm its packet is still on the shelf; move it to 25
+    and confirm it is gone while the daily freebie is untouched. **Then the case the window
+    opens:** open a pack for a game timed late yesterday, and confirm on a later reload —
+    still inside its 24 hours — that the packet has not come back. If it has, `Derive` is
+    narrowing game claims by date again.
 16. After swapping the mock client for the HTTP one, re-run the phase-1 visual
     checks — no component should have needed changing.
 

@@ -33,7 +33,7 @@ public class CardInstance
     public string? GameId { get; set; }
 
     /// <summary>
-    /// Whether it was drawn as an icoon. A mint-time historical record, and nothing more.
+    /// Whether it was drawn as an icoon. The kind of card this copy is, fixed at mint.
     ///
     /// <strong>Nothing reads this to decide what a card looks like, and nothing should
     /// start to.</strong> What a card shows follows its subject's <em>current</em> standing,
@@ -41,11 +41,23 @@ public class CardInstance
     /// colourway off the pool entry, so a player going inactive turns the card already in
     /// your book into an icoon. That is the same rule as a zilver card becoming goud when
     /// their form improves, and it is deliberate - a collection tracks the office as it is,
-    /// not as it was on the day each packet was torn open.
+    /// not as it was on the day each packet was torn open. Wiring this column into rendering
+    /// would freeze a card's face at mint and contradict that outright.
     ///
-    /// What this column is for is answering "what came out of the packet", which is a
-    /// question about history rather than about presentation. Wiring it into rendering would
-    /// freeze a card's face at mint and quietly contradict the live-card rule.
+    /// <strong>What it does decide is which slot a copy fills</strong>, and that is a
+    /// different question from what the copy looks like. A slot takes cards of its own kind:
+    /// the icoon slot of somebody you collected as an active player starts empty and has to
+    /// be packed again, and the player cards you hold are counted against it in brackets on
+    /// the checklist rather than ticking it. Symmetrically, an icoon who returns to play
+    /// brings back an active slot that their icoon copies do not fill. See
+    /// <see cref="MintTally"/> for the rule and why it is not a retreat from live cards, and
+    /// <see cref="Services.PackService.CountsBySubject"/> for the one query that reads this.
+    ///
+    /// The two rules hold at once because they answer different things. Appearance follows the
+    /// subject; what you have collected follows what you actually drew. Collapsing them in
+    /// either direction is the mistake: read this to draw a card and faces freeze at mint,
+    /// read the live flag to fill a slot and an icoon set arrives half-full on the day it is
+    /// unlocked, as a reward for cards earned towards a different set.
     /// </summary>
     public bool IsIcon { get; set; }
 

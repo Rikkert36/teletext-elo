@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "PowerShell(dotnet build AnagoLeaderboard\\\\UnitTests\\\\UnitTests.csproj -v m 2>&1)",
+      "PowerShell($out = dotnet test AnagoLeaderboard\\\\UnitTests\\\\UnitTests.csproj --no-build --filter \"FullyQualifiedName~PrintThePoolFromADatabase\" -l \"console;verbosity=detailed\" 2>&1; $out | Out-File -FilePath \"$env:TEMP\\\\pool-run.txt\" -Encoding utf8; $out | Select-Object -Last 15)",
+      "PowerShell(Select-String -Path \"$env:TEMP\\\\pool-run.txt\" -Pattern \"Failed |Error Message|Stack Trace|Exception|actives,\" -Context 0,6 | Select-Object -First 40)",
+      "PowerShell($env:POOL_SNAPSHOT_OUT = $null; dotnet test AnagoLeaderboard\\\\UnitTests\\\\UnitTests.csproj --filter \"FullyQualifiedName~FiveCardPackOdds\" -l \"console;verbosity=detailed\" 2>&1 | Out-File -FilePath \"$env:TEMP\\\\odds-run.txt\" -Encoding utf8; Get-Content \"$env:TEMP\\\\odds-run.txt\" | Select-Object -First 70)",
+      "PowerShell(dotnet test AnagoLeaderboard\\\\UnitTests\\\\UnitTests.csproj --filter \"FullyQualifiedName~FiveCardPackOdds\" -l \"console;verbosity=detailed\" 2>&1)",
+      "PowerShell($out = dotnet test AnagoLeaderboard\\\\UnitTests\\\\UnitTests.csproj --no-build --filter \"TestCategory=odds&FullyQualifiedName~FiveCardPackOdds\" -l \"console;verbosity=detailed\" 2>&1; $s = \\($out | Select-String \"^name \"\\).LineNumber; \\($out | Select-Object -Skip \\($s-3\\) -First 52\\) -join \"`n\")",
+      "PowerShell($raw = \\(Invoke-WebRequest -Uri \"https://rik-dev.anago.io/tafelvoetbal-server/api/cards/pool\" -TimeoutSec 30\\).Content; $path = \"C:\\\\Users\\\\rmaas\\\\Documents\\\\GitHub\\\\teletext-elo\\\\AnagoLeaderboard\\\\UnitTests\\\\Data\\\\pool-snapshot.json\"; [System.IO.File]::WriteAllText\\($path, $raw, \\(New-Object System.Text.UTF8Encoding\\($false\\)\\)\\); \"written $\\(\\(Get-Item $path\\).Length\\) bytes\")",
+      "PowerShell($raw = \\(Invoke-WebRequest -Uri \"https://rik-dev.anago.io/tafelvoetbal-server/api/cards/pool\" -UseBasicParsing -TimeoutSec 30\\).Content; $path = \"C:\\\\Users\\\\rmaas\\\\Documents\\\\GitHub\\\\teletext-elo\\\\AnagoLeaderboard\\\\UnitTests\\\\Data\\\\pool-snapshot.json\"; [System.IO.File]::WriteAllText\\($path, $raw, \\(New-Object System.Text.UTF8Encoding\\($false\\)\\)\\); \"written $\\(\\(Get-Item $path\\).Length\\) bytes\"; $raw.Substring\\(0,200\\))",
+      "PowerShell(Get-Content \"$env:TEMP\\\\odds3.txt\" | Select-String -Pattern \"error|Failed|Exception|actives,\" -Context 0,8 | Select-Object -First 6)",
+      "PowerShell(& \"C:\\\\Users\\\\rmaas\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-rmaas-Documents-GitHub-teletext-elo\\\\34cd7a90-27ce-4e8b-847a-c814500db49d\\\\scratchpad\\\\decompose.ps1\")"
     ]
   }
 }

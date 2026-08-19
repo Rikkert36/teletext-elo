@@ -80,10 +80,25 @@ export interface CollectionState {
   icons: CardPlayer[];
 }
 
-/** How many copies of one player's card the collector holds. */
+/**
+ * How many copies of one subject the collector holds, split by the kind of card each copy
+ * came out of the packet as.
+ *
+ * A slot is filled by a card of its own kind, so these are not two views of one pile: the
+ * icoon slot of somebody you collected as an active player starts empty and has to be
+ * packed again, and `asPlayer` is then what the checklist prints in brackets against the
+ * unticked row. Symmetric — an icoon who returns to play brings an active slot back with
+ * them, which their icoon copies do not fill.
+ *
+ * Neither number says anything about what a card *looks* like. That is still read off the
+ * live pool entry, icoon colourway included.
+ */
 export interface OwnedCardCount {
   playerId: string;
-  count: number;
+  /** Copies drawn while the subject was an active player. */
+  asPlayer: number;
+  /** Copies drawn while the subject was an icoon. */
+  asIcon: number;
 }
 
 /**

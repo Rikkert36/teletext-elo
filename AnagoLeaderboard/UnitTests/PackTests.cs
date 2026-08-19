@@ -60,7 +60,13 @@ namespace UnitTests
 
         /* ----------------------------------------------------------------- *
          * Sizing: 1 for playing, +2 for winning, +2 for beating the expected
-         * margin by three or more.
+         * margin - by three or more if you won, by anything at all if you
+         * lost. A loss therefore caps at three; five needs a win.
+         *
+         * `GameBetween`'s two ratings are the first and second team's, so the
+         * first team is the underdog whenever the second rating is higher.
+         * Expected margins used below, from ExpectedScoreCalculator: a level
+         * game is +1, 150 adrift is -2, 700 adrift is -7.
          * ----------------------------------------------------------------- */
 
         [Test]
@@ -98,15 +104,103 @@ namespace UnitTests
             Assert.That(pack.Reason, Is.EqualTo("Gewonnen met t1p2 van t2p1 en t2p2 met 10 - 3"));
         }
 
+        /// <summary>
+        /// The upset, and the reason a winner's bonus is gated at three rather than at one: an
+        /// underdog who wins pays five, but a level game that merely went your way does not.
+        /// Winning and beating the expectation are nearly the same claim, so the second +2 has to
+        /// measure magnitude or it is paying twice for one fact.
+        /// </summary>
+        [Test]
+        public void Underdog_AWinIsFiveCardsButALevelGameWonNarrowlyIsThree()
+        {
+            // Expected -2, actual +1: three better than the ratings said.
+            Assert.That(PackService.PackForGame(GameBetween(10, 9, 1250, 1400), "t1p1").Size,
+                Is.EqualTo(5));
+
+            // Expected +1, actual +1: won, and did exactly what was expected of them.
+            Assert.That(PackService.PackForGame(GameBetween(10, 9), "t1p1").Size, Is.EqualTo(3));
+        }
+
+        /// <summary>
+        /// The loser's bonus. Any improvement on the expected margin earns it, where it used to
+        /// take three - which a loss hardly ever cleared, so half of all packets were a flat
+        /// single. Note that this needs the reader to be at least a mild underdog: in a level game
+        /// the expected margin is ±1, so a loss can never beat it.
+        /// </summary>
+        [Test]
+        public void Underdog_ALossOneGoalBetterThanExpectedIsThreeCards()
+        {
+            // Expected -2, actual -1. One better, and that is enough.
+            var pack = PackService.PackForGame(GameBetween(9, 10, 1250, 1400), "t1p1");
+
+            Assert.That(pack.Size, Is.EqualTo(3));
+            Assert.That(pack.Reason, Is.EqualTo("Verloren met t1p2 van t2p1 en t2p2 met 9 - 10"));
+
+            // But it does not double the opponents: the doubling keeps the winner's bar at both
+            // ends, and the rule change deliberately left it alone.
+            Assert.That(pack.DoubledPlayerIds, Is.Empty);
+        }
+
+        [Test]
+        public void Underdog_ALossExactlyOnThePredictionIsOneCard()
+        {
+            // Expected -2, actual -2. Both margins are integers, so landing on the prediction is
+            // not an improvement on it.
+            var pack = PackService.PackForGame(GameBetween(8, 10, 1250, 1400), "t1p1");
+
+            Assert.That(pack.Size, Is.EqualTo(1));
+        }
+
         [Test]
         public void HeavyUnderdog_AGoodLossIsThreeCards()
         {
             // The first team is 700 rating adrift, so they are expected to lose by a distance.
-            // Losing 8-10 clears that by enough to earn the margin bonus without winning.
+            // Losing 8-10 clears that by five, which is where the cap bites: a loss stops at three
+            // however far past the prediction it finishes, because five requires a win.
             var pack = PackService.PackForGame(GameBetween(8, 10, 700, 1400), "t1p1");
 
             Assert.That(pack.Size, Is.EqualTo(3));
             Assert.That(pack.Reason, Is.EqualTo("Verloren met t1p2 van t2p1 en t2p2 met 8 - 10"));
+
+            // Clearing it by three or more does double the opponents, win or lose.
+            Assert.That(pack.DoubledPlayerIds, Is.EquivalentTo(new[] { "t2p1", "t2p2" }));
+        }
+
+        /// <summary>
+        /// The size never falls when the result improves, at any fixed expectation - so there is
+        /// never a reason to throw a game. Walked over every scoreline from either seat.
+        /// </summary>
+        [TestCase(0)]
+        [TestCase(150)]
+        [TestCase(400)]
+        [TestCase(700)]
+        public void SizeIsMonotonicInYourOwnGoalDifference(int gap)
+        {
+            // Every scoreline from the reader's own seat, worst first: 0-10 through 9-10, then
+            // 10-9 through 10-0. So the reader's goal difference runs -10 to +10.
+            var scorelines = new List<(int Own, int Against)>();
+            for (var own = 0; own <= 9; own++) scorelines.Add((own, 10));
+            for (var against = 9; against >= 0; against--) scorelines.Add((10, against));
+
+            // Read from both seats, with the reader always the side that is `gap` adrift.
+            foreach (var playerId in new[] { "t1p1", "t2p1" })
+            {
+                var previous = 0;
+
+                foreach (var (own, against) in scorelines)
+                {
+                    var game = playerId == "t1p1"
+                        ? GameBetween(own, against, 1400 - gap, 1400)
+                        : GameBetween(against, own, 1400, 1400 - gap);
+
+                    var size = PackService.PackForGame(game, playerId).Size;
+
+                    Assert.That(size, Is.GreaterThanOrEqualTo(previous),
+                        $"{playerId} at a {gap} gap went backwards on {own} - {against}");
+
+                    previous = size;
+                }
+            }
         }
 
         /// <summary>
@@ -246,16 +340,39 @@ namespace UnitTests
         }
 
         [Test]
-        public void YesterdaysGameOffersNothingToday()
+        public void AGamePackStandsOpenForTwentyFourHours()
         {
-            var yesterday = GameBetween(10, 7);
-            yesterday.CreatedAt = Today.AddDays(-1);
+            // The case that retired same-day expiry: played on the way out of the office, opened
+            // on the way back in. Under the old rule midnight took it.
+            var lastNight = GameBetween(10, 7);
+            lastNight.CreatedAt = Today.AddDays(-1).AddHours(3); // 17:00 yesterday.
+
+            var nextMorning = Today.AddDays(-1).AddHours(19); // 09:00 today.
 
             var packs = PackService.Derive(
-                "t1p1", new[] { yesterday }, Array.Empty<PackClaim>(), Today);
+                "t1p1", new[] { lastNight }, Array.Empty<PackClaim>(), nextMorning);
 
-            // Hard same-day expiry needs no job and no filter: "today's games" is the query.
-            Assert.That(packs.Select(pack => pack.Id), Is.EqualTo(new[] { "daily:2026-08-11" }));
+            Assert.That(packs.Any(pack => pack.Id == "game:" + lastNight.Id));
+        }
+
+        [Test]
+        public void AGamePackExpiresADayAfterTheGame()
+        {
+            var game = GameBetween(10, 7);
+            game.CreatedAt = Today.AddDays(-1); // Exactly 24h before `Today`.
+
+            // On the edge it is already gone: the window is "less than a day old", so a game
+            // exactly a day old is out rather than balanced on the boundary.
+            Assert.That(
+                PackService.Derive("t1p1", new[] { game }, Array.Empty<PackClaim>(), Today)
+                    .Select(pack => pack.Id),
+                Is.EqualTo(new[] { "daily:2026-08-11" }));
+
+            // A minute earlier it is still there. No job and no sweep - the window is the query.
+            Assert.That(
+                PackService.Derive(
+                        "t1p1", new[] { game }, Array.Empty<PackClaim>(), Today.AddMinutes(-1))
+                    .Any(pack => pack.Id == "game:" + game.Id));
         }
 
         [Test]
@@ -270,6 +387,61 @@ namespace UnitTests
             // And only for the player who claimed it. The other three still have theirs.
             var theirs = PackService.Derive("t2p1", new[] { game }, Array.Empty<PackClaim>(), Today);
             Assert.That(theirs.Any(pack => pack.Id == "game:" + game.Id));
+        }
+
+        /// <summary>
+        /// The trap the rolling window opens, and the whole reason `Derive` subtracts game claims
+        /// without looking at their date.
+        ///
+        /// A pack earned last night can be opened last night and is still inside the window this
+        /// morning. If the claim were narrowed to the day - as it was, safely, while a pack could
+        /// not outlive the day it was earned on - yesterday's claim would fall out of view and the
+        /// packet would be back on the shelf, already opened.
+        /// </summary>
+        [Test]
+        public void AGameClaimedYesterdayIsNotOfferedAgainToday()
+        {
+            var lastNight = GameBetween(10, 7);
+            lastNight.CreatedAt = Today.AddDays(-1).AddHours(3); // 17:00 yesterday.
+
+            var claimedThen = new[]
+            {
+                PackClaim.ForGame("t1p1", lastNight.Id, Today.AddDays(-1))
+            };
+
+            var nextMorning = Today.AddDays(-1).AddHours(19); // 09:00 today, still in the window.
+
+            var packs = PackService.Derive(
+                "t1p1", new[] { lastNight }, claimedThen, nextMorning);
+
+            Assert.That(
+                packs.Any(pack => pack.Id == "game:" + lastNight.Id),
+                Is.False,
+                "an opened pack came back the next morning");
+        }
+
+        /// <summary>
+        /// The same guarantee stated without a window at all: a claim is the record that a pack
+        /// was opened, and nothing about how long ago that was may bring it back.
+        /// </summary>
+        [Test]
+        public void AGameClaimIsNeverOutlivedByItsPack()
+        {
+            var game = GameBetween(10, 7);
+            game.CreatedAt = Today;
+
+            var claimed = new[] { PackClaim.ForGame("t1p1", game.Id, Today) };
+
+            foreach (var offset in new[] { 0, 1, 6, 23 })
+            {
+                var packs = PackService.Derive(
+                    "t1p1", new[] { game }, claimed, Today.AddHours(offset));
+
+                Assert.That(
+                    packs.Any(pack => pack.Id == "game:" + game.Id),
+                    Is.False,
+                    $"offered again {offset}h after being claimed");
+            }
         }
 
         [Test]

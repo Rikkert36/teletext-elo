@@ -71,10 +71,11 @@ public class PackClaim
     /// by its row - but it is stored for all three, because it is the only thing that makes an
     /// old row readable.
     ///
-    /// **A gift claim is deliberately not keyed on it.** A present stands open for days, so the
-    /// derivation has to see a gift claim from last Tuesday or the packet comes back every
-    /// morning. See <see cref="Services.PackService.Derive"/>, which narrows the other two
-    /// sources to the day and leaves this one alone.
+    /// **Only the daily freebie is keyed on it, and nothing else may become so.** A present
+    /// stands open forever and a game pack for a full day, so the derivation has to see a gift
+    /// claim from last Tuesday or last night's game claim this morning, or the packet comes back
+    /// after it was opened. See <see cref="Services.PackService.Derive"/>, which subtracts every
+    /// claim it is given and reads this column for the daily alone.
     /// </summary>
     public DateTime ClaimDate { get; set; }
 

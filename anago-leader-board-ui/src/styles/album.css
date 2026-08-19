@@ -2436,6 +2436,20 @@
 }
 
 /*
+ * The same column when it is carrying "(2×)" instead of a doubles numeral: the cards you
+ * hold of this subject as the other kind, which do not fill this slot.
+ *
+ * Wider, because the numeral column is one em and this is four characters — the leader dots
+ * give the width up, which is what they are for. Fainter than a doubles figure and no
+ * further: it is a note about cards that are not here, and a hand would have written it
+ * smaller, but the list is already at the smallest size that stays legible on this paper.
+ */
+.album__entry-dupe--former {
+  width: 2.9em;
+  opacity: 0.55;
+}
+
+/*
  * The tally, set as a form: printed label, blank, printed total. The figure in
  * the blank is the only thing on the page that changes, and it changes because a
  * hand wrote it there.
