@@ -108,8 +108,8 @@ namespace UnitTests
         /// A million packs of every size a game can pay, against the arithmetic.
         ///
         /// Icons locked and no opponent bonus - an ordinary earned pack, opened by a collector who
-        /// has not finished the active set. 1, 3 and 5 are the only sizes that exist: one for
-        /// playing, +2 for winning, +2 for beating the expected margin by three.
+        /// has not finished the active set. 1, 3 and 5 are the only sizes that exist; how a game
+        /// picks between them is <see cref="PackSizeMix"/>'s question, not this one's.
         ///
         /// The Monte Carlo is checked against an <em>exact</em> reference computed in
         /// <see cref="ExactInclusionProbabilities"/>, so this is a proof rather than a printout: if
@@ -625,7 +625,7 @@ namespace UnitTests
             var live = new Dictionary<int, int> { [1] = 0, [3] = 0, [5] = 0 };
             var retired = new Dictionary<int, int> { [1] = 0, [3] = 0, [5] = 0 };
             var doubled = 0;
-            var doubledOnTheLosersBar = 0;
+            var doubledUnderTheRetiredBar = 0;
             var seats = 0;
 
             foreach (var game in games)
@@ -642,17 +642,19 @@ namespace UnitTests
                     foreach (var player in new[] { team.FirstPlayer, team.SecondPlayer })
                     {
                         var won = game.IsWonBy(player.PlayerId);
+                        var pack = PackService.PackForGame(game, player.PlayerId);
 
-                        live[PackService.PackForGame(game, player.PlayerId).Size]++;
+                        live[pack.Size]++;
 
                         // The retired rule: one threshold of three, win or lose.
                         retired[1 + (won ? 2 : 0) + (residual >= 3 ? 2 : 0)]++;
 
-                        if (won || residual >= 3) doubled++;
+                        // Read off the packet rather than recomputed, so this reports what the
+                        // service does and cannot quietly measure a stale copy of the rule.
+                        if (pack.DoubledPlayerIds.Any()) doubled++;
 
-                        // What it would fire on if it followed the loser's bonus down to any
-                        // improvement at all, rather than keeping the winner's bar at both ends.
-                        if (won || residual >= 1) doubledOnTheLosersBar++;
+                        // What it fired on under the retired single bar of three.
+                        if (won || residual >= 3) doubledUnderTheRetiredBar++;
 
                         seats++;
                     }
@@ -681,7 +683,7 @@ namespace UnitTests
                 .AppendLine($"  change   {liveMean / retiredMean - 1,9:P1}")
                 .AppendLine()
                 .AppendLine($"  opponent bonus fires on {doubled / (double)seats:P1} of packs")
-                .AppendLine($"  ... and would on {doubledOnTheLosersBar / (double)seats:P1} at the loser's bar");
+                .AppendLine($"  ... and did on {doubledUnderTheRetiredBar / (double)seats:P1} under the retired bar");
 
             TestContext.Out.WriteLine(table.ToString());
         }

@@ -4,19 +4,27 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AnagoLeaderboard.Controllers
 {
+    /// <summary>
+    /// The read-only side of the trading cards: what a pack can contain, and what packs have
+    /// actually contained. Nothing here is anybody's state to change, which is why none of it
+    /// needs the player in the path the way <see cref="CollectionsController"/> does.
+    /// </summary>
     [Route("api")]
     [ApiController]
     public class CardController : ControllerBase
     {
         private readonly CardPoolService _cardPoolService;
         private readonly CardStatisticsService _cardStatisticsService;
+        private readonly PackHistoryService _packHistoryService;
 
         public CardController(
             CardPoolService cardPoolService,
-            CardStatisticsService cardStatisticsService)
+            CardStatisticsService cardStatisticsService,
+            PackHistoryService packHistoryService)
         {
             _cardPoolService = cardPoolService;
             _cardStatisticsService = cardStatisticsService;
+            _packHistoryService = packHistoryService;
         }
 
         /// <summary>
@@ -48,6 +56,29 @@ namespace AnagoLeaderboard.Controllers
         public async Task<CardStatistics> GetCardStatistics()
         {
             return await _cardStatisticsService.GetStatistics();
+        }
+
+        /// <summary>
+        /// Every pack that has been opened, newest first, with the cards it contained grouped
+        /// under it.
+        ///
+        /// The same rows the statistics endpoint counts, grouped by the claim instead of by the
+        /// face - so this is the one route that can say what came out of a particular packet, and
+        /// that four copies of somebody were one lucky five-card packet rather than four mornings
+        /// in a row.
+        ///
+        /// Ungated, like the two above it, and see <see cref="PackHistory"/> for why naming the
+        /// collector does not change that. Unpaged on purpose: a few thousand claims a year is
+        /// small enough to hand over whole, and a page number would be the third order this API
+        /// has to keep straight for a route that is read by hand.
+        ///
+        /// Costs one leaderboard replay and two queries, like every other GET here. Nothing is
+        /// written.
+        /// </summary>
+        [HttpGet("packs")]
+        public async Task<PackHistory> GetPackHistory()
+        {
+            return await _packHistoryService.GetHistory();
         }
     }
 }

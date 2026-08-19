@@ -22,6 +22,11 @@ for one fact, because Elo pays the over-performer and in a level game the winner
 the over-performer. A loss caps at 3. The cost is measured rather than assumed —
 `PackOddsTests.PackSizeMix`, +4.7% on the average packet, no `DHigh` change.
 
+**The opponent bonus follows it**, because the two were always one test: *any packet
+bigger than a single doubles both opponents*. Holding the doubling at the winner's ≥3
+while the loser's +2 sat at ≥1 was tried for about an hour and is wrong — it leaves a
+three-card packet that doubles nobody. Keep the identity.
+
 **A slot is filled by a card of its own kind, and an icoon has to be packed as an
 icoon.** Read "A slot is filled by a card of its own kind" under The icon pool before
 touching anything that counts a collection. It is one sentence to state and easy to undo by
@@ -38,6 +43,15 @@ across every collector. Ungated, aggregate, nothing written. It deliberately car
 expected-share column: that figure depends on the pool at each draw, the doubled players in
 that pack, any gift floor, whether that collector had icons unlocked, and the draw being
 without replacement, and the thing it would be used for is re-tuning the rating scale.
+
+**And a `GET api/packs`** — every pack that was ever opened, newest first, with its cards
+grouped under it. The same rows the statistics endpoint counts, grouped by the claim instead
+of by the face, which is the one question no aggregate can answer: whether four copies of
+somebody were one lucky five-card packet or four mornings in a row. Unpaged and unfiltered on
+purpose — a few thousand claims a year is small enough to hand over whole, and the route is
+read by hand. It is ungated like the other two even though it names the collector, because
+`GET api/collections/{playerId}` already hands over an entire collection to anybody who asks;
+adding a key here would protect nothing that is not already public.
 
 **The rating scale has been re-ijked, and the fixed point is `1000 → 80` — not 1851.**
 Five anchors moved: the top three from `2200/2600/3000` to `2000/2300/2600`, and
@@ -590,7 +604,7 @@ sized by how well they did, and collections build toward a icons unlock.
 | Access gate | Collection page unlocks once that player has **≥5 games** — symmetric with the card pool. **Signing in is never refused**; an under-gate name lands on a shut, padlocked album that says how many games are left. |
 | Pack recipients | **All four participants** of a game. |
 | Pack size | 1 for playing, **+2** for winning, **+2** for beating the expected margin — **by ≥3 if you won, by anything at all if you lost**. So 1, 3 or 5, and **a loss caps at 3**. Settled 2026-08-19; the loser's bar was ≥3 too until then. See "The two bars". |
-| Opponent bonus | Winning *or* beating expected margin by ≥3 doubles both opponents' tickets in that pack. Flat 2×, does not stack to 4×. Flavour, not balance. **Keeps the winner's ≥3 bar at both ends** — it did not follow the loser's bonus down. |
+| Opponent bonus | **Any packet bigger than a single doubles both opponents' tickets** in that pack — the same test as the two +2s, not a second one beside it. Flat 2×, does not stack to 4×. Flavour, not balance. |
 | Within a pack | Each player at most once — draw **without replacement**. |
 | Free pack | One 1-card pack per player per day. |
 | Gifts | A pack handed out rather than earned, and the **only** grant-shaped thing in the design. To named players, or to everybody — which is expanded into one addressed row each when the gift is given. Either *n* ordinary cards **or** one card at a floor on the overall, never both. |
@@ -1025,6 +1039,11 @@ better result never pays less and there is never a reason to throw a game.
 `PackTests.SizeIsMonotonicInYourOwnGoalDifference` walks every scoreline from both
 seats at four rating gaps and pins that.
 
+**The opponent bonus moved with the loser's bar, and had to.** It is the same test as
+the +2 rather than a similar-looking one beside it — see "Opponent bonus" for why
+splitting them apart leaves a three-card packet that doubles nobody. If either bar is
+ever touched again, that identity is the thing to check.
+
 ### One of each per pack
 
 Each player can appear at most once in a pack, so a pack is a draw **without
@@ -1035,10 +1054,19 @@ smaller than the pack size, though 38 vs 5 makes it theoretical.
 
 ### Opponent bonus
 
-A qualifying player (won, or beat expected margin by ≥3) has **both opponents'
-tickets doubled** for that pack's draw. Flat 2× even if both conditions are met —
-a dominant win already pays 5 cards, and compounding to 4× would let blowouts
-dominate collections.
+A qualifying player has **both opponents' tickets doubled** for that pack's draw.
+Flat 2× even if both conditions are met — a dominant win already pays 5 cards, and
+compounding to 4× would let blowouts dominate collections.
+
+**"Qualifying" is the same test as the +2, so the whole rule is: any packet bigger
+than a single doubles both opponents.** One condition, tested once, and the identity
+is what to preserve if either half is ever touched again — `PackTests`
+`.TheOpponentBonusFiresExactlyWhenThePacketBeatsASingle` walks every scoreline from
+both seats at four rating gaps to pin it. It nearly came apart when the loser's bonus
+dropped to ≥1 and this was left at the winner's ≥3: that would have left a three-card
+packet that doubled nobody — the only packet in the design that pays more than a
+single without saying who it was earned against. Measured, it fires on **59.1%** of
+packets, against 53.1% under the retired shared bar.
 
 **This is flavour, not balance, and should be treated as such.** Doubling 2 of 38
 players shifts only ~6% of the ticket mass, lifting Petar's season rate ~8%. The
@@ -1047,14 +1075,10 @@ easily if you beat them* — which happens to be true, and happens to mean that
 collecting the best player is easiest for whoever beats the best player. Do not
 tune it as an economy lever.
 
-**It kept the winner's ≥3 bar at both ends when the loser's bonus dropped to ≥1.**
-It is the same `won || residual >= 3` it always was, and now deliberately no longer
-the same condition as the +2. That is a choice not to disturb something the sizing
-change did not have to disturb, not a claim that the wider version would have been
-harmful: measured over 3,192 games it fires on **53.1%** of packets, against
-**59.1%** on the loser's bar. Six points on a thing that is explicitly not a lever.
-Note what that 53.1% says on its own — the doubling was never rare, because `won`
-alone is half of all packets. The legend is about *why* it fired, not how often.
+Note what 59.1% says on its own: **the doubling was never rare**, because a win alone
+is half of all packets. The legend is about *why* it fires, not how often — and six
+points of extra frequency on a thing that is explicitly not a lever is not a reason to
+split it away from the +2.
 
 ### Per-player odds at DHigh = 2.5
 
@@ -1607,6 +1631,27 @@ Done:
     "Per-player odds at DHigh = 2.5" by eye instead.
   - Ungated, like `cards/pool`. Every figure in it is an aggregate over what is already
     public, and no row says which cards a named collector holds.
+- **`Services/PackHistoryService.cs`** — every pack that was opened, with the cards it
+  minted, behind `GET api/packs`. Its own service for the same two reasons the statistics
+  service is one, and kept apart from *that* one because grouping by claim and grouping by
+  subject share no work beyond the replay every GET here already pays for. One replay and
+  two queries; nothing is written.
+  - **Newest first, unpaged, unfiltered.** A page number would be a third order this API
+    has to keep straight on a route that is read by hand, and a `?playerId=` filter would
+    duplicate what `GET api/collections/{playerId}` already answers better.
+  - Cards inside a packet come back **best first**, the pool's own order. Draw order is not
+    available to sort by: a packet is minted in one pass, so every card in it shares a
+    `MintedAt` to the tick.
+  - `Source`, `GameId` and `GiftId` travel as they are stored, and `Source` as its **name**
+    rather than its number — nothing here configures a string enum converter, and a bare
+    `3` on the wire says nothing.
+  - `MintedAsIcon` per card, off `CardInstance.IsIcon`, for exactly the reason
+    `CardStatistic` carries it: the `Subject` beside it is live, so this is the only thing
+    that can tell a pull made before somebody retired from one made after. It does not
+    decide how the card is drawn, and nothing here may start reading it that way.
+  - A claim with no cards is not a state the app can produce — a packet always contains at
+    least one — but it comes back as an empty list rather than a missing row, because a
+    claim whose cards were deleted by hand is worth seeing.
 
 - **`Services/PackService.cs`** — deriving, sizing, rolling, claiming, the daily
   freebie, and giving. `Derive`, `PackForGame`, `DailyPack`, `GiftPack` and `Roll` are all

@@ -136,9 +136,8 @@ namespace UnitTests
             Assert.That(pack.Size, Is.EqualTo(3));
             Assert.That(pack.Reason, Is.EqualTo("Verloren met t1p2 van t2p1 en t2p2 met 9 - 10"));
 
-            // But it does not double the opponents: the doubling keeps the winner's bar at both
-            // ends, and the rule change deliberately left it alone.
-            Assert.That(pack.DoubledPlayerIds, Is.Empty);
+            // And it doubles the opponents, because the doubling is the same test as the +2.
+            Assert.That(pack.DoubledPlayerIds, Is.EquivalentTo(new[] { "t2p1", "t2p2" }));
         }
 
         [Test]
@@ -170,6 +169,48 @@ namespace UnitTests
         /// The size never falls when the result improves, at any fixed expectation - so there is
         /// never a reason to throw a game. Walked over every scoreline from either seat.
         /// </summary>
+        /// <summary>
+        /// The whole of the opponent bonus, in one line: any packet bigger than a single doubles
+        /// both opponents, and a single doubles nobody.
+        ///
+        /// It holds because the doubling is the same test as the two +2s rather than a second,
+        /// similar-looking one. Holding it at the winner's bar while the loser's bonus sat at one
+        /// would leave a three-card packet that doubled nobody - the only packet in the design
+        /// that would pay more than a single without saying who it was earned against.
+        /// </summary>
+        [TestCase(0)]
+        [TestCase(150)]
+        [TestCase(400)]
+        [TestCase(700)]
+        public void TheOpponentBonusFiresExactlyWhenThePacketBeatsASingle(int gap)
+        {
+            foreach (var playerId in new[] { "t1p1", "t2p1" })
+            {
+                for (var own = 0; own <= 10; own++)
+                {
+                    for (var against = 0; against <= 10; against++)
+                    {
+                        // A scoreline the game model can hold: somebody reached ten, not both.
+                        if ((own == 10) == (against == 10)) continue;
+
+                        var game = playerId == "t1p1"
+                            ? GameBetween(own, against, 1400 - gap, 1400)
+                            : GameBetween(against, own, 1400, 1400 - gap);
+
+                        var pack = PackService.PackForGame(game, playerId);
+                        var opponents = playerId == "t1p1"
+                            ? new[] { "t2p1", "t2p2" }
+                            : new[] { "t1p1", "t1p2" };
+
+                        Assert.That(
+                            pack.DoubledPlayerIds,
+                            pack.Size > 1 ? Is.EquivalentTo(opponents) : Is.Empty,
+                            $"{playerId} at a {gap} gap, {own} - {against}, {pack.Size} cards");
+                    }
+                }
+            }
+        }
+
         [TestCase(0)]
         [TestCase(150)]
         [TestCase(400)]

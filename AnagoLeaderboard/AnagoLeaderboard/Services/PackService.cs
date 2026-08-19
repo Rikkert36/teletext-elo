@@ -371,11 +371,12 @@ public class PackService
         // 4x would let blowouts dominate collections. This is flavour, not an economy lever:
         // doubling 2 of 38 players shifts about 6% of the ticket mass.
         //
-        // It keeps the winner's bar at both ends rather than following `beatExpectation` down to
-        // the loser's, which is a choice not to disturb something the rule change did not have to
-        // disturb: `PackOddsTests.PackSizeMix` measures it at 53.1% of packs, against 59.1% on the
-        // loser's bar. Neither number is a lever - this is flavour - so it stays where it was.
-        var doubled = won || residual >= MarginBonusThreshold
+        // It is the same test as the two +2s, so the whole of it is: **any packet bigger than a
+        // single doubles both opponents**. Keep it that way. Splitting the two apart - by holding
+        // this at the winner's bar when the loser's bonus dropped to one - leaves a three-card
+        // packet that doubles nobody, which is the only packet in the design that would pay more
+        // than a single without saying who it was earned against.
+        var doubled = won || beatExpectation
             ? new List<string> { opponents.FirstPlayer.PlayerId, opponents.SecondPlayer.PlayerId }
             : new List<string>();
 
