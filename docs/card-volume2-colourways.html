@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Deel II — kleurwegen voor de persoonlijke kaart</title>
+<style>
+  :root {
+    --din: "Bahnschrift SemiCondensed", "DIN Condensed", "Agency FB", "Franklin Gothic", sans-serif;
+    --table: #171310;
+    --ink: #ece6da;
+    --ink-soft: #b7ac97;
+    --ink-mute: #8b8171;
+    --rule: #342c23;
+    --brass: #b08e42;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 2.5rem 2rem 6rem;
+    background: var(--table);
+    background-image: radial-gradient(120% 80% at 50% -10%, #241d17 0%, #171310 46%, #0e0b09 100%);
+    color: var(--ink);
+    font: 15px/1.62 -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+
+  h1 { font: 400 2rem/1.05 var(--din); letter-spacing: .02em; margin: 0 0 .5rem; }
+  h2 { font: 400 1.4rem/1.1 var(--din); letter-spacing: .03em; margin: 3.5rem 0 .3rem; }
+  h3 { font: 400 .8rem/1 var(--din); letter-spacing: .2em; text-transform: uppercase;
+       color: var(--ink-mute); margin: 2rem 0 .7rem; }
+  p { max-width: 64ch; color: var(--ink-soft); margin: .3rem 0 1rem; }
+  p b { color: var(--ink); font-weight: 600; }
+  code { font: 12.5px/1 ui-monospace, "Cascadia Mono", Consolas, monospace; color: var(--brass); }
+
+  .rule { border: 0; border-top: 1px solid var(--rule); margin: 3rem 0 0; }
+
+  .note {
+    max-width: 68ch; border-left: 2px solid #4d4030; padding: .1rem 0 .1rem 1rem;
+    color: var(--ink-mute); font-size: 14px;
+  }
+  .note strong { color: var(--ink-soft); }
+
+  /* ---- controls: which book, on which ground ---- */
+
+  .bar {
+    position: sticky; top: 0; z-index: 20;
+    display: flex; gap: 1.4rem; flex-wrap: wrap; align-items: center;
+    margin: 2.5rem 0 0; padding: .8rem 0;
+    background: linear-gradient(to bottom, #171310 74%, transparent);
+    border-bottom: 1px solid var(--rule);
+  }
+  .bar label, .bar > span {
+    font: 400 .76rem/1 var(--din); letter-spacing: .18em;
+    text-transform: uppercase; color: var(--ink-mute);
+  }
+  select, .bar button {
+    font: 400 .85rem/1 var(--din); letter-spacing: .09em; text-transform: uppercase;
+    color: var(--ink-soft); background: #1e1913;
+    border: 1px solid var(--rule); border-radius: 2px;
+    padding: .45rem .7rem; cursor: pointer;
+  }
+  .bar button[aria-pressed="true"] { color: #120e0b; background: var(--brass); border-color: var(--brass); }
+  select:focus-visible, .bar button:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+  .grounds { display: flex; gap: .35rem; }
+
+  #status { font: 400 .78rem/1.4 var(--din); letter-spacing: .1em;
+            text-transform: uppercase; color: var(--brass); }
+
+  /* ================================================================= *
+   * THE CARD — volume 1's construction. The photo is an <img>, not a
+   * background: an <img> from http://localhost is not blocked on a page
+   * opened over file://, and a cross-origin background-image is. The mask
+   * is a pure gradient for the same reason - a mask-image pointing at a
+   * URL would be dropped and the cards would render as hard rectangles.
+   * ================================================================= */
+
+  .plate { margin: 1.6rem 0 0; padding: 1.3rem; border-radius: 3px;
+           background: var(--plate-bg, #120e0b);
+           box-shadow: var(--plate-shadow, inset 0 0 0 1px #2b231b);
+           overflow-x: auto; transition: background-color .25s, box-shadow .25s; }
+  .strip { display: flex; gap: 1rem; align-items: flex-start; min-width: max-content; }
+  .slot { display: flex; flex-direction: column; gap: .55rem; width: 176px; }
+  .slot figcaption {
+    font: 400 .74rem/1.4 var(--din); letter-spacing: .11em;
+    text-transform: uppercase; color: var(--label, #8b8171);
+  }
+  .slot figcaption b { display: block; font-size: .82rem; letter-spacing: .12em;
+                       color: var(--label-strong, #cfc5b2); }
+
+  .card {
+    position: relative; width: 176px; aspect-ratio: 5 / 7;
+    border-radius: 6px; overflow: hidden;
+    container-type: inline-size; isolation: isolate;
+    box-shadow: 0 1px 2px rgba(0,0,0,.55), 0 9px 20px rgba(0,0,0,.45);
+    transition: transform .18s ease;
+  }
+  .card:hover { transform: translateY(-4px) scale(1.03); z-index: 5; }
+  .card--nophoto { outline: 1px solid #7d3030; outline-offset: -1px; }
+
+  .photo, .tint {
+    position: absolute; inset: 0;
+    -webkit-mask-image:
+      linear-gradient(to top, transparent 2%, #000 34%),
+      radial-gradient(circle at 0% 0%, transparent 13%, #000 31%);
+    mask-image:
+      linear-gradient(to top, transparent 2%, #000 34%),
+      radial-gradient(circle at 0% 0%, transparent 13%, #000 31%);
+    -webkit-mask-composite: source-in;
+    mask-composite: intersect;
+  }
+  .photo { overflow: hidden; }
+  .photo img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 17%; display: block; }
+  .tint { mix-blend-mode: multiply; opacity: .42; }
+
+  .overall {
+    position: absolute; left: 5.5cqw; bottom: 11.5cqw;
+    font: 400 20.5cqw/.84 var(--din); font-variant-numeric: tabular-nums;
+    letter-spacing: -.012em;
+  }
+  .name {
+    position: absolute; left: 6cqw; right: 6cqw; bottom: 4.2cqw;
+    font: 400 10cqw/1 var(--din); letter-spacing: .02em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .sheen {
+    position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(112deg, transparent 34%, rgba(255,255,255,.9) 47%, transparent 58%);
+    opacity: var(--sheen, .17); mix-blend-mode: screen;
+  }
+
+  .mini .strip { gap: .42rem; }
+  .mini .card { width: 68px; border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,.55); }
+  .mini .card:hover { transform: translateY(-3px) scale(1.5); }
+  .mini .slot { width: 68px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card, .plate { transition: none; }
+    .card:hover { transform: none; }
+  }
+
+  /* ---- A · gedrukte inkt, warm tegenover koud ---- */
+  .a .card { --sheen: .03;
+    background: radial-gradient(115% 90% at 78% 8%, var(--light), var(--body-c) 58%, var(--deep) 100%); }
+  .a .tint { background: linear-gradient(to bottom, var(--t1), var(--t2)); }
+  .a .overall, .a .name { color: var(--type); }
+  .a .card::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .15;
+    mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.55'/></svg>");
+  }
+  .band-angst  { --light:#5d7288; --body-c:#33455a; --deep:#1e2b3a; --t1:#7d93a8; --t2:#2c3d51; --type:#101720; }
+  .band-lastig { --light:#7d93a1; --body-c:#556d7b; --deep:#384b56; --t1:#93a8b4; --t2:#4a5f6b; --type:#141c21; }
+  .band-gelijk { --light:#a9a094; --body-c:#7d766c; --deep:#57514a; --t1:#b3a99c; --t2:#6d665d; --type:#1a1712; }
+  .band-oefen  { --light:#c99a68; --body-c:#9c6640; --deep:#6d4527; --t1:#cf9e6d; --t2:#84532f; --type:#221307; }
+
+  /* The icoon differs in exactly one thing: the gold rule. Same ground, same band,
+     same photo, same ink as any other card - which is why this sits outside the four
+     options rather than inside one of them.
+
+     Two-class selectors because .b .card::before owns the same pseudo-element and
+     outranks a bare .is-icoon::before. In B the rule therefore replaces that option's
+     edge ring on an icoon, which is the intended trade: one mark, not two. */
+  .a .is-icoon::before, .b .is-icoon::before,
+  .c .is-icoon::before, .d .is-icoon::before {
+    content: ""; position: absolute; inset: 0; z-index: 3; border-radius: 6px;
+    box-shadow: inset 0 0 0 1px rgba(176,142,66,.85);
+  }
+
+  /* ---- B · één grond, richting ---- */
+  .b .card { --sheen: .04;
+    background: radial-gradient(120% 95% at var(--lx) var(--ly), #b9ae9d, #8b8274 46%, #4f4a42 100%); }
+  .b .tint { background: linear-gradient(to bottom, #a89d8c, #5d574e); }
+  .b .overall, .b .name { color: #181410; }
+  .b .card::before { content: ""; position: absolute; inset: 0; z-index: 3; border-radius: 6px;
+                     box-shadow: inset 0 0 0 var(--edge, 1px) rgba(28,22,15,.55); }
+  .b .band-angst  { --lx: 8%;  --ly: 92%; --edge: 3px; }
+  .b .band-lastig { --lx: 30%; --ly: 72%; --edge: 2px; }
+  .b .band-gelijk { --lx: 52%; --ly: 50%; --edge: 1px; }
+  .b .band-oefen  { --lx: 84%; --ly: 10%; --edge: 1px; }
+
+  /* ---- C · duotoon drukwerk ---- */
+  .c .card { --sheen: 0; background: var(--stock); }
+  .c .photo img { filter: grayscale(1) contrast(1.22) brightness(1.04); }
+  .c .tint { opacity: .86; background: linear-gradient(to bottom, var(--spot), var(--spot-deep)); }
+  .c .overall, .c .name { color: var(--spot-deep); }
+  .c .overall { z-index: 1; }
+  .c .overall::after { content: attr(data-echo); position: absolute; left: .05em; top: .055em;
+                       color: var(--spot); opacity: .55; z-index: -1; }
+  .c .band-angst  { --stock:#e4e0d6; --spot:#7d94ab; --spot-deep:#22354a; }
+  .c .band-lastig { --stock:#e6e2d7; --spot:#93a6ac; --spot-deep:#33484f; }
+  .c .band-gelijk { --stock:#e9e3d4; --spot:#b3a894; --spot-deep:#46403a; }
+  .c .band-oefen  { --stock:#eae1cf; --spot:#d59a63; --spot-deep:#6d3f1d; }
+
+  /* ---- D · linnen band ---- */
+  .d .card { --sheen: .02; background: #efe7d6; }
+  .d .photo { inset: 0 0 30% 0;
+    -webkit-mask-image: radial-gradient(circle at 0% 0%, transparent 13%, #000 31%);
+    mask-image: radial-gradient(circle at 0% 0%, transparent 13%, #000 31%); }
+  .d .tint { display: none; }
+  .cloth { display: none; position: absolute; left: 0; right: 0; bottom: 0; height: 30%;
+    background:
+      repeating-linear-gradient(90deg, rgba(255,255,255,.10) 0 1px, transparent 1px 3px),
+      repeating-linear-gradient(0deg,  rgba(0,0,0,.13) 0 1px, transparent 1px 3px),
+      linear-gradient(to bottom, var(--cloth-light), var(--cloth));
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 -1px 2px rgba(0,0,0,.14); }
+  .d .cloth { display: block; }
+  .d .overall, .d .name { color: var(--cloth-type); }
+  .d .band-angst  { --cloth:#2b3c4e; --cloth-light:#3d5266; --cloth-type:#e6e9ee; }
+  .d .band-lastig { --cloth:#4a6270; --cloth-light:#5d7886; --cloth-type:#e9eef1; }
+  .d .band-gelijk { --cloth:#7a7365; --cloth-light:#928a7b; --cloth-type:#f2ede2; }
+  .d .band-oefen  { --cloth:#96603a; --cloth-light:#b1794c; --cloth-type:#f7ecdd; }
+
+  table { border-collapse: collapse; margin: 1rem 0 0; font-size: 14px; }
+  th, td { text-align: left; padding: .32rem .95rem .32rem 0; border-bottom: 1px solid var(--rule); }
+  th { color: var(--ink-mute); font: 400 12px/1.4 var(--din);
+       letter-spacing: .09em; text-transform: uppercase; }
+  td { color: var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<h1>Deel II — kleurwegen voor de persoonlijke kaart</h1>
+
+<p style="max-width:74ch">
+  Vier richtingen voor de kaart van het <b>persoonlijke album</b>, waar het cijfer niet zegt
+  hoe goed iemand is maar hoe hij tegen jóu ligt. Brons/zilver/goud kan hier niet: die metalen
+  betekenen "goede speler" voor iedereen die deel I heeft vastgehouden, en Marie's 92 is
+  Esther — een 68 op de ranglijst. Een gouden Esther liegt.
+</p>
+
+<p class="note" id="source-note">
+  <strong>Dit is geen mockup.</strong> De cijfers zijn veertien echte boeken uit
+  <code>GET api/cards/volume2?anchors=-5:92,0:82,5:50&amp;trustAt=10</code> en reizen mee met dit
+  document; <strong>alleen de foto's streamen van <code>http://localhost:44350</code></strong>,
+  dus start de API voor je dit leest. Een kaart waarvan de foto niet aankomt krijgt een rode rand.
+</p>
+<p class="note">
+  Drie dingen reizen met opzet mee in plaats van opgehaald te worden, en het zijn alle drie
+  dezelfde soort val. Een <code>fetch</code> naar localhost vanaf een pagina op
+  <code>file://</code> heeft herkomst <code>null</code> en wordt door CORS geweigerd. Een
+  <code>mask-image</code> naar localhost wordt vanaf <code>file://</code> stilletjes
+  weggegooid — dan zouden dit harde rechthoeken zijn, precies op de proef die de uitsnede moet
+  bewijzen. Een <code>background-image</code> idem. Alleen <code>&lt;img&gt;</code> komt er
+  ongehinderd doorheen, en daarom hangen de foto's daaraan.
+</p>
+
+<div class="bar">
+  <label for="who">Boek van</label>
+  <select id="who"></select>
+  <span>Ondergrond</span>
+  <div class="grounds" role="group" aria-label="Ondergrond">
+    <button type="button" data-ground="table" aria-pressed="true">Mahonie</button>
+    <button type="button" data-ground="page" aria-pressed="false">Albumpagina</button>
+    <button type="button" data-ground="none" aria-pressed="false">Geen</button>
+  </div>
+  <span id="status">laden…</span>
+</div>
+
+<h3>Wat vaststaat, uit deel I</h3>
+<table>
+  <tr><th>Regel</th><th>Waar die uit komt</th></tr>
+  <tr><td>Divergerend, niet oplopend</td><td>Oefenmateriaal ← gelijkwaardig → angstgegner: neutrale kern, twee tegengestelde uiteinden. Deel I's metalen zijn een ladder.</td></tr>
+  <tr><td>Materiaal, geen label</td><td>Elk geplaat cijfer, elk kader om de naam en de <i>legende</i>-pil sneuvelden als "badge op een foto"</td></tr>
+  <tr><td>Moet albumformaat halen</td><td>Bij de icoon-herbouw viel grond die alleen in verzadiging verschilde om; <b>warm tegenover koud hield stand</b></td></tr>
+  <tr><td>Niet bijna-wit</td><td>De tint vermenigvuldigt over de foto; zilvers witte tint deed niets en die kaarten lazen als blanco papier</td></tr>
+  <tr><td>Iconen dragen de band</td><td>De gouden regel is het <b>enige</b> verschil met een actieve kaart: zelfde grond, zelfde band, zelfde foto, zelfde inkt. Een kaart die de band ontwijkt kan niet zeggen of die persoon je angstgegner was — en juist bij wie weg is, is dat het interessantste in het boek</td></tr>
+</table>
+
+<hr class="rule">
+<h2>A · Gedrukte inkt, warm tegenover koud</h2>
+<p>
+  Verander het materiaal, niet alleen het palet. Deel I is metaal met folieglans op
+  <code>.17</code>; dit is bedrukt karton met de glans op <code>.03</code>. De band loopt op
+  <b>temperatuur</b>, de enige as die dit project zelf gemeten heeft als leesbaar op
+  albumformaat. Het warme uiteinde blijft aards en ontzadigd — metallisch warm gaat als goud
+  lezen.
+</p>
+<div class="plate a" data-deck="top" data-count="6"></div>
+<h3>Het hele boek op albumformaat</h3>
+<div class="plate mini a" data-deck="all"></div>
+
+<hr class="rule">
+<h2>B · Één grond, de richting draagt de band</h2>
+<p>
+  Eén kleurweg voor het hele deel, zoals de icoon er één heeft. De relatie zit in de
+  <b>richting</b>: het lichte veld reist over de diagonaal, rechtsboven voor oefenmateriaal,
+  linksonder voor de angstgegner. De regel op de rand verzwaart mee.
+</p>
+<p class="note">
+  Elegant en goedkoop, en de icoon bewijst dat één grond een hele klasse kan dragen. Maar het
+  is <strong>ongetest op albumformaat</strong>, en het bewijs uit dit project wijst de andere
+  kant op. In de rij hieronder valt het om of niet.
+</p>
+<div class="plate b" data-deck="top" data-count="6"></div>
+<h3>Het hele boek op albumformaat — hier valt het om of niet</h3>
+<div class="plate mini b" data-deck="all"></div>
+
+<hr class="rule">
+<h2>C · Duotoon drukwerk</h2>
+<p>
+  De hele kaart is een <b>tweekleurendruk</b>: zwart plus één steunkleur die met de band
+  verschuift, hard over een monochrome foto, met een haartje verkeerd geregistreerde tweede
+  plaat onder het cijfer. De scherpste breuk met deel I van de vier — maar de foto's raken
+  hun kleur kwijt, en de foto is 60–70% van de kaart.
+</p>
+<div class="plate c" data-deck="top" data-count="6"></div>
+<h3>Het hele boek op albumformaat</h3>
+<div class="plate mini c" data-deck="all"></div>
+
+<hr class="rule">
+<h2>D · Linnen band</h2>
+<p>
+  Ivoor karton, foto in kleur, en de relatie in een strook <b>boekbinderslinnen</b> over de
+  onderste derde. Dat zet de kaart in het vocabulaire dat het album al heeft: de vijf leren
+  stains, de halflinnen icoonband.
+</p>
+<p class="note">
+  Let op: dit deel zet <strong>weefsel</strong> op de kaart, en een icoon draagt datzelfde weefsel
+  met alleen de gouden regel eromheen. Er is dus geen tweede grond die ermee kan botsen — de vraag
+  is of één regel op linnen nog leest.
+</p>
+<div class="plate d" data-deck="top" data-count="6"></div>
+<h3>Het hele boek op albumformaat</h3>
+<div class="plate mini d" data-deck="all"></div>
+
+<hr class="rule">
+<h2>Waar ik op zou gaan</h2>
+<p>
+  <b>A</b>, met <b>C</b> als het alternatief mocht A nog te dicht bij deel I voelen. A
+  verandert het materiaal én de as, houdt de foto's in kleur — die van een icoon ook — en
+  leunt op het enige leesbaarheidsbewijs dat dit project zelf heeft opgeleverd.
+</p>
+<p class="note">
+  <strong>Eén afleiding, los van de kleur:</strong> de band is een <b>etiket op het gedrukte
+  cijfer</b> — drempels op 86 / 80 / 70 — en leest het record niet zelf. Zo werken deel I's
+  tiers ook, en het is de enige constructie waarin de kleur en het getal op één kaart elkaar
+  niet kunnen tegenspreken. De band opnieuw uit het record afleiden onder een eigen krimp doet
+  dat wél: dan loopt <em>gelijkwaardig</em> van overall 52 tot 91, krijgt 56% van elk boek, en
+  drukt 7% van de paren binnen een boek een koudere band op een lager getal — op de plank zijn
+  dat warme kaarten met grijze ertussen.
+</p>
+
+<script>
+window.H2H_BOOKS = {"Petar \"beetje gepiel\" Drandarov":[["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",9,-6.57,87,92,0],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",9,-11.12,86,91,0],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",52,-3.19,83,89,0],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",11,-3.19,61,89,1],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",114,-3.06,79,88,1],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",39,-2.73,85,88,1],["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",35,-2.41,92,87,0],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",427,-2.07,86,86,1],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",46,-1.84,86,86,0],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",12,-2.1,81,86,0],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",556,-1.61,89,85,1],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",59,-1.16,72,84,1],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",150,-0.52,88,83,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",40,-0.46,85,83,0],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",3,-8.01,79,83,1],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",1,-18.01,82,83,1],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",9,-0.46,68,82,1],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",163,0.2,88,81,1],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",2,-1.01,76,78,1],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",1,-0.01,78,78,1],["432d8107-ac5d-4147-b690-150de744601b","Yannick",1,-5.01,73,75,1],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",80,1.19,84,74,1],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",7,1.7,81,74,1],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",100,1.34,83,73,1],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",1,6.99,76,73,0],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",34,1.52,83,72,0],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",58,1.56,82,71,1],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",3,11.32,80,71,0],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",92,1.73,69,70,1],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",106,1.96,81,69,1],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",64,1.86,83,69,0],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",4,8.49,81,69,1],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",2,-3.01,64,69,0],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",0,0,69,69,0],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",0,0,68,68,0],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",17,2.16,83,67,1],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",6,2.32,69,67,0],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",1,15.99,69,67,1],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",3,2.99,68,66,1],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",10,2.49,71,65,1],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",7,2.84,67,64,1],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",1,38.99,65,64,0],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",47,2.9,73,62,0],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",26,2.99,66,62,1],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",1,23.99,63,62,1],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",16,3.18,70,61,0],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",2,3.99,62,61,1],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",4,8.74,67,60,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",1,23.99,59,58,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",7,10.27,71,56,1],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",6,12.65,65,56,1],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",0,0,55,55,1],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",7,7.13,58,52,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",6,5.82,52,52,1]],"Rik \"Dev-stagiair\" Maas":[["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",69,-6.17,92,92,0],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",14,-4.32,81,90,0],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",19,-3.75,87,89,0],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",6,-5.25,82,88,1],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",325,-2.66,88,87,1],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",192,-2.33,82,86,1],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",103,-2.44,72,86,1],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",62,-1.91,85,85,1],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",477,-0.98,86,84,1],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",97,-1.25,84,84,1],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",8,-1.25,83,84,1],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",4,-5.5,78,84,1],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",206,-0.47,88,83,1],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",141,-0.5,83,83,0],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",556,-0.15,89,82,1],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",68,-0.03,73,82,0],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",60,-0.13,86,82,0],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",42,-0.18,86,82,0],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",197,0.13,79,81,1],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",100,0.11,83,81,0],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",81,0.27,83,80,0],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",63,0.31,69,80,1],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",26,0.44,61,79,1],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",4,-0.75,76,79,0],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",183,0.7,81,78,1],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",110,0.64,83,78,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",5,-0.55,73,78,0],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",6,-0.92,67,77,1],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",90,1.28,66,75,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",3,2.92,79,75,1],["432d8107-ac5d-4147-b690-150de744601b","Yannick",4,2.25,73,71,1],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",1,0.25,69,70,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",23,2.2,85,69,0],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",17,2.19,71,69,1],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",5,2.45,69,69,0],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",2,-2.75,64,69,0],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",4,10.5,80,68,0],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",0,0,68,68,0],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",20,2.95,68,65,1],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",1,14.25,67,65,1],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",2,6.75,68,64,1],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",1,4.25,65,64,1],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",3,10.92,68,63,1],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",6,6.25,81,62,1],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",2,4.25,63,62,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",4,8.75,69,61,0],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",3,23.25,65,61,0],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",6,10.92,76,60,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",0,0,59,59,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",3,18.25,55,54,1],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",13,4.94,81,53,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",31,7.44,52,52,1],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",23,6.81,70,52,0],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",18,6.25,71,52,1],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",15,6.52,58,52,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",10,15.35,62,52,1]],"Ton \"ooit eerste gestaan\" Pastoor":[["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",48,-5.9,92,92,0],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",169,-2.02,82,90,1],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",163,-1.8,89,89,1],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",34,-1.23,84,87,1],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",0,0,87,87,0],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",76,-1.09,79,86,1],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",0,0,86,86,0],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",194,-0.41,86,84,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",8,-0.59,85,84,0],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",3,-2.92,81,84,1],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",32,-0.31,83,83,1],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",8,-1.21,68,83,1],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",154,-0.05,88,82,1],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",75,-0.03,81,82,1],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",44,-0.04,85,82,1],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",5,-2.79,69,81,0],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",1,4.41,83,80,1],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",33,0.32,83,78,0],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",4,0.66,81,78,1],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",0,0,78,78,1],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",18,0.41,73,77,0],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",1,11.41,80,77,0],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",2,7.41,82,76,1],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",57,0.55,72,75,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",9,0.52,79,75,1],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",42,0.72,69,73,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["432d8107-ac5d-4147-b690-150de744601b","Yannick",1,13.41,73,71,1],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",4,9.16,81,69,0],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",0,0,69,69,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",0,0,69,69,0],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",0,0,68,68,1],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",1,1.41,67,67,1],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",0,0,67,67,1],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",325,1.32,89,66,1],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",4,8.16,76,66,0],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",1,13.41,68,66,0],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",54,1.38,83,65,0],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",0,0,65,65,0],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",0,0,65,65,1],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",1,9.41,66,64,1],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",0,0,64,64,0],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",4,12.91,71,63,1],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",0,0,62,62,1],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",5,4.61,71,61,1],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",6,4.58,76,60,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",0,0,59,59,1],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",6,11.91,70,58,0],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",26,2.07,86,56,0],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",0,0,55,55,1],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",59,4.28,83,52,0],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",18,5.97,58,52,1],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",17,3.88,61,52,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",0,0,52,52,1]],"Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg":[["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",23,-12.41,92,92,0],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",17,-8.85,87,92,0],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",5,-17.57,86,89,0],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",52,-2.36,85,86,1],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",42,-2.47,84,86,1],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",21,-2.21,79,85,1],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",12,-2.22,73,85,0],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",4,-5.22,81,85,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",3,-2.97,85,85,0],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",206,-1.25,89,84,1],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",154,-1.51,88,84,1],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",150,-1.46,89,84,1],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",142,-0.49,86,83,1],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",1,0.03,83,83,1],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",14,-0.26,68,82,1],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",1,-20.97,81,82,0],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",11,0.21,76,81,0],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",13,0.88,66,78,1],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",0,0,78,78,1],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",102,1.04,82,77,1],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",44,1.05,83,77,0],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",35,0.94,69,77,1],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",2,6.53,82,76,1],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",15,1.36,83,75,1],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",2,3.03,76,74,1],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",113,1.84,81,73,1],["432d8107-ac5d-4147-b690-150de744601b","Yannick",0,0,73,73,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",11,2.3,86,71,0],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",3,15.36,80,71,0],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",0,0,71,71,1],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",58,2.58,83,70,0],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",29,2.51,61,70,1],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",4,2.78,71,70,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",9,2.81,79,69,1],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",4,15.03,81,69,1],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",0,0,69,69,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",0,0,69,69,0],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",31,2.84,72,68,1],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",0,0,68,68,0],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",0,0,67,67,1],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",0,0,67,67,1],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",1,13.03,68,66,1],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",0,0,65,65,0],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",0,0,65,65,1],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",39,3.7,83,64,0],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",3,10.03,70,64,0],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",0,0,64,64,0],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",3,10.7,69,63,0],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",2,27.53,62,60,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",0,0,59,59,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",5,6.43,58,55,1],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",0,0,55,55,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",2,19.03,52,52,1]],"Luuk \"grote schaapje\" Heijmans":[["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",15,-3.25,85,90,0],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",8,-7.92,83,90,1],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",24,-2.8,83,89,0],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",4,-21.8,87,89,0],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",77,-2.45,72,88,1],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",11,-2.41,71,88,1],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",61,-1.95,69,87,1],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",59,-1.96,83,87,0],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",28,-1.69,85,86,1],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",9,-1.27,81,85,1],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",88,-0.77,81,84,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",4,-14.05,79,84,1],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",4,-6.8,78,84,1],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",194,-0.22,88,83,1],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",142,-0.53,88,83,1],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",56,-0.57,83,83,0],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",2,-25.55,81,83,1],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",1,-18.05,82,83,1],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",79,-0.16,82,82,1],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",8,-0.05,81,82,0],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",477,0.18,89,81,1],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",1,-28.05,80,81,0],["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",35,0.38,92,79,0],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",1,-9.05,76,78,0],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",427,1.01,89,74,1],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",101,1.02,79,74,1],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",29,0.95,86,74,0],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",32,1.17,73,73,0],["432d8107-ac5d-4147-b690-150de744601b","Yannick",0,0,73,73,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",5,-1.05,58,72,1],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",5,0.15,61,71,1],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",68,1.51,83,70,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",0,0,69,69,0],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",3,14.95,76,68,1],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",3,2.29,69,68,1],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",0,0,68,68,0],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",0,0,67,67,1],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",2,3.95,68,64,1],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",68,2.36,84,63,1],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",1,14.95,64,63,0],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",3,14.29,67,62,1],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",2,21.95,65,62,0],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",1,-8.05,59,62,1],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",3,5.29,65,61,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",1,13.95,62,61,1],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",18,3.12,68,57,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",1,41.95,58,57,0],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",0,0,55,55,1],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",8,9.7,69,54,0],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",26,4.91,86,52,0],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",18,7.4,70,52,0],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",16,4.77,66,52,1],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",9,5.17,71,52,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",1,11.95,52,52,1]],"Casper \"ooit vijfde gestaan\" Keijsers":[["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",10,-8.17,79,92,1],["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",5,-9.97,92,92,0],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",16,-7.09,72,91,1],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",10,-4.97,73,89,0],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",5,-6.57,86,89,0],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",25,-4.49,83,88,0],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",8,-3.72,87,87,0],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",8,-4.47,81,87,1],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",9,-2.41,83,85,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",5,-6.17,79,85,1],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",44,-1.52,88,84,1],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",1,-12.97,83,84,1],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",56,-0.68,81,83,1],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",29,-0.76,83,83,0],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",2,-2.97,82,83,1],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",62,0.19,89,81,1],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",1,-7.97,80,81,0],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",0,0,81,81,1],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",52,0.41,88,80,1],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",11,0.58,84,80,1],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",40,0.66,83,79,0],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",39,0.75,89,79,1],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",28,0.67,86,79,1],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",1,14.03,81,78,0],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",0,0,78,78,1],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",1,0.03,76,77,0],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",3,17.7,85,75,0],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",21,1.93,58,74,1],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",7,1.03,61,73,1],["432d8107-ac5d-4147-b690-150de744601b","Yannick",0,0,73,73,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",3,4.36,76,72,1],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",0,0,71,71,1],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",5,2.83,69,70,1],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",0,0,69,69,1],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",0,0,69,69,0],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",0,0,68,68,1],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",0,0,68,68,0],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",2,16.53,71,67,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",1,18.03,69,67,0],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",0,0,67,67,1],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",0,0,67,67,1],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",7,4.17,68,65,1],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",1,4.03,65,65,1],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",1,28.03,65,64,0],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",0,0,64,64,0],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",4,5.53,66,63,1],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",0,0,62,62,1],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",59,4.91,82,61,1],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",6,7.2,70,59,0],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",10,5.73,86,58,0],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",1,7.03,59,58,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",0,0,55,55,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",3,12.7,52,52,1]],"Ridho \"Return Of The King\" Hidayat":[["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",24,-7.09,72,92,1],["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",1,-50.63,92,92,0],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",80,-1.83,89,89,1],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",68,-2.04,86,89,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",5,-7.83,85,89,0],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",12,-1.55,69,88,1],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",1,-6.63,87,88,0],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",30,-1.3,82,87,1],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",11,-1.17,85,86,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",4,-3.13,79,84,1],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",0,0,83,83,0],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",1,7.37,86,82,0],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",0,0,81,81,0],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",4,1.12,86,79,0],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",1,25.37,82,79,1],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",0,0,78,78,1],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",0,0,76,76,1],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",0,0,76,76,0],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",2,6.37,81,75,1],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",3,13.37,83,73,1],["432d8107-ac5d-4147-b690-150de744601b","Yannick",0,0,73,73,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",0,0,73,73,0],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",97,0.87,89,72,1],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",3,12.7,80,71,0],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",0,0,71,71,1],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",34,1.02,88,70,1],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",4,5.62,83,70,0],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",0,0,70,70,0],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",4,7.62,81,69,1],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",1,11.37,71,69,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",0,0,69,69,0],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",3,-6.63,58,68,1],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",0,0,68,68,1],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",0,0,68,68,0],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",0,0,67,67,1],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",1,17.37,67,65,1],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",0,0,65,65,0],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",0,0,65,65,1],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",3,21.7,69,63,1],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",1,7.37,64,63,0],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",42,1.87,88,61,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",1,8.37,62,61,1],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",7,14.37,83,60,0],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",5,8.77,69,60,0],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",4,4.12,66,60,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",0,0,59,59,1],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",3,13.7,61,58,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",0,0,55,55,1],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",70,3.31,81,52,1],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",16,3.68,83,52,1],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",15,3.37,79,52,1],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",9,4.26,68,52,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",1,20.37,52,52,1]],"Daan \"Diagonaldo\" van der Beek":[["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",12,-4.42,69,92,1],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",9,-3.39,86,91,0],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",16,-2.81,84,90,1],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",6,-4.5,83,88,0],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",100,-1.85,89,87,1],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",22,-1.68,83,87,1],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",15,-1.83,88,87,1],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",2,-12.5,86,87,0],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",0,0,87,87,0],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",110,-0.89,89,85,1],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",68,-1.06,86,85,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",23,-0.54,85,84,0],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",11,-0.5,58,83,1],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",2,-17.5,81,83,1],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",0,0,82,82,1],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",0,0,81,81,1],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",32,0.22,88,80,1],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",29,0.26,79,80,1],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",0,0,80,80,0],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",9,0.39,83,79,0],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",5,-0.5,73,78,0],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",5,-1.5,68,77,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",1,6.5,79,76,1],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",0,0,76,76,0],["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",24,0.75,92,75,0],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",2,12.5,81,75,0],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",7,1.36,83,73,0],["432d8107-ac5d-4147-b690-150de744601b","Yannick",0,0,73,73,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",1,-7.5,67,70,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",0,0,69,69,0],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",6,2.17,76,68,1],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",4,16.25,78,67,1],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",2,13.5,71,67,1],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",9,1.95,85,66,1],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",0,0,65,65,0],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",0,0,65,65,1],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",26,1.89,82,64,1],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",2,13.5,68,64,0],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",2,3,66,64,1],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",0,0,64,64,0],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",3,16.17,67,62,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",2,18,62,60,1],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",1,10.5,61,60,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",1,8.5,59,58,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",8,6,69,54,1],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",2,44,55,54,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",1,2.5,52,53,1],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",37,4.66,81,52,1],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",28,4.14,70,52,0],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",17,6.09,71,52,1],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",15,13.37,68,52,1],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",10,10.6,69,52,0],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",9,11.61,72,52,1]],"Nadia \"NEEEEEEEEEE\" Cissen":[["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",10,-11.16,81,92,1],["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",5,-9.56,92,92,0],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",59,-6.04,85,90,1],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",10,-4.96,87,88,0],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",27,-4.05,83,87,0],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",8,-4.53,82,87,1],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",5,-3.56,86,87,0],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",102,-3.39,81,86,1],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",58,-2.73,89,86,1],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",15,-3.03,86,86,0],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",102,-2.17,88,85,1],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",4,-4.16,83,85,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",4,-1.16,85,85,0],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",26,-1.54,83,84,1],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",3,-20.16,80,84,0],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",12,-0.58,76,83,0],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",79,-0.04,86,82,1],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",69,-0.13,72,82,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",21,0.03,79,82,1],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",7,-1.02,81,82,0],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",37,0.17,79,81,1],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",110,0.6,83,80,0],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",97,0.91,83,78,0],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",1,0.84,78,78,1],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",169,1.27,88,77,1],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",4,2.59,81,77,1],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",192,1.42,89,76,1],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",30,1.51,84,76,1],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",4,-1.66,70,76,0],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",30,1.64,69,75,1],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",1,-7.16,71,73,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",39,2.35,73,72,0],["432d8107-ac5d-4147-b690-150de744601b","Yannick",1,4.84,73,72,1],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",0,0,69,69,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",0,0,69,69,0],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",12,3.34,66,68,1],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",0,0,68,68,1],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",0,0,68,68,0],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",0,0,67,67,1],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",11,3.93,68,66,1],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",1,34.84,67,65,1],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",0,0,65,65,0],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",25,4.36,61,64,1],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",0,0,64,64,0],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",46,5.17,58,60,1],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",6,7.01,71,60,1],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",5,14.84,69,60,0],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",2,11.84,62,60,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",0,0,59,59,1],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",7,10.27,76,58,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",6,11.84,65,56,1],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",0,0,55,55,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",2,9.34,52,52,1]],"Aniek Aartse":[["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",59,-4.28,88,90,1],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",21,-4.09,69,90,1],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",58,-2.97,88,88,1],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",18,-3.25,83,88,0],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",8,-6.05,70,88,0],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",5,-4.42,83,87,1],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",5,-5.22,82,87,1],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",0,0,87,87,0],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",64,-2.3,89,86,1],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",0,0,86,86,0],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",25,-1.34,86,85,0],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",40,-1.05,85,84,1],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",0,0,84,84,1],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",26,-0.65,61,83,1],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",110,-0.17,82,82,1],["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",11,-0.15,92,82,0],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",0,0,81,81,1],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",141,0.32,89,80,1],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",7,0.44,81,80,1],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",0,0,80,80,0],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",9,0.69,83,79,1],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",2,-5.42,76,79,1],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",0,0,78,78,1],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",66,0.85,81,77,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",3,12.58,85,75,0],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",58,1.37,83,74,0],["432d8107-ac5d-4147-b690-150de744601b","Yannick",3,0.91,73,74,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",72,1.86,79,71,1],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",0,0,71,71,1],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",0,0,69,69,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",0,0,69,69,0],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",0,0,68,68,0],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",59,2.5,86,67,1],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",0,0,67,67,1],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",4,15.33,76,66,0],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",1,14.58,68,66,1],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",1,9.58,68,66,1],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",0,0,65,65,0],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",2,28.58,67,64,1],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",0,0,64,64,0],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",103,3.06,73,63,0],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",3,7.58,69,63,0],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",79,3.3,72,62,1],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",2,20.08,65,62,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",0,0,62,62,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",0,0,59,59,1],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",6,7.75,71,58,1],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",6,8.08,68,57,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",8,7.45,79,56,1],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",0,0,55,55,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",5,20.38,58,54,0],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",8,9.2,66,53,1],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",20,8.63,81,52,0],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",7,5.72,58,52,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",1,23.58,52,52,1]],"Anneloes \"De trein\" Ernest":[["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",5,-7.58,92,92,0],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",37,-4.15,83,91,1],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",113,-2.8,88,88,1],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",106,-2.96,89,88,1],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",70,-2.93,84,88,1],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",12,-2.48,87,87,0],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",8,-2.36,86,87,0],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",5,-6.38,81,87,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",2,-6.48,85,86,0],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",183,-1.43,89,85,1],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",5,-4.58,76,84,0],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",4,-3.48,80,84,0],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",75,-0.54,88,83,1],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",66,-0.26,83,83,0],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",56,-0.27,85,83,1],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",50,-0.48,83,83,0],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",14,-0.63,86,83,0],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",4,0.02,81,81,0],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",17,0.25,61,80,1],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",3,-3.65,76,80,1],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",6,0.52,81,79,1],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",1,-23.98,78,79,1],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",3,2.35,83,78,1],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",88,0.74,86,77,1],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",4,-0.23,71,76,1],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",6,0.68,69,74,0],["432d8107-ac5d-4147-b690-150de744601b","Yannick",0,0,73,73,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",72,1.72,83,70,0],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",0,0,68,68,0],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",60,2.13,72,67,1],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",1,33.02,69,67,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",1,34.02,69,67,0],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",5,8.22,82,66,1],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",1,35.02,67,65,1],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",1,8.02,67,65,1],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",0,0,65,65,1],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",3,20.35,70,64,0],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",0,0,64,64,0],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",21,2.73,73,63,0],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",6,8.85,79,62,1],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",2,25.52,65,62,0],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",4,19.77,68,61,1],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",102,3.25,82,60,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",3,17.35,62,58,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",2,-0.98,52,58,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",1,34.02,59,58,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",36,3.71,68,56,1],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",4,12.77,58,55,1],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",36,4.02,79,54,1],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",20,4.12,69,54,1],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",3,19.02,55,54,1],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",15,8.95,66,52,1],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",10,12.12,71,52,1]],"Lieke Verhoeven":[["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",10,-2.95,83,92,0],["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",5,-5.65,92,92,0],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",17,-2.07,86,90,0],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",34,-1.77,89,89,1],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",3,-4.91,87,89,0],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",54,-1.21,88,87,1],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",44,-1.27,88,87,1],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",4,-4.5,84,87,1],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",72,-0.95,81,86,1],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",3,-7.25,83,86,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",1,-26.25,85,86,0],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",3,-2.25,82,85,1],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",97,-0.32,82,83,1],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",81,-0.27,89,83,1],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",23,-0.2,79,83,1],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",58,-0.04,83,82,0],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",7,-0.1,83,82,1],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",3,-1.58,80,82,0],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",1,32.75,86,82,0],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",1,-18.25,81,82,0],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",2,-10.75,76,79,1],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",29,0.58,72,75,1],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",1,10.75,78,75,1],["432d8107-ac5d-4147-b690-150de744601b","Yannick",1,-5.25,73,75,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",21,0.99,73,70,0],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",4,5,81,69,1],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",0,0,69,69,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",0,0,69,69,0],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",0,0,69,69,0],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",1,17.75,70,68,0],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",0,0,68,68,0],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",0,0,67,67,1],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",1,20.75,68,66,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",5,8.75,79,65,1],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",2,16.75,67,64,1],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",1,17.75,65,64,0],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",4,7.75,71,63,1],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",4,3.75,71,63,1],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",1,7.75,64,63,0],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",0,0,62,62,1],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",13,1.91,69,59,1],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",5,10.75,68,59,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",0,0,59,59,1],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",7,8.18,76,58,0],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",6,12.09,66,56,1],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",6,5.25,65,56,1],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",4,11.25,58,55,1],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",0,0,55,55,1],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",25,4.27,85,52,1],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",24,3.5,86,52,1],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",16,9.44,81,52,1],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",9,11.42,61,52,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",3,8.75,52,52,1]],"Daan \"Vinci\" Verkade":[["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",36,-3.53,81,92,1],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",10,-5.03,66,92,1],["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",8,-4.4,92,92,0],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",15,-2.53,84,89,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",6,-8.86,85,89,0],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",5,-23.73,83,88,1],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",4,-4.53,86,88,0],["527c421f-d0ee-49c8-b87c-7340b71b0e96","Marie \"Harde schreeuwer\" Versteeg",38,-1.35,72,86,1],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",55,-0.89,86,85,0],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",13,-1.07,69,85,1],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",101,-0.6,86,84,1],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",72,-0.81,83,84,0],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",4,-7.53,79,84,1],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",197,-0.41,89,83,1],["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",9,-0.64,68,82,1],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",37,0.15,82,81,1],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",0,0,81,81,1],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",4,0.47,82,80,1],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",2,7.47,87,80,0],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",0,0,80,80,0],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",4,-9.28,71,79,1],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",29,0.71,83,76,1],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",0,0,76,76,0],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",1,3.47,78,75,1],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",2,-4.53,69,74,0],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",76,0.97,88,73,1],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",3,10.47,83,73,0],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",1,23.47,76,73,1],["432d8107-ac5d-4147-b690-150de744601b","Yannick",0,0,73,73,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",1,-10.53,68,70,1],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",23,1.43,83,69,0],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",4,15.97,81,69,1],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",0,0,69,69,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",0,0,69,69,0],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",4,-5.28,52,68,1],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",0,0,68,68,0],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",21,1.71,88,67,1],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",0,0,67,67,1],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",1,22.47,67,65,1],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",0,0,65,65,0],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",0,0,65,65,1],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",0,0,64,64,0],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",4,5.72,71,63,1],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",1,5.47,62,61,1],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",114,2.51,89,59,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",0,0,59,59,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",8,8.47,81,56,0],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",3,9.8,58,56,1],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",0,0,55,55,1],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",26,4.89,73,52,0],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",17,4.88,70,52,0],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",10,7.67,85,52,1],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",9,19.14,61,52,1]],"Marie \"Harde schreeuwer\" Versteeg":[["8094ad42-794b-4d98-8228-a0894b59e762","Esther \"Vrijwilliger\"",10,-8.45,68,92,1],["f9e220a1-2290-46ad-9bac-fd3c65e5738f","Rianne 'GIFjeskoningin' Meiberg",26,-6.59,69,91,1],["44ec2c75-25a7-4ab4-ab2b-afa5d5bcda4c","Daan \"Diagonaldo\" van der Beek",9,-11.16,83,91,1],["e69b616d-33f3-41bb-95ab-d83dd6c325dd","Roel Loonen",2,-2.05,92,91,0],["35e7cbe7-62c4-4b21-ada4-70d8ec59c780","Luc Geurts",6,-10.21,86,90,0],["3eddd710-ce41-4225-b722-4107f3450074","Nynke Koornstra",23,-5.18,73,89,0],["eb2140b7-c20c-4ca6-9005-edfd0a3b59b9","Thomas Herrings",5,-13.05,83,88,0],["08548a49-477a-405c-b742-40e6de5bb7af","Mark :tarwebrood: \"heeft ooit tweede gestaan\" Razenberg",31,-3.85,88,87,1],["4ee58006-84d5-40e5-98c4-c0f576c4c92f","Lieke Daniels",0,0,87,87,0],["084ff71e-0a5d-4fee-8c2e-0d58bb34c3b9","Aniek Aartse",79,-2.77,83,86,0],["99417d22-9d1d-426e-b5aa-de1ba62f3eba","Bart Rutten",0,0,86,86,0],["86e7fbb5-2d7c-4b58-a227-bdc732accc5d","Anneloes \"De trein\" Ernest",60,-2.16,81,85,1],["43285b84-a5a2-4318-af41-c624f72964bf","Rakesh Badal ",0,0,85,85,0],["2724f764-4837-4623-a48f-b204014b8769","Ton \"ooit eerste gestaan\" Pastoor",57,-1.19,88,84,1],["91aa9d7c-8186-4242-b957-52924df4e4f9","Gijs \"Hypno\" Janssen",0,0,83,83,1],["f20b169b-aec5-4462-822f-e378326dbb79","Nadia \"NEEEEEEEEEE\" Cissen",69,-0.08,82,82,1],["27d01eda-dc90-4a81-891a-6d00f91ef79d","Petar \"beetje gepiel\" Drandarov",59,0.11,89,82,1],["4319b84e-eb01-42b4-b1e3-3d4faa03bfbb","Jeroen \"devops\" Mens",0,0,82,82,1],["5848389a-231e-4f40-aaf5-a3279013332d","Lieke Verhoeven",29,0.13,83,81,0],["bc9ac71c-6bc7-45eb-9b6e-a41771a71f65","Yu Fee Chan",0,0,80,80,0],["cfb66496-4e21-446b-8ff4-c44fdd7d0234","Niek \"Nikos\"",1,-9.05,78,79,1],["44c8a599-1faa-486e-939e-e3afcd90d334","Tanny",2,-1.55,76,78,1],["2fbf1b87-6fcd-460d-8a2a-c3a34318e95c","Rik \"Dev-stagiair\" Maas",103,1.64,89,75,1],["808d23eb-10e5-4d07-851c-3902aaba1cda","Daan \"Vinci\" Verkade",38,1.77,79,75,1],["32ff155d-cf56-44b1-88f3-10f234aaf2ec","Bo \"IJskoud\"",11,1.95,71,74,1],["1e55c518-674f-4f55-8107-c9a6a96bbc31","Max \"Paarse slip\" Smedts",2,7.95,79,73,1],["432d8107-ac5d-4147-b690-150de744601b","Yannick",0,0,73,73,1],["141a1af6-9c6c-427d-a533-c8153d019eb4","Femke Berendsen",0,0,73,73,0],["8d4f0a6c-5b94-4bba-b5b5-fecf043e64ad","Luuk \"grote schaapje\" Heijmans",77,2.36,86,72,1],["3db685db-ae5f-4b79-b0a6-455c1d8634c4","Evie \"Ik wil worst\" Wijnhoven",4,-7.8,58,72,1],["0f2376d6-2c45-4f64-bea6-bcb27352850e","Mathijs",3,17.95,81,72,1],["d77771b6-b714-4bb5-98d6-61511e50c123","Jeroen \"Jerry\" van Geel",2,-2.05,68,71,1],["966faa86-037d-4666-832f-5d0b15c28d0e","Simon",0,0,71,71,1],["7bf0cb27-9a8b-475e-942c-fff550ac6992","Wouter Donders",8,3.83,81,69,0],["cf93ec3f-c378-4a50-b3cc-d4490e9f53f0","Daryll Sardjoe",1,5.95,70,69,0],["a70cf550-1ed4-4551-8106-78556e5dee6a","Ewan \"Bradley Cooper\" Deeley",0,0,69,69,1],["6d93d40a-6aea-4f9b-a370-05f51d71b457","Pieter Ebbers",0,0,69,69,0],["63caee9b-eec0-4a92-99b0-7a01469271a1","Edward Versteijnen",0,0,69,69,0],["f4007378-c534-48c0-a5c3-a85abd907a1c","Sevda",0,0,68,68,1],["1b6d918c-d0c6-4419-a286-ad6f94d49e89","Karin \" Tijgah\"",0,0,67,67,1],["ab29240b-32d7-423f-b5ac-bb9f4ecbc682","Tim \"Schuurmachine\" Houthuijs",0,0,67,67,1],["9a159b0b-bae4-4b74-ad24-54dbee09b618","Laura \"Miedema\" Ackermans",5,15.55,81,66,1],["0a0f1bac-0308-4b92-848f-e42d05298686","Charlie Cottrell",1,13.95,68,66,0],["7fda373b-e2c1-4c97-825c-446928bac5eb","Quynh Pham",0,0,65,65,0],["5eb57dc9-4aac-42d8-818c-a670543ea5c4","Lotte \"Functioneel doucher\" Wesselman",0,0,65,65,1],["b4285664-1d65-4f16-bd41-553f3eec74ce","Luuk Reinders",0,0,64,64,0],["b7a2d5bd-6e63-4b3d-9221-33f46a7cc5cc","Bas van Kampen",5,14.95,76,63,0],["b1d1b114-0174-4daa-b518-c3f902afe6be","Dmitry",0,0,63,63,1],["0b242a31-3aa5-4595-907b-965ba6369c2c","Fraser",0,0,62,62,1],["0a9a2736-30f5-477f-899c-368901dd0a63","Ida",6,6.29,66,60,1],["e01b2a10-e1cf-40ce-9b37-946cb91436fe","Jasper \"Kebabman\" van Buul",4,6.2,61,59,1],["1c93d552-56dc-4c43-9cf1-07f6bf0faa2f","Sandra",1,33.95,59,58,1],["6b4f6310-12a1-4f01-9f67-fc1837db2024","Mike van der Meijden",0,0,58,58,0],["28ab44a8-1d9d-4d7c-a5b8-d62c0da2610b","Casper \"ooit vijfde gestaan\" Keijsers",16,6.08,85,57,1],["a1b4a4e0-e35d-43ed-95ba-696b7b0f67a3","Angela",0,0,55,55,1],["f2cf0132-0bd9-4113-bb91-971cc65d3482","Ridho \"Return Of The King\" Hidayat",24,7.41,84,52,1],["068ae7c1-9818-47ee-ac41-07a7ca9430b2","Daria",1,25.95,52,52,1]]};
+</script>
+
+<script>
+(function () {
+  'use strict';
+
+  /* Photos still stream; only an <img> survives file:// -> localhost. */
+  var API = 'http://localhost:44350';
+
+  var status = document.getElementById('status');
+  var picker = document.getElementById('who');
+  var rows = [];
+
+  /*
+   * The band is a label on the printed number, and nothing else reaches it.
+   *
+   * Deel I's tiers are built the same way - they threshold the overall, not the
+   * rating behind it - and it is the only construction in which the colour and
+   * the figure on one card cannot contradict each other.
+   *
+   * **The band must not re-derive the record under its own shrinkage.** The
+   * number already carries one confidence model: the API's blend, full trust at
+   * trustAt=10, then extent-normalised per book, clamped and pinned. A second
+   * model on top of it disagrees, and measurably so - reading the centred record
+   * at K=100 puts 'gelijkwaardig' across overalls 52 to 91, hands it 56% of every
+   * book, and leaves 7% of within-book pairs printing a colder band on a lower
+   * number. On the shelf that is warm cards interleaved with grey ones.
+   *
+   * The cuts are absolute rather than per-book percentiles, because the API has
+   * already normalised each book; ranking them again would normalise twice. On
+   * the fourteen real books they give every book 5-11 angstgegners and 23-31
+   * commons, so no book comes out one colour.
+   */
+  var BANDS = [[86, 'angst'], [80, 'lastig'], [70, 'gelijk']];
+
+  function bandFor(row) {
+    for (var i = 0; i < BANDS.length; i++) {
+      if (row.blendedDeltaOverall >= BANDS[i][0]) return BANDS[i][1];
+    }
+    return 'oefen';
+  }
+
+  var BAND_LABEL = {
+    angst:  ['Angstgegner', 'koud'],
+    lastig: ['Lastig', 'koeler'],
+    gelijk: ['Gelijkwaardig', 'neutraal'],
+    oefen:  ['Oefenmateriaal', 'warm']
+  };
+
+  function card(row, withCaption) {
+    var el = document.createElement('div');
+    el.className = 'card band-' + bandFor(row) + (row.subjectActive ? '' : ' is-icoon');
+    el.title = row.subjectName + ' — ' + row.games + ' duels, record ' +
+               row.centredDelta.toFixed(2) + ', ranglijst ' + row.globalOverall;
+
+    var img = new Image();
+    img.alt = '';
+    img.src = API + '/api/player/' + row.subjectId + '/avatar';
+    img.addEventListener('error', function () { el.classList.add('card--nophoto'); });
+
+    var photo = document.createElement('div');
+    photo.className = 'photo';
+    photo.appendChild(img);
+
+    var tint = document.createElement('div');
+    tint.className = 'tint';
+
+    var cloth = document.createElement('div');
+    cloth.className = 'cloth';
+
+    var overall = document.createElement('div');
+    overall.className = 'overall';
+    overall.textContent = row.blendedDeltaOverall;
+    overall.setAttribute('data-echo', row.blendedDeltaOverall);
+
+    var sheen = document.createElement('div');
+    sheen.className = 'sheen';
+
+    el.appendChild(photo); el.appendChild(tint); el.appendChild(cloth);
+    el.appendChild(overall);
+
+    if (withCaption) {
+      var name = document.createElement('div');
+      name.className = 'name';
+      name.textContent = row.subjectName.replace(/\s*["'].*$/, '').split(' ')[0];
+      el.appendChild(name);
+    }
+    el.appendChild(sheen);
+
+    if (!withCaption) return el;
+
+    var fig = document.createElement('figure');
+    fig.className = 'slot';
+    fig.style.margin = '0';
+    var cap = document.createElement('figcaption');
+    var label = BAND_LABEL[bandFor(row)];
+    cap.innerHTML = '<b>' + label[0] + '</b>' + row.games + ' duels · ranglijst ' + row.globalOverall;
+    fig.appendChild(el); fig.appendChild(cap);
+    return fig;
+  }
+
+  function render(collector) {
+    var book = rows
+      .filter(function (r) { return r.collectorName === collector; })
+      .sort(function (a, b) { return b.blendedDeltaOverall - a.blendedDeltaOverall ||
+                                     b.games - a.games; });
+
+    document.querySelectorAll('.plate[data-deck]').forEach(function (plate) {
+      var top = plate.dataset.deck === 'top';
+      var slice = top ? book.slice(0, Number(plate.dataset.count || 6)) : book;
+
+      var strip = document.createElement('div');
+      strip.className = 'strip';
+      slice.forEach(function (row) { strip.appendChild(card(row, top)); });
+
+      plate.textContent = '';
+      plate.appendChild(strip);
+    });
+
+    status.textContent = book.length + ' kaarten';
+  }
+
+  var GROUNDS = {
+    table: ['#120e0b', 'inset 0 0 0 1px #2b231b, inset 0 22px 60px rgba(0,0,0,.55)', '#8b8171', '#cfc5b2'],
+    page:  ['#e8e0cd', 'inset 0 0 0 1px #cdc3ab, inset 0 18px 46px rgba(120,104,74,.22)', '#7d7461', '#3a3428'],
+    none:  ['transparent', 'none', '#8b8171', '#cfc5b2']
+  };
+
+  document.querySelectorAll('.grounds button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var g = GROUNDS[b.dataset.ground], s = document.documentElement.style;
+      s.setProperty('--plate-bg', g[0]);
+      s.setProperty('--plate-shadow', g[1]);
+      s.setProperty('--label', g[2]);
+      s.setProperty('--label-strong', g[3]);
+      document.querySelectorAll('.grounds button').forEach(function (o) {
+        o.setAttribute('aria-pressed', String(o === b));
+      });
+    });
+  });
+
+  picker.addEventListener('change', function () { render(picker.value); });
+
+  /* The books, already in the document. Fourteen collectors, busiest first, each row
+   * flattened to [id, name, games, centredDelta, globalOverall, blendedDeltaOverall,
+   * active] - the full report is 1.8MB and most of it is pairs nobody will ever look at.
+   *
+   * To refresh after a run of games, with the API up:
+   *
+   *   curl "http://localhost:44350/api/cards/volume2?anchors=-5:92,0:82,5:50&trustAt=10"
+   *
+   * and re-flatten into the H2H_BOOKS block above. */
+  var BOOKS = window.H2H_BOOKS || {};
+
+  Object.keys(BOOKS).forEach(function (name) {
+    BOOKS[name].forEach(function (a) {
+      rows.push({
+        collectorName: name,
+        subjectId: a[0], subjectName: a[1], games: a[2],
+        centredDelta: a[3], globalOverall: a[4],
+        blendedDeltaOverall: a[5], subjectActive: !!a[6]
+      });
+    });
+
+    var o = document.createElement('option');
+    o.value = name;
+    o.textContent = name.replace(/\s*["'].*$/, '').trim();
+    picker.appendChild(o);
+  });
+
+  if (!picker.options.length) {
+    status.textContent = 'geen boeken ingesloten';
+    return;
+  }
+
+  picker.value = picker.options[0].value;
+  render(picker.value);
+})();
+</script>
+
+</body>
+</html>

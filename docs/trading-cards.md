@@ -1,6 +1,22 @@
 # Trading cards for teletext-elo
 
-## Where this stands (last updated 2026-08-19)
+## Where this stands (last updated 2026-08-25)
+
+**There is a volume II now, and it is a report rather than a feature.** Everything
+in this document up to the "Volume II" heading near the end is volume I — one
+shared book, a card's overall is the subject's leaderboard rating. Volume II keeps
+the pool, the packs, the album and the ceremony and changes one thing: **a card's
+overall comes from the collector's own head-to-head record against that subject**,
+so your angstgegner is your rare card and every book is different. `GET
+api/cards/volume2` computes it; nothing writes, and `CardPoolService` does not
+know it exists.
+
+The consequence to carry into any card work: **a volume II overall does not mean
+what a volume I overall means.** A 92 there says "hard for me", not "good player" —
+Marie's 92 is Esther, a 68 on the board. That is also why volume II cannot wear
+brons/zilver/goud. Read the "Volume II" section before touching
+`HeadToHeadService`, `DeltaScaleCalculator`, `Cards:DeltaScaleAnchors` or
+`cards/volume2`; the figures in them were measured and most look arbitrary.
 
 **Game packs stand open for 24 rolling hours, and the daily freebie does not.** Read
 "Twenty-four hours, and only for game packs" before touching the window in
@@ -51,7 +67,17 @@ somebody were one lucky five-card packet or four mornings in a row. Unpaged and 
 purpose — a few thousand claims a year is small enough to hand over whole, and the route is
 read by hand. It is ungated like the other two even though it names the collector, because
 `GET api/collections/{playerId}` already hands over an entire collection to anybody who asks;
-adding a key here would protect nothing that is not already public.
+adding a key here would protect nothing that is not already public. **`?compact=true`** answers
+the same log as a `string[]`, one line per packet — `19-08-2026 14:02 - Rik pakte: Ton (74),
+Mark (81)` — the way `player/champion-history` does, off a `Line()` on the model so the two
+shapes cannot drift apart. The bracketed overall is what turns the line from a list of names
+into a record of whether the packet was worth opening, and it is **today's overall, not the one
+the card was worth at the draw**: it is read off the live pool, exactly as the album, the
+checklist and `subject.overall` in the full response are. So an old line can read
+`Rik pakte: Petar (89)` about a packet opened when Petar was a 70 — the same rule that turns a
+zilver card in your book to goud, not a defect of it. A mint-time overall is a different
+feature: nothing stores a rating on `CardInstance`, deliberately, so it would need a frozen
+column beside `IsIcon` and would print a number nothing else in the app shows.
 
 **The rating scale has been re-ijked, and the fixed point is `1000 → 80` — not 1851.**
 Five anchors moved: the top three from `2200/2600/3000` to `2000/2300/2600`, and
@@ -621,7 +647,11 @@ sized by how well they did, and collections build toward a icons unlock.
 | Earning them | Completing the active set makes the unlock **claimable, not automatic** — it puts a packet with one guaranteed icoon on the shelf. Opening it re-binds the album and then reveals the card. The latch is still permanent once pulled. |
 | That packet | **Derived** like the daily freebie, never granted: offered while the set is complete and its claim does not exist, so it follows the set both ways. One card, normal weighting narrowed to the icons, and a guarantee axis of its own rather than a very high overall floor. |
 | Presents | **Never expire.** And a gift to "everybody" is expanded into one addressed row per player at gift time, so every row has a recipient and next year's joiners are not still owed a present. |
-| The icon binding | A **half-bound** book: ivory boards with the chosen stain kept as the spine and the four corners. Brass edge and gold foil unchanged, so the five stains stay one product line. The only re-bind that exists. |
+| The icon binding | A **half-bound** book: ivory boards with the chosen stain kept as the spine and the four corners. Brass edge and gold foil unchanged, so the ten stains stay one product line. The only re-bind that exists. |
+| The binding's proportions | The leather runs **further in than it did**: corners at 20% and the band at 26px, against 13% and 10px. Settled 2026-08-25. It is the one change that makes the board smaller without changing what the object is — 90.4% of the board was ivory and 76.1% is, and that was the whole complaint. The two numbers are one decision: a 20% corner leaves a 15px flat run at head and tail, so a 10px band would step visibly at every corner. See [icoonband-design.html](icoonband-design.html) §5. |
+| The rods on the icon binding | **They stay, in gold.** Settled 2026-08-25, and it reverses an accident rather than a decision: `.album__cover-rods` sits *before* `.album__cover-icons`, so the ivory boards paint over the blind strike and the book you get for finishing is barer than the one you started with. Nobody chose that; it fell out of a placement note. The drawing does not move a coordinate — it clears the corners and the band with room to spare. |
+| How the rods are struck on ivory | Same drawing, same construction, three things different. The strike colour is `--board-hi × 0.575` — on leather a raised form catches the lamp so `--detail` goes *toward white*; on ivory the lamp can add nothing, so it goes toward black and you read the form by its shadow. `--ornament-edge` **splits into two**, light and shadow: white on ivory has 11.1 L* of headroom and black has 88.9, so one shared weight that makes the white visible makes the black a drawing. And the depth sits a step above the leather (`--tint` 0.32), because a hairline that reads on near-black is swallowed by a light ground. |
+| The metal | **Bladgoud**, a gradient across the whole board along the same 150° as the lamp: #ffeeb8 → #d2a533 → #6b4a0f, with the relief's two tones in that metal rather than in white and black. Settled 2026-08-25. The finding that took four attempts: `--foil-rule` is **brass, not gold** — chroma 44 where gold leaf is around 60 — so no amount of turning it up reads as gold, it only gets darker. This is an eleventh colour and that was accepted knowingly; like `--board-edge` it is identical on all ten stains. It also sharpens the old rule: it is not that gold cannot go on ivory, it is that `--foil` cannot, because that is foil chosen for near-black leather. |
 | Cards ↔ games | `CardInstance.GameId` FK with cascade delete. |
 | Cards ↔ players | `SubjectPlayerId` FK, **also cascade**. Player deletion only ever happens for accidentally-created players, so losing their cards is correct. |
 | Presentation | Not a screen: a **mahogany table** seen from above, with the book, the packets and the controls as objects lying on it. No OS chrome, token-driven. Chosen from ten candidates in two families — five screens, five timbers. |
@@ -631,6 +661,13 @@ sized by how well they did, and collections build toward a icons unlock.
 | Sound | Fully **synthesised** (WebAudio, no assets). On, with no in-page toggle. |
 | Pacing | Two knobs — `DEFAULT_SCALE` (2) and `DEFAULT_CEREMONY_MS` (2000). Both settled by ear on the sliders and baked in. |
 | Reveal ceremony | Graduated over four levels at 75/80/85/90 overall. Identical at any timestamp `t`; only the *length* differs. |
+
+The icon binding's four rows above were arrived at by elimination over six
+rounds, and every rejected option is kept with its measurement in
+[icoonband-design.html](icoonband-design.html) — the flat print, the printed
+outline, the debossed strike, the leather onlay, the band-as-rod, and the other
+four white-space shapes. It is **in the app** as of the same day; that page's §6 lists
+the five places it landed.
 
 Deferred: trading between collections.
 
@@ -1652,6 +1689,20 @@ Done:
   - A claim with no cards is not a state the app can produce — a packet always contains at
     least one — but it comes back as an empty list rather than a missing row, because a
     claim whose cards were deleted by hand is worth seeing.
+  - **`?compact=true` is a parameter on the same route, not a second route.** It is one
+    report at two levels of detail, and a `packs/lines` beside it would be a second thing to
+    remember to extend. The line comes off `OpenedPack.Line()` — the model owns its one-line
+    form, the way `ChampionChange` does, so the terse and the full shape are the same data
+    rather than two assemblers to keep in step. The cost is an untyped `ActionResult` and no
+    Swagger schema on the action, which is affordable on an API whose generated client is
+    never regenerated.
+    - Dutch, first names, duplicates repeated, cards in the response's own best-first order,
+      and the stamp to the minute with the year spelled out — a log that runs for years
+      cannot use a champion change's bare `dd-MM`. Formatted **invariant**, because `:` in a
+      .NET format string is the culture's time separator rather than a literal.
+    - Silent about the source, the game and `MintedAsIcon`. The line is the skim of who
+      packed what and when; anything that needs to know where a packet came from asks for
+      the full response, which is the same route without the parameter.
 
 - **`Services/PackService.cs`** — deriving, sizing, rolling, claiming, the daily
   freebie, and giving. `Derive`, `PackForGame`, `DailyPack`, `GiftPack` and `Roll` are all
@@ -6605,3 +6656,213 @@ Still open: judging the icoon face itself against 20 real portraits rather than
 placeholder names — in particular the 9 silver and bronze icoons, which are what
 the "tier moves the metal and nothing else" rule was written for and has never
 been tested on.
+
+## Volume II — the personal album
+
+Everything above this heading is **volume I**: one shared book, where a card's
+overall is the subject's rating off the leaderboard. Petar is an 89 for everybody,
+and completing the set is essentially one long wait for him.
+
+**Volume II keeps the pool, the pack sizes, the album and the ceremony, and
+changes exactly one thing: a card's overall comes from the collector's own
+head-to-head record against that subject.** Your angstgegner is your rare card.
+Every book is therefore different, which is the point — it is the first thing in
+this app that makes looking at somebody else's collection worth doing.
+
+**The number does not mean what it means in volume I, and everything else follows
+from that.** A 92 here does not say "good player", it says "hard for me". Marie's
+92 is Esther, a 68 on the board. Anything that reads a volume II overall as a
+statement about standing is wrong — including, and this is the load-bearing
+consequence, the metals: **volume II cannot wear brons/zilver/goud**, because
+those already mean "good player" to everyone who has held a card, and a gold
+Esther in Marie's book would be a lie. The colourway work that follows from that
+is in [card-volume2-colourways.html](card-volume2-colourways.html).
+
+**Status: a report, not a feature.** `GET api/cards/volume2` computes it, nothing
+writes, no pack is drawn through it, and `CardPoolService` does not know it
+exists. Promoting it is a real architectural change — see the end of this section.
+
+### The metric: average Elo delta per game, and why not win rate
+
+The record is `TeamPerformance.DeltaPoints` summed over the games two people
+played on opposite sides, divided by the game count — the same aggregation
+`PlayerService.GetPlayerStatistics` already does for the oefenmateriaal and
+angstgegner rows on a player page.
+
+**It has to be the delta and not the raw head-to-head**, and that one choice is
+what makes the volume possible at all. On raw win rate Petar beats everybody, so
+Petar is everyone's angstgegner and you have rebuilt volume I with extra steps.
+The Elo delta is *already* expectation-adjusted, so Petar is only your angstgegner
+if you do worse against him than your rating says you should — and the best player
+in the office can genuinely be somebody's oefenmateriaal. That inversion is the
+whole product.
+
+Three properties of `DeltaPoints` are load-bearing and all three look tidy-able:
+
+- **It is exactly zero-sum.** `teamDelta = {d, -d}`, so `-otherTeam.DeltaPoints`
+  is identically your own team's figure. The sign source is cosmetic.
+- **It excludes the first-ten-games experience factor.** `CalculateOutcome`
+  applies `ExperienceFactor` to the *rating* and reports the unadjusted delta.
+  Keep it that way: the factor is per player, so including it gives the two
+  players on one team different deltas and leaves no team figure to attribute to
+  an opponent; and it is a convergence device that says nothing about the game.
+- **The expectation already includes both opponents.** `ProbTeam1Wins` is built
+  from all four ratings, so "Petar was carrying her" is priced in. What is *not*
+  separable is which of the two opponents caused the residual — a co-occurrence
+  problem rather than an expectation one, and it averages out wherever partners
+  vary.
+
+**The goal-difference alternative was built, measured and rejected.** Actual
+margin minus expected margin is better constructed — right reference point,
+symmetric weighting, a quarter of the per-game noise — and on the decisive
+statistic it came out a wash: shrinkage constants of 173–992 against the delta's
+526–988. It also needs `ExpectedScoreCalculator.GetExactExpectedMargin` rather
+than `GetExpectedMargin`, because the integer version clamps a level fixture to
+±1 and rounds, and both biases survive averaging. It lost on pacing: completion
+spread 0.57–1.94× against the delta's 1.07–1.32×.
+
+### What the measurement actually said
+
+`HeadToHeadTests.PrintTheDistribution`, against a copy of the production database.
+On 3,306 pairs to 2026-08-25:
+
+| | |
+|---|---:|
+| Pairs who have never met | **1,700 of 3,306** |
+| Pairs at ≥10 games | 428 |
+| Pairs at ≥100 games | 54 |
+| Per-game delta, standard deviation | **17.3** |
+| Matchup signal, standard deviation | **0.5–3.0** |
+
+**The signal is small and the noise is not**, and the whole design is built around
+that. Percentiles narrow almost exactly as `1/√n`, which is the signature of
+sampling noise; the deep bands put the real matchup effect at about half a delta
+point. Reliability is `n/(n+k)` with k in the low hundreds, so a 25-game pair is a
+few per cent signal.
+
+Two consequences that look like defects and are not:
+
+- **A one-game pair is not evidence.** Every one of the 24 most extreme pairs was
+  a 1–2 game pair, at ±39 to ±54. Angela at +19.00 on three games would be the
+  *commonest* card in Rik's book — and on a slightly different metric she is
+  nearly the rarest. The blend below exists to stop exactly this.
+- **A sample floor does not rescue it.** Past a floor there is almost nothing left
+  to read. The floor was the wrong worry; the weighting was the right one.
+
+### The settled configuration
+
+Read all of these before changing any of them. They look arbitrary and none are.
+
+| | | |
+|---|---|---|
+| Anchors | `−5 → 92, 0 → 82, +5 → 50` | see below |
+| Trust | **10 games** to full weight, ramping from 0 | at 5, a card's churn peaks at ±24 overall points exactly where its weight tops out |
+| Centring | median of the collector's pairs at ≥10 games, shrunk by `m/(m+5)` | |
+| Extent | per book: mean of ranks **2–5** of their negative deep records, pinned at 60% of the outer anchor, clamped ×¼–×4 | |
+| Ceiling | **each book's own pool maximum**, not a fixed 92 | |
+
+**±5 as the extent.** The centred records at ten games or more run p10/p90 =
+−5.51/+4.25. That is the band believable pairs occupy; the full range reaches ±50,
+and fitting to *that* put every real matchup within two points of the middle.
+
+**92 at the rare end — the cap is the pacing lever, not the median.** Tickets
+halve every 2.5 overall points above the hinge, so 95 is **2.3×** rarer than
+today's top card and 99 is **six times** rarer. 92 puts the chase at parity with
+volume I.
+
+**82 in the middle, which is not the book's median.** The blend pulls thin pairs
+back toward their ordinary ratings, so a middle anchor of 82 produces a book whose
+median is about 73 — today's. What the anchor sets is where the **80 line** falls
+against the record distribution, and at 82 it lands just above a zero record,
+which is what puts ~23 cards at 80 or above: the count a real book holds. It took
+a sweep to find. At a middle of 73 the count is 9.
+
+**Both metrics need centring, and Elo self-centring is not it.** Elo balances a
+player's games-*weighted* total to zero, which keeps their rating honest and says
+nothing about the unweighted list of one figure per opponent. Uncentred, Roel's
+median card prints 52 and Daria's 95 — one book almost all commons, the other
+almost all rares. Median rather than mean because the list is fat-tailed by
+construction; deep pairs only, and shrunk, because a constant computed off
+one-game pairs jitters — and it is subtracted from *every* card, so a game against
+A and B would otherwise move C.
+
+**The extent is a multiplier, so it is the fragile one.** Read off a single rank
+it makes one specific opponent the silent owner of a whole book's width: Marie's
+factor by rank runs 0.36 / 0.46 / 0.58 / 0.78 / 1.08, so one result reordering her
+top few moves her entire book by a third — beating one nemesis would have made two
+others rarer and pushed three commons further down. Averaging ranks 2–5 needs
+several results to shift. Rank 1 is excluded for the same reason it was never used
+alone: it is the most volatile figure in the book.
+
+**The ceiling is read off the book, not the config.** A fixed 92 hands the
+top-rated player a card rarer than their own pool contains — they are excluded
+from their own book, so its natural ceiling is the second-highest rating on the
+board. Roel's volume came out **2.3× harder** than his volume I purely from that.
+
+### What it produces
+
+Completion, as expected cards drawn to fill the book (`ExpectedDraws` in the
+tests). **The count above 80 is not a proxy for this** and misled for several
+rounds:
+
+| collector | factor | ≥80 | max | completion |
+|---|---:|---:|---:|---:|
+| Rik | ×0.91 | 22 | 92 | 1.15× |
+| Ton | ×1.95 | 17 | 92 | 1.17× |
+| Marie | ×0.65 | 20 | 92 | 1.46× |
+| Roel | ×2.08 | 12 | 89 | 1.11× |
+| Anneloes | ×1.07 | 20 | 92 | 1.23× |
+| Petar | ×1.05 | 18 | 92 | 1.29× |
+| Luuk | ×1.25 | 22 | 90 | 0.92× |
+| Ridho | ×1.79 | 13 | 92 | 1.52× |
+
+**Fewer cards above 80 makes a volume harder, not easier** — the opposite of the
+intuition, and it cost several rounds of chasing the wrong number. Draw odds are a
+share of the ticket mass, so concentrating the rare mass into nine cards instead
+of 23 makes each of them rarer.
+
+Roel and Ridho are the outliers and neither is a scaling artefact. Of Roel's eight
+deep pairs only four have negative records at all — he genuinely has few hard
+matchups, and no scale can invent them.
+
+### Rejected, so they are not re-walked
+
+- **Rank mapping.** Deal each book the ratings it already contains, in the order
+  the record puts the cards in. Gives perfect distribution parity and 1.00×
+  completion for everybody — and throws the magnitudes away, so the number stops
+  saying *how much* worse a matchup is and says only where it came in the queue.
+- **Rank-anchored interpolation.** Pin the target at a few ranks, interpolate on
+  the record between them. Same family, same objection.
+- **Pinning the book's median.** Works, and unpins the cap: shifting a book to fix
+  its median pushes the top card through the ceiling. Completion went from a
+  1.0–2.9× spread to **0.3–7.1×**. The knob survives as `?medianTarget=`, off by
+  default.
+- **The frequency axis** — rarity from how often you have played somebody rather
+  than how it went. Noiseless, and a different volume rather than this one.
+
+### Where the code is
+
+- `HeadToHeadService` — the aggregation and every candidate scale. One pass over
+  the games for all collectors at once; **inactive players kept**, because
+  filtering them out (as the player page rightly does) would silently delete every
+  icoon from a personal album.
+- `DeltaScaleCalculator` — the record → overall scale. **Monotonically
+  decreasing**, unlike every other scale here: a positive record is
+  oefenmateriaal, which is a *common* card.
+- `Cards:DeltaScaleAnchors` in `appsettings.json` — wins over the C# defaults at
+  runtime, exactly as `ScaleAnchors` does, so the two have to move together.
+- `HeadToHeadTests` — two ordinary tests pin the settled figures;
+  `PrintTheDistribution`, `PrintOneBook`, `PrintCollectorCentres` and
+  `DumpTheReport` are `[Explicit]` and read a copy of the real database.
+
+### What promoting it would take
+
+**The pool becomes per-collector.** `GET api/cards/pool` answers one shared,
+cacheable object today; volume II answers a different pool per viewer, and
+`CardRatingCalculator` gains a second input. That also finishes off any hope of a
+meaningful expected-share column on the statistics endpoint — though that was
+already ruled out for four other reasons.
+
+Still open: whether the personal record sets the rarity at all or only the card's
+face and its label, and how a volume II book coexists with volume I's completion.
+Neither is decided here.

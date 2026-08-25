@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace AnagoLeaderboard.Models.Results;
 
 /// <summary>
@@ -45,7 +47,69 @@ public sealed record OpenedPack(
     string Source,
     string? GameId,
     string? GiftId,
-    IReadOnlyList<PackedCard> Cards);
+    IReadOnlyList<PackedCard> Cards)
+{
+    /// <summary>
+    /// The packet as one line, for <c>GET api/packs?compact=true</c> - the same arrangement
+    /// <c>player/champion-history</c> uses, where the model owns its one-line form and the
+    /// controller only maps over it. Derived from this object rather than assembled anywhere
+    /// else, so the two shapes of the route cannot come to disagree about what was in a packet.
+    ///
+    /// To the minute, and the day is stamped in full: this log runs for years, so a
+    /// <c>dd-MM</c> the way a champion change carries would be ambiguous the moment there is a
+    /// second season of it. Formatted invariant rather than in the server's culture, because
+    /// <c>:</c> in a format string is the culture's *time separator* placeholder rather than a
+    /// literal colon - a machine set to the wrong locale would quietly print <c>14.02</c>.
+    ///
+    /// Dutch, because a line served for somebody to read is UI copy - the same reason a champion
+    /// change says "speelde niet voor 2 weken" rather than translating it.
+    ///
+    /// First names, like every other line and every card face in this app. Duplicates are
+    /// repeated rather than collapsed, because two copies of somebody is what a packet
+    /// containing two copies of somebody should read as - and they are in the list's own
+    /// best-first order. The overall in brackets is what makes that order legible: without it
+    /// the line says a packet held three cards but not whether it was worth opening.
+    ///
+    /// <strong>That overall is today's, not the one the card was worth on the day it was
+    /// pulled</strong>, because it is read off <see cref="PackedCard.Subject"/>, which is the
+    /// live pool. So a line can say <c>Rik pakte: Petar (89)</c> about a packet torn open when
+    /// Petar was a 70. That is not a rounding of the truth, it is the same rule the album, the
+    /// checklist and the statistics follow - <see cref="CardInstance"/> stores no rating at all
+    /// on purpose, and pulling somebody at zilver who becomes goud is the intended behaviour
+    /// rather than a defect of it. It is also what keeps this line agreeing with the
+    /// <c>subject.overall</c> the full response carries for the same card, which is the whole
+    /// reason <see cref="Line"/> is derived from this object.
+    ///
+    /// A mint-time overall would need a frozen column of its own beside
+    /// <see cref="CardInstance.IsIcon"/> and would print a number that nothing else in the app
+    /// shows. If that is ever wanted it is a feature, not a format change: read that property's
+    /// remarks first, because they say why the one frozen flag there is does not decide what a
+    /// card looks like.
+    ///
+    /// Deliberately silent about <see cref="Source"/>, <see cref="GameId"/> and
+    /// <see cref="PackedCard.MintedAsIcon"/>. This is the skim of who packed what and when;
+    /// anything that has to know where a packet came from wants the full response, which is
+    /// the same route without the parameter.
+    /// </summary>
+    public string Line() =>
+        $"{ClaimedAt.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture)} - "
+        + $"{FirstName(CollectorName)} pakte: "
+        + string.Join(
+            ", ",
+            Cards.Select(card => $"{FirstName(card.Subject.Name)} ({card.Subject.Overall})"));
+
+    /// <summary>
+    /// The first word of a name, the way <see cref="Models.ChampionInfo"/> takes it. Two people
+    /// sharing a first name is a collision this line accepts: it is what their cards print, so a
+    /// log that disambiguated would name them differently from the thing it is a log of.
+    /// </summary>
+    private static string FirstName(string name)
+    {
+        var space = name.IndexOfAny(new[] { ' ', '\t', '\n', '\r' });
+
+        return space == -1 ? name : name[..space];
+    }
+}
 
 /// <summary>
 /// One card out of one packet.

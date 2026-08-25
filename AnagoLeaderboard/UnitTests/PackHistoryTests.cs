@@ -166,6 +166,98 @@ namespace UnitTests
             Assert.That(card.MintedAsIcon, Is.False, "but it was not packed as one");
         }
 
+        /// <summary>
+        /// The compact line behind <c>?compact=true</c>: to the minute, first names with the
+        /// overall in brackets, and the cards in the order the full response lists them.
+        /// </summary>
+        [Test]
+        public async Task ThePackReadsAsOneLine()
+        {
+            var players = await ARosterThatHasPlayed();
+
+            var claim = await Mint(players[0].Id, new[] { players[1].Id, players[2].Id });
+            claim.ClaimedAt = new DateTime(2026, 8, 19, 14, 2, 11);
+            await _dbContext.SaveChangesAsync();
+
+            var pack = (await _packHistoryService.GetHistory()).Packs.Single();
+            var faces = string.Join(
+                ", ",
+                pack.Cards.Select(card => $"{card.Subject.Name} ({card.Subject.Overall})"));
+
+            Assert.That(pack.Line(), Is.EqualTo($"19-08-2026 14:02 - Rik pakte: {faces}"));
+        }
+
+        /// <summary>
+        /// The overall in brackets is the subject's now, not the one they printed on the day the
+        /// packet was opened - the same rule as the face itself, and the reason nothing freezes a
+        /// rating onto <c>CardInstance</c>. A line about a card pulled at 70 reads 89 once its
+        /// subject is an 89.
+        /// </summary>
+        [Test]
+        public async Task TheOverallOnTheLineIsTodaysRatherThanTheOneItWasPackedAt()
+        {
+            var players = await ARosterThatHasPlayed();
+            var subject = players[1];
+
+            await Mint(players[0].Id, new[] { subject.Id });
+
+            var atMint = (await _packHistoryService.GetHistory())
+                .Packs.Single().Cards.Single().Subject.Overall;
+
+            // Four more thrashings by the subject, so the standing behind the card - and with it
+            // the number in the corner - is not the one the packet was opened at.
+            for (var i = 0; i < 4; i++)
+            {
+                await AGame(players[1], players[2], players[0], players[3]);
+            }
+
+            var pack = (await _packHistoryService.GetHistory()).Packs.Single();
+            var today = pack.Cards.Single().Subject.Overall;
+
+            Assert.That(
+                today,
+                Is.Not.EqualTo(atMint),
+                "the fixture has to move the subject's overall or this test proves nothing");
+            Assert.That(pack.Line(), Does.EndWith($"{subject.Name} ({today})"));
+        }
+
+        /// <summary>
+        /// First names on the line, for the collector and the cards alike - the same trim
+        /// <c>ChampionInfo</c> does, and what a card face prints.
+        /// </summary>
+        [Test]
+        public async Task TheLineTakesFirstNamesOnly()
+        {
+            await ARosterThatHasPlayed();
+            var collector = await AddPlayer("Jan de Vries");
+            var subject = await AddPlayer("Piet Jansen");
+
+            await Mint(collector.Id, new[] { subject.Id });
+
+            var pack = (await _packHistoryService.GetHistory()).Packs.Single();
+
+            Assert.That(
+                pack.Line(),
+                Does.EndWith($"Jan pakte: Piet ({pack.Cards.Single().Subject.Overall})"));
+        }
+
+        /// <summary>
+        /// Two copies of one subject read as two names. Collapsing them would make a five-card
+        /// packet of one player look like a single.
+        /// </summary>
+        [Test]
+        public async Task DuplicatesAreRepeatedOnTheLine()
+        {
+            var players = await ARosterThatHasPlayed();
+
+            await Mint(players[0].Id, new[] { players[1].Id, players[1].Id });
+
+            var pack = (await _packHistoryService.GetHistory()).Packs.Single();
+            var face = $"{players[1].Name} ({pack.Cards[0].Subject.Overall})";
+
+            Assert.That(pack.Line(), Does.EndWith($"{face}, {face}"));
+        }
+
         [Test]
         public async Task DeletingTheGameTakesItsPacksOutOfTheLog()
         {

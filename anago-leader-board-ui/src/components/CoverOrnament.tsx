@@ -4,12 +4,15 @@ import React from 'react';
  * The blind ornament on the album's front board: four foosball rods, 1-2-3-5 from
  * keeper to attack, with the owner's name in the gap between the second and the third.
  *
- * **It is not a drawing on the leather, it is the leather pushed up.** There is no
- * second colour anywhere in here that matters — the stain's own tone runs at a fifth of
- * strength (`--ornament-tint`) and everything you actually see is white and black at
- * seven tenths (`--ornament-edge`), which is what a blind stamp is: no ink, only relief.
- * Turn the tint up to full and it stops being an impression and becomes a light blue
- * picture printed on a navy book. See `album.css` for the two dials and their values.
+ * **On the leather cover it is not a drawing on the hide, it is the hide pushed up.**
+ * There is no second colour in here that matters — the stain's own tone runs at a fifth of
+ * strength (`--ornament-tint`) and what you actually see is white and black at seven
+ * tenths (`--ornament-light` and `--ornament-shadow`), which is what a blind stamp is: no
+ * ink, only relief. Turn the tint up to full and it stops being an impression and becomes
+ * a light blue picture printed on a navy book.
+ *
+ * On the icon binding the same drawing is struck in gold leaf on the ivory boards instead.
+ * See `album.css` for both sets of dials and their values; none of it is in this file.
  *
  * **Every plane is drawn four times, and that is the whole effect.** Head, torso, legs
  * and foot each get a shadow form a fraction down-right, the body itself, a highlight
@@ -33,8 +36,14 @@ import React from 'react';
  * **Only on the full-size cover.** `.choice__book` on the choosing table is its own small
  * flat face and deliberately does not get this: at 224px the three edges of a relief
  * start to merge, at 112px they are one thick line, and what that table is for is telling
- * bordeaux from ossenbloed. The half-bound icon binding covers it rather than switching
- * it off — see the placement note in `album.css`.
+ * bordeaux from ossenbloed. That argument holds harder on the icon binding, whose shadow
+ * side runs at 0.95 of an already thin black.
+ *
+ * **It is drawn on the icon binding too, in gold leaf on the boards.** Everything that
+ * differs there is a handful of custom properties in `album.css`
+ * (`.album--icons .album__cover-rods`); this file draws one geometry and knows nothing
+ * about which material it lands in. The `<defs>` below is the exception, and only because
+ * a gradient has to be a real element somewhere.
  *
  * **The eleven figures are written out, not `<use href="#…">` on one definition**, and
  * that is not a missed optimisation. It was a sprite first, with the id from `useId()`
@@ -181,6 +190,28 @@ const CoverOrnament: React.FC = () => (
     aria-hidden="true"
     focusable="false"
   >
+    {/*
+      The leaf, for the icon binding — `--ornament-paint` points at it from album.css.
+
+      **A literal id, and that is deliberate.** `useId()` returns `:R0:`, colons and all,
+      which is a legal id and not a reference a fragment lookup can be trusted with; that
+      is the same trap that made the eleven figures written out rather than a sprite. Two
+      mounted covers therefore define the same id twice, which is harmless here: both
+      elements are identical, and `userSpaceOnUse` resolves against the *referencing*
+      element's user space, so whichever one the lookup finds paints both covers correctly.
+
+      Along the lamp's own 150deg, and across the whole drawing rather than per figure —
+      eleven figures with a gradient each read as eleven stickers.
+    */}
+    <defs>
+      <linearGradient id="album-goldleaf" gradientUnits="userSpaceOnUse"
+                      x1="60" y1="40" x2="720" y2="960">
+        <stop offset="0" stopColor="#ffeeb8" />
+        <stop offset="0.45" stopColor="#d2a533" />
+        <stop offset="1" stopColor="#6b4a0f" />
+      </linearGradient>
+    </defs>
+
     {ROWS.map((row) => {
       const gaps = gapsFor(row.players);
 

@@ -322,22 +322,31 @@
   /* `--board-out`, the squares, is on `:root` — the cover ceremony draws the shut book's
      box from outside the album. See the note there. */
 
-  /*
-   * How high the leather runs along the edges of the icon binding — see
-   * `.album__cover-icons`.
+  /* ----------------------------------------------------------------
+   * How far the leather comes onto the icon binding — see `.album__cover-icons`.
    *
-   * **Not a chosen thickness: it is the run the corner pieces already leave.** Their boxes
-   * are `13% 13%`, which on a board taller than it is wide is a tall rectangle, and a 45°
-   * cut across one leaves leather standing at both ends of the head and the tail —
-   * `6.5% × (H − W)`, which comes to 8.3px at a 420px page and 10.9px at 560px. A literal
-   * of 10px rather than that expression, because CSS cannot mix the two axes in one length,
-   * and a band that disagreed with the corners by a pixel or two would be visible as a step
-   * where they meet — where a band that is a pixel or two *proud* of them is not.
+   * **These two are one decision and cannot be moved apart.** A corner box is
+   * `--board-corner` of *each* axis, so on a board taller than it is wide it is a tall
+   * rectangle, and the 45° cut across it cannot reach the far corner: it leaves leather
+   * standing at the head and the tail to a depth of `(corner / 2) × (H − W)`. The band has
+   * to be **at least** that, or the diagonal drops to the band in a visible step at every
+   * corner. At 20% on a 560×718 board that run is 15.8px, so a 10px band would step 5.8px
+   * four times. Above the run there is no step at all — the diagonal simply meets the band
+   * a little sooner, at x = 101.8px instead of 112.
    *
-   * It is deliberately close to `--board-out` and has nothing to do with it. That is the
-   * board standing proud of the paper; this is covering material on the board's face.
-   */
-  --board-band: 10px;
+   * **20% and 26px, up from 13% and 10px, settled 2026-08-25.** The boards were 90.4% of
+   * the face and are 76.1%, and that was the whole complaint about this binding: it is the
+   * largest white field on a table of dark wood. It is also the only change that makes them
+   * smaller without changing what the object *is* — still a half-bound book, still ten
+   * stains in one product line. docs/icoonband-design.html §5 computes both numbers and
+   * what they cost the ornament in clearance (stang 1 keeps 19.2px to the nearest corner,
+   * against 58.4px before).
+   *
+   * `--board-band` is deliberately close to `--board-out` and has nothing to do with it.
+   * That is the board standing proud of the paper; this is covering material on its face.
+   * ---------------------------------------------------------------- */
+  --board-corner: 20%;
+  --board-band: 26px;
 
   /*
    * How wide the brass hairline is where the leather meets the boards.
@@ -3260,19 +3269,23 @@
  * The geometry and the reasoning are in `CoverOrnament.tsx` and, at length, in
  * docs/cover-ornament.html. What lives here is the ink, and there is almost none of it.
  *
- * **Two dials, and they are not one dial.** `--ornament-edge` scales every white and
- * every black — how high the form stands. `--ornament-tint` scales the leather's own
- * tone — how visible the form is at all. At 0.7 and 0.2 a figure's body is
- * 0.24 x 0.2 ≈ 5% and the rest is light and shadow: that is a blind stamp, which has no
- * second colour by definition. Turning the tint up is the one change that takes the
- * whole thing from an impression in the hide to a pale blue picture on top of it, so if
- * this ever looks wrong, that is the number to suspect.
+ * **The dials are listed on the rule below.** On the leather cover they come to three:
+ * how high the form stands (`--ornament-light` and `--ornament-shadow`, both 0.7) and how
+ * visible it is at all (`--ornament-tint`, 0.2). At those values a figure's body is
+ * 0.24 x 0.2 ≈ 5% and everything else is light and shadow: that is a blind stamp, which
+ * has no second colour by definition. Turning the tint up here is the one change that
+ * takes this from an impression in the hide to a pale blue picture on top of it, so if the
+ * leather cover ever looks wrong, that is the number to suspect.
  *
- * **White and black are identical on all ten stains**, and only `currentColor` moves.
- * Same rule as the brass and the gold in `albumLeather.ts`: one workshop, ten leathers,
- * and the lamp in that workshop does not change with the skin. The five classes that
- * carry the stain are `.rod-face`, `.rod-top-inner`, `.rod-left-inner`, `.shape-fill`
- * and `.edge-mid`.
+ * **The icon binding is a different bewerking on the same drawing**, and it is at the
+ * bottom of this block: the boards are ivory, so the same numbers do something else
+ * entirely. See `.album--icons .album__cover-rods`.
+ *
+ * **White and black are identical on all ten stains**, and only the own-colour layers
+ * move. Same rule as the brass and the gold in `albumLeather.ts`: one workshop, ten
+ * leathers, and the lamp in that workshop does not change with the skin. The six classes
+ * that carry the own colour are `.rod-face`, `.rod-top-inner`, `.rod-left-inner`,
+ * `.shape-fill`, `.edge-mid` and `.detail-mid`.
  *
  * **The black is stronger than the white at every level** — 30 against 18 on the outline,
  * 32 against 19 on the rod, 19 against 9 on the seams. Leather is matt: it swallows light
@@ -3282,17 +3295,51 @@
  * **`fill: none` on the svg is load-bearing.** The `.edge-*` shapes are outlines of the
  * same rects and paths as the fills; inheriting a fill turns each figure into a block.
  *
- * **Placement: after the hide, before `.album__cover-icons`.** Everything in here stacks
- * in tree order — `.album__face` sets no `preserve-3d`, so `z-index` buys nothing (see
- * the note on `.album__cover-icons`). Sitting before the icon binding means the ivory
- * boards paint over the rods, so the re-bind wipe carries them off with the leather
- * instead of leaving them lying across the new boards, and no kill-list rule is needed.
+ * **Placement: after `.album__cover-icons`, and that is a decision rather than an
+ * ordering.** Everything in here stacks in tree order — `.album__face` sets no
+ * `preserve-3d`, so `z-index` buys nothing (see the note on `.album__cover-icons`).
+ *
+ * **Before it is the wrong place, and it is the tempting one.** Put this rule above
+ * `.album__cover-icons` and the ivory boards paint straight over the rods: the book you
+ * get for finishing the set is barer than the one you started with, and the only thing on
+ * its board is the name. The reason it looks right is that it also solves the re-bind —
+ * the white-out cannot leave rods lying across new boards if there are none. That is
+ * solving it by deletion. The answer is to strike them into the boards as well, which is
+ * what the block at the bottom does.
+ *
+ * From here the ornament survives the white-out and changes material rather than
+ * disappearing into it, which is the better ceremony as well: a book being re-cased, not
+ * re-drawn. The whole argument, with every rejected alternative measured, is in
+ * docs/icoonband-design.html.
+ *
  * `.album__cover::after` still goes over the top of all of it, which is right: the roll
  * at the board's edge is a real edge, and this is an impression in the flat inside it.
  * ---------------------------------------------------------------- */
 .album__cover-rods {
-  --ornament-edge: 0.7;
+  /*
+   * **The light and the shadow carry separate weights, and they have to.** One number for
+   * both is enough on leather, which is nearly black: the two tones are not in each
+   * other's way there, and both sit at 0.7. On the icon binding's boards they are — white
+   * on ivory has 11.1 L* of headroom against black's 88.9, so a shared weight that makes
+   * the white visible makes the black a drawing.
+   *
+   *   --ornament-light    how much of --ornament-tone-hi: the side the lamp is on
+   *   --ornament-shadow   how much of --ornament-tone-lo: the side it is not
+   *   --ornament-tint     how much of the mark's own colour: how deep the strike is
+   *   --gilt-w            how hard the metal stands; 1 when there is no metal
+   *   --ornament-paint    what the six own-colour layers are painted in
+   *
+   * `--ornament-paint` exists because `color` cannot hold a gradient and the icon
+   * binding's gold is one. It defaults to `currentColor`, so on leather it resolves to
+   * the `--detail` below and nothing had to be threaded through.
+   */
+  --ornament-light: 0.7;
+  --ornament-shadow: 0.7;
   --ornament-tint: 0.2;
+  --gilt-w: 1;
+  --ornament-paint: currentColor;
+  --ornament-tone-hi: #fff;
+  --ornament-tone-lo: #000;
   position: absolute;
   inset: 0;
   width: 100%;
@@ -3307,88 +3354,88 @@
    leather just under it, a soft dark just above the bottom, black on the bottom. No
    rounded corners and no round caps; see CoverOrnament.tsx. */
 .album__cover-rods .rod-shadow {
-  fill: #000;
-  fill-opacity: calc(0.09 * var(--ornament-edge));
+  fill: var(--ornament-tone-lo);
+  fill-opacity: calc(0.09 * var(--ornament-shadow));
 }
 .album__cover-rods .rod-face {
-  fill: currentColor;
-  fill-opacity: calc(0.23 * var(--ornament-tint));
+  fill: var(--ornament-paint);
+  fill-opacity: calc(0.23 * var(--ornament-tint) * var(--gilt-w));
 }
 .album__cover-rods .rod-top {
-  stroke: #fff;
-  stroke-opacity: calc(0.19 * var(--ornament-edge));
+  stroke: var(--ornament-tone-hi);
+  stroke-opacity: calc(0.19 * var(--ornament-light));
   stroke-width: 1.05;
 }
 .album__cover-rods .rod-top-inner {
-  stroke: currentColor;
-  stroke-opacity: calc(0.48 * var(--ornament-tint));
+  stroke: var(--ornament-paint);
+  stroke-opacity: calc(0.48 * var(--ornament-tint) * var(--gilt-w));
   stroke-width: 0.75;
 }
 .album__cover-rods .rod-bottom-inner {
-  stroke: #000;
-  stroke-opacity: calc(0.16 * var(--ornament-edge));
+  stroke: var(--ornament-tone-lo);
+  stroke-opacity: calc(0.16 * var(--ornament-shadow));
   stroke-width: 0.8;
 }
 .album__cover-rods .rod-bottom {
-  stroke: #000;
-  stroke-opacity: calc(0.32 * var(--ornament-edge));
+  stroke: var(--ornament-tone-lo);
+  stroke-opacity: calc(0.32 * var(--ornament-shadow));
   stroke-width: 1.1;
 }
 .album__cover-rods .rod-left {
-  stroke: #fff;
-  stroke-opacity: calc(0.16 * var(--ornament-edge));
+  stroke: var(--ornament-tone-hi);
+  stroke-opacity: calc(0.16 * var(--ornament-light));
   stroke-width: 1;
 }
 .album__cover-rods .rod-left-inner {
-  stroke: currentColor;
-  stroke-opacity: calc(0.42 * var(--ornament-tint));
+  stroke: var(--ornament-paint);
+  stroke-opacity: calc(0.42 * var(--ornament-tint) * var(--gilt-w));
   stroke-width: 0.75;
 }
 .album__cover-rods .rod-right-inner {
-  stroke: #000;
-  stroke-opacity: calc(0.14 * var(--ornament-edge));
+  stroke: var(--ornament-tone-lo);
+  stroke-opacity: calc(0.14 * var(--ornament-shadow));
   stroke-width: 0.75;
 }
 .album__cover-rods .rod-right {
-  stroke: #000;
-  stroke-opacity: calc(0.28 * var(--ornament-edge));
+  stroke: var(--ornament-tone-lo);
+  stroke-opacity: calc(0.28 * var(--ornament-shadow));
   stroke-width: 1;
 }
 
 /* The planes of a figure: the body, with a shadow form under it and a highlight form
    over it, each a fraction offset. */
 .album__cover-rods .shape-fill {
-  fill: currentColor;
-  fill-opacity: calc(0.24 * var(--ornament-tint));
+  fill: var(--ornament-paint);
+  fill-opacity: calc(0.24 * var(--ornament-tint) * var(--gilt-w));
 }
 .album__cover-rods .shape-hiFill {
-  fill: #fff;
-  fill-opacity: calc(0.05 * var(--ornament-edge));
+  fill: var(--ornament-tone-hi);
+  fill-opacity: calc(0.05 * var(--ornament-light));
 }
 .album__cover-rods .shape-loFill {
-  fill: #000;
-  fill-opacity: calc(0.09 * var(--ornament-edge));
+  fill: var(--ornament-tone-lo);
+  fill-opacity: calc(0.09 * var(--ornament-shadow));
 }
 
 /* The raised edge: the same outline three times, half a unit apart. This is what makes
    a silhouette into a relief. */
 .album__cover-rods .edge-hi {
-  stroke: #fff;
-  stroke-opacity: calc(0.18 * var(--ornament-edge));
+  stroke: var(--ornament-tone-hi);
+  stroke-opacity: calc(0.18 * var(--ornament-light));
   stroke-width: 1.05;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 .album__cover-rods .edge-mid {
-  stroke: currentColor;
-  stroke-opacity: calc(0.42 * var(--ornament-tint));
+  stroke: var(--ornament-paint);
+  stroke-opacity: calc(0.42 * var(--ornament-tint) * var(--gilt-w));
   stroke-width: 0.95;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 .album__cover-rods .edge-lo {
-  stroke: #000;
-  stroke-opacity: calc(0.3 * var(--ornament-edge));
+  stroke: var(--ornament-tone-lo);
+  stroke-opacity: calc(0.3 * var(--ornament-shadow));
   stroke-width: 1.1;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -3397,22 +3444,70 @@
 /* The seams in the casting: knee, shoulder, top of the foot. The cheapest layer of the
    four and the one that stops the figures reading as silhouettes. */
 .album__cover-rods .detail-hi {
-  stroke: #fff;
-  stroke-opacity: calc(0.09 * var(--ornament-edge));
+  stroke: var(--ornament-tone-hi);
+  stroke-opacity: calc(0.09 * var(--ornament-light));
   stroke-width: 0.8;
   stroke-linecap: round;
 }
 .album__cover-rods .detail-mid {
-  stroke: currentColor;
-  stroke-opacity: calc(0.26 * var(--ornament-tint));
+  stroke: var(--ornament-paint);
+  stroke-opacity: calc(0.26 * var(--ornament-tint) * var(--gilt-w));
   stroke-width: 0.72;
   stroke-linecap: round;
 }
 .album__cover-rods .detail-lo {
-  stroke: #000;
-  stroke-opacity: calc(0.19 * var(--ornament-edge));
+  stroke: var(--ornament-tone-lo);
+  stroke-opacity: calc(0.19 * var(--ornament-shadow));
   stroke-width: 0.84;
   stroke-linecap: round;
+}
+
+/* ---------------------------------------------------------------- *
+ * The ornament on the icon binding: gold leaf on paper boards
+ *
+ * The same drawing, the same construction, three things different — and the third is the
+ * one that matters.
+ *
+ * **The strike colour goes the other way.** On leather a raised form catches the lamp, so
+ * `--detail` is the hide's own colour with white in it and you read the form by its light
+ * side. Ivory has no light left to give, so a raised form there is read by the shadow it
+ * throws and `--board-detail` is the board's own colour with black in it. See
+ * albumLeather.ts, where it is one sum and not a table.
+ *
+ * **The two weights split apart**, for the reason at the top of this block: 1.75 and 0.21
+ * against 0.7 and 0.7 (this rule then overrides both again for the metal, below).
+ *
+ * **And it is struck in gold rather than blind.** All six own-colour layers take the leaf,
+ * and the two tones of the relief take that metal's own light and shadow instead of white
+ * and black — which is the whole difference between a gold *colour* and a gold *metal*: a
+ * metal surface has its highlight and its shadow in its own hue.
+ *
+ * **`--foil-rule` is not the gold to use here, and neither is `--foil`.** `--foil` is
+ * #e6c98a, chosen to glow on near-black leather, and on ivory it moves the ground by about
+ * a single L*; that is the same finding that took the cover's type from foil to bronze.
+ * `--foil-rule` reaches further but is brass rather than gold — chroma 44 where leaf sits
+ * around 60 — so turning it up only ever gets darker, never golden. #ffeeb8 → #d2a533 →
+ * #6b4a0f is a real gold, and it is an eleventh colour taken knowingly: like `--board-edge`
+ * it is identical on all ten stains, so the product line holds.
+ *
+ * The numbers were measured rather than chosen; docs/icoonband-design.html has the table
+ * and every rejected alternative beside it.
+ *
+ * **The gradient, and why it is a paint server rather than a colour.** `color` cannot hold
+ * one, which is what `--ornament-paint` is for. It runs along the same 150deg as the lamp
+ * the whole cover is lit by, in `userSpaceOnUse` over the drawing's own viewBox, so it is
+ * one sweep across the board — per-figure gradients would read as eleven stickers. It is
+ * defined in CoverOrnament.tsx, next to the geometry it belongs to.
+ * ---------------------------------------------------------------- */
+.album--icons .album__cover-rods {
+  color: var(--board-detail, #8c8982);
+  --ornament-paint: url(#album-goldleaf);
+  --ornament-tint: 0.32;
+  --gilt-w: 3.2;
+  --ornament-tone-hi: #fffdf0;
+  --ornament-tone-lo: #2e1f06;
+  --ornament-light: 4;
+  --ornament-shadow: 0.95;
 }
 
 /* "Verzamelalbum van", above the owner's name. Deliberately the smaller of the
@@ -3733,26 +3828,29 @@
      * the two corners on that side into one brown mass that read as a letter strip rather
      * than as a binding. The corners alone say half-bound, which is the whole claim.
      *
-     * 13%, down from 22%: at the larger size the triangles were the loudest thing on an
-     * otherwise quiet board, and a corner piece is a reinforcement rather than a panel.
+     * The size is `--board-corner`; see the note on it up in `.album`, which is where it
+     * and `--board-band` are set together. It went 22% → 13% because at the larger size the
+     * triangles were the loudest thing on an otherwise quiet board and a corner piece is a
+     * reinforcement rather than a panel, and then 13% → 20% because the boards were still
+     * the largest white field on the table.
      * `--leather-lo` rather than `--mid`, because these sit on a pale ground where the
      * darker end of the stain reads as leather instead of as paint.
      *
      * 45deg points the hypotenuse at the nearest corner.
      */
     linear-gradient(45deg, var(--leather-lo, #4a3820) 0 50%, transparent 50%) left bottom /
-      13% 13% no-repeat,
-    linear-gradient(135deg, var(--leather-lo, #4a3820) 0 50%, transparent 50%) left top / 13%
-      13% no-repeat,
+      var(--board-corner) var(--board-corner) no-repeat,
+    linear-gradient(135deg, var(--leather-lo, #4a3820) 0 50%, transparent 50%) left top /
+      var(--board-corner) var(--board-corner) no-repeat,
     linear-gradient(225deg, var(--leather-lo, #4a3820) 0 50%, transparent 50%) right top /
-      13% 13% no-repeat,
+      var(--board-corner) var(--board-corner) no-repeat,
     linear-gradient(315deg, var(--leather-lo, #4a3820) 0 50%, transparent 50%) right bottom /
-      13% 13% no-repeat,
+      var(--board-corner) var(--board-corner) no-repeat,
     /*
      * The four edges, in the same leather as the corners — head, tail and both sides.
      *
-     * **The corner pieces were already asking for this and only half-drawing it.** A 13%
-     * box is 13% of the *width* across and 13% of the *height* down, and the board is
+     * **The corner pieces were already asking for this and only half-drawing it.** A
+     * corner box is `--board-corner` of the *width* across and of the *height* down, and
      * taller than it is wide, so the 45° cut cannot reach either far corner of that box:
      * it leaves a flat run of leather along the head and the tail, `6.5% × (H − W)`, which
      * is 8–11px at every page size the desktop book takes. Four corners with a flat run at
@@ -3797,16 +3895,16 @@
      * colour, and it is still identical on all five stains.
      */
     linear-gradient(45deg, var(--board-edge, #6b5325) 0 50%, transparent 50%) left bottom /
-      calc(13% + var(--board-rule-w) * 1.414) calc(13% + var(--board-rule-w) * 1.414)
+      calc(var(--board-corner) + var(--board-rule-w) * 1.414) calc(var(--board-corner) + var(--board-rule-w) * 1.414)
       no-repeat,
     linear-gradient(135deg, var(--board-edge, #6b5325) 0 50%, transparent 50%) left top /
-      calc(13% + var(--board-rule-w) * 1.414) calc(13% + var(--board-rule-w) * 1.414)
+      calc(var(--board-corner) + var(--board-rule-w) * 1.414) calc(var(--board-corner) + var(--board-rule-w) * 1.414)
       no-repeat,
     linear-gradient(225deg, var(--board-edge, #6b5325) 0 50%, transparent 50%) right top /
-      calc(13% + var(--board-rule-w) * 1.414) calc(13% + var(--board-rule-w) * 1.414)
+      calc(var(--board-corner) + var(--board-rule-w) * 1.414) calc(var(--board-corner) + var(--board-rule-w) * 1.414)
       no-repeat,
     linear-gradient(315deg, var(--board-edge, #6b5325) 0 50%, transparent 50%) right bottom /
-      calc(13% + var(--board-rule-w) * 1.414) calc(13% + var(--board-rule-w) * 1.414)
+      calc(var(--board-corner) + var(--board-rule-w) * 1.414) calc(var(--board-corner) + var(--board-rule-w) * 1.414)
       no-repeat,
     linear-gradient(var(--board-edge, #6b5325), var(--board-edge, #6b5325)) left top / 100%
       calc(var(--board-band) + var(--board-rule-w)) no-repeat,

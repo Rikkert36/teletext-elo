@@ -33,11 +33,13 @@ builder.Services.AddScoped<CollectionService>();
 builder.Services.AddScoped<PackService>();
 builder.Services.AddScoped<CardStatisticsService>();
 builder.Services.AddScoped<PackHistoryService>();
+builder.Services.AddScoped<HeadToHeadService>();
 
 // No state, just paths and a process invocation, so singletons.
 builder.Services.AddSingleton<AvatarStorage>();
 // Pure functions over a fixed balance table read once from configuration.
 builder.Services.AddSingleton<CardRatingCalculator>();
+builder.Services.AddSingleton<DeltaScaleCalculator>();
 builder.Services.AddSingleton<SilhouetteService>();
 
 builder.Services.AddControllers();

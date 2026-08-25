@@ -214,6 +214,22 @@ export const albumLeather = (cover: string | null | undefined): CSSProperties =>
      * fall out of step, and an unused custom property costs nothing — the half-binding is
      * composed in CSS out of tokens that are always here.
      */
+    /*
+     * The tone the ornament is struck in **on the boards**, and it is the mirror of
+     * `--detail` above rather than a second guess at it.
+     *
+     * On leather a raised form catches the lamp, so the strike goes toward *white* — that
+     * is why `--detail` is `hi` with 18% white in it. On the boards the lamp has nothing
+     * left to add (white on ivory is 11.1 L* of headroom against black's 88.9), so a raised
+     * form there is read by the shadow it throws and the tone goes the other way: the
+     * board's own colour, a fixed fraction toward black.
+     *
+     * **0.575 is solved, not chosen.** It is the fraction at which `edge-mid` on ivory
+     * moves the ground by the same 2.55 L* it moves the leather. One sum rather than a
+     * table, exactly like `lighten(stain.hi, 0.82)`, and identical on all ten stains
+     * because `--board-hi` is.
+     */
+    '--board-detail': '#8c8982',
     '--board-hi': '#f4efe2',
     '--board-mid': '#e6dfcd',
     '--board-lo': '#d8cfb8',

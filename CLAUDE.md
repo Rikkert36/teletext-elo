@@ -14,9 +14,18 @@ design, every settled decision and the reasoning behind it lives in
 anything under `src/mock/`, `src/styles/card.css`, `album.css`, `packopen.css`,
 `putaway.css`, `viewer.css`, `game.css`, `components/PackOpener.tsx`, `Album.tsx`,
 `PlayerCard.tsx`, `CardViewer.tsx`, `PutAway.tsx`, `utils/sounds.ts`, or — on the API side —
-`Services/PackService.cs`, `CollectionService.cs`, `CardPoolService.cs` and
-`Calculators/CardRatingCalculator.cs`.** It records a great many decisions that were
+`Services/PackService.cs`, `CollectionService.cs`, `CardPoolService.cs`,
+`HeadToHeadService.cs` and `Calculators/CardRatingCalculator.cs`,
+`Calculators/DeltaScaleCalculator.cs`.** It records a great many decisions that were
 arrived at by elimination and will otherwise be re-litigated or silently undone.
+
+**There is a volume II** — same pool, same packs, same album, but a card's overall
+comes from *your own head-to-head record against that subject* rather than from the
+leaderboard, so your angstgegner is your rare card and every collector's book is
+different. It is a report today (`GET api/cards/volume2`), not a feature: nothing
+writes and `CardPoolService` does not know it exists. The thing to carry: **a
+volume II overall means "hard for me", not "good player"** — which is why it cannot
+wear brons/zilver/goud. Its own section is at the end of the doc.
 
 Two of them are load-bearing enough to repeat here. **Packs are derived, never
 granted** — `CreateGame` writes a game and nothing else, and reintroducing a write

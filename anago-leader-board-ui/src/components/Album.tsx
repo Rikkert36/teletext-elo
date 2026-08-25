@@ -707,12 +707,6 @@ const PageFace: React.FC<{
     return (
       <div className="album__cover">
         {/*
-          The ornament, before the icon binding on purpose: everything in here paints in
-          tree order, so the ivory boards go over it and the re-bind wipe carries the rods
-          off with the leather they were struck into. See `album.css`.
-        */}
-        <CoverOrnament />
-        {/*
           The icon binding: ivory boards, with the chosen stain kept as the four corners.
 
           A half-bound book, so the leather it was bound in is still what carries the
@@ -730,6 +724,14 @@ const PageFace: React.FC<{
           another — which is what an opacity crossfade would have given.
         */}
         {binding ? <div className="album__cover-icons" /> : null}
+
+        {/*
+          The ornament, after the icon binding: everything in here paints in tree order, so
+          this is what keeps the rods on the board instead of under it. Struck into the
+          leather on a leather cover and into the boards in gold leaf on a re-bound one,
+          which is entirely a matter of custom properties — see `album.css`.
+        */}
+        <CoverOrnament />
 
         {page.kicker ? <div className="album__cover-kicker">{page.kicker}</div> : null}
         {/*
