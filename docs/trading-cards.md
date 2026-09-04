@@ -1817,6 +1817,43 @@ exactly 70.5 — left on the default the two scales would have disagreed by a po
 on a whole family of real ratings, quietly. `CardRatingCalculator` rounds
 `AwayFromZero` and there is a test pinning it.
 
+### The photo is served resized, and never by the API itself
+
+`api/player/{id}/avatar?w=512` takes a **width the caller will draw at**, not a file to
+send, and the resized copies are made offline by the silhouette generator.
+
+The problem it solves is specific to the book. An avatar is an original camera upload —
+the pool averages 1.6 MB and the largest is 5000×5000 — and the album mounts *every page
+at once*, with all the leaves absolutely positioned on the same screen rect. So
+`loading="lazy"` on the portraits defers nothing: every leaf is in the viewport, only
+behind others in z, and opening the book pulled **137 MB** of photo for 57 cards 145 px
+wide. Measured in Firefox on a laptop that struggles: 175 MB of a 250 MB tab was player
+photos, most of it the encoded bytes held resident rather than decoded bitmaps. It is now
+2.9 MB.
+
+Three things about it are decisions rather than mechanics.
+
+**512 and 1024, and the number is the shorter side.** The photo is `object-fit: cover`
+over a 5:7 card and nearly every source is square, so it is scaled to the card's
+*height*, not its width — 203 px in the album, 336 for the pack opener's hero, 532 in the
+card viewer. Sizing from the width is the easy mistake and lands ~40% short. The viewer is
+the only surface that asks for 1024, because it is the only one where the photo is the
+thing being looked at.
+
+**The leaderboard, the history page and the player page ask for 512 too**, though they
+draw at 40 and 160 px. A browser caches on the whole url, so a face fetched at two widths
+is downloaded twice — leaving those three on the original would have made *opening both
+pages* worse than before, not neutral. One width means the second page costs nothing.
+
+**Nothing resizes on request.** The copies are written by the generator after an upload
+and by a backfill run, and the endpoint falls back to the original whenever there is
+none — missing, stale, or a photo already smaller than what was asked for. That is a
+deliberate trade for keeping a native image decoder out of `w3wp`, which is the whole
+argument `SilhouetteService` and `tools/silhouette/README.md` make for that process
+existing: its dlls would be locked during a deploy and its memory held permanently for
+something that runs when a photo is uploaded and never again. Adding a width is therefore
+a deploy **plus** a backfill run; a deploy alone silently keeps serving originals.
+
 ## Presentation layer
 
 The teletext theme is deliberately minimal and cannot carry a card collection, so

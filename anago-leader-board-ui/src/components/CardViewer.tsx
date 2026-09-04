@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { splitName, TIER_LABELS } from '../mock/cardMock';
+import { AVATAR_WIDTH_VIEWER, splitName, TIER_LABELS } from '../mock/cardMock';
 import PlayerCard, { ownedLabel } from './PlayerCard';
 import { AlbumSlotRef } from './Album';
 import '../styles/viewer.css';
@@ -132,7 +132,13 @@ const CardViewer: React.FC<CardViewerProps> = ({ slots, index, onIndex, onClose 
           tier metal — and here that is a card at 380px, not a thumbnail.
         */}
         <div className="viewer__card">
-          <PlayerCard card={slot.card} empty={empty} eager />
+          {/* The one surface that asks for the larger photo — see `portraitWidth`. */}
+          <PlayerCard
+            card={slot.card}
+            empty={empty}
+            eager
+            portraitWidth={AVATAR_WIDTH_VIEWER}
+          />
         </div>
 
         {/*

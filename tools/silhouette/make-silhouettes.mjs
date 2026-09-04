@@ -1,5 +1,6 @@
 /**
- * Generates the silhouette mask for one player, or for the whole avatar directory.
+ * Generates the silhouette mask for one player, or for the whole avatar directory —
+ * and the resized copies of the photo that the front end actually draws.
  *
  * Called by the API as a child process right after an avatar upload (see
  * SilhouetteService), and runnable by hand for the initial backfill or to repair a
@@ -7,8 +8,24 @@
  *
  *   node make-silhouettes.mjs --avatars <dir> --out <dir> --id <playerId>
  *   node make-silhouettes.mjs --avatars <dir> --out <dir> --all [--force]
+ *   ... --variant 512:<dir> --variant 1024:<dir>     also write resized copies
+ *   ... --variants-only                              skip the mask, and the model with it
  *
- * A mask is skipped when it is newer than its avatar, so --all is cheap to repeat.
+ * An output is skipped when it is newer than its avatar, so --all is cheap to repeat.
+ *
+ * **Why the resized copies are made here.** An avatar is an original camera upload —
+ * the pool averages 1.6 MB and the largest are 5000×5000 — and the album mounts every
+ * page of the book at once, so opening it downloaded ~90 MB and decoded a quarter of a
+ * gigapixel to draw cards 145px wide. The photo has to be reduced *somewhere*, and this
+ * process is where: it already decodes the avatar to read it for the mask, it already
+ * runs on exactly the event that invalidates a copy, and it is already outside the API
+ * process — which is the whole argument SilhouetteService makes for existing. Resizing
+ * in the API would put a native image decoder in w3wp, locked during a deploy, for the
+ * sake of something that runs a few times a year.
+ *
+ * A copy is therefore *not* guaranteed to be there: the endpoint falls back to the
+ * original when one is missing, which is the pre-existing behaviour rather than a
+ * failure. It also means new widths are backfilled by running this, not by deploying.
  *
  * How it works: u2netp is a salient-object network. It has no notion of faces — it
  * predicts which pixels belong to the dominant subject, which is exactly the thing a
@@ -35,6 +52,13 @@ const MODEL = path.join(HERE, "u2netp.onnx");
 
 const N = 320;                        // u2net input size
 const CARD_W = 512, CARD_H = 716;     // 5:7, the aspect the mask is stored at
+/**
+ * Quality of a resized copy. High for a JPEG, because a card's photo is a face at a
+ * couple of hundred pixels and the ringing shows: at 512px the difference between 85
+ * and the usual 75 is ~15 kB on a file that started at 1.6 MB, which is no difference
+ * at all next to what this is here to save.
+ */
+const JPEG_QUALITY = 85;
 const RATIO = 5 / 7;
 const MEAN = [0.485, 0.456, 0.406];
 const STD = [0.229, 0.224, 0.225];
@@ -90,6 +114,37 @@ function parseArgs(argv) {
 }
 
 /**
+ * The `--variant <width>:<dir>` pairs, which `parseArgs` cannot carry because it keeps
+ * one value per flag and there is one of these per width.
+ *
+ * Split on the **first** colon: the directory is an absolute Windows path and brings a
+ * drive letter's colon with it.
+ *
+ * The widths are not a list this script owns. AvatarStorage decides where every file
+ * belonging to a player lives and what sizes exist, for the same reason it was written
+ * in the first place, and passes both in.
+ */
+function parseVariants(argv) {
+  const variants = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] !== "--variant") continue;
+    const value = argv[i + 1];
+    const split = value === undefined ? -1 : value.indexOf(":");
+    if (split <= 0) {
+      console.error(`--variant wants <width>:<dir>, got ${value ?? "nothing"}`);
+      process.exit(2);
+    }
+    const width = Number(value.slice(0, split));
+    if (!Number.isInteger(width) || width < 1) {
+      console.error(`--variant width is not a whole number: ${value.slice(0, split)}`);
+      process.exit(2);
+    }
+    variants.push({ width, dir: value.slice(split + 1) });
+  }
+  return variants;
+}
+
+/**
  * Decode on the magic bytes rather than the extension or the content type.
  *
  * Avatars are stored with no extension at all, and the API reports image/jpeg for every
@@ -99,9 +154,101 @@ function parseArgs(argv) {
 function decode(buffer) {
   if (buffer[0] === 0x89 && buffer[1] === 0x50) {
     const png = PNG.sync.read(buffer);
-    return { data: png.data, width: png.width, height: png.height };
+    return {
+      data: png.data, width: png.width, height: png.height,
+      transparent: hasAlpha(png.data), orientation: 1
+    };
   }
-  return jpeg.decode(buffer, { useTArray: true, maxMemoryUsageInMB: 2048 });
+  // A JPEG cannot carry alpha, so the copies of one are always safe to encode as JPEG.
+  return {
+    ...jpeg.decode(buffer, { useTArray: true, maxMemoryUsageInMB: 2048 }),
+    transparent: false,
+    orientation: exifOrientation(buffer)
+  };
+}
+
+/** Whether any pixel is less than fully opaque — see `writeVariants`. */
+function hasAlpha(data) {
+  for (let i = 3; i < data.length; i += 4) if (data[i] !== 255) return true;
+  return false;
+}
+
+/**
+ * The EXIF orientation of a JPEG, 1 when there is none.
+ *
+ * **Read here because a copy has to be rotated where the original was not.** A browser
+ * applies this tag when it draws an `<img>`, and `jpeg-js` hands over the stored pixels
+ * without it — so three avatars in the pool are stored on their side and displayed
+ * upright. Re-encoding those without baking the rotation in produces a copy that is
+ * sideways *on the card*, which is the one way this whole change could be visible.
+ *
+ * A hand-rolled reader rather than a dependency: it is one tag in the first IFD, and the
+ * tool's other two packages are its decoders.
+ */
+function exifOrientation(buffer) {
+  let i = 2;
+  while (i < buffer.length - 3) {
+    if (buffer[i] !== 0xff) { i++; continue; }
+    const marker = buffer[i + 1];
+    // Markers that carry no length: padding, restarts, and the two delimiters.
+    if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) { i += 2; continue; }
+    // The scan, past which there are no more headers worth walking.
+    if (marker === 0xda) break;
+
+    const length = buffer.readUInt16BE(i + 2);
+    if (marker === 0xe1 && buffer.slice(i + 4, i + 8).toString("latin1") === "Exif") {
+      const tiff = i + 10;
+      const little = buffer.slice(tiff, tiff + 2).toString("latin1") === "II";
+      const u16 = (at) => (little ? buffer.readUInt16LE(at) : buffer.readUInt16BE(at));
+      const u32 = (at) => (little ? buffer.readUInt32LE(at) : buffer.readUInt32BE(at));
+
+      const ifd = tiff + u32(tiff + 4);
+      const entries = u16(ifd);
+      for (let e = 0; e < entries; e++) {
+        const entry = ifd + 2 + e * 12;
+        if (u16(entry) === 0x0112) {
+          const value = u16(entry + 8);
+          return value >= 1 && value <= 8 ? value : 1;
+        }
+      }
+      return 1;
+    }
+    i += 2 + length;
+  }
+  return 1;
+}
+
+/**
+ * Bakes an EXIF orientation into the pixels, so the copy needs no tag of its own.
+ *
+ * All eight, not only the rotate-90 that the pool happens to contain: the mirrored four
+ * are two lines each here and a silently mirrored face later.
+ */
+function applyOrientation(src, w, h, orientation) {
+  if (orientation === 1) return { data: src, w, h };
+
+  // 5 through 8 exchange the axes, so the copy is the other way up.
+  const swaps = orientation >= 5;
+  const ow = swaps ? h : w, oh = swaps ? w : h;
+  const out = Buffer.alloc(ow * oh * 4);
+
+  for (let y = 0; y < oh; y++) {
+    for (let x = 0; x < ow; x++) {
+      let sx, sy;
+      switch (orientation) {
+        case 2: sx = w - 1 - x; sy = y; break;              // mirrored
+        case 3: sx = w - 1 - x; sy = h - 1 - y; break;      // 180°
+        case 4: sx = x; sy = h - 1 - y; break;              // mirrored, 180°
+        case 5: sx = y; sy = x; break;                      // mirrored, 90° anticlockwise
+        case 6: sx = y; sy = h - 1 - x; break;              // 90° clockwise
+        case 7: sx = w - 1 - y; sy = h - 1 - x; break;      // mirrored, 90° clockwise
+        default: sx = w - 1 - y; sy = x; break;             // 8: 90° anticlockwise
+      }
+      src.copy(out, (y * ow + x) * 4, (sy * w + sx) * 4, (sy * w + sx) * 4 + 4);
+    }
+  }
+
+  return { data: out, w: ow, h: oh };
 }
 
 /** Bilinear resample of an RGBA buffer. */
@@ -139,6 +286,146 @@ function crop(src, sw, sh, rect, dw, dh) {
     src.copy(patch, y * rect.w * 4, (sy * sw + sx) * 4, (sy * sw + sx + rect.w) * 4);
   }
   return resample(patch, rect.w, rect.h, dw, dh);
+}
+
+/* ------------------------------------------------------------------ *
+ * The resized copies
+ * ------------------------------------------------------------------ */
+
+/**
+ * Which source pixels fall under each destination pixel, and how much of each.
+ *
+ * One axis at a time: a box filter is separable, so a reduction is two passes of this
+ * rather than a rectangle read per output pixel, and the weights for a column are the
+ * same for every row. Normalised, so a partial pixel at either end of the box does not
+ * darken the edge.
+ */
+function boxWeights(srcLen, dstLen) {
+  const scale = srcLen / dstLen;
+  const rows = [];
+  for (let d = 0; d < dstLen; d++) {
+    const from = d * scale, to = (d + 1) * scale;
+    const first = Math.floor(from), last = Math.min(srcLen - 1, Math.ceil(to) - 1);
+    const entries = [];
+    let total = 0;
+    for (let s = first; s <= last; s++) {
+      const weight = Math.min(to, s + 1) - Math.max(from, s);
+      if (weight > 0) { entries.push([s, weight]); total += weight; }
+    }
+    rows.push(entries.map(([s, weight]) => [s, weight / total]));
+  }
+  return rows;
+}
+
+/**
+ * Area-average reduction of an RGBA buffer.
+ *
+ * Deliberately not `resample`, which is bilinear. Bilinear reads four neighbours however
+ * far it is reducing, so past a factor of two it is point-sampling — and these reductions
+ * are up to tenfold, where that turns a face into aliasing and a jumper into moiré. This
+ * averages every source pixel under the destination pixel instead, which is the filter a
+ * photo being reduced that far actually needs.
+ *
+ * Reduction only. The callers never ask for an enlargement — see `variantSize`.
+ */
+function downscale(src, sw, sh, dw, dh) {
+  const xw = boxWeights(sw, dw);
+  const yw = boxWeights(sh, dh);
+
+  // Horizontally first, into the destination width at the source height. Float, because
+  // rounding between the two passes is a second quantisation for no reason.
+  const mid = new Float32Array(dw * sh * 4);
+  for (let y = 0; y < sh; y++) {
+    const srcRow = y * sw * 4, midRow = y * dw * 4;
+    for (let x = 0; x < dw; x++) {
+      let r = 0, g = 0, b = 0, a = 0;
+      for (const [sx, weight] of xw[x]) {
+        const o = srcRow + sx * 4;
+        r += src[o] * weight; g += src[o + 1] * weight;
+        b += src[o + 2] * weight; a += src[o + 3] * weight;
+      }
+      const o = midRow + x * 4;
+      mid[o] = r; mid[o + 1] = g; mid[o + 2] = b; mid[o + 3] = a;
+    }
+  }
+
+  const out = Buffer.alloc(dw * dh * 4);
+  for (let y = 0; y < dh; y++) {
+    for (let x = 0; x < dw; x++) {
+      let r = 0, g = 0, b = 0, a = 0;
+      for (const [sy, weight] of yw[y]) {
+        const o = (sy * dw + x) * 4;
+        r += mid[o] * weight; g += mid[o + 1] * weight;
+        b += mid[o + 2] * weight; a += mid[o + 3] * weight;
+      }
+      const o = (y * dw + x) * 4;
+      out[o] = Math.round(r); out[o + 1] = Math.round(g);
+      out[o + 2] = Math.round(b); out[o + 3] = Math.round(a);
+    }
+  }
+  return out;
+}
+
+/**
+ * The size a copy is written at, or null when there is nothing to gain.
+ *
+ * **The width is the target for the *shorter* side.** Every card draws the photo with
+ * `object-fit: cover`, so a square source is scaled to the card's *height* — 203px in
+ * the album, 532px in the card viewer — and it is the short side that has to survive
+ * that. Scaling the longest side instead leaves a portrait photo soft in the viewer,
+ * which is the one surface where the photo is the thing being looked at.
+ *
+ * Never an enlargement: a source already at or under the target is left alone and the
+ * endpoint serves the original, which is both smaller and sharper than a copy of it.
+ */
+function variantSize(sw, sh, width) {
+  const shortest = Math.min(sw, sh);
+  if (shortest <= width) return null;
+
+  const scale = width / shortest;
+  return { w: Math.max(1, Math.round(sw * scale)), h: Math.max(1, Math.round(sh * scale)) };
+}
+
+/**
+ * Writes the resized copies of one avatar.
+ *
+ * JPEG, because these are photographs and the whole point is the byte count: a 512px
+ * face is ~60 kB encoded against ~400 kB as a PNG. **Except where the source carries
+ * transparency** — three avatars in the pool do — because a card with a cut-out photo
+ * shows its own metal through the hole, and flattening that onto a colour would be a
+ * visible change to a card rather than a faster one. Those keep alpha and stay PNG.
+ *
+ * The format is not in the filename and does not need to be: the avatar endpoint has
+ * always reported image/jpeg for every avatar while most of the pool is in fact PNG, so
+ * a browser sniffs these either way.
+ */
+function writeVariants(source, id, variants) {
+  const written = [];
+
+  for (const { width, dir } of variants) {
+    const size = variantSize(source.width, source.height, width);
+    if (size === null) continue;
+
+    // Reduce first and rotate second: the rotation is a pixel-for-pixel copy either way,
+    // and doing it on the small buffer is a tenth of a megapixel rather than twelve.
+    const reduced = downscale(source.data, source.width, source.height, size.w, size.h);
+    const shown = applyOrientation(reduced, size.w, size.h, source.orientation);
+
+    let encoded;
+    if (source.transparent) {
+      const png = new PNG({ width: shown.w, height: shown.h });
+      shown.data.copy(png.data);
+      encoded = PNG.sync.write(png);
+    } else {
+      encoded = jpeg.encode({ data: shown.data, width: shown.w, height: shown.h }, JPEG_QUALITY).data;
+    }
+
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, id), encoded);
+    written.push(`${width}=${shown.w}x${shown.h}/${Math.round(encoded.length / 1024)}kB`);
+  }
+
+  return written;
 }
 
 /** The card's own crop: cover in 5:7, object-position center 22%. */
@@ -398,8 +685,7 @@ function keepLargest(mask, w, h, cc) {
   for (let i = 0; i < w * h; i++) if (!keep[i]) mask[i] = 0;
 }
 
-async function generate(session, avatarFile, outFile) {
-  const source = decode(fs.readFileSync(avatarFile));
+async function generate(session, source, outFile) {
   const src = Buffer.from(source.data);
   const whole = { x: 0, y: 0, w: source.width, h: source.height };
 
@@ -453,7 +739,8 @@ async function generate(session, avatarFile, outFile) {
   return { reframed, area: final.area, dominance: final.dominance };
 }
 
-/** A mask is stale when it is missing or older than the avatar it came from. */
+/** An output — a mask, or one resized copy — is stale when it is missing or older than
+    the avatar it came from. */
 function isStale(avatarFile, outFile) {
   if (!fs.existsSync(outFile)) return true;
   return fs.statSync(avatarFile).mtimeMs > fs.statSync(outFile).mtimeMs;
@@ -461,21 +748,30 @@ function isStale(avatarFile, outFile) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  const variants = parseVariants(process.argv.slice(2));
   const avatarDir = args.avatars;
   const outDir = args.out;
+  // Masks are the default job; --variants-only leaves them alone, which is also the one
+  // mode that needs neither the model nor a session.
+  const masks = !args["variants-only"];
 
-  if (!avatarDir || !outDir) {
-    console.error("usage: make-silhouettes.mjs --avatars <dir> --out <dir> (--id <playerId> | --all) [--force]");
+  if (!avatarDir || (masks && !outDir)) {
+    console.error("usage: make-silhouettes.mjs --avatars <dir> --out <dir> (--id <playerId> | --all) [--force]\n" +
+      "       [--variant <width>:<dir> ...] [--variants-only]");
     process.exit(2);
   }
-  if (!fs.existsSync(MODEL)) {
+  if (!masks && variants.length === 0) {
+    console.error("--variants-only with no --variant leaves nothing to do");
+    process.exit(2);
+  }
+  if (masks && !fs.existsSync(MODEL)) {
     console.error(`model not found at ${MODEL}\n` +
       "fetch it once with:\n" +
       "  curl -L -o u2netp.onnx https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx");
     process.exit(3);
   }
 
-  fs.mkdirSync(outDir, { recursive: true });
+  if (masks) fs.mkdirSync(outDir, { recursive: true });
 
   // Avatars are stored as the bare player id with no extension, so anything that is a
   // file and is not the fallback image is a candidate.
@@ -491,28 +787,62 @@ async function main() {
     process.exit(2);
   }
 
-  const session = await ort.InferenceSession.create(MODEL);
+  // Created on first use rather than up front: a run that only writes resized copies
+  // has no reason to load a segmentation model, and on a backfill that is the difference
+  // between minutes and seconds.
+  let session = null;
+
   let written = 0, skipped = 0, failed = 0;
 
   for (const id of ids) {
     const avatarFile = path.join(avatarDir, id);
-    const outFile = path.join(outDir, id + ".png");
+    const outFile = masks ? path.join(outDir, id + ".png") : null;
 
     if (!fs.existsSync(avatarFile)) {
       console.error(`no avatar for ${id}`);
       failed++;
       continue;
     }
-    if (!args.force && !isStale(avatarFile, outFile)) {
+
+    // Each output stands or falls on its own age, so a new width is backfilled without
+    // re-running the model over the whole pool, and a replaced photo refreshes all of
+    // them.
+    const maskWanted = masks && (args.force || isStale(avatarFile, outFile));
+    const variantsWanted = variants.filter(({ dir }) =>
+      args.force || isStale(avatarFile, path.join(dir, id)));
+
+    if (!maskWanted && variantsWanted.length === 0) {
       skipped++;
       continue;
     }
 
     try {
-      const stats = await generate(session, avatarFile, outFile);
+      // One decode for both jobs. These are the files this whole tool exists to avoid
+      // reading twice: the largest in the pool is 25 megapixels.
+      const source = decode(fs.readFileSync(avatarFile));
+
+      const notes = [];
+      if (maskWanted) {
+        session ??= await ort.InferenceSession.create(MODEL);
+        const stats = await generate(session, source, outFile);
+        notes.push(`area=${stats.area.toFixed(2)} dominance=${stats.dominance.toFixed(2)}` +
+          (stats.reframed ? " reframed" : ""));
+      }
+      if (variantsWanted.length > 0) {
+        notes.push(...writeVariants(source, id, variantsWanted));
+      }
+
+      // An avatar already smaller than every width asked for produces nothing, and that
+      // is the finished state rather than a failure: the endpoint serves the original,
+      // which is smaller and sharper than a copy of it would be. It is decided here, on
+      // the decoded size, rather than by reading a header a second time.
+      if (notes.length === 0) {
+        skipped++;
+        continue;
+      }
+
       written++;
-      console.log(`${id} area=${stats.area.toFixed(2)} dominance=${stats.dominance.toFixed(2)}` +
-        (stats.reframed ? " reframed" : ""));
+      console.log(`${id} ${notes.join(" ")}`);
     } catch (error) {
       failed++;
       console.error(`${id} failed: ${error.message}`);

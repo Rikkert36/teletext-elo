@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { avatarUrl } from '../mock/cardMock';
 import {
   Table,
   TableContainer,
@@ -260,9 +261,12 @@ const HistoryPage: React.FC = () => {
     setPlayersLoading(false);
   };
 
-  const getAvatarLink = (playerId: string) => {
-    return `${window.TAFELVOETBAL_SERVER_URL}/api/player/${playerId}/avatar`;
-  };
+  /*
+   * The resized copy, not the original: these are the same faces the album draws, and a
+   * browser caches on the whole url — so asking here for exactly what the card asks for
+   * means the second page someone opens downloads none of them again. See `AVATAR_WIDTH`.
+   */
+  const getAvatarLink = (playerId: string) => avatarUrl(playerId);
 
   const showPlayersOrLoading = () => {
     if (playersLoading) {

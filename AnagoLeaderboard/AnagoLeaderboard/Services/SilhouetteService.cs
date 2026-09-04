@@ -4,7 +4,13 @@ using System.Diagnostics;
 namespace AnagoLeaderboard.Services;
 
 /// <summary>
-/// Regenerates the silhouette mask for a single player, in a separate process.
+/// Regenerates everything derived from a single player's photo, in a separate process:
+/// the silhouette mask, and the resized copies the front end actually draws
+/// (<see cref="AvatarStorage.VariantWidths"/>).
+///
+/// Both come off one decode of the avatar, which is the reason they share a run — the
+/// largest photo in the pool is 25 megapixels, and reading one twice costs more than
+/// everything else here put together.
 ///
 /// Deliberately not in this process. Generating a mask needs a segmentation model
 /// (ONNX Runtime) and an image decoder, both native, and under in-process IIS hosting
@@ -92,6 +98,15 @@ public class SilhouetteService
             startInfo.ArgumentList.Add(_storage.SilhouetteDirectory);
             startInfo.ArgumentList.Add("--id");
             startInfo.ArgumentList.Add(id);
+
+            // And the resized copies of the photo, in the same run: the generator decodes
+            // the avatar once and both outputs come off that decode. Which widths exist is
+            // AvatarStorage's to say, not the script's — see VariantWidths.
+            foreach (var width in AvatarStorage.VariantWidths)
+            {
+                startInfo.ArgumentList.Add("--variant");
+                startInfo.ArgumentList.Add($"{width}:{_storage.AvatarVariantDirectory(width)}");
+            }
 
             using var process = Process.Start(startInfo);
             if (process == null)

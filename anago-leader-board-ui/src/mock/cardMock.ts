@@ -346,8 +346,29 @@ export const firstNameOf = (name: string): string => {
   return display.split(' ').filter(Boolean)[0] ?? display;
 };
 
-export const avatarUrl = (playerId: string): string =>
-  `${window.TAFELVOETBAL_SERVER_URL}/api/player/${playerId}/avatar`;
+/**
+ * How wide a photo is asked for, in pixels of its shorter side.
+ *
+ * **Two sizes for the whole app, and the smaller one is deliberately more than the
+ * album needs.** A browser caches on the whole url, so a face asked for at two widths
+ * is a face downloaded twice — and the leaderboard's 40px avatar, the player page's
+ * 160px one and the album's card are the same people. Everything but the card viewer
+ * therefore shares one width, and the second page someone opens costs nothing.
+ *
+ * The numbers are the drawn size at 2×, and the drawn size is the card's *height*: the
+ * photo is `object-fit: cover` and the sources are square, so a 145px album card paints
+ * 203px of photo and the 380px viewer paints 532px.
+ *
+ * The server keeps a copy at each of these (`AvatarStorage.VariantWidths`) and falls
+ * back to the original where it has none, so asking is always safe. Changing a number
+ * here without changing it there silently gives back the original — correct, but the
+ * slow path this exists to avoid.
+ */
+export const AVATAR_WIDTH = 512;
+export const AVATAR_WIDTH_VIEWER = 1024;
+
+export const avatarUrl = (playerId: string, width: number = AVATAR_WIDTH): string =>
+  `${window.TAFELVOETBAL_SERVER_URL}/api/player/${playerId}/avatar?w=${width}`;
 
 /**
  * The silhouette mask for a card you do not own yet.

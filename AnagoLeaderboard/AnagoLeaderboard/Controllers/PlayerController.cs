@@ -97,17 +97,42 @@ namespace AnagoLeaderboard.Controllers
         /// An hour of staleness is the price: a replaced photo takes that long to appear,
         /// or one hard refresh. Same bargain the silhouette makes below, on the same asset.
         /// </summary>
+        /// <param name="w">
+        /// How wide the photo will be drawn, in pixels of its shorter side — not which
+        /// file to send. Any width is accepted: it is snapped to a size that exists
+        /// (<see cref="AvatarStorage.VariantWidths"/>) and falls back to the original
+        /// whenever there is no copy at that size, so a caller never has to know which
+        /// sizes are kept or whether one was ever generated.
+        ///
+        /// **Absent means the original**, and that is why it is optional rather than
+        /// defaulted. The endpoint predates the resized copies and other callers still
+        /// want the full photo; a default would quietly reduce those without anyone
+        /// choosing it.
+        ///
+        /// Note that a browser caches on the whole url, query string included, so two
+        /// pages drawing the same face at different widths download it twice. That is the
+        /// reason the card and the three MUI avatars all ask for 512 rather than each
+        /// asking for what it happens to need.
+        /// </param>
         [HttpGet("player/{id}/avatar")]
         [ResponseCache(Duration = 3600, Location = ResponseCacheLocation.Any)]
-        public IActionResult GetAvatar(string id)
+        public IActionResult GetAvatar(string id, int? w = null)
         {
-            var (path, lastModified, length) = _playerService.GetAvatarFile(id);
+            var width = w == null ? (int?)null : AvatarStorage.NearestVariantWidth(w.Value);
+            var (path, lastModified, length) = _playerService.GetAvatarFile(id, width);
 
             // An upload always rewrites the file, so write time plus length identifies a
             // version well enough. PhysicalFile handles the 304 by itself when the browser
             // sends If-None-Match, and streams the file off disk instead of buffering it.
+            //
+            // The width is not in the tag and does not need to be: it changes which file
+            // was resolved, so it is already in the length, and the two live under
+            // different urls anyway.
             var etag = new EntityTagHeaderValue($"\"{lastModified.Ticks:x}-{length:x}\"");
 
+            // image/jpeg for every avatar, which is a lie of long standing — most of the
+            // pool is in fact PNG, and a resized copy is a JPEG unless the source had
+            // transparency to keep. Browsers sniff the body, so this has never mattered.
             return PhysicalFile(path, "image/jpeg", lastModified, etag);
         }
 

@@ -128,9 +128,9 @@ namespace AnagoLeaderboard.Services
 
         /// The avatar as a path plus the metadata a conditional GET needs, rather than as
         /// bytes — see <see cref="AvatarStorage.ResolveAvatar"/> for why.
-        internal (string Path, DateTime LastModified, long Length) GetAvatarFile(string id)
+        internal (string Path, DateTime LastModified, long Length) GetAvatarFile(string id, int? width = null)
         {
-            return _storage.ResolveAvatar(id);
+            return _storage.ResolveAvatar(id, width);
         }
 
         /// <summary>

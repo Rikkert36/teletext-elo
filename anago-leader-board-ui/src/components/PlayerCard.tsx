@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Card, avatarUrl, initialsFor, silhouetteUrl, splitName } from '../mock/cardMock';
+import {
+  AVATAR_WIDTH,
+  Card,
+  avatarUrl,
+  initialsFor,
+  silhouetteUrl,
+  splitName,
+} from '../mock/cardMock';
 import { rikDevWordmark } from '../utils/brand';
 import '../styles/card.css';
 
@@ -41,6 +48,15 @@ interface PlayerCardProps {
    * of it is off-screen, which is the case lazy loading is for.
    */
   eager?: boolean;
+  /**
+   * Which of the two stored sizes to ask the server for — see `AVATAR_WIDTH`.
+   *
+   * The card is 512 everywhere it appears at card size, which is everywhere but the card
+   * viewer: there the card is 380px wide and the photo is the thing being looked at, so
+   * it is the one surface that asks for 1024. Set it there and nowhere else — a second
+   * width in a second place is a second download of the same face.
+   */
+  portraitWidth?: number;
   /**
    * The pack opener's silhouette beat: hold back *who* it is after the flip has
    * already said how good it is, and then write it on.
@@ -108,10 +124,11 @@ export const otherKindLabel = (count: number, isIconSlot: boolean): string =>
  * and the write path is known to disagree with the read path, so a missing
  * image is an expected state rather than an error.
  */
-const Portrait: React.FC<{ card: Card; empty: boolean; eager: boolean }> = ({
+const Portrait: React.FC<{ card: Card; empty: boolean; eager: boolean; width: number }> = ({
   card,
   empty,
   eager,
+  width,
 }) => {
   const [failed, setFailed] = useState(false);
 
@@ -121,7 +138,7 @@ const Portrait: React.FC<{ card: Card; empty: boolean; eager: boolean }> = ({
         <div className="card__initials">{initialsFor(card.player.name)}</div>
       ) : (
         <img
-          src={avatarUrl(card.player.id)}
+          src={avatarUrl(card.player.id, width)}
           alt={empty ? '' : card.player.name}
           onError={() => setFailed(true)}
           loading={eager ? 'eager' : 'lazy'}
@@ -196,6 +213,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
   empty = false,
   count,
   eager = false,
+  portraitWidth = AVATAR_WIDTH,
   reveal,
   className = '',
   onClick,
@@ -292,7 +310,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({
               portrait masks.
             */}
             {reveal ? <Silhouette playerId={card.player.id} eager /> : null}
-            <Portrait card={card} empty={empty} eager={eager} />
+            <Portrait card={card} empty={empty} eager={eager} width={portraitWidth} />
           </>
         )}
 
