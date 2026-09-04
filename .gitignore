@@ -502,3 +502,9 @@ anago-leader-board-ui/node_modules/.bin/acorn.cmd
 # from here so the value itself never enters the repository.
 *.private.http
 .claude/settings.json
+
+# Pack-matrix runs. The scripts in tools/pack-matrix write one timestamped workbook per
+# run into outputs/, so the folder fills up with generated files that are not source.
+# Input.txt beside them is a raw dump of GET api/packs and is deliberately left tracked.
+tools/pack-matrix/outputs/
+tools/pack-matrix/__pycache__/

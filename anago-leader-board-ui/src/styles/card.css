@@ -317,11 +317,28 @@
 }
 
 /*
- * The 1px gold rule. See the note above for why this is not the frame that was
+ * The gold rule. See the note above for why this is not the frame that was
  * rejected five times: it is on the edge, not inset, so no stock sits outside it.
  *
  * `::before` because `::after` is the foil sheen every card carries, and above
  * it so the sheen does not wash the gold out at the crossing.
+ *
+ * Its width is a *ratio of the card*, not a literal, for the same reason the type
+ * is: a fixed 1px is a different rule at every size the card is rendered at, and
+ * the two extremes are 3.7× apart — a hairline lost on the 380px viewer card, a
+ * visible band on a 104px one. 0.667cqw is 1px on the 150px base card, which is the
+ * width the rule was drawn at, so the book is unchanged and every other context now
+ * matches it. A pseudo-element resolves `cqw` against its originating element, so
+ * this reads the card's own container and needs nothing from the context around it —
+ * the viewer, the reveal hero and the FLIP into the album all scale for free.
+ *
+ * The 1px floor is a rendering guard: below one device pixel a hairline is dithered
+ * to a paler line rather than a thinner one, which reads as a *dimmer* gold rather
+ * than a finer rule. It binds under ~150px, where the ratio and the literal are
+ * within a third of a pixel of each other anyway.
+ *
+ * This is not the widening the note above forbids — the rule's weight relative to
+ * the card it sits on is exactly what it was.
  */
 .card--icoon::before {
   content: "";
@@ -329,7 +346,7 @@
   inset: 0;
   z-index: 4;
   pointer-events: none;
-  border: 1px solid rgba(176, 142, 66, 0.85);
+  border: max(1px, 0.667cqw) solid rgba(176, 142, 66, 0.85);
   border-radius: 6px;
 }
 

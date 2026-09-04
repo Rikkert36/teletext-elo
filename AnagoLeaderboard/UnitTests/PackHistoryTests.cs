@@ -168,7 +168,8 @@ namespace UnitTests
 
         /// <summary>
         /// The compact line behind <c>?compact=true</c>: to the minute, first names with the
-        /// overall in brackets, and the cards in the order the full response lists them.
+        /// overall in brackets and a <c>*</c> on the ones that filled a slot, and the cards in the
+        /// order the full response lists them.
         /// </summary>
         [Test]
         public async Task ThePackReadsAsOneLine()
@@ -182,7 +183,14 @@ namespace UnitTests
             var pack = (await _packHistoryService.GetHistory()).Packs.Single();
             var faces = string.Join(
                 ", ",
-                pack.Cards.Select(card => $"{card.Subject.Name} ({card.Subject.Overall})"));
+                pack.Cards.Select(card =>
+                    $"{card.Subject.Name} ({card.Subject.Overall})"
+                    + (card.FirstCopy ? "*" : string.Empty)));
+
+            Assert.That(
+                pack.Cards.Select(card => card.FirstCopy),
+                Is.All.True,
+                "both subjects are new to this collector, so the line has to star both");
 
             Assert.That(pack.Line(), Is.EqualTo($"19-08-2026 14:02 - Rik pakte: {faces}"));
         }
@@ -218,7 +226,7 @@ namespace UnitTests
                 today,
                 Is.Not.EqualTo(atMint),
                 "the fixture has to move the subject's overall or this test proves nothing");
-            Assert.That(pack.Line(), Does.EndWith($"{subject.Name} ({today})"));
+            Assert.That(pack.Line(), Does.EndWith($"{subject.Name} ({today})*"));
         }
 
         /// <summary>
@@ -238,12 +246,14 @@ namespace UnitTests
 
             Assert.That(
                 pack.Line(),
-                Does.EndWith($"Jan pakte: Piet ({pack.Cards.Single().Subject.Overall})"));
+                Does.EndWith($"Jan pakte: Piet ({pack.Cards.Single().Subject.Overall})*"));
         }
 
         /// <summary>
         /// Two copies of one subject read as two names. Collapsing them would make a five-card
         /// packet of one player look like a single.
+        ///
+        /// Only the first of them stars: the packet filled one slot, not two.
         /// </summary>
         [Test]
         public async Task DuplicatesAreRepeatedOnTheLine()
@@ -255,7 +265,92 @@ namespace UnitTests
             var pack = (await _packHistoryService.GetHistory()).Packs.Single();
             var face = $"{players[1].Name} ({pack.Cards[0].Subject.Overall})";
 
-            Assert.That(pack.Line(), Does.EndWith($"{face}, {face}"));
+            Assert.That(pack.Line(), Does.EndWith($"{face}*, {face}"));
+            Assert.That(
+                pack.Cards.Select(card => card.FirstCopy),
+                Is.EqualTo(new[] { true, false }));
+        }
+
+        /// <summary>
+        /// The star is per collector and per slot, and it is history: the first copy keeps it once
+        /// a second copy exists, because it is still the pull that filled the slot.
+        /// </summary>
+        [Test]
+        public async Task OnlyTheFirstCopyOfASlotIsAFirstCopy()
+        {
+            var players = await ARosterThatHasPlayed();
+            var subject = players[1];
+
+            // Two days, because one collector gets one daily freebie a day.
+            var first = await Mint(
+                players[0].Id, new[] { subject.Id }, DateTime.Today.AddDays(-1));
+            var second = await Mint(players[0].Id, new[] { subject.Id });
+
+            var history = await _packHistoryService.GetHistory();
+
+            Assert.That(
+                history.Packs.Single(pack => pack.PackId == first.Id).Cards.Single().FirstCopy,
+                Is.True,
+                "the pull that filled the slot keeps the star");
+            Assert.That(
+                history.Packs.Single(pack => pack.PackId == second.Id).Cards.Single().FirstCopy,
+                Is.False);
+        }
+
+        /// <summary>
+        /// Somebody else packing a subject first does not take your star. The slot a copy fills is
+        /// in the collector's own book.
+        /// </summary>
+        [Test]
+        public async Task AnotherCollectorsFirstCopyIsNotYours()
+        {
+            var players = await ARosterThatHasPlayed();
+            var subject = players[2];
+
+            var theirs = await Mint(
+                players[0].Id, new[] { subject.Id }, DateTime.Today.AddDays(-1));
+            var mine = await Mint(players[1].Id, new[] { subject.Id });
+
+            var history = await _packHistoryService.GetHistory();
+
+            Assert.That(
+                history.Packs.Single(pack => pack.PackId == theirs.Id).Cards.Single().FirstCopy,
+                Is.True);
+            Assert.That(
+                history.Packs.Single(pack => pack.PackId == mine.Id).Cards.Single().FirstCopy,
+                Is.True);
+        }
+
+        /// <summary>
+        /// The star keys on the slot rather than the face, so it splits on the flag frozen at mint
+        /// exactly the way the checklist's tally does: a first icoon of somebody whose player card
+        /// you already hold fills a slot that was empty, and stars.
+        /// </summary>
+        [Test]
+        public async Task AFirstIconOfAnAlreadyCollectedSubjectIsAFirstCopy()
+        {
+            var players = await ARosterThatHasPlayed();
+            var subject = players[1];
+
+            var asPlayer = await Mint(
+                players[0].Id, new[] { subject.Id }, DateTime.Today.AddDays(-1));
+
+            var claim = PackClaim.ForIcons(players[0].Id, DateTime.Today);
+            _dbContext.PackClaims.Add(claim);
+            _dbContext.CardInstances.Add(
+                CardInstance.Mint(
+                    players[0].Id, subject.Id, claim.Id, gameId: null, isIcon: true));
+            await _dbContext.SaveChangesAsync();
+
+            var history = await _packHistoryService.GetHistory();
+
+            Assert.That(
+                history.Packs.Single(pack => pack.PackId == asPlayer.Id).Cards.Single().FirstCopy,
+                Is.True);
+            Assert.That(
+                history.Packs.Single(pack => pack.PackId == claim.Id).Cards.Single().FirstCopy,
+                Is.True,
+                "the icoon slot was empty, so the icoon copy fills it");
         }
 
         [Test]

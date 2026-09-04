@@ -494,6 +494,19 @@ const CollectionPage: React.FC = () => {
    */
   const pendingIconPack = useRef<Pack | null>(null);
   /**
+   * The collection as the icons claim left it, held until the re-binding is over.
+   *
+   * Exactly `pendingCollection`'s job for the other ceremony, and parked for the same reason:
+   * the unlock is what changes the book's binding, so applying it when it lands would change
+   * the book *during* the ceremony whose whole subject is that change. It carries the id it
+   * belongs to for the reason that one does.
+   *
+   * The request still goes out on the first click, and that is not the part that was wrong:
+   * the ceremony is what hides the round trip, and it is what lets a refusal be known by the
+   * time `handleRebound` runs rather than after the light has gone.
+   */
+  const pendingIconState = useRef<{ playerId: string; state: CollectionState } | null>(null);
+  /**
    * The re-binding is being played from the test panel, with no packet and no write.
    *
    * A ref rather than state because only `handleRebound` reads it, and it has to be readable
@@ -1480,23 +1493,45 @@ const CollectionPage: React.FC = () => {
    * The set-completion packet was picked up: unlock the icons and start the re-binding.
    *
    * The write goes out **at the start** of the ceremony, the same contract `AlbumChoice`
-   * has with `onChoose`, so it is in flight while the book shuts — and it has to land
-   * before the packet itself is claimed, or the draw would have no icons to choose from.
-   * That ordering is the whole reason this is two calls rather than one.
+   * has with `onChoose`, so it is in flight while the book shuts. It is two calls rather
+   * than one because the draw reads the icons latch, and the packet must not be claimed
+   * before the unlock has landed — which the reader's own click on the sealed packet leaves
+   * an unbounded pause for, so the ordering has slack and the early send is buying latency
+   * rather than safety.
    *
-   * The response is applied straight away rather than parked. That is the opposite of the
-   * pack-reveal rule, and deliberately: what it carries is the *unlock*, which the claim
-   * about to follow depends on. It grows the album by roughly half at the same time, and
-   * that is free here because the book is shut — nothing on screen shifts.
+   * **The answer is parked, not applied**, exactly as the pack reveal parks its own. It
+   * carries the unlock, the unlock is what re-binds the book, and applying it here put the
+   * finished book on screen in the first moments of the ceremony that exists to reveal it —
+   * the reader watched an already-bound book shut, charge and bloom to nothing. `Album`
+   * drives the binding off the beats, so the swap lands under the white-out whether this
+   * took 40ms or four seconds.
+   *
+   * Nothing between here and `handleRebound` needs it: the packet is handed over by id and
+   * the opener claims it against the API, which answers with its own fresh state.
    */
   const claimIcons = () => {
     if (!player) return;
+    const forPlayerId = player.id;
 
     setRebinding(true);
 
     void client
-      .claimIcons(player.id)
-      .then(setCollection)
+      .claimIcons(forPlayerId)
+      .then((state) => {
+        /*
+         * The ceremony is longer than this request by a wide margin, but not by construction
+         * — unlike the pack reveal, which waits on its own claim. So if the book has already
+         * been handed back there is nothing left to hold the answer for, and it applies
+         * itself rather than being parked for a handover that has been and gone. The packet
+         * `handleRebound` takes is the signal: it is set before this call and cleared there.
+         */
+        if (pendingIconPack.current === null) {
+          setCollection(state);
+          return;
+        }
+
+        pendingIconState.current = { playerId: forPlayerId, state };
+      })
       .catch((reason) => {
         /*
          * Deliberately **not** aborting the ceremony. It has already started, and a book
@@ -1524,10 +1559,20 @@ const CollectionPage: React.FC = () => {
    */
   const handleRebound = useCallback(() => {
     const packet = pendingIconPack.current;
+    const unlocked = pendingIconState.current;
     const demo = rebindDemo.current;
     pendingIconPack.current = null;
+    pendingIconState.current = null;
     rebindDemo.current = false;
     setRebinding(false);
+
+    /*
+     * The unlock lands here, which is what makes the book's own binding the ceremony's to
+     * announce. The album grows by roughly half in the same commit and that is free: the
+     * book is shut, and on the path that has a packet it is about to be replaced by the
+     * opener anyway.
+     */
+    if (unlocked && unlocked.playerId === player?.id) setCollection(unlocked.state);
 
     /* Played from the test panel: nothing was claimed and nothing is owed. The book keeps its
        icon binding until the next read, which is the point of watching it. */

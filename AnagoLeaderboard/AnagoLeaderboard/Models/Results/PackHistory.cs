@@ -86,6 +86,13 @@ public sealed record OpenedPack(
     /// remarks first, because they say why the one frozen flag there is does not decide what a
     /// card looks like.
     ///
+    /// A trailing <c>*</c> marks a <see cref="PackedCard.FirstCopy"/> - the pull that filled a
+    /// slot that had been empty until then. It is the one thing on this line that is not a
+    /// rendering of the pool but a fact about the draw, and it is here because it is what makes
+    /// the log readable as a story: without it every line is a list of faces, and with it the
+    /// good mornings stand out. Two copies of a new subject in one packet star only the first,
+    /// because the second one filled nothing.
+    ///
     /// Deliberately silent about <see cref="Source"/>, <see cref="GameId"/> and
     /// <see cref="PackedCard.MintedAsIcon"/>. This is the skim of who packed what and when;
     /// anything that has to know where a packet came from wants the full response, which is
@@ -96,7 +103,9 @@ public sealed record OpenedPack(
         + $"{FirstName(CollectorName)} pakte: "
         + string.Join(
             ", ",
-            Cards.Select(card => $"{FirstName(card.Subject.Name)} ({card.Subject.Overall})"));
+            Cards.Select(card =>
+                $"{FirstName(card.Subject.Name)} ({card.Subject.Overall})"
+                + (card.FirstCopy ? "*" : string.Empty)));
 
     /// <summary>
     /// The first word of a name, the way <see cref="Models.ChampionInfo"/> takes it. Two people
@@ -126,4 +135,26 @@ public sealed record OpenedPack(
 /// it is what decided which slot the copy filled, and it is the only reason a pull of somebody
 /// who has since retired can be told from one made after.
 /// </param>
-public sealed record PackedCard(CardSubject Subject, bool MintedAsIcon);
+/// <param name="FirstCopy">
+/// Whether this copy filled a slot that was empty until then: the first time this collector ever
+/// packed this subject <em>as this kind of card</em>. The <c>*</c> on <see cref="OpenedPack.Line"/>.
+///
+/// <strong>Keyed on the slot, not on the face</strong>, so it splits on
+/// <see cref="MintedAsIcon"/> exactly the way <see cref="Services.PackService.CountsBySubject"/>
+/// does - a first icoon of somebody whose player card you already hold is a new slot and stars,
+/// because the checklist counts those player cards in brackets against it rather than ticking it.
+/// See <see cref="CardInstance.IsIcon"/> for the rule and why the two questions - what a card
+/// looks like, and what you have collected - are answered by different flags. Keying this on the
+/// subject alone would print no star on the day an icoon set opens, which is the day there is
+/// most to star.
+///
+/// History, like <see cref="MintedAsIcon"/> and unlike <see cref="Subject"/>: it is a fact about
+/// the moment the packet was torn open, so it does not move when the subject's standing does. It
+/// does move when an <em>earlier</em> claim is deleted, because then the copy that was second
+/// becomes the one that filled the slot - which is right, and is the same cascade that takes a
+/// mis-entered game's packets out of the log entirely.
+///
+/// Per collector, and only ever about the collector who opened the packet. Somebody else pulling
+/// a card first does not take your star: the slot it filled was in your book.
+/// </param>
+public sealed record PackedCard(CardSubject Subject, bool MintedAsIcon, bool FirstCopy);

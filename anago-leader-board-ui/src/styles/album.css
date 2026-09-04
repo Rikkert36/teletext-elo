@@ -2433,10 +2433,26 @@
   opacity: 0.82;
 }
 
-/* Doubles, noted beside the tick in the same hand. */
+/*
+ * Doubles, noted beside the tick in the same hand — and the bracketed figure, which is the
+ * same column (`.album__entry-dupe--former`).
+ *
+ * **One width for both, on every line, whether the line writes anything here or not.** This
+ * column is the last thing on the row, so it is what holds the box off the trim: a column
+ * that sized itself to its content would leave the one row carrying a bracket with its box
+ * a couple of characters inboard of the other fifty, which is the one thing a checklist's
+ * boxes cannot do. It was 1em with the bracket widening it to 2.9em, and that is exactly
+ * what went wrong.
+ *
+ * 2em, and for the same reason as `.album__entry-nr`: a whole multiple of a whole-pixel
+ * font size, so the glyphs stay crisp. It fits "(12)" italic, which is the widest thing
+ * this column can be asked to print — a doubles numeral is one character. The width comes
+ * out of the leader dots, which is what they are for, and on a phone (no dots) out of the
+ * name.
+ */
 .album__entry-dupe {
   flex: none;
-  width: 1em;
+  width: 2em;
   text-align: center;
   font-style: italic;
   font-variant-numeric: tabular-nums;
@@ -2445,16 +2461,14 @@
 }
 
 /*
- * The same column when it is carrying "(2×)" instead of a doubles numeral: the cards you
- * hold of this subject as the other kind, which do not fill this slot.
+ * The column when it is carrying "(2)" instead of a doubles numeral: the cards you hold of
+ * this subject as the other kind, which do not fill this slot.
  *
- * Wider, because the numeral column is one em and this is four characters — the leader dots
- * give the width up, which is what they are for. Fainter than a doubles figure and no
- * further: it is a note about cards that are not here, and a hand would have written it
- * smaller, but the list is already at the smallest size that stays legible on this paper.
+ * Fainter than a doubles figure and no further: it is a note about cards that are not here,
+ * and a hand would have written it smaller, but the list is already at the smallest size
+ * that stays legible on this paper.
  */
 .album__entry-dupe--former {
-  width: 2.9em;
   opacity: 0.55;
 }
 

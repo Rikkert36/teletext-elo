@@ -935,8 +935,8 @@ const PageFace: React.FC<{
                     empty and the other kind is not, since the two can never want
                     it at once: `count` is 0 in that case, so there is no doubles
                     numeral to displace. Bracketed and not a bare number because
-                    it is a note about cards that are not in this slot, and it
-                    needs its own width — the numeral column is 1em.
+                    it is a note about cards that are not in this slot. The column
+                    is one fixed width for both — see `.album__entry-dupe`.
                   */}
                   <span
                     className={`album__entry-dupe${
@@ -944,7 +944,7 @@ const PageFace: React.FC<{
                     }`}
                   >
                     {entry.count > 1 ? entry.count : ''}
-                    {!has && former ? `(${entry.other}×)` : ''}
+                    {!has && former ? `(${entry.other})` : ''}
                   </span>
                   {/*
                     The mark is a drawn tick and the doubles figure is a bare
@@ -1540,9 +1540,17 @@ const Album: React.FC<AlbumProps> = ({
    *
    * So: from the bloom, when the whole page is white and there is nothing to see the
    * swap against. See `BOUND_PHASES`.
+   *
+   * **While a ceremony is running the phase is the only authority, and `icons` is not
+   * consulted at all** — this was an `||` of the two, and a book whose latch was already set
+   * was drawn in its finished binding from the first frame. The parking above keeps the real
+   * path clear of that, but not the test panel's replay: the seal sets the latch by hand with
+   * no claim anywhere, so the one button that exists to judge this ceremony was the one place
+   * guaranteed to show it with nothing to reveal. Reading the beats alone also means the
+   * swap cannot be moved by anything that lands mid-ceremony.
    */
   const showBinding =
-    icons === true || (rebindPhase !== null && BOUND_PHASES.has(rebindPhase));
+    rebindPhase !== null ? BOUND_PHASES.has(rebindPhase) : icons === true;
 
   /*
    * Follow the card viewer: whatever it is showing, the book turns to.

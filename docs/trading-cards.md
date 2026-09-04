@@ -49,7 +49,7 @@ touching anything that counts a collection. It is one sentence to state and easy
 accident, because it looks like two counts that want to be one: appearance is still live —
 a retired subject's card wears the icoon colourway wherever it is drawn — while
 `CardInstance.IsIcon` decides which slot a copy fills. Collapse them either way and
-something breaks quietly. The load-bearing detail is the **bracket**: `(2×)` against the
+something breaks quietly. The load-bearing detail is the **bracket**: `(2)` against the
 unticked checklist row is the only thing between this rule and a card you know you had
 disappearing without a word, which is why the same idea was rejected the first time it came
 up. No migration was needed; the column was always right.
@@ -68,7 +68,7 @@ purpose — a few thousand claims a year is small enough to hand over whole, and
 read by hand. It is ungated like the other two even though it names the collector, because
 `GET api/collections/{playerId}` already hands over an entire collection to anybody who asks;
 adding a key here would protect nothing that is not already public. **`?compact=true`** answers
-the same log as a `string[]`, one line per packet — `19-08-2026 14:02 - Rik pakte: Ton (74),
+the same log as a `string[]`, one line per packet — `19-08-2026 14:02 - Rik pakte: Ton (74)*,
 Mark (81)` — the way `player/champion-history` does, off a `Line()` on the model so the two
 shapes cannot drift apart. The bracketed overall is what turns the line from a list of names
 into a record of whether the packet was worth opening, and it is **today's overall, not the one
@@ -78,6 +78,25 @@ checklist and `subject.overall` in the full response are. So an old line can rea
 zilver card in your book to goud, not a defect of it. A mint-time overall is a different
 feature: nothing stores a rating on `CardInstance`, deliberately, so it would need a frozen
 column beside `IsIcon` and would print a number nothing else in the app shows.
+
+**The `*` is a first copy** — this collector had never packed that card before, so the pull
+filled a slot that had been empty. It is a `firstCopy` on every card in the full response as
+well, and the compact line reads off it, so a star and a `firstCopy: true` cannot disagree. Two
+things it is deliberately not. It is **keyed on the slot, not on the face**: it splits on
+`MintedAsIcon` the same way `PackService.CountsBySubject` splits its tally, so a first icoon of
+somebody whose player card you already hold does star, because the icoon slot it filled was
+empty and the player cards are counted against it in brackets rather than ticking it. Keying it
+on the subject alone would print no star on the day an icoon set opens, which is the day there
+is most to star. And it is **history, not a rendering of the pool** — the one other thing on the
+line that is, beside `MintedAsIcon`. The first copy keeps its star once a second copy exists,
+because it is still the pull that filled the slot; two copies of a new subject in the same
+packet star only the one printed first, because the second filled nothing; and somebody else
+packing a subject before you does not take your star, because the slot a copy fills is in your
+own book. It does move when an *earlier* claim is deleted — the copy that was second becomes the
+one that filled the slot, which is right, and is the same cascade that takes a mis-entered
+game's packets out of the log altogether. Deciding it costs no query: the log is walked oldest
+first over the rows already in memory, and reversed into the newest-first order the route
+answers in.
 
 **The rating scale has been re-ijked, and the fixed point is `1000 → 80` — not 1851.**
 Five anchors moved: the top three from `2200/2600/3000` to `2000/2300/2600`, and
@@ -697,7 +716,9 @@ asserted.
 **An icoon has to be packed as an icoon.** Retiring somebody whose card you hold does
 not hand you their icoon: their active slot goes with them, their icoon slot arrives
 empty when the icons unlock, and the player cards you hold are counted **in brackets**
-against the unticked checklist row — `(2×)`, in the column the doubles numeral uses.
+against the unticked checklist row — `(2)`, in the column the doubles numeral uses. That
+column is one fixed width on every line, bracket or not, because it is what holds the box
+off the trim and the boxes have to stand in one column down the page.
 Symmetric: an icoon who starts playing again brings an active slot back that their icoon
 copies do not fill, and `ActiveSetComplete` reads player cards only for exactly that
 reason.
@@ -2580,9 +2601,24 @@ recognises the packet, fires the unlock, plays the re-binding while it is in fli
 `handleRebound` hands the packet to the opener when the book is back. `PackOpener` needed no
 change at all — it is handed a pack like any other.
 
-The unlock's response is applied **immediately** rather than parked, which is the opposite
-of the pack-reveal rule and deliberate: the claim about to follow depends on it. Growing the
-album by half at the same moment is free, because the book is shut.
+The unlock's response is **parked until the ceremony ends**, the same rule the pack reveal
+follows, and for a sharper version of the same reason (settled 2026-09-01). It was applied
+the moment it landed, on the argument that the claim about to follow depends on it and that
+growing the album is free behind a shut cover. The second half is true and the first is not:
+the draw depends on the *server* holding the latch, not on this page holding a copy of it,
+and the reader's own click on the sealed packet leaves an unbounded pause before anything
+reads it. So the early send buys latency cover, not safety — and applying the answer bought
+nothing at all while costing the whole ceremony, because **the unlock is what re-binds the
+book**. Over localhost it landed a few hundred milliseconds into a six-second sequence, so
+the finished book shut, charged and bloomed to a reveal of itself.
+
+The rule that generalises: **a ceremony owns everything it is about for its whole length.**
+The pack reveal already had it — the book must not gain the cards while you are watching them
+come out of the packet — and the re-binding is the same claim about the binding. `Album`
+therefore reads the binding off its own beats and not off `iconsUnlocked` at all while a
+ceremony is running, which also covers the test panel's replay: the seal sets the latch by
+hand with no claim anywhere, so the one button built to judge this ceremony was the one place
+guaranteed to show it with nothing left to reveal.
 
 Skipped entirely when the book is already bound — the test panel's `force` path — because
 re-binding a book already in its icon binding is a ceremony with nothing to show.
@@ -3605,7 +3641,8 @@ Four parts and no more:
 2. **One near-white two-zone ground**, a warm ivory light zone in the upper right
    over a near-neutral body shading to grey-taupe at the lower left, so an icoon
    reads from the far side of a spread. The same ground on every icoon.
-3. **A 1px gold rule** on the edge — `rgba(176,142,66,.85)` at inset 0.
+3. **A gold rule** on the edge — `rgba(176,142,66,.85)` at inset 0, `max(1px, .667cqw)`
+   wide, which is 1px on the 150px base card and scales with the card everywhere else.
 4. **The type is an olive-bronze**, `#7C6A3C`, where the tiers use a near-black.
    The reference sets its number, name and rules in metal, and that is most of why
    those cards read as pressed rather than printed.
@@ -3790,6 +3827,16 @@ boundary rather than hanging a frame on it. The ground is also near-white everyw
 now, which is the other half — a boundary that needed drawing, on a card that no
 longer has a dark metal edge to draw it. Do not inset it and do not widen it; either
 one is the rejected object again.
+
+**Its width is a ratio of the card, not a literal** — `max(1px, .667cqw)`, the same
+move the type made. A card is rendered from 104px in a compact row to 380px in the
+viewer, and a fixed 1px is a different rule at each: a hairline that disappears on the
+viewer card, a visible band on the small one. .667cqw is 1px at the 150px base width the
+rule was drawn at, so the book keeps the weight it was tuned to and every other context
+matches it. The 1px floor only guards sub-pixel rendering, where a hairline is dithered
+paler rather than drawn thinner and the gold reads as dim instead of fine. This is not
+the widening forbidden above: the rule's weight relative to its card is unchanged, which
+is the whole reason the ratio is there.
 
 Also rejected along the way: a sepia version of the existing gold (a gold card with
 a grey photo is a gold card, and icoons lie among rare golds in the album); a
@@ -6622,8 +6669,9 @@ presentation layer.
     Then confirm no present expires — a gift from last week is still on the shelf.
 15b. Set a subject whose card you hold to inactive with the icons locked: the card leaves
     the book and `{totalCards} kaarten` is unchanged. Unlocking brings the slot back
-    wearing the icoon colourway and **empty**, with `(2×)` against the unticked checklist
-    row and `2× als speler` on its hover. Then pack that icoon and confirm it reveals as
+    wearing the icoon colourway and **empty**, with `(2)` after the unticked checklist row's
+    box — which stays in line with every other box on the page — and `2× als speler` on
+    its hover. Then pack that icoon and confirm it reveals as
     **nieuw** rather than as a duplicate, the bracket gives way to the row's own count, and
     the hover still carries the player cards. Repeat with the icons *already* unlocked: the
     card leaves the active pages and the empty icoon slot appears in the same fetch.

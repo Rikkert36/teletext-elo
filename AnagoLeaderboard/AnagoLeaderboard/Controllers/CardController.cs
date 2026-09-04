@@ -80,11 +80,15 @@ namespace AnagoLeaderboard.Controllers
         /// </summary>
         /// <param name="compact">
         /// Collapses each packet to one readable line - <c>"19-08-2026 14:02 - Rik pakte: Ton
-        /// (74), Mark (81)"</c> - and answers a <c>string[]</c> instead of the full object,
+        /// (74)*, Mark (81)"</c> - and answers a <c>string[]</c> instead of the full object,
         /// exactly like <c>player/champion-history</c> does. The lines come off
         /// <see cref="OpenedPack.Line"/>, so the two shapes are the same data and cannot drift -
         /// the bracketed overall included, which is today's rather than the one the card was
         /// worth at the draw. See that method for why.
+        ///
+        /// The <c>*</c> is a <see cref="PackedCard.FirstCopy"/>: Rik had never packed Ton before,
+        /// and had Mark already. It reads off the same property the full response carries, so a
+        /// starred line and a <c>firstCopy: true</c> are the same claim about the same card.
         ///
         /// A parameter on this route rather than a second route, because it is one report at two
         /// levels of detail and a <c>packs/lines</c> beside it would be a second thing to

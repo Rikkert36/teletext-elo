@@ -13,7 +13,7 @@ Daarvoor is de *volledige* pack-historie nodig, niet de compacte regels:
     GET api/packs?compact=true                   (het andere script)
 
 De compacte regels dragen de overall van de kaarten wel ("Ton (74)"), maar niet
-die van de gever, geen speler-id om op te sleutelen en geen icoon-vlag. De
+die van de packer, geen speler-id om op te sleutelen en geen icoon-vlag. De
 volledige respons bevat per kaart het hele subject. Sla die respons op als
 Input.txt naast dit script.
 
@@ -98,7 +98,7 @@ def first_name(name):
 def parse_packs(packs):
     """Geeft (counts, people, stats, errors) terug.
 
-    counts: dict[(gever_id, ontvanger_id)] -> aantal keer
+    counts: dict[(packer_id, gepackte_id)] -> aantal keer
     people: dict[id] -> {"name", "overall", "rating", "icon", "games"}
             overall is None voor iemand die zelf geen kaart heeft (te weinig
             wedstrijden) maar wel packs opent.
@@ -127,28 +127,28 @@ def parse_packs(packs):
         return entry
 
     for pack in packs:
-        giver_id = field(pack, "collectorId")
-        giver_name = field(pack, "collectorName")
+        packer_id = field(pack, "collectorId")
+        packer_name = field(pack, "collectorName")
         cards = field(pack, "cards")
 
-        if not giver_id or not isinstance(cards, list):
+        if not packer_id or not isinstance(cards, list):
             errors.append(pack)
             continue
 
-        ensure(giver_id, giver_name or giver_id)
+        ensure(packer_id, packer_name or packer_id)
 
         broken = False
         for card in cards:
             subject = field(card, "subject")
-            receiver_id = field(subject, "id")
-            if not receiver_id:
+            packed_id = field(subject, "id")
+            if not packed_id:
                 # Eenmaal per pack tellen, ook als er meer kaarten in stuk zijn -
                 # anders zegt de teller straks dat er meer packs kapot waren dan er
                 # packs zijn.
                 broken = True
                 continue
 
-            entry = ensure(receiver_id, field(subject, "name") or receiver_id)
+            entry = ensure(packed_id, field(subject, "name") or packed_id)
             # Het subject komt van de levende pool, dus elk voorkomen draagt
             # dezelfde overall; de laatste overschrijft de vorige zonder verschil.
             entry["overall"] = field(subject, "overall")
@@ -156,7 +156,7 @@ def parse_packs(packs):
             entry["icon"] = bool(field(subject, "isIcon", False))
             entry["games"] = field(subject, "numberOfGames")
 
-            key = (giver_id, receiver_id)
+            key = (packer_id, packed_id)
             counts[key] = counts.get(key, 0) + 1
             total_cards += 1
 
@@ -212,6 +212,7 @@ def build_workbook(counts, people, order):
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
     center = Alignment(horizontal="center", vertical="center")
     slanted = Alignment(horizontal="center", vertical="bottom", textRotation=60)
+    stacked = Alignment(horizontal="center", vertical="bottom", wrap_text=True)
 
     def head(row, col, value, alignment=center):
         c = ws.cell(row=row, column=col, value=value)
@@ -221,63 +222,94 @@ def build_workbook(counts, people, order):
         c.border = border
         return c
 
-    # Rij 1: kolomkoppen (ontvangers), op overall van hoog naar laag. Schuin,
+    def total_cell(row, col, value):
+        c = ws.cell(row=row, column=col, value=value)
+        c.font = bold
+        c.fill = total_fill
+        c.alignment = center
+        c.border = border
+        return c
+
+    # Twee totaalkolommen, want ze zeggen verschillende dingen: vier keer dezelfde
+    # kaart is vier kaarten maar een unieke.
+    #
+    # Ze staan vooraan in plaats van achteraan, tegen de gewoonte in. Met zevenendertig
+    # spelers is de matrix veertig kolommen breed, en Excel kan alleen aan de linkerkant
+    # bevriezen - achteraan zouden juist de twee getallen die je leest van het scherm af
+    # staan. Vooraan reizen ze mee met de naam. De twee totaalrijen blijven wel onderaan:
+    # veertig rijen passen bijna op een scherm en veertig kolommen bij lange na niet, dus
+    # de assen zijn scheef omdat het blad zelf scheef is.
+    total_col = 2
+    unique_col = 3
+    first_col = 4
+
+    # Rij 1: kolomkoppen (de gepackten), op overall van hoog naar laag. Schuin,
     # want "Petar (89)" past niet in een kolom van tien tekens breed.
-    head(1, 1, "Gever \\ Ontvanger")
-    for j, person_id in enumerate(order, start=2):
+    head(1, 1, "Packer \\ Gepackte")
+    # Deze twee gewikkeld in plaats van schuin: op 60 graden zou "Totale unieke
+    # kaarten gepackt" de hele kopregel twee keer zo hoog maken voor twee kolommen.
+    head(1, total_col, "Totale kaarten gepackt", alignment=stacked)
+    head(1, unique_col, "Totale unieke kaarten gepackt", alignment=stacked)
+    for j, person_id in enumerate(order, start=first_col):
         entry = people[person_id]
         c = head(1, j, label(entry), alignment=slanted)
         if entry["icon"]:
             c.fill = icon_fill
-    total_col = n + 2
-    head(1, total_col, "Totaal gegeven", alignment=slanted)
 
-    # Datarijen (gevers), in dezelfde volgorde als de kolommen.
+    # Datarijen (de packers), in dezelfde volgorde als de kolommen.
     col_totals = [0] * n
-    for i, giver_id in enumerate(order):
+    col_uniques = [0] * n
+    for i, packer_id in enumerate(order):
         row = i + 2
-        entry = people[giver_id]
+        entry = people[packer_id]
         c = head(row, 1, label(entry))
         if entry["icon"]:
             c.fill = icon_fill
 
         row_total = 0
-        for j, receiver_id in enumerate(order):
-            value = counts.get((giver_id, receiver_id), 0)
-            cell = ws.cell(row=row, column=j + 2, value=value if value else None)
+        row_unique = 0
+        for j, packed_id in enumerate(order):
+            value = counts.get((packer_id, packed_id), 0)
+            cell = ws.cell(row=row, column=j + first_col, value=value if value else None)
             cell.alignment = center
             cell.border = border
-            if giver_id == receiver_id:
+            if packer_id == packed_id:
                 cell.fill = diag_fill
             row_total += value
             col_totals[j] += value
+            if value:
+                row_unique += 1
+                col_uniques[j] += 1
 
-        tc = ws.cell(row=row, column=total_col, value=row_total)
-        tc.font = bold
-        tc.fill = total_fill
-        tc.alignment = center
-        tc.border = border
+        total_cell(row, total_col, row_total)
+        total_cell(row, unique_col, row_unique)
 
-    # Totaalrij.
+    # Totaalrij: hoe vaak iemand zelf gepackt is, en door hoeveel verschillende
+    # packers - de spiegel van de twee totaalkolommen.
     total_row = n + 2
-    head(total_row, 1, "Totaal ontvangen")
+    unique_row = n + 3
+    head(total_row, 1, "Totaal gepackt")
+    head(unique_row, 1, "Door unieke packers")
     for j in range(n):
-        c = ws.cell(row=total_row, column=j + 2, value=col_totals[j])
-        c.font = bold
-        c.fill = total_fill
-        c.alignment = center
-        c.border = border
+        total_cell(total_row, j + first_col, col_totals[j])
+        total_cell(unique_row, j + first_col, col_uniques[j])
 
-    c = ws.cell(row=total_row, column=total_col, value=sum(col_totals))
-    c.font = bold
-    c.fill = total_fill
-    c.alignment = center
-    c.border = border
+    # De hoek: alle kaarten, en alle paren packer-gepackte die ooit voorkwamen. De
+    # twee overgebleven hoekvakjes blijven leeg - daar zou alleen het getal van de
+    # tegenoverliggende hoek nog een keer staan.
+    total_cell(total_row, total_col, sum(col_totals))
+    total_cell(unique_row, unique_col, sum(col_uniques))
+    total_cell(total_row, unique_col, None)
+    total_cell(unique_row, total_col, None)
 
     ws.column_dimensions["A"].width = 18
-    for j in range(2, total_col + 1):
+    for j in (total_col, unique_col):
+        ws.column_dimensions[get_column_letter(j)].width = 14
+    for j in range(first_col, first_col + n):
         ws.column_dimensions[get_column_letter(j)].width = 11
-    ws.freeze_panes = "B2"
+    # Naam en beide totalen blijven staan tijdens het scrollen; dat is de hele reden
+    # dat ze vooraan staan.
+    ws.freeze_panes = "D2"
     ws.row_dimensions[1].height = 95
 
     return wb
@@ -291,13 +323,13 @@ def build_summary_sheet(wb, counts, people):
     header_font = Font(bold=True, color="FFFFFF")
 
     headers = [
-        "Gever",
-        "Overall gever",
-        "Ontvanger",
-        "Overall ontvanger",
-        "Rating ontvanger",
+        "Packer",
+        "Overall packer",
+        "Gepackte",
+        "Overall gepackte",
+        "Rating gepackte",
         "Icoon",
-        "Aantal keer gepakt",
+        "Aantal keer gepackt",
     ]
     for j, h in enumerate(headers, start=1):
         c = ws.cell(row=1, column=j, value=h)
@@ -313,15 +345,15 @@ def build_summary_sheet(wb, counts, people):
             (people[kv[0][1]]["name"] or "").lower(),
         ),
     )
-    for i, ((giver_id, receiver_id), aantal) in enumerate(rows, start=2):
-        giver = people[giver_id]
-        receiver = people[receiver_id]
-        ws.cell(row=i, column=1, value=first_name(giver["name"]))
-        ws.cell(row=i, column=2, value=giver["overall"])
-        ws.cell(row=i, column=3, value=first_name(receiver["name"]))
-        ws.cell(row=i, column=4, value=receiver["overall"])
-        ws.cell(row=i, column=5, value=receiver["rating"])
-        ws.cell(row=i, column=6, value="ja" if receiver["icon"] else "nee")
+    for i, ((packer_id, packed_id), aantal) in enumerate(rows, start=2):
+        packer = people[packer_id]
+        packed = people[packed_id]
+        ws.cell(row=i, column=1, value=first_name(packer["name"]))
+        ws.cell(row=i, column=2, value=packer["overall"])
+        ws.cell(row=i, column=3, value=first_name(packed["name"]))
+        ws.cell(row=i, column=4, value=packed["overall"])
+        ws.cell(row=i, column=5, value=packed["rating"])
+        ws.cell(row=i, column=6, value="ja" if packed["icon"] else "nee")
         ws.cell(row=i, column=7, value=aantal)
 
     for column, width in zip("ABCDEFG", (16, 14, 16, 18, 17, 8, 20)):
@@ -332,7 +364,7 @@ def build_summary_sheet(wb, counts, people):
 
 def build_people_sheet(wb, counts, people, order):
     """Een regel per persoon, in dezelfde volgorde als de matrix: wat iemand
-    trok, hoe vaak hij zelf getrokken werd, en door hoeveel verschillende mensen."""
+    packte, hoe vaak hij zelf gepackt werd, en door hoeveel verschillende packers."""
     ws = wb.create_sheet("Spelers (op overall)")
     header_fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
     header_font = Font(bold=True, color="FFFFFF")
@@ -343,9 +375,9 @@ def build_people_sheet(wb, counts, people, order):
         "Rating",
         "Wedstrijden",
         "Icoon",
-        "Kaarten getrokken",
-        "Keer getrokken",
-        "Door hoeveel mensen",
+        "Kaarten gepackt",
+        "Keer gepackt",
+        "Door hoeveel packers",
     ]
     for j, h in enumerate(headers, start=1):
         c = ws.cell(row=1, column=j, value=h)
@@ -355,10 +387,10 @@ def build_people_sheet(wb, counts, people, order):
     given = {}
     received = {}
     owners = {}
-    for (giver_id, receiver_id), aantal in counts.items():
-        given[giver_id] = given.get(giver_id, 0) + aantal
-        received[receiver_id] = received.get(receiver_id, 0) + aantal
-        owners[receiver_id] = owners.get(receiver_id, 0) + 1
+    for (packer_id, packed_id), aantal in counts.items():
+        given[packer_id] = given.get(packer_id, 0) + aantal
+        received[packed_id] = received.get(packed_id, 0) + aantal
+        owners[packed_id] = owners.get(packed_id, 0) + 1
 
     for i, person_id in enumerate(order, start=2):
         entry = people[person_id]
@@ -408,9 +440,14 @@ def main():
     build_summary_sheet(wb, counts, people)
     build_people_sheet(wb, counts, people, order)
 
+    # Elke run schrijft een eigen bestand, dus ze horen bij elkaar in een eigen map
+    # in plaats van los naast het script. outputs/ staat in .gitignore.
+    output_dir = os.path.join(folder, "outputs")
+    os.makedirs(output_dir, exist_ok=True)
+
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     out_name = f"Pack_Matrix_Rating_{timestamp}.xlsx"
-    out_path = os.path.join(folder, out_name)
+    out_path = os.path.join(output_dir, out_name)
     wb.save(out_path)
 
     zonder_kaart = sum(1 for p in people.values() if p["overall"] is None)
@@ -420,7 +457,7 @@ def main():
     )
     if zonder_kaart:
         print(f"({zonder_kaart} daarvan hebben zelf geen kaart en staan onderaan de matrix.)")
-    print(f"Klaar! Bestand opgeslagen als: {out_name}")
+    print(f"Klaar! Bestand opgeslagen als: outputs\\{out_name}")
     print(f"Volledig pad: {out_path}")
 
 

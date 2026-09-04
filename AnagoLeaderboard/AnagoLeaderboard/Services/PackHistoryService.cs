@@ -42,9 +42,17 @@ public class PackHistoryService
         var names = players.ToDictionary(player => player.Id, player => player.Name);
         var subjects = players.ToDictionary(player => player.Id, _cardPoolService.SubjectFor);
 
-        var claims = await _dbContext.PackClaims
-            .OrderByDescending(claim => claim.ClaimedAt)
-            .ToListAsync();
+        // Oldest first here, and reversed at the end into the newest-first order the route
+        // answers in. The star can only be decided by walking the log forwards: a copy is the
+        // first of its slot exactly when nothing before it filled that slot, and "before" is not
+        // a question a newest-first pass can answer. Tie-broken on the id, because two claims can
+        // carry the same stamp - the daily and a game packet opened in the same minute - and
+        // without it the two could swap places between runs and hand the star to a different one
+        // of them each time.
+        var claims = (await _dbContext.PackClaims.ToListAsync())
+            .OrderBy(claim => claim.ClaimedAt)
+            .ThenBy(claim => claim.Id, StringComparer.Ordinal)
+            .ToList();
 
         // Every card, grouped in memory rather than a query per claim. The whole table is coming
         // back either way - there is no paging on this route - so N+1 round trips would buy
@@ -53,8 +61,16 @@ public class PackHistoryService
             .GroupBy(card => card.PackClaimId)
             .ToDictionary(group => group.Key, group => group.ToList());
 
-        var packs = claims
-            .Select(claim => new OpenedPack(
+        // Every slot any collector has ever filled, in the order they filled them. One set for
+        // the whole pass rather than a query per claim: the table is already in memory above, and
+        // the answer for a claim depends on every claim before it anyway.
+        var filled = new HashSet<(string Collector, string Subject, bool AsIcon)>();
+
+        var packs = new List<OpenedPack>(claims.Count);
+
+        foreach (var claim in claims)
+        {
+            packs.Add(new OpenedPack(
                 claim.Id,
                 claim.ClaimedAt,
                 claim.PlayerId,
@@ -62,8 +78,10 @@ public class PackHistoryService
                 claim.Source.ToString(),
                 claim.GameId,
                 claim.GiftId,
-                Cards(cardsByClaim.GetValueOrDefault(claim.Id), subjects)))
-            .ToList();
+                Cards(claim.PlayerId, cardsByClaim.GetValueOrDefault(claim.Id), subjects, filled)));
+        }
+
+        packs.Reverse();
 
         return new PackHistory(
             packs.Count,
@@ -80,13 +98,27 @@ public class PackHistoryService
     /// An empty list is not a state a claim can be in - a pack always contains at least one card -
     /// but it is what a claim whose cards were deleted by hand would show, and that is more useful
     /// than a missing row.
+    ///
+    /// <paramref name="filled"/> is the slots already taken and is added to as the packet is
+    /// walked, so <see cref="PackedCard.FirstCopy"/> falls out of the set's own answer to "was
+    /// this new". Marked <em>after</em> the sort rather than in draw order, which only matters for
+    /// two identical copies in one packet: the star then lands on the one that is printed first,
+    /// so the line reads as a star and a duplicate beside it rather than the other way round.
+    /// Every card in a packet is minted in one pass and shares a tick, so there is no draw order
+    /// to prefer instead.
     /// </summary>
     private static IReadOnlyList<PackedCard> Cards(
+        string collectorId,
         List<CardInstance>? cards,
-        IReadOnlyDictionary<string, CardSubject> subjects) =>
+        IReadOnlyDictionary<string, CardSubject> subjects,
+        HashSet<(string Collector, string Subject, bool AsIcon)> filled) =>
         (cards ?? new List<CardInstance>())
-        .Select(card => new PackedCard(subjects[card.SubjectPlayerId], card.IsIcon))
+        .Select(card => (Subject: subjects[card.SubjectPlayerId], card.SubjectPlayerId, card.IsIcon))
         .OrderByDescending(card => card.Subject.Overall)
         .ThenBy(card => card.Subject.Name)
+        .Select(card => new PackedCard(
+            card.Subject,
+            card.IsIcon,
+            filled.Add((collectorId, card.SubjectPlayerId, card.IsIcon))))
         .ToList();
 }
