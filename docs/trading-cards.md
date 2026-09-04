@@ -2026,6 +2026,55 @@ not. And the pile is still a tidy wrapping grid where real packets tossed down w
 overlap, which is the strongest cue of the four and the one that would cost the shelf's
 width formula, the hit targets, the scroll clip and the flight FLIP.
 
+### The pages you are reading are not the pages that turn
+
+The book is a CSS 3D object: `.album` carries a `perspective`, `.album__book` is
+`preserve-3d`, and each leaf rotates about the gutter with its two faces culled by
+`backface-visibility`. That is what makes a page turn look like paper. It also means the
+whole text block is composited and **resampled** on its way to the screen, and on a card's
+photograph that is plainly visible — the same card read soft in the album and sharp in the
+card viewer, which is a flat `position: fixed` overlay outside the book.
+
+Two things fix it, and they are one design.
+
+**`.album--settled` takes the book out of 3D whenever no leaf is turning** — no
+perspective, no `preserve-3d`. The book only needs to be an object while something
+rotates. That fixes the right-hand page outright, because it is the front face of a leaf
+with no transform on it at all.
+
+**`.album__spread` draws the two pages on show a second time**, flat, positioned by layout,
+with no transform of any kind. This is for the left-hand page, which cannot be fixed by
+flattening: it is the back face of a leaf mirrored by `rotateY(-180deg)` and un-mirrored by
+a second reflection on the face, and although that pair composes to a pure translation,
+Chrome reflects the rasterised layer — about the book's left-hand edge, which is centred in
+a container of arbitrary width and so lands between two device pixels. No page-width
+arithmetic can align it.
+
+Three decisions inside that are worth keeping.
+
+**The pages are duplicated, not moved.** Handing the content from the leaf to the spread at
+the start of a turn would remount every card, and a fresh `<img>` does not paint on its
+first frame even from cache. Both copies stay mounted; only one is ever *live*, because
+`visible` is what writes `data-slot-shown`, and that is the attribute `PutAway` finds a
+slot by. Exactly one element may carry it.
+
+**The mirror cannot come off a resting leaf, and it was tried.** Positioning a flipped leaf
+on the left half by layout is geometrically correct, and every back-face rule survives it —
+they are already written in final on-screen coordinates, because two reflections compose to
+identity. What kills it is that `.album__leaf` transitions `transform`: a leaf whose flip is
+layout at rest and a rotation while turning has two descriptions of the same state, and the
+class changes in the same commit as `flipped`, so every settle and every turn start
+animates a rotation nobody asked for. Fixing that means splitting a turn across three or
+four frames, since a transition cannot be enabled and its value changed in one commit.
+
+**Only content spreads get the flat copy.** Leaf 0 and the last leaf are boards, larger
+than a page on every side, so a page-sized copy of a board's endpaper would leave the real
+one showing around the edge. The two spreads that include one carry no cards.
+
+Everything above is written out at length in album.css under "A book at rest is flat" and
+"The settled spread", including the attempts that did nothing — a larger photo, zeroing the
+faces' depth, snapping the page width — so that they are not tried a second time.
+
 ### Getting in: the ledger and the five books
 
 The page used to have one entrance and no beginning. A bare type-ahead sat in the

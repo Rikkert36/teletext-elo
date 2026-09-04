@@ -119,6 +119,18 @@
    * is the whole thing this is here to prevent. `.album-side` spends 2px of it asking
    * for a fraction more than two packets need, for the same reason.
    */
+  /*
+   * **Left fractional on purpose, and it was briefly snapped to a multiple of 4px.**
+   *
+   * That was aimed at the left-hand page's blur, back when a flipped leaf was mirrored:
+   * two reflections compose to a translation of exactly `--page-w`, so a fractional one
+   * put the whole page between device pixels. It is not needed now that the settled
+   * spread draws both pages with no transform at all, and it cannot be had anyway —
+   * `round()` here goes through `--page-h`'s `calc()`, and `postcss-calc` in the
+   * production minifier cannot parse it, which fails the build. The checklist's type
+   * still snaps with `round()`, and that is fine: it is a `font-size`, not something
+   * another `calc()` reads.
+   */
   --page-w: min(
     40vw,
     calc(70vh * 0.78),
@@ -941,12 +953,16 @@
 }
 
 /**
- * Both faces need an explicit 3D transform.
+ * Both faces need an explicit 3D transform **while a leaf is turning**.
  *
  * `backface-visibility: hidden` is ignored on an element that isn't itself
  * 3D-transformed, so the front face — which previously had no transform at all —
  * stayed visible after its leaf rotated, showing mirrored through the back of
  * the page. The `translateZ` also keeps the two faces from z-fighting.
+ *
+ * All of this applies while a leaf is turning. At rest the whole text block leaves the 3D
+ * scene, and the culling described above stops working and is done by hand instead — see
+ * "A book at rest is flat" below, which is the other half of this rule.
  */
 .album__face--front {
   transform: rotateY(0deg) translateZ(1px);
@@ -954,6 +970,245 @@
 
 .album__face--back {
   transform: rotateY(180deg) translateZ(1px);
+}
+
+/* ---------------------------------------------------------------- *
+ * A book at rest is flat, and that is what makes it sharp
+ *
+ * **`.album--settled` is on whenever no leaf is turning, and it takes the text block out
+ * of the 3D scene.** The book only needs to be a 3D object while something is rotating;
+ * the rest of the time it is two sheets of paper facing the reader, and being one costs it
+ * the sharpness of everything printed on it.
+ *
+ * A `preserve-3d` subtree is composited and *resampled* on its way to the screen, and the
+ * loss is not subtle: the same card read visibly soft in the book and sharp in the card
+ * viewer, which is a flat `position: fixed` overlay outside the book. On type it is the
+ * blur the checklist fights by snapping its font size to an integer (see the note there);
+ * on the cards' photos there is no equivalent trick.
+ *
+ * **This is half the answer and `.album__spread` is the other half.** Flattening fixes the
+ * right-hand page outright — it is the front face of an untransformed leaf, so it ends up
+ * drawn straight at device resolution — and it is what lets the spread work at all, since
+ * the spread is a child of the book. It does *not* fix the left-hand page, which is the
+ * back face of a mirrored leaf; that is what the spread exists for, and its own note
+ * carries the reasoning.
+ *
+ * **Four things were tried before the spread and the record is here so they are not tried
+ * again.** A larger photo: 4x the pixels changed nothing, the loss is in the resample and
+ * not the source. Zeroing the faces' `translateZ` while keeping `preserve-3d`: nothing, it
+ * is the 3D rendering context and not the depth inside it. Snapping `--page-w` to whole
+ * pixels: right for the mirror, and removed with it — `round()` here is also unparseable
+ * to the production minifier, see the note on `--page-w`. And **removing the mirror from a
+ * resting leaf**, positioning it on the left half by layout instead: geometrically correct,
+ * and the back-face rules survive it, but it makes a leaf's `transform` differ between
+ * resting and turning — and `.album__leaf` transitions `transform`, so every settle and
+ * every turn start animated a rotation nobody asked for. Arranging otherwise needs the
+ * turn broken into three or four frames, because a transition cannot be enabled and its
+ * value changed in one commit. That is a state machine around every page turn, and it is
+ * why the pages are drawn a second time instead.
+ *
+ * **What has to be replaced is the culling.** `backface-visibility` is meaningless once
+ * nothing is in a 3D rendering context, and Chrome then honours it inconsistently: left
+ * on, it culled the *pages'* back faces while leaving the cover's, so the inside front
+ * cover showed as the left-hand page on every settled spread. So it is turned off outright
+ * and the turned-away face is hidden by hand — which face that is, is already known from
+ * `--flipped`. `visibility` and not `display`, because faces are measured: a hidden face
+ * keeps its box, and the FLIP that lands a card in a slot reads rects off the page it is
+ * landing on.
+ *
+ * **Nothing here touches `.album__leaf`'s own `transform`, and that is deliberate.** It is
+ * the property the page turn transitions, and the class toggles in the same commit as
+ * `flipped`; anything that changes it between the two states animates. The faces carry no
+ * transition, which is why their mirrors can be rewritten freely.
+ *
+ * **`z-index: 0` is not decoration.** `perspective` was what made `.album` a stacking
+ * context — the turn strips and the rebind rings are positioned against it, and the note
+ * on `.album__ring` says so. Taking it away without putting a stacking context back lets
+ * all of that escape into the page. `z-index: 0` on an already `position: relative`
+ * element is the cheapest replacement and sorts identically among its siblings, which
+ * matters: `.album-main` in game.css is written the way it is because the asides and the
+ * album hit-test in paint order.
+ *
+ * Timing: `transform-style` and `perspective` cannot transition, so the swap is discrete
+ * and has to land before the rotation starts. It does by construction — the class is
+ * derived from `moving`, and Album.tsx sets `moving` and `flipped` in one batched commit
+ * for exactly this reason. Coming back it waits for `onTransitionEnd`, so the leaf is
+ * already lying flat by the time the depth returns.
+ *
+ * The rebind ceremony is excluded from `.album--settled` in Album.tsx. Its rings are
+ * genuinely 3D — tilted and yawed beads orbiting the book, which need the perspective to
+ * read as orbits rather than as ellipses drawn on top.
+ *
+ * Mobile matches none of this: it slides `.album__slide` and has no leaves at all.
+ * ---------------------------------------------------------------- */
+
+.album--settled {
+  perspective: none;
+  z-index: 0;
+}
+
+.album--settled .album__book,
+.album--settled .album__leaf {
+  transform-style: flat;
+}
+
+.album--settled .album__face {
+  backface-visibility: visible;
+  -webkit-backface-visibility: visible;
+}
+
+/*
+ * The leaves' mirrors, restated as 2D `scaleX` rather than left as flattened `rotateY`s.
+ *
+ * The two are the same reflection here — a `rotateY(180deg)` about `50% 50%`, with the
+ * perspective off and the chain flat, is a reflection about the face's centre line — so
+ * this is not buying geometry. What it buys is that nothing downstream depends on *how*
+ * the browser flattens a 3D rotation, or on whether it still applies backface culling to
+ * one it has flattened. Both of those were live bugs on the way here: a projected
+ * `rotateY` left the middle column of cards sharp and the outer two soft, and a culled one
+ * put the inside front cover on the left-hand page.
+ *
+ * `scaleX(1)` on the front face is identity, and is not a leftover: a face with no
+ * transform at all is not a stacking context, and its contents' `z-index` would escape
+ * into the leaf.
+ */
+.album--settled .album__leaf .album__face--front {
+  transform: scaleX(1);
+}
+
+.album--settled .album__leaf .album__face--back {
+  transform: scaleX(-1);
+}
+
+.album--settled .album__leaf:not(.album__leaf--flipped) .album__face--back,
+.album--settled .album__leaf--flipped .album__face--front {
+  visibility: hidden;
+}
+
+/*
+ * **The two things that are drawn *over* the pages are drawn over them by depth, and
+ * depth is what just went away.**
+ *
+ * `.album__spine` and `.album__spinecap` sit at `translateZ(2px)` and come *before* the
+ * leaves in the document, which is deliberate: in a 3D rendering context paint order is
+ * depth, so 2px clears the faces' 1px and nothing else was needed. Flattened, they fall
+ * back to document order and disappear behind the pile — the hollow at the gutter and the
+ * hardware in the overhang both vanished the moment a turn finished.
+ *
+ * So they take a `z-index` instead, and it has to beat every leaf: `leafZ` tops out at
+ * `leafCount + 2`, which grows with the pool, hence a number with room in it rather than
+ * one derived from the count. `.album__turn` needs no such rule — it is a sibling of
+ * `.album__book`, not a child, so its own `z-index: 40` already sorts it in `.album`'s
+ * stacking context, and a flat book cannot reach past it.
+ *
+ * `.album__binding` and the two `.album__backing`s are the other three children before
+ * the leaves and must stay *behind* them. They carry no depth, so document order already
+ * has them right and they are deliberately not listed here.
+ */
+.album--settled .album__spine,
+.album--settled .album__spinecap {
+  transform: none;
+  z-index: 100;
+}
+
+/* ---------------------------------------------------------------- *
+ * The settled spread: the two pages on show, drawn outside the leaves
+ *
+ * **The last of the softness lived in the left-hand page's mirror, and this is how it
+ * stops being a mirror.** A flipped leaf is carried to the left half by
+ * `rotateY(-180deg)` and its back face un-mirrors with a second reflection; composed that
+ * pair is a pure translation, but Chrome rasterises the face and *then* reflects the
+ * layer, and the leaf's reflection axis is the book's left-hand edge — centred in a
+ * container of arbitrary width, so it lands between two device pixels. Nothing derived
+ * from `--page-w` can align it, and the mirror cannot be taken off a leaf: `transform` is
+ * what the turn transitions, and any difference between resting and turning animates as a
+ * rotation nobody asked for.
+ *
+ * So the two pages on show are drawn a second time, here, by an element that has no
+ * transform of any kind and is positioned by layout. At rest this is what you are looking
+ * at and the leaves beneath it are the pile, the boards and the fore-edge; the moment a
+ * leaf starts to turn it goes `visibility: hidden` and the leaves carry the pages again,
+ * mirror and all, which is invisible on a page in motion.
+ *
+ * **A child of `.album__book`, not a sibling.** `inset: 0` then lands exactly on the two
+ * pages, which is the whole geometry — and it is safe only because `.album--settled`
+ * flattens the book: inside a `preserve-3d` parent this would join the 3D scene and be
+ * resampled like everything else. It is never shown while the book is not settled, so the
+ * two facts cannot come apart. The turn strips and the rebind rings are siblings for the
+ * opposite reason, and their notes say so.
+ *
+ * **Its children carry `.album__face--front` / `--back`.** Every rule that draws a page —
+ * the fold and trim shading, the running band, the ruled stock, the corner radii, the
+ * fore-edge — is written against those classes and unscoped, so all of it applies here
+ * untouched. Two exceptions had to be widened or narrowed by hand: the shading container
+ * above, which was scoped to a paper leaf, and the settled mirrors, which are now scoped
+ * to a leaf so they cannot reach this.
+ *
+ * **Duplicated, not moved.** Both copies stay mounted, because handing the page content
+ * from one parent to the other at the start of a turn would remount every card in it and
+ * a fresh `<img>` does not paint on its first frame even from cache — the blink that
+ * `eager` exists to prevent, see `PlayerCard`. Only one copy is ever *live*: `visible` is
+ * what writes `data-slot-shown` and the focusable `tabIndex`, and Album.tsx gives it to
+ * the spread while settled and to the leaves otherwise, so the selector `PutAway` uses to
+ * find a slot still matches exactly one element.
+ *
+ * **Only content spreads.** The first and last spread put a board's endpaper on one side,
+ * and a board is `--board-out` larger than a page, so a page-sized copy of it would leave
+ * the real one showing around the edge. Those two spreads have no cards on them and keep
+ * the leaves' own rendering — see the gate in Album.tsx.
+ * ---------------------------------------------------------------- */
+
+.album__spread {
+  position: absolute;
+  inset: 0;
+  /* Over every leaf — `leafZ` tops out at `leafCount + 2` — and under the spine, which
+     the settled state puts at 100 so the gutter still draws over the paper. */
+  z-index: 90;
+}
+
+.album:not(.album--settled) .album__spread {
+  /*
+   * `visibility`, not `display`. The pages under it are the same cards, and dropping them
+   * out of layout for the length of every turn would re-run the lazy-load and the decode
+   * each time the book settles.
+   */
+  visibility: hidden;
+}
+
+/*
+ * The two halves, by layout. The book is `--page-w * 2` wide, so these are the pages'
+ * own boxes — and `left`/`width` have to be given explicitly because `.album__face` is
+ * `inset: 0`, which is right inside a leaf and covers the whole book out here.
+ */
+.album__spread .album__face--back {
+  left: 0;
+  right: auto;
+  width: var(--page-w);
+}
+
+.album__spread .album__face--front {
+  left: var(--page-w);
+  right: auto;
+  width: var(--page-w);
+}
+
+/*
+ * **The faces' own mirrors have to be cancelled here, and forgetting it is what made the
+ * left-hand page's cards flip the instant the book settled.**
+ *
+ * `.album__face--back` carries `rotateY(180deg)` unconditionally, and inside a leaf that
+ * is exactly right: it undoes the leaf's own reflection, which is what lets a back face be
+ * written in final on-screen coordinates. Out here there is no leaf reflection to undo, so
+ * the same rule simply mirrors the page — and since it only shows once the spread does,
+ * the page read correctly for the whole turn and then flipped on arrival.
+ *
+ * `scaleX(1)` rather than `none`, for the reason the leaves' own settled rule gives: a
+ * face with no transform at all is not a stacking context, and the band and the shading
+ * layer inside it carry `z-index`.
+ */
+.album__spread .album__face--front,
+.album__spread .album__face--back {
+  transform: scaleX(1);
 }
 
 /*
@@ -1704,7 +1959,8 @@
  * Paper leaves only. The two boards carry endpapers with their own hinge and turn-in
  * shading, and a second set over them would be counting the same light twice.
  */
-.album__leaf:not(.album__leaf--cover):not(.album__leaf--back) .album__face::before {
+.album__leaf:not(.album__leaf--cover):not(.album__leaf--back) .album__face::before,
+.album__spread .album__face::before {
   content: "";
   position: absolute;
   inset: 0;

@@ -1879,6 +1879,28 @@ const Album: React.FC<AlbumProps> = ({
     return index < flipped ? index + 1 : leafCount - index;
   };
 
+  /**
+   * Nothing is turning: the book is flat and the flat spread is what is on screen.
+   *
+   * The same condition `.album--settled` is built from, because it has to be — the spread
+   * is only sharp while the book is flattened, and only correct while no leaf is mid
+   * rotation. See "The settled spread" in album.css.
+   */
+  const atRest = moving === null && !rebindingNow;
+
+  /**
+   * Whether the flat spread is drawn at all, which is **not** the same question as whether
+   * it is showing.
+   *
+   * It stays mounted across a turn on purpose (the pages would otherwise remount and blink
+   * — see the album.css note), so this is about the *spread*, not the moment: only a
+   * content spread qualifies. Leaf 0 and the last leaf are boards, `--board-out` larger
+   * than a page on every side, so a page-sized copy of a board's endpaper would leave the
+   * real one showing around it. The two spreads that include one carry no cards and keep
+   * the leaves' own rendering.
+   */
+  const spreadPages = !isMobile && flipped >= 2 && flipped < leafCount - 1;
+
   /* ---------------------------------------------------------------- *
    * The leaf a turn is uncovering, so the page underneath can be shaded
    *
@@ -2182,6 +2204,27 @@ const Album: React.FC<AlbumProps> = ({
             */
             rebindingNow ? 'album--rebind' : '',
             rebindPhase ? `album--rebind-${rebindPhase}` : '',
+            /*
+              Nothing is turning, so the book does not need to be a 3D object — and being
+              one costs it the sharpness of everything printed on it. It is also what makes
+              `.album__spread` possible: the spread is a child of the book, so it is only
+              sharp while the book is flat. See "A book at rest is flat" in album.css for
+              what the class switches off and what has to replace the backface culling once
+              the depth is gone.
+
+              Derived from `moving` rather than tracked, so the swap lands in the same
+              commit as the rotation: every caller sets `moving` and `flipped` together,
+              and `onTransitionEnd` clears `moving` only once the leaf has landed. **Do not
+              make this touch a leaf's `transform`** — that is the property the turn
+              transitions, and the class arrives in the same commit as `flipped`, so any
+              difference between the two states animates as a rotation nobody asked for.
+
+              **And never while the book is being re-bound.** `moving` is null for the
+              whole of that ceremony, but the rings orbiting the book are real 3D — tilted
+              and yawed beads that pass behind the boards — and the settled state takes the
+              perspective away, which would flatten them into ellipses drawn on top.
+            */
+            atRest ? 'album--settled' : '',
           ]
             .filter(Boolean)
             .join(' ')}
@@ -2272,6 +2315,14 @@ const Album: React.FC<AlbumProps> = ({
             : Array.from({ length: leafCount }, (_, leaf) => (
                 <div
                   key={leaf}
+                  /*
+                    The spread carries the readable copy of both pages, so the leaves are
+                    the pile, the boards and the fore-edge and nothing a screen reader
+                    needs — without this the same twelve cards are in the tree twice. Not
+                    conditional on `atRest`: mid-turn the pages are in motion and reading
+                    them is meaningless either way.
+                  */
+                  aria-hidden={spreadPages || undefined}
                   className={[
                     'album__leaf',
                     leaf < flipped ? 'album__leaf--flipped' : '',
@@ -2325,7 +2376,13 @@ const Album: React.FC<AlbumProps> = ({
                     <PageFace
                       page={pages[leaf * 2]}
                       index={leaf * 2}
-                      visible={leaf === flipped}
+                      /*
+                        `visible` is what writes `data-slot-shown` and the focusable
+                        `tabIndex`, so exactly one copy of a page may hold it or `PutAway`'s
+                        slot selector matches two elements. While the flat spread is showing
+                        it is the live copy and these are not.
+                      */
+                      visible={leaf === flipped && !(spreadPages && atRest)}
                       onCardOpen={onCardOpen}
                       binding={showBinding}
                       held={held}
@@ -2336,7 +2393,8 @@ const Album: React.FC<AlbumProps> = ({
                     <PageFace
                       page={pages[leaf * 2 + 1]}
                       index={leaf * 2 + 1}
-                      visible={leaf === flipped - 1}
+                      /* See the front face above for why this defers to the spread. */
+                      visible={leaf === flipped - 1 && !(spreadPages && atRest)}
                       onCardOpen={onCardOpen}
                       held={held}
                       filling={filling}
@@ -2344,6 +2402,41 @@ const Album: React.FC<AlbumProps> = ({
                   </div>
                 </div>
               ))}
+
+          {/*
+            The two pages on show, drawn flat and outside the leaves.
+
+            The last child of `.album__book`, and a child rather than a sibling so that
+            `inset: 0` lands exactly on the two pages. See "The settled spread" in
+            album.css for why that is safe only while the book is flattened, why the pages
+            are duplicated rather than moved, and why the endpaper spreads are left out.
+          */}
+          {spreadPages ? (
+            <div className="album__spread" aria-hidden={!atRest || undefined}>
+              <div className="album__face album__face--back">
+                <PageFace
+                  page={pages[(flipped - 1) * 2 + 1]}
+                  index={(flipped - 1) * 2 + 1}
+                  visible={atRest}
+                  onCardOpen={onCardOpen}
+                  held={held}
+                  filling={filling}
+                />
+              </div>
+
+              <div className="album__face album__face--front">
+                <PageFace
+                  page={pages[flipped * 2]}
+                  index={flipped * 2}
+                  visible={atRest}
+                  onCardOpen={onCardOpen}
+                  binding={showBinding}
+                  held={held}
+                  filling={filling}
+                />
+              </div>
+            </div>
+          ) : null}
           </div>
 
           {/*
