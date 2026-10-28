@@ -17,17 +17,20 @@ namespace AnagoLeaderboard.Controllers
         private readonly CardStatisticsService _cardStatisticsService;
         private readonly PackHistoryService _packHistoryService;
         private readonly HeadToHeadService _headToHeadService;
+        private readonly CollectorStandingsService _collectorStandingsService;
 
         public CardController(
             CardPoolService cardPoolService,
             CardStatisticsService cardStatisticsService,
             PackHistoryService packHistoryService,
-            HeadToHeadService headToHeadService)
+            HeadToHeadService headToHeadService,
+            CollectorStandingsService collectorStandingsService)
         {
             _cardPoolService = cardPoolService;
             _cardStatisticsService = cardStatisticsService;
             _packHistoryService = packHistoryService;
             _headToHeadService = headToHeadService;
+            _collectorStandingsService = collectorStandingsService;
         }
 
         /// <summary>
@@ -59,6 +62,16 @@ namespace AnagoLeaderboard.Controllers
         public async Task<CardStatistics> GetCardStatistics()
         {
             return await _cardStatisticsService.GetStatistics();
+        }
+
+        /// <summary>
+        /// The collectors' standings and the pack matrix: every active collector's book value, gaps and copy counts.
+        /// Ungated, like <c>api/packs</c>, which already names who packed what. Nothing is written.
+        /// </summary>
+        [HttpGet("cards/collectors")]
+        public async Task<CollectorStandings> GetCollectorStandings()
+        {
+            return await _collectorStandingsService.GetStandings();
         }
 
         /// <summary>

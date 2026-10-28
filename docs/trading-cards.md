@@ -648,7 +648,7 @@ sized by how well they did, and collections build toward a icons unlock.
 | Album cover | Five leather stains — bordeaux, cognac, bosgroen, marineblauw, antraciet — brass edge and gold foil on all five. **Chosen once**, with no preview. |
 | Access gate | Collection page unlocks once that player has **≥5 games** — symmetric with the card pool. **Signing in is never refused**; an under-gate name lands on a shut, padlocked album that says how many games are left. |
 | Pack recipients | **All four participants** of a game. |
-| Pack size | 1 for playing, **+2** for winning, **+2** for beating the expected margin — **by ≥3 if you won, by anything at all if you lost**. So 1, 3 or 5, and **a loss caps at 3**. Settled 2026-08-19; the loser's bar was ≥3 too until then. See "The two bars". |
+| Pack size | 1 for playing, **+2** for winning, **+2** for beating the expected margin — **by ≥3 if you won, by anything at all if you lost**. So 1, 3 or 5, and **a loss caps at 3**. **A 10–0 is always 5**, because once the expectation is past 10–3 a whitewash is the most anyone can do (2026-09-24). Settled 2026-08-19; the loser's bar was ≥3 too until then. See "The two bars". |
 | Opponent bonus | **Any packet bigger than a single doubles both opponents' tickets** in that pack — the same test as the two +2s, not a second one beside it. Flat 2×, does not stack to 4×. Flavour, not balance. |
 | Within a pack | Each player at most once — draw **without replacement**. |
 | Free pack | One 1-card pack per player per day. |
@@ -1091,6 +1091,11 @@ least a mild underdog — a level game's expected margin is ±1, so the side exp
 to lose by one would have to *win* to beat it. The bonus therefore cannot fire in an
 even game at all, which is most games in this office, and is why it costs so much
 less than it looks like it should (see "Volume and pacing").
+
+**A whitewash always clears the winner's bar.** Against a heavy enough underdog the
+expected margin passes 10–3, and ≥3 better than that is more than ten goals — a five
+nobody could earn. So 10–0 pays five regardless of the expectation. Only the winner's
+top result is lifted, so monotonicity holds.
 
 Both bars are monotone in your own goal difference at any fixed expectation, so a
 better result never pays less and there is never a reason to throw a game.
@@ -4328,7 +4333,9 @@ truer reading of "objects lying next to the book".
     it makes the element a candidate for promotion out of the flattened subtree that
     back-face culling depends on.
 - **But the 3D exists only while the card is turning** — `.opener__flip--turning`, added
-  for the 320ms of the transition and taken away after. **Anything 3D in that subtree
+  with the turn and taken away at `TURN_FLAT_MS` (270 of the 320ms), when the easing tail
+  has 3° left: a card that looks settled should also be sharp, and the snap is under half
+  a pixel of width. **Anything 3D in that subtree
   makes Chrome rasterize the card at roughly CSS resolution and scale it up to the
   device's pixels**, and the card back is then visibly soft on any HiDPI screen, in the
   one state it is ever looked at: still, face down, waiting to be clicked. While it is
@@ -4354,6 +4361,12 @@ truer reading of "objects lying next to the book".
     on a face defeats the inline `visibility: hidden` that `heroVisible` puts on
     `.opener__riser` for the hand-off — the card then flies down to the revealed row and
     stays in the centre too, one card in two places. It shipped that way for one revision.
+- **Moving the card through `@property` custom properties instead of `transform` was
+  tried and reverted** (2026-10-26). The idea was a main-thread repaint per frame instead
+  of a composited texture. It did not visibly sharpen anything, and the entrance then
+  appeared late: the main thread is busy at the tear, so the 180ms clock ran out before
+  a frame was drawn. The compositor runs the motion regardless of that. Measure which
+  layer is soft before trying again. The row slots carry no `will-change: transform`.
 - **Hold is counted from the end of the flip**, not the start. A single "dwell"
   measured from the turn left the card readable for about 40ms.
 - **Hold depends on newness only** (340ms, +340ms if new). Rarity is expressed in
@@ -6790,6 +6803,71 @@ Still open: judging the icoon face itself against 20 real portraits rather than
 placeholder names — in particular the 9 silver and bronze icoons, which are what
 the "tier moves the metal and nothing else" rule was written for and has never
 been tested on.
+
+## The collectors' standings
+
+`GET api/cards/collectors` — how far every collector is with their album, and the pack
+matrix behind it. It brings the `tools/pakgeluk` book value and the `tools/pack-matrix`
+grid into the app; the page that shows it is a newspaper lying on the table, standings on
+the front and the matrix on the back. Read-only and ungated, like `api/packs`.
+
+Settled 2026-10-28:
+
+- **Who is listed:** active players with an album, including an empty one. Retired players
+  drop off even if they collected.
+- **The percentage is book value, not a card count.** Each slot weighs `1/p`, its chance of
+  being drawn, off `TicketsFor` — the same tickets the draw uses, so the standings cannot
+  drift from the odds. Volume I slots are weighed in the pool without icons, icon slots in
+  the pool with them, exactly as `tools/pakgeluk` does. Missing Petar costs about thirty
+  times what missing Daria does, which is the point.
+- **Today's overalls, on purpose.** A live rating says how far through the book you are
+  now; the rating a card had when it was drawn does not. Do not replay draw-time odds.
+- **Rounded down**, so 100% means complete.
+- **Icon collectors are those who unlocked the book**, not those holding an icoon card.
+  They come first with a second figure — volume I and the icons together — and then
+  everybody else by volume I. Equal books share a rank.
+- **A slot is filled by its own kind**, as everywhere else: the matrix counts player copies
+  under volume I and icon copies under the icons.
+- **Gaps are listed rarest first**, volume I before icons. The page prints no ratings; they
+  only set the order.
+
+### De Verzamelaar: the newspaper on the table
+
+`Newspaper.tsx` and `newspaper.css`. There is no page and no nav item for the standings —
+they are a folded newspaper lying in the right margin under the register, and you pick it
+up the way you pick up a card: it is lifted to the middle of the table over a scrim.
+
+- **Three pages, leafed through like the album.** Verzamelalbum (the standings), Pakmatrix,
+  and Pakjes — `api/packs?compact=true` printed as a results column, grouped by day, the
+  lines exactly as the endpoint writes them. A page turns away over its left edge to show
+  the next beneath it, and the previous one swings back in from the left; past the last
+  page is the first again. Turning a single sheet over was the first version and only
+  holds two sides; a spread of two pages side by side leaves the matrix no width. A tab
+  was tried too and dropped — a newspaper has no tabs. The printed cross-references at the
+  top of each page, ← → and a swipe turn it; Esc or a click beside it puts it back.
+  Turning strips on the edges, like the album's, were tried and dropped.
+- **It reads as a standings section, not an article.** No headline describing the state —
+  the page is live, and a headline that does not update is worse than none. The only date
+  is today's, in the running head.
+- **Folded in half, and the fold is real.** The paper on the table is a miniature of the
+  actual page — the top half, at the width it will be lifted to, scaled down — so lifting
+  it changes its size and nothing else. It flies up showing only that top half, and the
+  lower half swings down from behind along the fold *during* the flight, not after it.
+  Putting it back is the same in reverse. It is folded at whatever page it was put down on, and opens
+  there again. A generic folded paper that was swapped for the real page on arrival was
+  the first version, and the swap was the jarring part.
+- **The book's arrows stand down while it is up** (`keysElsewhere` on `Album`), the same
+  rule the card viewer follows.
+- **Fetched with every collection state** (standings and pack lines together) — the first read, a refetch, a packet opened —
+  so it is already printed when picked up. That costs a second leaderboard replay per
+  collection read, accepted so the paper lifts at once. Should it be picked up before the
+  first answer, it stays on the table until there is one: the standings never pop in on a
+  sheet already up. A failed fetch still flies, with one line saying it was not delivered.
+- **Names are first names**, with the last name's initial where two people share one.
+- **Self-hosted faces**: UnifrakturMaguntia for the masthead, Oswald for heads, PT Serif
+  for text — all OFL, in `src/fonts`, like the Teletext and Florilane faces.
+- It shares the register's stand-down during a reveal and the binding ceremony by lying
+  in the register's own aside.
 
 ## Volume II — the personal album
 

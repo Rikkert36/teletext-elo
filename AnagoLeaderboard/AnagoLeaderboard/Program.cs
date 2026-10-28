@@ -34,6 +34,7 @@ builder.Services.AddScoped<PackService>();
 builder.Services.AddScoped<CardStatisticsService>();
 builder.Services.AddScoped<PackHistoryService>();
 builder.Services.AddScoped<HeadToHeadService>();
+builder.Services.AddScoped<CollectorStandingsService>();
 
 // No state, just paths and a process invocation, so singletons.
 builder.Services.AddSingleton<AvatarStorage>();

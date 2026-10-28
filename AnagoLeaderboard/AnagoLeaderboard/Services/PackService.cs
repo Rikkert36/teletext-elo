@@ -359,11 +359,13 @@ public class PackService
         // The second +2 is gated harder for a winner than for a loser, because for a winner it is
         // very nearly the same claim as the first one. A loser needs only to have done better than
         // the ratings said; a winner needs to have done so emphatically. See the two thresholds.
-        var beatExpectation =
-            residual >= (won ? MarginBonusThreshold : LosingMarginBonusThreshold);
-
         var team = game.GetTeam(playerId);
         var opponents = game.GetOtherTeam(playerId);
+
+        // A 10-0 is five whatever was expected: nothing is left to beat once the prediction is past 10-3.
+        var beatExpectation =
+            residual >= (won ? MarginBonusThreshold : LosingMarginBonusThreshold)
+            || (won && opponents.Goals == 0);
         var partner = team.FirstPlayer.PlayerId == playerId ? team.SecondPlayer : team.FirstPlayer;
 
         // Winning *or* beating the expected margin doubles both opponents' tickets. Flat 2x

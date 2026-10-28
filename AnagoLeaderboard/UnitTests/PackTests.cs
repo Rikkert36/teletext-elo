@@ -151,6 +151,20 @@ namespace UnitTests
         }
 
         [Test]
+        public void HeavyFavourite_AWhitewashIsFiveCards()
+        {
+            var game = GameBetween(10, 0, 1400, 400);
+            Assert.That(10 - new GameWithAnalytics(game).ExpectedScore, Is.GreaterThan(7));
+
+            var pack = PackService.PackForGame(game, "t1p1");
+
+            Assert.That(pack.Size, Is.EqualTo(5));
+            Assert.That(pack.DoubledPlayerIds, Is.EquivalentTo(new[] { "t2p1", "t2p2" }));
+            Assert.That(PackService.PackForGame(GameBetween(10, 1, 1400, 400), "t1p1").Size,
+                Is.EqualTo(3));
+        }
+
+        [Test]
         public void HeavyUnderdog_AGoodLossIsThreeCards()
         {
             // The first team is 700 rating adrift, so they are expected to lose by a distance.

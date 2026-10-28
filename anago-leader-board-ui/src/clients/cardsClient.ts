@@ -190,9 +190,37 @@ export interface CardsClient {
    * times a month rather than a thousand times a year.
    */
   giftPack(options: GrantOptions): Promise<GiftResult>;
+  /** Every active collector's book value, gaps and copy counts — the newspaper on the table. */
+  getCollectorStandings(): Promise<CollectorStandings>;
+  /** Every opened packet as one line, newest first: `28-10-2026 13:01 - Rik pakte: Anneloes (84)*`. */
+  getPackLines(): Promise<string[]>;
 }
 
-const api = (path: string): string => `${window.TAFELVOETBAL_SERVER_URL}${path}`;
+/** `GET api/cards/collectors`. Card lists are rarest first, and every count list follows them. */
+export interface CollectorStandings {
+  actives: CardPlayer[];
+  icons: CardPlayer[];
+  collectors: CollectorStanding[];
+}
+
+export interface CollectorStanding {
+  playerId: string;
+  name: string;
+  /** Shared by collectors whose books are worth exactly the same. */
+  rank: number;
+  iconsUnlocked: boolean;
+  /** Book value of volume I, rounded down, so 100 means complete. */
+  volumeOnePercent: number;
+  /** Volume I and the icons together; null until the icons are unlocked. */
+  withIconsPercent: number | null;
+  /** Subject ids of the empty slots, rarest first, volume I before icons. */
+  missing: string[];
+  activeCounts: number[];
+  /** Null until the icons are unlocked. */
+  iconCounts: number[] | null;
+}
+
+const api =(path: string): string => `${window.TAFELVOETBAL_SERVER_URL}${path}`;
 
 /**
  * Every card request goes through here so a failure is one shape and one message.
@@ -328,6 +356,14 @@ export const httpCardsClient: CardsClient = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(options),
     });
+  },
+
+  async getCollectorStandings() {
+    return request<CollectorStandings>('/api/cards/collectors');
+  },
+
+  async getPackLines() {
+    return request<string[]>('/api/packs?compact=true');
   },
 };
 

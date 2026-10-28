@@ -1184,6 +1184,8 @@ interface AlbumProps {
    * separate close-time handling, and the 620ms leaf transition is never seen.
    */
   focusPlayerId?: string | null;
+  /** Something has been picked up off the table and owns the arrow keys, so the book does not turn. */
+  keysElsewhere?: boolean;
   /**
    * The spread the book is **already open on** when it mounts, named by a card printed
    * on it. Overrides the saved reading position for that one mount.
@@ -1273,6 +1275,7 @@ const Album: React.FC<AlbumProps> = ({
   footer,
   onCardOpen,
   focusPlayerId,
+  keysElsewhere,
   openAtPlayerId,
   turnToPlayerId,
   onTurned,
@@ -1843,6 +1846,7 @@ const Album: React.FC<AlbumProps> = ({
    */
   useEffect(() => {
     if (focusPlayerId) return;
+    if (keysElsewhere) return;
     /* The book is being re-bound and is not the reader's to turn until it is handed back. */
     if (rebindingNow) return;
 
@@ -1867,7 +1871,7 @@ const Album: React.FC<AlbumProps> = ({
     /* `rebindingNow` has to be here, not just read in the body: the listener is torn down
        and rebuilt when it changes, which is what gives the reader their arrows back the
        moment the book is handed over. */
-  }, [focusPlayerId, turn, rebindingNow]);
+  }, [focusPlayerId, keysElsewhere, turn, rebindingNow]);
 
   /**
    * Unflipped leaves stack lowest-index-on-top so leaf `flipped` shows on the

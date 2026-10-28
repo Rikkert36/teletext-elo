@@ -1424,7 +1424,7 @@
  * - **A bare `<img>` and a card outside the 3D context were both sharp**, which is what
  *   ruled out the artwork. Two rounds of resampling the asset changed nothing.
  *
- * So the 3D machinery is switched on for the 320ms of the turn and switched off again.
+ * So the 3D machinery is switched on for the turn and switched off again.
  * While it is on the card is soft, and nobody can see that, because it is rotating. At
  * rest there is no 3D context, no promoted layer, and the card rasterizes at the device's
  * own resolution.
@@ -1436,10 +1436,11 @@
  * `setState` calls for exactly this reason — see the note there, and the one at
  * `playCard` about why batching in this file cannot be assumed.
  *
- * Taking `--turning` away again at the end is safe and needs no care: the transition is
- * declared under it too, so it goes in the same frame as the transform it would have
- * animated. The front face loses its own `rotateY(180deg)` in that same frame, so the two
- * cancel exactly as they did while turning and nothing moves.
+ * **`--turning` comes off before the transition ends**, at `TURN_FLAT_MS`, when the easing
+ * tail has 3° left. The last ~50ms were a card that looked settled and still read soft;
+ * snapping the remaining 3° changes its width by under half a pixel. The transition is
+ * declared under the class too, so it goes in the same frame as the transform it would
+ * have animated, and the front face loses its own `rotateY(180deg)` in that frame as well.
  */
 .opener__flip {
   position: absolute;
@@ -2581,10 +2582,10 @@
  * in PackOpener — it starts at the big card's position and size and travels in.
  * A keyframe animation on the card would fight that, since both target
  * `transform`.
+ *
+ * **And no `will-change: transform`.** It keeps every card in the row on its own layer at
+ * rest, rasterized once rather than drawn at native resolution.
  */
-.opener__revealed .opener__slot {
-  will-change: transform;
-}
 
 /* ---------------------------------------------------------------- *
  * Beat 5 — the row is the ending

@@ -94,6 +94,8 @@ export const REACH_MS = 220;
 const FLIP_LEAD_MS = 180;
 /** Must match the `.opener__flip` transition in packopen.css. */
 const FLIP_MS = 320;
+/** When the easing tail leaves 3° to turn — the card is foreshortened by under half a pixel. */
+const TURN_FLAT_MS = 270;
 /**
  * Gap between the outgoing card leaving for the row and the next one arriving.
  *
@@ -695,7 +697,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
   const [heroVisible, setHeroVisible] = useState(true);
   const [faceUp, setFaceUp] = useState(false);
   /**
-   * True only for the 320ms the card is actually rotating.
+   * True only while the card is visibly rotating — `TURN_FLAT_MS`, not the full `FLIP_MS`.
    *
    * It exists to keep the 3D context off the card at rest. Anything 3D in that subtree
    * makes Chrome rasterize the card at CSS resolution and scale it up, which on a HiDPI
@@ -1171,7 +1173,7 @@ const PackOpener: React.FC<PackOpenerProps> = ({
    */
   useEffect(() => {
     if (!turning) return undefined;
-    const timer = window.setTimeout(() => setTurning(false), ms(FLIP_MS));
+    const timer = window.setTimeout(() => setTurning(false), ms(TURN_FLAT_MS));
     return () => window.clearTimeout(timer);
   }, [turning]);
 

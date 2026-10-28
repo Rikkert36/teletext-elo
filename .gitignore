@@ -508,3 +508,10 @@ anago-leader-board-ui/node_modules/.bin/acorn.cmd
 # Input.txt beside them is a raw dump of GET api/packs and is deliberately left tracked.
 tools/pack-matrix/outputs/
 tools/pack-matrix/__pycache__/
+/tools
+
+.nx/installation
+.nx/cache
+.nx/workspace-data
+.nx/self-healing
+.nx/migrate-runs

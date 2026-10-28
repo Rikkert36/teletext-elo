@@ -14,6 +14,7 @@ import GameShell from '../components/GameShell';
 import Hourglass from '../components/Hourglass';
 import PackOpener, { REACH_MS } from '../components/PackOpener';
 import LedgerCorner from '../components/LedgerCorner';
+import Newspaper, { Edition } from '../components/Newspaper';
 import LockedAlbum from '../components/LockedAlbum';
 import PackFace from '../components/PackFace';
 import PackTile from '../components/PackTile';
@@ -421,6 +422,29 @@ const CollectionPage: React.FC = () => {
   const handsFull = revealing || placing !== null;
   /** Index into `slotOrder` of the card being looked at, or null for none. */
   const [viewing, setViewing] = useState<number | null>(null);
+  const [newspaperLifted, setNewspaperLifted] = useState(false);
+  const [edition, setEdition] = useState<Edition | null>(null);
+  const [editionFailed, setEditionFailed] = useState(false);
+
+  /* Every new collection state — the first fetch, a refetch, a packet opened — reprints the newspaper. */
+  const albumOnTable = collection?.album != null;
+  useEffect(() => {
+    if (!albumOnTable) return;
+    let current = true;
+    Promise.all([client.getCollectorStandings(), client.getPackLines()])
+      .then(([standings, packs]) => {
+        if (!current) return;
+        setEdition({ standings, packs });
+        setEditionFailed(false);
+      })
+      .catch(() => {
+        if (current) setEditionFailed(true);
+      });
+    return () => {
+      current = false;
+    };
+  }, [collection, albumOnTable]);
+
   const [fastMode, setFastMode] = useState(() => read(FAST_KEY) === 'true');
   /**
    * Whatever went wrong, in Dutch. Branched on before anything else.
@@ -1867,6 +1891,11 @@ const CollectionPage: React.FC = () => {
             }`}
           >
             <LedgerCorner name={ownerName ?? player.name} onSignOut={forgetPlayer} />
+            <Newspaper
+              edition={edition}
+              failed={editionFailed}
+              onLiftedChange={setNewspaperLifted}
+            />
           </aside>
 
           {/*
@@ -2191,6 +2220,7 @@ const CollectionPage: React.FC = () => {
                 }}
                 /* Keeps the book on the spread of whatever the viewer is showing. */
                 focusPlayerId={viewingSlot?.card.player.id ?? null}
+                keysElsewhere={newspaperLifted}
                 /*
                   A pack is being put away. The book comes back **already open** on the
                   page the first card goes on — read at mount, which is what makes it free:

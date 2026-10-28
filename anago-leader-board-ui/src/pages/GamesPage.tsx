@@ -21,6 +21,7 @@ import {
 
 import GameAnalyticsTooltipWrapper from "./GameAnalyticsTooltipWrapper";
 import { readCurrentPlayerId } from "../utils/currentPlayer";
+import { splitName } from "../mock/cardMock";
 import AddIcon from "@mui/icons-material/Add";
 import { Theme } from "@mui/material";
 import { makeStyles, createStyles } from "@mui/styles";
@@ -858,7 +859,7 @@ const showMatchesOnDay = (day: GamesPerDay) =>
         onChange={(_, next) =>
           setNewMatchForm({ ...newMatchForm, [field]: options.indexOf(next) })
         }
-        getOptionLabel={(player) => player.name ?? ""}
+        getOptionLabel={(player) => splitName(player.name ?? "").display}
         isOptionEqualToValue={(option, value) => option.id === value.id}
         /* No clear button: a slot without a player is not a state the form has. */
         disableClearable

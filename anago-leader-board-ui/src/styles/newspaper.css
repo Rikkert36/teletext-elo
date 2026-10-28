@@ -1,0 +1,676 @@
+/*
+ * De Verzamelaar: the collectors' standings as a newspaper lying on the table.
+ * Folded in the margin under the register; picked up, it is lifted over the table like the card viewer.
+ */
+
+@font-face {
+  font-family: 'UnifrakturMaguntia';
+  src: url('../fonts/UnifrakturMaguntia-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Oswald';
+  font-weight: 500;
+  src: url('../fonts/Oswald-Medium.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Oswald';
+  font-weight: 700;
+  src: url('../fonts/Oswald-Bold.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PT Serif';
+  font-weight: 400;
+  src: url('../fonts/PTSerif-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PT Serif';
+  font-weight: 400;
+  font-style: italic;
+  src: url('../fonts/PTSerif-Italic.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'PT Serif';
+  font-weight: 700;
+  src: url('../fonts/PTSerif-Bold.ttf') format('truetype');
+  font-display: swap;
+}
+
+.newspaper-folded,
+.newspaper {
+  --np-paper: #ece6d4;
+  --np-paper-hi: #f4efe0;
+  --np-ink: #1e1b17;
+  --np-ink-soft: #5b5446;
+  --np-ink-faint: #9a917c;
+  --np-tint: rgba(30, 27, 23, 0.07);
+  --np-masthead: 'UnifrakturMaguntia', 'Old English Text MT', Georgia, serif;
+  --np-head: 'Oswald', 'Arial Narrow', Impact, sans-serif;
+  --np-body: 'PT Serif', Georgia, 'Times New Roman', serif;
+  --np-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0.3  0 0 0 0 0.26  0 0 0 0 0.2  0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------------------------------------------------------------- *
+ * Folded on the table
+ * ---------------------------------------------------------------- */
+
+/* The spot is the paper's untilted footprint; the tilt is on the paper, so lifting can measure the spot. */
+.newspaper-spot {
+  margin-top: 22px;
+}
+
+.newspaper-folded {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.5;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--np-paper);
+  box-shadow: 3px 8px 18px rgba(14, 5, 2, 0.6);
+  transition: translate 160ms ease, box-shadow 160ms ease;
+}
+
+/* The fold along the bottom edge: the lower half lies doubled underneath. */
+.newspaper-folded::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 14%;
+  background: linear-gradient(180deg, transparent, rgba(30, 27, 23, 0.16));
+  pointer-events: none;
+}
+
+.newspaper-folded:hover,
+.newspaper-folded:focus-visible {
+  translate: 0 -2px;
+  box-shadow: 4px 12px 22px rgba(14, 5, 2, 0.55);
+}
+
+.newspaper-folded:focus-visible {
+  outline: 2px solid #f0e2bd;
+  outline-offset: 3px;
+}
+
+.newspaper-folded--lifted {
+  visibility: hidden;
+}
+
+.newspaper-folded__print {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  text-align: left;
+}
+
+.newspaper-folded__print .newspaper__sheet {
+  box-shadow: none;
+}
+
+/* ---------------------------------------------------------------- *
+ * Lifted over the table
+ * ---------------------------------------------------------------- */
+
+/* The overlay is the scroller, not the sheet: scrolling inside the 3D-turned sheet is what made it judder. */
+.newspaper {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  cursor: pointer;
+}
+
+.newspaper__scrim {
+  position: fixed;
+  inset: 0;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.78);
+  opacity: 1;
+  transition: opacity var(--np-lift-ms, 200ms) ease;
+}
+
+.newspaper--lifting .newspaper__scrim {
+  animation: newspaper-scrim-in var(--np-lift-ms, 200ms) ease-out both;
+}
+
+.newspaper--returning .newspaper__scrim {
+  opacity: 0;
+}
+
+@keyframes newspaper-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Rasterised once and moved as a texture while it flies, rather than repainted at every scale. */
+.newspaper--lifting .newspaper__lift,
+.newspaper--returning .newspaper__lift,
+.newspaper__flap {
+  will-change: transform;
+}
+
+.newspaper__lift {
+  position: relative;
+  width: min(1040px, 100%);
+  margin: auto 0;
+  transform-origin: 50% 50%;
+  outline: none;
+  touch-action: pan-y;
+  cursor: auto;
+}
+
+/* Three pages, one showing: a page is turned away over its left edge, like a leaf of the album. */
+.newspaper__pages {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.newspaper__sheet {
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 22px clamp(18px, 4vw, 44px) 32px;
+  color: var(--np-ink);
+  font-family: var(--np-body);
+  background-color: var(--np-paper);
+  background-image:
+    radial-gradient(circle at 50% 0%, var(--np-paper-hi) 0%, transparent 70%),
+    var(--np-grain);
+  box-shadow: 0 2px 3px rgba(0, 0, 0, 0.35), 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.newspaper__page {
+  grid-area: 1 / 1;
+  transform-origin: left center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.newspaper__page:not(.newspaper__page--settled) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.newspaper__page--away {
+  visibility: hidden;
+}
+
+.newspaper__page--under {
+  z-index: 1;
+}
+
+.newspaper__page--leaving {
+  z-index: 2;
+  animation: newspaper-leaf-away var(--np-turn-ms, 600ms) cubic-bezier(0.45, 0.05, 0.55, 0.95) both;
+}
+
+.newspaper__page--arriving {
+  z-index: 2;
+  animation: newspaper-leaf-in var(--np-turn-ms, 600ms) cubic-bezier(0.45, 0.05, 0.55, 0.95) both;
+}
+
+/* The lower half, swinging down from behind the top half along the fold. */
+.newspaper__flap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  overflow: hidden;
+  transform-origin: top center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.newspaper__flap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(30, 27, 23, 0.35), rgba(30, 27, 23, 0.1));
+  pointer-events: none;
+}
+
+.newspaper__flap-print {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.newspaper__flap-print .newspaper__sheet {
+  box-shadow: none;
+}
+
+/* Edge-on and out of sight until the lift sets it swinging (from the script, together with the flight). */
+.newspaper__flap--waiting {
+  transform: perspective(1800px) rotateX(-90deg);
+}
+
+.newspaper__flap--folding {
+  animation: newspaper-unfold var(--np-unfold-ms, 480ms) cubic-bezier(0.5, 0, 0.75, 0.4) reverse both;
+}
+
+.newspaper__flap--folding::after {
+  animation: newspaper-unfold-light var(--np-unfold-ms, 480ms) ease-in reverse both;
+}
+
+@keyframes newspaper-unfold {
+  from {
+    transform: perspective(1800px) rotateX(-90deg);
+  }
+  to {
+    transform: perspective(1800px) rotateX(0deg);
+  }
+}
+
+@keyframes newspaper-unfold-light {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes newspaper-leaf-away {
+  from {
+    transform: perspective(2600px) rotateY(0deg);
+  }
+  to {
+    transform: perspective(2600px) rotateY(-180deg);
+  }
+}
+
+@keyframes newspaper-leaf-in {
+  from {
+    transform: perspective(2600px) rotateY(-180deg);
+  }
+  to {
+    transform: perspective(2600px) rotateY(0deg);
+  }
+}
+
+/* ---------------------------------------------------------------- *
+ * Type
+ * ---------------------------------------------------------------- */
+
+.newspaper__pagers {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.newspaper__pager {
+  display: block;
+  padding: 0 0 8px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: var(--np-body);
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--np-ink);
+}
+
+.newspaper__pager:hover {
+  text-decoration: underline;
+}
+
+.newspaper__pager:focus-visible {
+  outline: 2px solid var(--np-ink);
+  outline-offset: 2px;
+}
+
+.newspaper__runhead {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 4px 16px;
+  padding-bottom: 6px;
+  border-bottom: 3px double var(--np-ink);
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--np-ink-soft);
+}
+
+.newspaper__runhead-title {
+  font-family: var(--np-masthead);
+  font-size: 1.3rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--np-ink);
+}
+
+.newspaper__runhead-section {
+  font-family: var(--np-head);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--np-ink);
+}
+
+.newspaper__section {
+  margin: 18px 0 0;
+  padding-bottom: 6px;
+  border-bottom: 3px solid var(--np-ink);
+  font-family: var(--np-head);
+  font-weight: 700;
+  font-size: clamp(1.6rem, 3.6vw, 2.4rem);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.newspaper__body {
+  margin-top: 6px;
+}
+
+.newspaper__notice {
+  margin: 24px 0 0;
+  font-style: italic;
+}
+
+.newspaper__sheet .hourglass {
+  margin: 32px auto 8px;
+  color: var(--np-ink-soft);
+}
+
+/* ---------------------------------------------------------------- *
+ * The standings
+ * ---------------------------------------------------------------- */
+
+.newspaper__stand {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.newspaper__stand th {
+  padding: 8px 0 6px 12px;
+  border-bottom: 1px solid var(--np-ink);
+  font-family: var(--np-head);
+  font-weight: 500;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: right;
+  color: var(--np-ink-soft);
+}
+
+.newspaper__stand th:first-child,
+.newspaper__stand th:nth-child(2) {
+  text-align: left;
+}
+
+.newspaper__stand td {
+  padding: 9px 0;
+  border-bottom: 1px dotted var(--np-ink-faint);
+  vertical-align: top;
+}
+
+.newspaper__stand tbody tr:hover td {
+  background: var(--np-tint);
+}
+
+.newspaper__stand tr.newspaper__divider td {
+  border-top: 3px double var(--np-ink);
+}
+
+.newspaper__rank {
+  width: 2.4rem;
+  padding-top: 12px !important;
+  font-weight: 700;
+}
+
+.newspaper__who {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.newspaper__portrait {
+  position: relative;
+  flex: 0 0 38px;
+  height: 46px;
+  overflow: hidden;
+  background: var(--np-paper);
+}
+
+.newspaper__portrait span {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  background: #b9b1a0;
+  color: var(--np-paper);
+  font-family: var(--np-head);
+  font-weight: 700;
+  font-size: 1.2rem;
+}
+
+.newspaper__portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: grayscale(1) contrast(1.35) brightness(1.05);
+  mix-blend-mode: multiply;
+}
+
+.newspaper__portrait::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, transparent 45%, rgba(236, 230, 212, 0.55) 50%);
+  background-size: 3px 3px;
+  pointer-events: none;
+}
+
+.newspaper__who-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 1.25rem;
+  padding-top: 3px;
+}
+
+.newspaper__name {
+  flex: 0 0 8.5rem;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.newspaper__missing {
+  flex: 1 1 18rem;
+  min-width: 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--np-ink);
+}
+
+.newspaper__missing em {
+  color: var(--np-ink-soft);
+}
+
+.newspaper__missing--done {
+  font-family: var(--np-head);
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.newspaper__num {
+  width: 5.5rem;
+  padding: 12px 0 9px 12px !important;
+  text-align: right;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- *
+ * The pack matrix
+ * ---------------------------------------------------------------- */
+
+.newspaper__scroll {
+  max-height: 60vh;
+  margin-top: 12px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--np-ink-soft) transparent;
+}
+
+.newspaper__matrix {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.newspaper__matrix th,
+.newspaper__matrix td {
+  min-width: 1.75rem;
+  padding: 3px 0;
+  border-bottom: 1px dotted var(--np-ink-faint);
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: normal;
+}
+
+.newspaper__matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding-bottom: 8px;
+  vertical-align: bottom;
+  border-bottom: 1px solid var(--np-ink);
+  background: var(--np-paper);
+}
+
+.newspaper__matrix thead th span {
+  display: inline-block;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  font-family: var(--np-head);
+  font-weight: 500;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.newspaper__matrix .newspaper__matrix-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  padding-right: 14px;
+  text-align: left;
+  white-space: nowrap;
+  font-weight: 700;
+  background: var(--np-paper);
+}
+
+.newspaper__matrix thead .newspaper__matrix-corner {
+  z-index: 3;
+}
+
+.newspaper__matrix-rank {
+  display: inline-block;
+  width: 2rem;
+}
+
+.newspaper__count {
+  font-weight: 700;
+}
+
+.newspaper__gap {
+  color: var(--np-ink-faint);
+}
+
+.newspaper__matrix .newspaper__hl {
+  background-color: #e0d9c4;
+}
+
+.newspaper__subsection {
+  margin: 28px 0 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--np-ink);
+  font-family: var(--np-head);
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.newspaper__legend {
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--np-ink-soft);
+}
+
+/* ---------------------------------------------------------------- *
+ * The packs: one column, newest at the top
+ * ---------------------------------------------------------------- */
+
+.newspaper__packs {
+  margin-top: 12px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.newspaper__day-head {
+  margin: 0 0 4px;
+  padding: 10px 0 2px;
+  border-bottom: 1px solid var(--np-ink);
+  font-family: var(--np-head);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.newspaper__day:first-child .newspaper__day-head {
+  padding-top: 0;
+}
+
+.newspaper__pack {
+  margin: 0;
+  padding-left: 3.1em;
+  text-indent: -3.1em;
+}
+
+.newspaper__pack-time {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 600px) {
+  .newspaper__portrait {
+    display: none;
+  }
+
+  .newspaper__num {
+    width: auto;
+  }
+}
