@@ -50,7 +50,17 @@ interface Fold {
   flap: number;
 }
 
-const sheetWidth = (): number => Math.min(SHEET_MAX_W, window.innerWidth - OVERLAY_GUTTERS);
+/** The sheet's side margins, the matrix's name column and one card column, at their widest. */
+const SHEET_PADDING = 88;
+const MATRIX_NAME_W = 170;
+const MATRIX_COL_W = 28;
+
+/** Wide enough to print the whole matrix without a scrollbar, where the window allows. */
+const sheetWidth = (columns: number): number =>
+  Math.min(
+    Math.max(SHEET_MAX_W, SHEET_PADDING + MATRIX_NAME_W + columns * MATRIX_COL_W),
+    window.innerWidth - OVERLAY_GUTTERS,
+  );
 
 /**
  * The collectors' standings, as a newspaper folded in half on the table — a miniature of the real
@@ -62,7 +72,8 @@ const Newspaper: React.FC<NewspaperProps> = ({ edition, failed, onLiftedChange }
   const [page, setPage] = useState(0);
   const [turning, setTurning] = useState<Turn | null>(null);
   const [fold, setFold] = useState<Fold | null>(null);
-  const [printWidth, setPrintWidth] = useState(sheetWidth);
+  const columns = edition ? Math.max(edition.standings.actives.length, edition.standings.icons.length) : 0;
+  const [printWidth, setPrintWidth] = useState(() => sheetWidth(columns));
   const [spotWidth, setSpotWidth] = useState(0);
 
   const spotRef = useRef<HTMLDivElement>(null);
@@ -88,7 +99,7 @@ const Newspaper: React.FC<NewspaperProps> = ({ edition, failed, onLiftedChange }
     if (!spot) return;
     const measure = () => {
       setSpotWidth(spot.clientWidth);
-      setPrintWidth(sheetWidth());
+      setPrintWidth(sheetWidth(columns));
     };
     measure();
     const observer = new ResizeObserver(measure);
@@ -98,7 +109,7 @@ const Newspaper: React.FC<NewspaperProps> = ({ edition, failed, onLiftedChange }
       observer.disconnect();
       window.removeEventListener('resize', measure);
     };
-  }, []);
+  }, [columns]);
 
   const lifted = phase !== 'folded' && phase !== 'fetching';
   useEffect(() => onLiftedChange?.(lifted), [lifted, onLiftedChange]);
@@ -387,6 +398,7 @@ const Newspaper: React.FC<NewspaperProps> = ({ edition, failed, onLiftedChange }
               <div
                 ref={sheetRef}
                 className="newspaper__lift"
+                style={{ width: printWidth }}
                 tabIndex={-1}
                 role="dialog"
                 aria-label="De Verzamelaar"
@@ -479,7 +491,13 @@ const Packs: React.FC<{ lines: string[] }> = ({ lines }) => {
       <div className="newspaper__packs">
         {days.map(({ day, entries }) => (
           <section key={day} className="newspaper__day">
-            <h3 className="newspaper__day-head">{day}</h3>
+            <h3 className="newspaper__day-head">
+              {day}
+              <span className="newspaper__day-count">
+                {' '}
+                – {entries.length} {entries.length === 1 ? 'pakje' : 'pakjes'} geopend
+              </span>
+            </h3>
             {entries.map((entry, index) => (
               <p key={index} className="newspaper__pack">
                 <span className="newspaper__pack-time">{entry.time}</span> {entry.text}
@@ -610,7 +628,6 @@ const Matrix: React.FC<{ standings: CollectorStandings }> = ({ standings }) => {
           />
         </>
       ) : null}
-      <p className="newspaper__legend">Getal: zo vaak gepakt. Een punt: mist nog.</p>
     </>
   );
 };
@@ -622,6 +639,10 @@ const Grid: React.FC<{
   names: Map<string, string>;
 }> = ({ cards, rows, counts, names }) => {
   const [hover, setHover] = useState<{ row: number; col: number } | null>(null);
+  const totals = useMemo(
+    () => cards.map((_, col) => rows.reduce((sum, collector) => sum + (counts(collector)[col] ?? 0), 0)),
+    [cards, rows, counts],
+  );
 
   return (
     <div className="newspaper__scroll" onMouseLeave={() => setHover(null)}>
@@ -641,6 +662,18 @@ const Grid: React.FC<{
           </tr>
         </thead>
         <tbody>
+          <tr className="newspaper__matrix-total">
+            <td className="newspaper__matrix-name">Totaal</td>
+            {totals.map((total, col) => (
+              <td
+                key={cards[col].id}
+                className={hover?.col === col ? 'newspaper__hl' : undefined}
+                onMouseEnter={() => setHover({ row: -1, col })}
+              >
+                {total}
+              </td>
+            ))}
+          </tr>
           {rows.map((collector, row) => {
             const values = counts(collector);
             return (

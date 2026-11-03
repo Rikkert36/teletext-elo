@@ -86,6 +86,15 @@ public class CardRatingCalculator
     /// <summary>Where the halving rate changes. Overall 80 is exactly visible rating 1000.</summary>
     private const double DefaultHinge = 80;
 
+    /// <summary>Where the halving slows again, so the very top does not keep doubling its rarity.</summary>
+    private const double DefaultTopHinge = 90;
+
+    /// <summary>
+    /// Overall points per halving above <see cref="DefaultTopHinge"/>. At 2.5 the chase for the top
+    /// active turned into an event of its own: his rating climbing from 90 to 92 halved his odds again.
+    /// </summary>
+    private const double DefaultDTop = 10;
+
     /// <summary>
     /// Games needed both to appear on a card and to own a collection.
     ///
@@ -100,6 +109,8 @@ public class CardRatingCalculator
     private readonly double _dLow;
     private readonly double _dHigh;
     private readonly double _hinge;
+    private readonly double _topHinge;
+    private readonly double _dTop;
 
     public int MinGames { get; }
 
@@ -126,6 +137,8 @@ public class CardRatingCalculator
         _dLow = section.GetValue("DLow", DefaultDLow);
         _dHigh = section.GetValue("DHigh", DefaultDHigh);
         _hinge = section.GetValue("Hinge", DefaultHinge);
+        _topHinge = section.GetValue("TopHinge", DefaultTopHinge);
+        _dTop = section.GetValue("DTop", DefaultDTop);
         MinGames = section.GetValue("MinGames", DefaultMinGames);
     }
 
@@ -137,6 +150,8 @@ public class CardRatingCalculator
         _dLow = DefaultDLow;
         _dHigh = DefaultDHigh;
         _hinge = DefaultHinge;
+        _topHinge = DefaultTopHinge;
+        _dTop = DefaultDTop;
         MinGames = DefaultMinGames;
     }
 
@@ -192,15 +207,18 @@ public class CardRatingCalculator
     /// gap, so a constant rate would make them barely 2x apart in rarity while two players
     /// 374 rating apart at the bottom came out 3.4x apart - backwards relative to real skill.
     ///
-    /// Continuous at the hinge: only the slope changes, there is no jump.
+    /// Above the top hinge the halving slows again (<c>DTop</c>), so a 92 is only a little rarer
+    /// than a 90 rather than half as common.
+    ///
+    /// Continuous at both hinges: only the slope changes, there is no jump.
     /// </summary>
     public double TicketsFor(int overall)
     {
-        var exponent = overall <= _hinge
-            ? (overall - _anchors[0].Overall) / _dLow
-            : (_hinge - _anchors[0].Overall) / _dLow + (overall - _hinge) / _dHigh;
+        var low = (Math.Min(overall, _hinge) - _anchors[0].Overall) / _dLow;
+        var high = Math.Max(0, Math.Min(overall, _topHinge) - _hinge) / _dHigh;
+        var top = Math.Max(0, overall - _topHinge) / _dTop;
 
-        return Math.Pow(2, -exponent);
+        return Math.Pow(2, -(low + high + top));
     }
 
     /// <summary>

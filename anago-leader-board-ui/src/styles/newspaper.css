@@ -171,7 +171,7 @@
 
 .newspaper__lift {
   position: relative;
-  width: min(1040px, 100%);
+  max-width: 100%;
   margin: auto 0;
   transform-origin: 50% 50%;
   outline: none;
@@ -423,6 +423,11 @@
   text-align: left;
 }
 
+.newspaper__stand th:nth-child(3),
+.newspaper__stand th:nth-child(4) {
+  padding-right: 14px;
+}
+
 .newspaper__stand td {
   padding: 9px 0;
   border-bottom: 1px dotted var(--np-ink-faint);
@@ -523,7 +528,7 @@
 
 .newspaper__num {
   width: 5.5rem;
-  padding: 12px 0 9px 12px !important;
+  padding: 12px 14px 9px 12px !important;
   text-align: right;
   white-space: nowrap;
   font-weight: 700;
@@ -533,11 +538,10 @@
  * The pack matrix
  * ---------------------------------------------------------------- */
 
+/* The sheet is made as wide as the matrix; this only scrolls on a window too narrow for that. */
 .newspaper__scroll {
-  max-height: 60vh;
   margin-top: 12px;
-  overflow: auto;
-  overscroll-behavior: contain;
+  overflow-x: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--np-ink-soft) transparent;
 }
@@ -558,9 +562,6 @@
 }
 
 .newspaper__matrix thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
   padding-bottom: 8px;
   vertical-align: bottom;
   border-bottom: 1px solid var(--np-ink);
@@ -597,6 +598,11 @@
 .newspaper__matrix-rank {
   display: inline-block;
   width: 2rem;
+}
+
+.newspaper__matrix .newspaper__matrix-total td {
+  font-weight: 700;
+  border-bottom: 3px double var(--np-ink);
 }
 
 .newspaper__count {
@@ -648,6 +654,13 @@
   font-size: 0.85rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.newspaper__day-count {
+  font-weight: 500;
+  color: var(--np-ink-soft);
+  text-transform: none;
+  letter-spacing: 0.02em;
 }
 
 .newspaper__day:first-child .newspaper__day-head {
