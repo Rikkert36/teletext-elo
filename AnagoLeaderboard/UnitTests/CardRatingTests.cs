@@ -193,5 +193,22 @@ namespace UnitTests
 
             Assert.That(spread, Is.EqualTo(16).Within(1e-9));
         }
+
+        /// <summary>
+        /// Above 90 the halving slows to one per ten points, without a jump at 90: a 92 holds
+        /// 0.87x the tickets of a 90 rather than the 0.57x it held at the 80-90 rate.
+        /// </summary>
+        [Test]
+        public void AboveNinetyTheRarityRampsTenPointsPerHalving()
+        {
+            var atTopHinge = _calculator.TicketsFor(90);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(atTopHinge, Is.EqualTo(Math.Pow(2, -(40d / 30 + 10 / 2.5))).Within(1e-12));
+                Assert.That(_calculator.TicketsFor(89) / atTopHinge, Is.EqualTo(Math.Pow(2, 1 / 2.5)).Within(1e-9));
+                Assert.That(_calculator.TicketsFor(92) / atTopHinge, Is.EqualTo(Math.Pow(2, -0.2)).Within(1e-9));
+            });
+        }
     }
 }

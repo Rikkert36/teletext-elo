@@ -2,6 +2,11 @@
 
 ## Where this stands (last updated 2026-08-25)
 
+**Above overall 90 the rarity ramps four times slower.** Read "Above 90 the halving slows"
+under The draw before touching `TicketsFor` or `TopHinge`/`DTop`. The top active's rating
+had climbed from a 90 to a 92 and halved his odds again on its own; the slope above 90 is
+now one halving per 10 points instead of 2.5.
+
 **There is a volume II now, and it is a report rather than a feature.** Everything
 in this document up to the "Volume II" heading near the end is volume I — one
 shared book, a card's overall is the subject's leaderboard rating. Volume II keeps
@@ -1030,10 +1035,11 @@ accelerates:
 
 ```
 E = (overall − 40) / 30              if overall ≤ 80
-E = 1.333 + (overall − 80) / 2.5     if overall > 80
+E = 1.333 + (overall − 80) / 2.5     if 80 < overall ≤ 90
+E = 5.333 + (overall − 90) / 10      if overall > 90
 ```
 
-Continuous at 80 — no jump, only the slope changes — and 80 is exactly rating
+Continuous at 80 and at 90 — no jump, only the slope changes — and 80 is exactly rating
 1000. Below it a halving takes 30 overall points, more than the entire sub-80
 range, so everyone there is near-flat by design.
 
@@ -1052,6 +1058,30 @@ a year. A reward almost nobody reaches is worse than one some people reach early
 leaderboard. If Petar goes inactive he moves to the icon pool and the
 remaining active set becomes dramatically easier. This number drifts with the
 roster; `DHigh` is the correction. Accepted knowingly.
+
+### Above 90 the halving slows
+
+`TopHinge` 90 and `DTop` 10, settled 2026-11-03. Above overall 90 the tickets halve every
+**10** points instead of every 2.5, so a 92 holds 0.87× the tickets of a 90 rather than
+0.57×. Nothing at 90 or below moves.
+
+**Why.** The odds were designed around the top active as a 90. His rating then climbed
+to 1948 — a 92 — and at the 80–90 rate that alone made him half as common again, with
+nobody having decided it. Replaying all 2,081 non-gift packs of 17 Aug – 3 Nov against
+the rating and pool of each moment, the raffle itself was fair (observed against expected
+over all cards: mean 0, spread 1.06), Petar included: 5 copies against 6.2 expected. It was
+the design that had drifted: 1 in 338 packs, against the 1 in 222 the per-player table was
+built on. Who gets him first had become the story of the album.
+
+**A slope, not a cap.** Drawing everything above 90 as a 90 restores the design most
+exactly (1 in 236) and can never drift again, but it breaks "higher is rarer" at the very
+top. A slope keeps that, and still drifts — at a quarter of the old pace. On the same
+replay: halving every 5 gives 1 in 286, every 10 gives **1 in 261**. At the volume of
+weeks 39–44 (~26 games, ~346 cards a week) that is one Petar every 1.8 weeks across the
+office instead of every 2.7.
+
+The standings weigh each slot by the same tickets, so a missing Petar costs a book less
+than it did. `tools/pakgeluk` carries a copy of the curve and moved with it.
 
 ### The two bars
 
