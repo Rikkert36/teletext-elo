@@ -13,7 +13,7 @@ public sealed record CollectorStandings(
 
 /// <param name="Rank">Shared by collectors whose books are worth exactly the same.</param>
 /// <param name="VolumeOnePercent">Book value of volume I, weighted 1/p per card, rounded down.</param>
-/// <param name="WithIconsPercent">Volume I and the icons book together; null until the icons are unlocked.</param>
+/// <param name="IconsPercent">Book value of the icons book alone, weighted the same way; null until the icons are unlocked.</param>
 /// <param name="Missing">Subject ids of the empty slots, rarest first, volume I before icons.</param>
 /// <param name="ActiveCounts">Player copies per card in <see cref="CollectorStandings.Actives"/>.</param>
 /// <param name="IconCounts">Icon copies per card in <see cref="CollectorStandings.Icons"/>; null until unlocked.</param>
@@ -23,7 +23,7 @@ public sealed record CollectorStanding(
     int Rank,
     bool IconsUnlocked,
     int VolumeOnePercent,
-    int? WithIconsPercent,
+    int? IconsPercent,
     IReadOnlyList<string> Missing,
     IReadOnlyList<int> ActiveCounts,
     IReadOnlyList<int>? IconCounts);

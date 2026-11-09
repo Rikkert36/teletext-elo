@@ -545,8 +545,8 @@ const Standings: React.FC<{ standings: CollectorStandings }> = ({ standings }) =
         <tr>
           <th />
           <th>Verzamelaar</th>
-          <th>Volume I</th>
-          <th>+ Iconen</th>
+          <th>Basis</th>
+          <th>Iconen</th>
         </tr>
       </thead>
       <tbody>
@@ -567,7 +567,7 @@ const Standings: React.FC<{ standings: CollectorStandings }> = ({ standings }) =
             </td>
             <td className="newspaper__num">{collector.volumeOnePercent}%</td>
             <td className="newspaper__num">
-              {collector.withIconsPercent === null ? '' : `${collector.withIconsPercent}%`}
+              {collector.iconsPercent === null ? '' : `${collector.iconsPercent}%`}
             </td>
           </tr>
         ))}

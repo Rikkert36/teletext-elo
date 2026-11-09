@@ -82,7 +82,7 @@ namespace UnitTests
             Assert.That(full.Rank, Is.EqualTo(1));
             Assert.That(empty.VolumeOnePercent, Is.Zero);
             Assert.That(empty.Missing, Is.EqualTo(standings.Actives.Select(s => s.Id)));
-            Assert.That(empty.WithIconsPercent, Is.Null);
+            Assert.That(empty.IconsPercent, Is.Null);
         }
 
         [Test]
@@ -140,7 +140,7 @@ namespace UnitTests
 
             Assert.That(iconCollector.PlayerId, Is.EqualTo(players[0].Id));
             Assert.That(iconCollector.IconsUnlocked, Is.True);
-            Assert.That(iconCollector.WithIconsPercent, Is.Zero);
+            Assert.That(iconCollector.IconsPercent, Is.Zero);
             Assert.That(iconCollector.IconCounts, Is.EqualTo(new[] { 0 }));
             Assert.That(iconCollector.Missing, Does.Contain(icon.Id), "a player copy does not fill the icoon slot");
             Assert.That(standings.Collectors[1].VolumeOnePercent, Is.EqualTo(100));

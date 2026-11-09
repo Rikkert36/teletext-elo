@@ -211,8 +211,8 @@ export interface CollectorStanding {
   iconsUnlocked: boolean;
   /** Book value of volume I, rounded down, so 100 means complete. */
   volumeOnePercent: number;
-  /** Volume I and the icons together; null until the icons are unlocked. */
-  withIconsPercent: number | null;
+  /** Book value of the icons alone; null until the icons are unlocked. */
+  iconsPercent: number | null;
   /** Subject ids of the empty slots, rarest first, volume I before icons. */
   missing: string[];
   activeCounts: number[];

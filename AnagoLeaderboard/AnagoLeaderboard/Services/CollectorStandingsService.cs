@@ -102,8 +102,8 @@ public class CollectorStandingsService
                     collector.IconsUnlocked,
                     Value = activeValue + iconValue,
                     VolumeOnePercent = Percent(activeValue, activeTotal),
-                    WithIconsPercent = collector.IconsUnlocked
-                        ? Percent(activeValue + iconValue, activeTotal + iconTotal)
+                    IconsPercent = collector.IconsUnlocked
+                        ? Percent(iconValue, iconTotal)
                         : (int?)null,
                     Missing = missing,
                     ActiveCounts = activeCounts,
@@ -132,7 +132,7 @@ public class CollectorStandingsService
                 rank,
                 collector.IconsUnlocked,
                 collector.VolumeOnePercent,
-                collector.WithIconsPercent,
+                collector.IconsPercent,
                 collector.Missing,
                 collector.ActiveCounts,
                 collector.IconCounts));

@@ -515,3 +515,4 @@ tools/pack-matrix/__pycache__/
 .nx/workspace-data
 .nx/self-healing
 .nx/migrate-runs
+/deploy
